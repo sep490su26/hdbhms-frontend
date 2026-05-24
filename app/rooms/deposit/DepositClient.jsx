@@ -3,12 +3,16 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
+  BadgeCheck,
+  CalendarDays,
+  CreditCard,
+  Home,
+  Mail,
   MapPin,
+  Phone,
   Ruler,
   ShieldCheck,
   Wifi,
@@ -131,7 +135,7 @@ function DepositInfoForm({ room, onSubmit }) {
           type="submit"
           className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] sm:col-span-2"
         >
-          Gửi yêu cầu đặt cọc
+          Tiếp tục đặt cọc
           <ArrowRight className="h-5 w-5" />
         </button>
       </form>
@@ -139,33 +143,78 @@ function DepositInfoForm({ room, onSubmit }) {
   );
 }
 
-function SuccessDialog({ room, customer }) {
+function DepositPaymentStep({ room, customer }) {
+  const identityDigits = String(customer.phone || customer.citizenId || "00000").replace(/\D/g, "").slice(-5).padStart(5, "0");
+  const paymentCode = `HD-${room.id}-${identityDigits}`;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="deposit-success-title">
-      <div className="w-full max-w-lg rounded-2xl border border-[#d7eee4] bg-white p-6 text-center shadow-2xl sm:p-8">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#ecfdf5] text-[#006c49]">
-          <Check className="h-8 w-8" />
+    <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-6 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
+      <div className="flex flex-col gap-4 border-b border-[#c5c6cd] pb-6 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">Bước đặt cọc</p>
+          <h1 className="mt-2 text-4xl font-bold tracking-[-0.02em] text-[#091426]">Đặt cọc giữ phòng</h1>
+          <p className="mt-2 text-base leading-7 text-[#45474c]">
+            {customer.fullName || "Khách thuê"} vui lòng chuyển khoản tiền cọc để giữ phòng {room.id}.
+          </p>
         </div>
-        <p className="mt-6 text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">Gửi yêu cầu thành công</p>
-        <h2 id="deposit-success-title" className="mt-2 text-3xl font-bold tracking-[-0.02em] text-[#091426]">
-          Đơn xét duyệt đặt cọc đã được gửi
-        </h2>
-        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#45474c]">
-          Yêu cầu đặt cọc phòng {room.id} của {customer.fullName || "khách thuê"} đã được ghi nhận. Hệ thống đang chuyển bạn về trang xem phòng.
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-[#006c49]">
-          <span className="h-3 w-3 animate-pulse rounded-full bg-[#006c49]" />
-          Đang chuyển hướng...
+        <div className="rounded-xl bg-[#ecfdf5] px-5 py-4 text-right">
+          <p className="text-sm text-[#007a55]">Số tiền cọc</p>
+          <p className="text-2xl font-bold text-[#006c49]">{room.depositLabel} VND</p>
         </div>
       </div>
-    </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_280px]">
+        <div className="grid gap-4">
+          <div className="rounded-xl border border-[#c5c6cd] bg-white p-5">
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-[#091426]" />
+              <h2 className="text-lg font-bold text-[#091426]">Chuyển khoản ngân hàng</h2>
+            </div>
+            <div className="mt-5 grid gap-3 text-sm text-[#45474c]">
+              <p><strong className="text-[#091426]">Ngân hàng:</strong> Vietcombank</p>
+              <p><strong className="text-[#091426]">Số tài khoản:</strong> 0123 456 789</p>
+              <p><strong className="text-[#091426]">Chủ tài khoản:</strong> HAI DANG HOUSE</p>
+              <p><strong className="text-[#091426]">Nội dung:</strong> {paymentCode}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#c5c6cd] bg-white p-5">
+            <h2 className="text-lg font-bold text-[#091426]">Thông tin giữ chỗ</h2>
+            <div className="mt-4 grid gap-3 text-sm text-[#45474c] sm:grid-cols-2">
+              <p><CalendarDays className="mr-2 inline h-4 w-4" /> Ký HĐ: {customer.contractDate || "Chưa chọn"}</p>
+              <p><Home className="mr-2 inline h-4 w-4" /> Vào ở: {customer.moveInDate || "Chưa chọn"}</p>
+              <p><Phone className="mr-2 inline h-4 w-4" /> {customer.phone || "Chưa có SĐT"}</p>
+              <p><Mail className="mr-2 inline h-4 w-4" /> {customer.email || "Chưa có email"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#c5c6cd] bg-white p-5 text-center">
+          <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
+            <div className="grid h-32 w-32 grid-cols-5 grid-rows-5 gap-1">
+              {Array.from({ length: 25 }).map((_, index) => (
+                <span key={index} className={`${index % 2 === 0 || index % 7 === 0 ? "bg-[#091426]" : "bg-white"} rounded-sm`} />
+              ))}
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-[#45474c]">Mã QR minh họa. Khi kết nối cổng thanh toán, hệ thống sẽ sinh QR theo mã {paymentCode}.</p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a]"
+      >
+        Tôi đã chuyển khoản đặt cọc
+        <BadgeCheck className="h-5 w-5" />
+      </button>
+    </section>
   );
 }
 
 export function DepositClient({ room }) {
-  const router = useRouter();
   const [customer, setCustomer] = useState({});
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [step, setStep] = useState("info");
 
   const submitDepositRequest = (data) => {
     setCustomer(data);
@@ -176,11 +225,7 @@ export function DepositClient({ room }) {
       moveInDate: data.moveInDate,
       contractDate: data.contractDate,
     });
-    setShowSuccessDialog(true);
-
-    window.setTimeout(() => {
-      router.push(`/rooms?depositSuccess=1&roomId=${room.id}`);
-    }, 1800);
+    setStep("deposit");
   };
 
   return (
@@ -193,7 +238,8 @@ export function DepositClient({ room }) {
 
         <div className="grid gap-8 lg:grid-cols-[352px_1fr]">
           <RoomSummary room={room} />
-          <DepositInfoForm room={room} onSubmit={submitDepositRequest} />
+          {step === "info" && <DepositInfoForm room={room} onSubmit={submitDepositRequest} />}
+          {step === "deposit" && <DepositPaymentStep room={room} customer={customer} />}
         </div>
 
         <div className="mt-16 grid gap-8 border-t border-[#c5c6cd] pt-10 text-sm text-[#45474c] md:grid-cols-3">
@@ -219,7 +265,6 @@ export function DepositClient({ room }) {
           </div>
         </div>
       </div>
-      {showSuccessDialog && <SuccessDialog room={room} customer={customer} />}
     </div>
   );
 }

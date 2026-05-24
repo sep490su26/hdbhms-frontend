@@ -550,6 +550,26 @@ function priceTierLabel(price) {
 function RoomDetailPanel({ room, tenantList, onClose }) {
   const tenant = room ? tenantList.find((t) => t.roomId === room.id) : null;
   const [detailTab, setDetailTab] = useState("info");
+  
+  const [roomDetail, setRoomDetail] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+
+  useEffect(() => {
+    if (!room?.roomId) return;
+    const fetchStaffDetail = async () => {
+      try {
+        setIsDetailLoading(true);
+        const res = await fetch(`http://localhost:8080/api/v1/rooms/id/${room.roomId}`, {
+          headers: { "Authorization": "Bearer <STAFF_JWT>" }
+        });
+        const json = await res.json();
+        if (json.code === 0) setRoomDetail(json.data);
+      } finally {
+        setIsDetailLoading(false);
+      }
+    };
+    fetchStaffDetail();
+  }, [room?.roomId]);
 
   if (!room) return null;
 
@@ -567,7 +587,7 @@ function RoomDetailPanel({ room, tenantList, onClose }) {
             </span>
           </div>
           <p className="mt-1 text-xs text-[#8590a6]">
-            {room.floor} &middot; {room.area} m² &middot; {room.feature}
+            Tầng {room.floorNumber} &middot; {room.area} m² &middot; {roomDetail?.publicNote ?? "Không có"}
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-md p-1 text-[#8590a6] hover:bg-white/10 hover:text-white">
@@ -598,34 +618,49 @@ function RoomDetailPanel({ room, tenantList, onClose }) {
       <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
         {detailTab === "info" && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-[#e2e8f0] p-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#45474c]">Giá thuê</p>
-              <p className="mt-1 text-2xl font-bold text-[#091426]">{formatMoney(room.listedPrice)}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "Diện tích", value: `${room.area} m²` },
-                { label: "Sức chứa", value: `${room.maxPeople} người` },
-                { label: "Đặc điểm", value: room.feature },
-                { label: "Loại phòng", value: room.type === "premium" ? "Cao cấp" : room.type === "quiet" ? "Yên tĩnh" : "Tiêu chuẩn" },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg bg-[#f7f9fb] p-3">
-                  <p className="text-[10px] font-semibold uppercase text-[#6b7280]">{label}</p>
-                  <p className="mt-0.5 text-sm font-bold text-[#191c1e]">{value}</p>
+            {isDetailLoading ? (
+              <div className="animate-pulse space-y-4">
+                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                <div className="h-4 bg-slate-200 rounded"></div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg border border-[#e2e8f0] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#45474c]">Giá thuê</p>
+                  <p className="mt-1 text-2xl font-bold text-[#091426]">{formatMoney(roomDetail?.listedPrice ?? room.price)}</p>
                 </div>
-              ))}
-            </div>
-            <div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#45474c]">Tiện nghi</p>
-              <ul className="space-y-1">
-                {room.amenities.map((a) => (
-                  <li key={a} className="flex items-center gap-2 text-sm text-[#45474c]">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Diện tích", value: `${roomDetail?.areaM2 ?? room.area} m²` },
+                    { label: "Sức chứa", value: `${roomDetail?.maxOccupants ?? 3} người` },
+                    { label: "Đặc điểm", value: roomDetail?.publicNote ?? "Không có" },
+                    { label: "Trạng thái xóa", value: roomDetail?.deletedAt ? "Đã xóa mềm" : "Hoạt động" },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-lg bg-[#f7f9fb] p-3">
+                      <p className="text-[10px] font-semibold uppercase text-[#6b7280]">{label}</p>
+                      <p className={`mt-0.5 text-sm font-bold ${roomDetail?.deletedAt && label === "Trạng thái xóa" ? "text-rose-600 line-through" : "text-[#191c1e]"}`}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="rounded-lg bg-amber-50 p-3 border border-amber-100">
+                   <p className="text-[10px] font-semibold uppercase text-amber-800">Ghi chú nội bộ (Staff Only)</p>
+                   <p className="mt-0.5 text-sm text-amber-900">{roomDetail?.internalNote ?? "Không có ghi chú"}</p>
+                </div>
+
+                <div className="mt-4">
+                   <label className="text-[10px] font-bold uppercase tracking-wider text-[#45474c]">Mã phòng (Cập nhật)</label>
+                   <input 
+                     type="text" 
+                     value={roomDetail?.roomCode ?? room.id} 
+                     readOnly 
+                     disabled 
+                     className="w-full bg-[#f7f9fb] border border-[#e2e8f0] text-[#6b7280] cursor-not-allowed rounded-lg px-3 py-2 mt-1 text-sm font-bold" 
+                     title="Mã phòng không thể thay đổi sau khi khởi tạo"
+                   />
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -702,19 +737,72 @@ function RoomCell({ room, isSelected, onClick, isLarge }) {
 }
 
 function FloorMapPage({ tenants: tenantList = [] }) {
+  const [apiRooms, setApiRooms] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    const fetchStaffRooms = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("http://localhost:8080/api/v1/rooms?size=100", {
+          headers: {
+            "Authorization": "Bearer <STAFF_JWT>",
+            "Content-Type": "application/json"
+          }
+        });
+        const json = await res.json();
+        if (json.code === 0) {
+          setApiRooms(json.data?.content ?? []);
+          setIsSuccess(true);
+        } else {
+          setIsError(true);
+        }
+      } catch (e) {
+        setIsError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStaffRooms();
+  }, []);
+
+  const floorRoomsData = useMemo(() => {
+    return apiRooms.map((apiRoom) => {
+
+      const statusLower = apiRoom.currentStatus?.toLowerCase() ?? "";
+      let mappedStatus = "occupied";
+      if (statusLower === "vacant") mappedStatus = "available";
+      else if (statusLower === "soon_vacant") mappedStatus = "soonVacant";
+      else if (statusLower === "reserved") mappedStatus = "deposited";
+      else if (statusLower === "maintenance") mappedStatus = "maintenance";
+
+      return {
+        id: apiRoom.roomCode ?? "",
+        roomId: apiRoom.id ?? null,
+        status: mappedStatus,
+        price: apiRoom.listedPrice ?? 0,
+        area: apiRoom.areaM2 ?? 0,
+        floorNumber: parseInt(apiRoom.floorName?.replace(/\D/g, '') || "1", 10),
+        position: (apiRoom.positionX ?? 0) < 50 ? "left" : "right"
+      };
+    });
+  }, [apiRooms]);
+
   const [activeFloor, setActiveFloor] = useState(2);
   const [selectedRoom, setSelectedRoom] = useState(null);
 
-  const floorRooms  = useMemo(() => allRooms.filter((r) => r.floorNumber === activeFloor), [activeFloor]);
+  const floorRooms  = useMemo(() => floorRoomsData.filter((r) => r.floorNumber === activeFloor), [floorRoomsData, activeFloor]);
   const leftRooms   = useMemo(() => floorRooms.filter((r) => r.position === "left"),  [floorRooms]);
   const rightRooms  = useMemo(() => floorRooms.filter((r) => r.position === "right"), [floorRooms]);
 
   const stats = useMemo(() => ({
-    total:       allRooms.length,
-    occupied:    allRooms.filter((r) => r.status === "occupied").length,
-    available:   allRooms.filter((r) => r.status === "available").length,
-    maintenance: allRooms.filter((r) => r.status === "maintenance").length,
-  }), []);
+    total:       floorRoomsData.length,
+    occupied:    floorRoomsData.filter((r) => r.status === "occupied").length,
+    available:   floorRoomsData.filter((r) => r.status === "available").length,
+    maintenance: floorRoomsData.filter((r) => r.status === "maintenance").length,
+  }), [floorRoomsData]);
 
   function handleRoomClick(room) {
     setSelectedRoom((prev) => (prev?.id === room.id ? null : room));
@@ -727,6 +815,10 @@ function FloorMapPage({ tenants: tenantList = [] }) {
         description="Xem nhanh trạng thái từng phòng theo tầng. Màu nền = mức giá, chấm tròn = trạng thái."
       />
 
+      {isLoading && <div className="py-10 text-center text-[#505f76] font-bold">Đang tải sơ đồ tầng...</div>}
+      {isError && <div className="p-4 bg-rose-50 text-rose-700 rounded-lg border border-rose-100 font-semibold text-sm mt-4">Không thể tải dữ liệu sơ đồ tầng. Vui lòng thử lại.</div>}
+      {isSuccess && (
+        <div className="space-y-6 mt-6">
       {/* KPI bar */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
@@ -849,6 +941,8 @@ function FloorMapPage({ tenants: tenantList = [] }) {
           )}
         </div>
       </div>
+      </div>
+      )}
     </>
   );
 }

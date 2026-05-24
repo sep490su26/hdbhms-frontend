@@ -37,9 +37,8 @@ export function Navbar() {
           : 'bg-transparent py-6' // Khi chưa scroll, hoàn toàn trong suốt, không có vệt đen nào
       }`}
     >
-      {/* Tăng chiều rộng tối đa (max-w-7xl) và padding hai bên để kéo giãn các phần tử ra biên */}
-      <div className="w-full px-6 sm:px-8 lg:px-12">
-        <div className="flex justify-between items-center h-12">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-12 items-center justify-between">
           
           {/* LOGO: Cố định góc bên trái */}
           <div className="flex-shrink-0">
@@ -54,14 +53,14 @@ export function Navbar() {
           </div>
 
           {/* DESKTOP MENU: Đẩy hẳn sang bên phải (right-aligned), không gom cụm ở giữa */}
-          <div className="hidden md:flex items-center gap-4"> 
+          <div className="hidden md:flex items-center gap-5"> 
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link 
                   key={link.name}
                   href={link.href} 
-                  className="relative px-4 py-2 rounded-xl text-sm font-medium transition-all group"
+                  className="group relative px-1 py-2 text-sm font-medium transition-colors"
                 >
                   <span className={`relative z-10 transition-colors duration-200 ${
                     isActive ? 'text-white font-bold' : 'text-slate-300 group-hover:text-white'
@@ -69,9 +68,9 @@ export function Navbar() {
                     {link.name}
                   </span>
                   {isActive && (
-                    <motion.div 
+                    <motion.span 
                       layoutId="navbar-indicator"
-                      className="absolute inset-0 bg-white/5 border border-white/10 rounded-xl z-0" 
+                      className="absolute inset-x-1 -bottom-0.5 h-0.5 rounded-full bg-white/70" 
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}

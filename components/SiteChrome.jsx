@@ -6,7 +6,9 @@ import { Footer } from "@/components/Footer";
 
 export function SiteChrome({ children }) {
   const pathname = usePathname();
-  const isManagementRoute = pathname?.startsWith("/management");
+  const isManagementRoute =
+    pathname?.startsWith("/management") ||
+    pathname?.startsWith("/viewing-customers");
 
   if (isManagementRoute) {
     return <>{children}</>;

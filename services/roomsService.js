@@ -19,6 +19,7 @@ const roomImages = [
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&q=80&crop=entropy",
   "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=900&q=80",
 ];
+const defaultRoomImage = roomImages[0];
 
 const amenitiesByType = {
   premium: ["Ban công riêng", "Cửa sổ lớn", "Máy lạnh Inverter", "Tủ quần áo", "Bàn làm việc", "Wifi tốc độ cao"],
@@ -95,6 +96,112 @@ export const rooms = floorPlans.flatMap((plan, floorIndex) =>
 );
 
 export const floors = ["Tất cả", ...floorPlans.map((plan) => plan.floor)];
+
+export const PUBLIC_ROOMS_API_URL = "https://06b97f40-a965-4019-90c8-0f4cf3eeedea.mock.pstmn.io/api/v1/rooms";
+export const LANDLORD_CONTACT_PHONE = "09770011200";
+export const CONTACT_PHONE_HREF = `tel:${LANDLORD_CONTACT_PHONE}`;
+export const CONTACT_ZALO_HREF = `https://zalo.me/${LANDLORD_CONTACT_PHONE}`;
+
+export function mapApiRoomStatus(currentStatus) {
+  const statusLower = currentStatus?.toLowerCase() ?? "";
+
+  if (statusLower === "vacant") return "available";
+  if (statusLower === "reserved") return "deposited";
+  return "occupied";
+}
+
+export function normalizeApiRoom(apiRoom, roomHolds = {}) {
+  const roomCode = apiRoom.roomCode ?? apiRoom.code ?? apiRoom.name ?? "";
+  const listedPrice = apiRoom.listedPrice ?? apiRoom.price ?? 0;
+  const floorName = apiRoom.floorName ?? apiRoom.floor?.name ?? "Tầng 1";
+  const floorNumber = parseInt(floorName?.replace(/\D/g, "") || "1", 10);
+  const imageUrlsFromApi = Array.isArray(apiRoom.imageUrls) ? apiRoom.imageUrls : [];
+  const imagesFromApi = Array.isArray(apiRoom.images) ? apiRoom.images : [];
+  const firstImageUrl = apiRoom.firstImageUrl ?? apiRoom.imageUrl ?? imagesFromApi?.[0]?.url ?? imagesFromApi?.[0] ?? defaultRoomImage;
+  const imageUrls = [
+    firstImageUrl,
+    ...imageUrlsFromApi,
+    ...imagesFromApi.map((image) => image?.url ?? image).filter(Boolean),
+  ].filter(Boolean);
+  const uniqueImages = [...new Set(imageUrls)];
+  const status = mapApiRoomStatus(apiRoom.currentStatus);
+  const normalizedRoom = {
+    id: roomCode,
+    roomId: apiRoom.id ?? null,
+    buildingId: apiRoom.buildingId ?? apiRoom.building?.id ?? apiRoom.propertyId ?? "hai-dang-house",
+    name: apiRoom.name ?? roomCode,
+    status,
+    type: apiRoom.type ?? "standard",
+    image: uniqueImages[0] ?? defaultRoomImage,
+    images: uniqueImages.length > 0 ? uniqueImages : [defaultRoomImage],
+    floor: floorName,
+    floorNumber,
+    priceLabel: listedPrice ? `${(listedPrice / 1000000).toFixed(1)} trđ/tháng` : "Liên hệ",
+    price: listedPrice,
+    listedPrice,
+    deposit: listedPrice,
+    depositLabel: listedPrice ? listedPrice.toLocaleString("vi-VN") : "Liên hệ",
+    area: apiRoom.areaM2 ?? apiRoom.area ?? 0,
+    feature: apiRoom.publicNote ?? apiRoom.feature ?? "Không có",
+    description: apiRoom.description ?? apiRoom.publicNote ?? "Không có mô tả",
+    maxPeople: apiRoom.maxOccupants ?? apiRoom.maxPeople ?? 3,
+    ownerName: apiRoom.ownerName ?? apiRoom.landlordName ?? "Hải Đăng House",
+    ownerNote: apiRoom.ownerNote ?? "Chủ nhà hỗ trợ xem phòng và phản hồi yêu cầu đặt cọc trong giờ hành chính.",
+    houseRules: apiRoom.houseRules ?? [
+      "Giữ yên tĩnh sau 22:00.",
+      "Không tự ý cải tạo kết cấu phòng.",
+      "Thông báo trước khi nuôi thú cưng hoặc ở thêm người.",
+    ],
+    lastMeterReading: { electric: 0, water: 0, recordedAt: "" },
+    amenities: apiRoom.amenities?.length
+      ? apiRoom.amenities
+      : ["Wifi tốc độ cao", "Điều hòa", "Bình nóng lạnh", "Máy giặt", "Vệ sinh khép kín", "Khu phơi đồ"],
+    buildingFacilities: apiRoom.buildingFacilities?.length
+      ? apiRoom.buildingFacilities
+      : ["An ninh 24/7", "Camera giám sát", "Bãi xe", "Khu giặt phơi", "Internet nhanh"],
+    position: (roomCode?.endsWith("01") || roomCode?.endsWith("02")) ? "left" : "right",
+  };
+
+  return {
+    ...normalizedRoom,
+    status: roomHolds[normalizedRoom.id] && normalizedRoom.status === "available" ? "deposited" : normalizedRoom.status,
+    holdExpiresAt: roomHolds[normalizedRoom.id]?.expiresAt,
+  };
+}
+
+export async function fetchPublicRooms({ size = 100 } = {}) {
+  const res = await fetch(`${PUBLIC_ROOMS_API_URL}?size=${size}`);
+  const json = await res.json();
+
+  if (json.code !== 0) {
+    throw new Error(json.message || "Không thể tải dữ liệu phòng");
+  }
+
+  return json.data?.content ?? [];
+}
+
+export async function fetchPublicRoomById(roomId) {
+  try {
+    const res = await fetch(`${PUBLIC_ROOMS_API_URL}/${roomId}`);
+    const json = await res.json();
+
+    if (json.code === 0 && json.data) {
+      return json.data;
+    }
+  } catch {
+    // The detail endpoint is planned; the list endpoint remains the supported fallback.
+  }
+
+  const roomsData = await fetchPublicRooms();
+  return roomsData.find((room) => room.id === roomId || room.roomCode === roomId) ?? null;
+}
+
+export function getRoomDetailHref(room) {
+  const buildingId = encodeURIComponent(room.buildingId || "hai-dang-house");
+  const roomId = encodeURIComponent(room.roomId || room.id);
+
+  return `/rooms/${buildingId}/${roomId}`;
+}
 
 export function findRoomById(roomId) {
   return rooms.find((room) => room.id === roomId) || rooms.find((room) => room.id === "P503") || rooms[0];

@@ -15,11 +15,20 @@ import {
   Phone,
   Ruler,
   ShieldCheck,
+  Upload,
   Wifi,
 } from "lucide-react";
 import { createRoomHold } from "../../../lib/roomHoldStorage";
 
-function Field({ label, name, placeholder, type = "text", className = "", required = true }) {
+const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
+
+const getTomorrowDateString = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split("T")[0];
+};
+
+function Field({ label, name, placeholder, type = "text", className = "", required = true, min, error, onChange, onInvalid }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className}`}>
       <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">{label}</span>
@@ -28,8 +37,40 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
         type={type}
         placeholder={placeholder}
         required={required}
-        className="h-[58px] rounded-lg border border-[#c5c6cd] bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+        min={min}
+        onChange={onChange}
+        onInvalid={onInvalid}
+        aria-invalid={error ? "true" : "false"}
+        className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+          error
+            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+        }`}
       />
+      {error && <span className="text-xs font-medium text-rose-600">{error}</span>}
+    </label>
+  );
+}
+
+function FileUploadZone({ id, name, label, helperText, preview, onChange }) {
+  return (
+    <label
+      htmlFor={id}
+      className="group flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#aeb1bb] bg-white px-4 py-5 text-center transition hover:border-[#091426] hover:bg-[#f5f3f4]"
+    >
+      <input id={id} name={name} type="file" accept="image/*" className="sr-only" onChange={onChange} />
+      {preview ? (
+        <div className="relative h-28 w-40 overflow-hidden rounded-lg border border-[#c5c6cd] bg-[#f5f3f4]">
+          <Image src={preview} alt={label} fill sizes="160px" className="object-cover" unoptimized />
+        </div>
+      ) : (
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-[#232946] transition group-hover:bg-[#e0e7ff]">
+          <Upload className="h-5 w-5" />
+        </span>
+      )}
+      <span className="mt-4 text-sm font-bold text-[#091426]">{label}</span>
+      <span className="mt-1 max-w-xs text-xs leading-5 text-[#6b7280]">{helperText}</span>
+      {preview && <span className="mt-3 text-xs font-semibold text-[#006c49]">Đã chọn ảnh, bấm để thay đổi</span>}
     </label>
   );
 }
@@ -84,9 +125,73 @@ function RoomSummary({ room }) {
 }
 
 function DepositInfoForm({ room, onSubmit }) {
+  const tomorrowDate = getTomorrowDateString();
+  const [dateErrors, setDateErrors] = useState({});
+  const [imagePreviews, setImagePreviews] = useState({
+    citizenIdImage: "",
+    portraitImage: "",
+  });
+
+  const validateFutureDate = (name, value) => {
+    const hasError = Boolean(value) && value < tomorrowDate;
+    setDateErrors((currentErrors) => ({
+      ...currentErrors,
+      [name]: hasError ? DATE_ERROR_MESSAGE : "",
+    }));
+    return !hasError;
+  };
+
+  const handleDateChange = (event) => {
+    validateFutureDate(event.target.name, event.target.value);
+  };
+
+  const handleDateInvalid = (event) => {
+    if (event.target.validity.rangeUnderflow) {
+      setDateErrors((currentErrors) => ({
+        ...currentErrors,
+        [event.target.name]: DATE_ERROR_MESSAGE,
+      }));
+    }
+  };
+
+  const handleFileChange = (name) => (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setImagePreviews((currentPreviews) => ({
+        ...currentPreviews,
+        [name]: "",
+      }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreviews((currentPreviews) => ({
+        ...currentPreviews,
+        [name]: reader.result,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit(Object.fromEntries(new FormData(event.currentTarget)));
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+    const isContractDateValid = validateFutureDate("contractDate", data.contractDate);
+    const isMoveInDateValid = validateFutureDate("moveInDate", data.moveInDate);
+
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    if (!isContractDateValid || !isMoveInDateValid) {
+      return;
+    }
+
+    onSubmit(data);
   };
 
   return (
@@ -99,15 +204,50 @@ function DepositInfoForm({ room, onSubmit }) {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2">
-        <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Nguyễn Văn A" />
+        <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" />
         <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" />
-        <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" />
-        <Field label="Ngày cấp CCCD" name="dateOfCreate" type="date" placeholder="mm/dd/yyyy" />
-        <Field label="Nơi cấp" name="placeOfCreateCitizenId" placeholder="Nhập nơi cấp CCCD" />
         <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" />
-        <Field label="Email" name="email" type="email" placeholder="example@gmail.com" />
-        <Field label="Ngày hẹn ký hợp đồng" name="contractDate" type="date" placeholder="mm/dd/yyyy" />
-        <Field label="Ngày dự kiến vào ở" name="moveInDate" type="date" placeholder="mm/dd/yyyy" />
+        <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} />
+        <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" />
+        <Field
+          label="Ngày hẹn ký hợp đồng"
+          name="contractDate"
+          type="date"
+          placeholder="mm/dd/yyyy"
+          min={tomorrowDate}
+          error={dateErrors.contractDate}
+          onChange={handleDateChange}
+          onInvalid={handleDateInvalid}
+        />
+        <Field
+          label="Ngày dự kiến vào ở"
+          name="moveInDate"
+          type="date"
+          placeholder="mm/dd/yyyy"
+          min={tomorrowDate}
+          error={dateErrors.moveInDate}
+          onChange={handleDateChange}
+          onInvalid={handleDateInvalid}
+        />
+
+        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+          <FileUploadZone
+            id="citizen-id-image"
+            name="citizenIdImage"
+            label="Ảnh Căn cước công dân (CCCD)"
+            helperText="Tải lên mặt trước/sau hoặc một ảnh chụp chung rõ thông tin."
+            preview={imagePreviews.citizenIdImage}
+            onChange={handleFileChange("citizenIdImage")}
+          />
+          <FileUploadZone
+            id="portrait-image"
+            name="portraitImage"
+            label="Ảnh chân dung"
+            helperText="Tải lên ảnh chân dung rõ mặt của khách thuê."
+            preview={imagePreviews.portraitImage}
+            onChange={handleFileChange("portraitImage")}
+          />
+        </div>
 
         <label className="flex flex-col gap-1.5 sm:col-span-2">
           <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>

@@ -115,9 +115,8 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
         <span
-          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${
-            publicStatusClass(room.status)
-          }`}
+          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${publicStatusClass(room.status)
+            }`}
         >
           {guestStatusCopy(room.status)}
         </span>
@@ -211,9 +210,8 @@ function RoomDetail({ room, onClose }) {
               key={image}
               type="button"
               onClick={() => setActiveImage(image)}
-              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${
-                activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
-              }`}
+              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
+                }`}
               aria-label={`Xem ảnh phòng ${index + 1}`}
             >
               <Image src={image} alt={`Ảnh ${index + 1} phòng ${room.id}`} fill sizes="96px" className="object-cover" />
@@ -390,9 +388,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                           setViewMode(item.key);
                           closePanel();
                         }}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${
-                          viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
-                        }`}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
+                          }`}
                       >
                         <Icon className="h-4 w-4" />
                         {item.label}
@@ -426,9 +423,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                         viewMode === "Listing" ? setActiveFloorFilter(floor) : setActiveFloorPlan(floor);
                         closePanel();
                       }}
-                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${
-                        isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
-                      }`}
+                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
                     >
                       {floor}
                     </button>
@@ -447,9 +443,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     />
                     <span className={`h-6 w-12 rounded-full transition ${availableOnly ? "bg-emerald-500" : "bg-slate-700"}`} />
                     <span
-                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
-                        availableOnly ? "translate-x-6" : ""
-                      }`}
+                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${availableOnly ? "translate-x-6" : ""
+                        }`}
                     />
                   </span>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Chỉ hiện phòng trống</span>
@@ -471,9 +466,9 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
-                            key={room.id}
+                            key={room.roomCode}
                             room={room}
-                            isSelected={selectedRoom?.id === room.id}
+                            isSelected={selectedRoom?.roomCode === room.roomCode}
                             onSelect={openRoom}
                           />
                         ))}

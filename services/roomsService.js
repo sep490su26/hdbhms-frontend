@@ -19,6 +19,7 @@ const roomImages = [
   "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&q=80&crop=entropy",
   "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=900&q=80",
 ];
+const defaultRoomImage = roomImages[0];
 
 const amenitiesByType = {
   premium: ["Ban công riêng", "Cửa sổ lớn", "Máy lạnh Inverter", "Tủ quần áo", "Bàn làm việc", "Wifi tốc độ cao"],

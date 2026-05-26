@@ -37,7 +37,7 @@ function getAuthHeaders(extraHeaders = {}) {
   };
 }
 
-async function parseEnvelope(response) {
+export async function parseEnvelope(response) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.code !== 0) {

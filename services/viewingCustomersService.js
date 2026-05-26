@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+import { authenticatedFetch, parseEnvelope } from "./identityAccessService";
+
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "1";
 
 export const VIEWING_STATUSES = {
@@ -13,34 +14,7 @@ export const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "Hủy hẹn" },
 ];
 
-async function request(path, options = {}) {
-  let response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-      ...options,
-    });
-  } catch (error) {
-    throw new Error(`Không thể gọi API backend ${API_BASE_URL}. Kiểm tra backend đang chạy và CORS cho localhost:3000.`);
-  }
 
-  const text = await response.text();
-  const body = text ? JSON.parse(text) : {};
-
-  if (!response.ok) {
-    throw new Error(body.details || body.message || "Không thể kết nối API.");
-  }
-
-  if (body.code && body.code !== 1000 && body.code !== 0) {
-    throw new Error(body.details || body.message || "API trả về lỗi.");
-  }
-
-  return body.data ?? body;
-}
 
 function readField(item, camelKey, snakeKey = camelKey) {
   return item?.[camelKey] ?? item?.[snakeKey];
@@ -135,7 +109,7 @@ export function mapVisitRequest(item) {
 }
 
 export async function fetchViewingCustomers({ filters, page, size }) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests${toQuery({
+  const response = await authenticatedFetch(`/visit-requests${toQuery({
     keyword: filters.keyword,
     propertyId: filters.propertyId,
     roomId: filters.roomId,
@@ -145,6 +119,7 @@ export async function fetchViewingCustomers({ filters, page, size }) {
     page,
     size,
   })}`);
+  const data = await parseEnvelope(response);
 
   return {
     items: (data.items || []).map(mapVisitRequest),
@@ -156,12 +131,13 @@ export async function fetchViewingCustomers({ filters, page, size }) {
 }
 
 export async function fetchViewingCustomerStats(filters) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/stats${toQuery({
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/stats${toQuery({
     propertyId: filters.propertyId,
     roomId: filters.roomId,
     fromDate: filters.fromDate,
     toDate: filters.toDate,
   })}`);
+  const data = await parseEnvelope(response);
 
   return {
     todayCount: readField(data, "todayCount", "today_count") || 0,
@@ -172,7 +148,7 @@ export async function fetchViewingCustomerStats(filters) {
 }
 
 export async function fetchViewingCustomerTrash({ filters, page, size }) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/trash${toQuery({
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/trash${toQuery({
     keyword: filters.keyword,
     propertyId: filters.propertyId,
     roomId: filters.roomId,
@@ -182,6 +158,7 @@ export async function fetchViewingCustomerTrash({ filters, page, size }) {
     page,
     size,
   })}`);
+  const data = await parseEnvelope(response);
 
   return {
     items: (data.items || []).map(mapVisitRequest),
@@ -193,50 +170,57 @@ export async function fetchViewingCustomerTrash({ filters, page, size }) {
 }
 
 export async function createViewingCustomer(payload) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
+  const data = await parseEnvelope(response);
   return mapVisitRequest(data);
 }
 
 export async function updateViewingCustomer(id, payload) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/${id}`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+  const data = await parseEnvelope(response);
   return mapVisitRequest(data);
 }
 
 export async function updateViewingCustomerStatus(id, status) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/${id}/status`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
+  const data = await parseEnvelope(response);
   return mapVisitRequest(data);
 }
 
 export async function deleteViewingCustomer(id) {
-  await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/${id}`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}`, {
     method: "DELETE",
   });
+  await parseEnvelope(response);
 }
 
 export async function restoreViewingCustomer(id) {
-  const data = await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/${id}/restore`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/restore`, {
     method: "POST",
   });
+  const data = await parseEnvelope(response);
   return mapVisitRequest(data);
 }
 
 export async function forceDeleteViewingCustomer(id) {
-  await request(`/api/v1/tenants/${TENANT_ID}/visit-requests/${id}/force`, {
+  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/force`, {
     method: "DELETE",
   });
+  await parseEnvelope(response);
 }
 
 export async function fetchViewingProperties() {
-  const data = await request("/api/v1/properties/simple");
+  const response = await authenticatedFetch("/properties/simple");
+  const data = await parseEnvelope(response);
   return (data || []).map((property) => ({
     id: readField(property, "id"),
     name: readField(property, "name"),
@@ -246,7 +230,8 @@ export async function fetchViewingProperties() {
 
 export async function fetchViewingRooms(propertyId) {
   if (!propertyId || propertyId === "all") return [];
-  const data = await request(`/api/v1/properties/${propertyId}/rooms/simple`);
+  const response = await authenticatedFetch(`/properties/${propertyId}/rooms/simple`);
+  const data = await parseEnvelope(response);
   return (data || []).map((room) => ({
     id: readField(room, "id"),
     propertyId: readField(room, "propertyId", "property_id") ?? Number(propertyId),

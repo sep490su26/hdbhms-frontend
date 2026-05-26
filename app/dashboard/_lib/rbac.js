@@ -22,6 +22,7 @@ export const SECTION_PERMISSIONS = {
   floor: [ROLES.OWNER, ROLES.MANAGER],
   rooms: [ROLES.OWNER, ROLES.MANAGER],
   tenants: [ROLES.OWNER, ROLES.MANAGER],
+  viewingCustomers: [ROLES.OWNER, ROLES.MANAGER],
   accounts: [ROLES.OWNER],
   meterReadings: [ROLES.OWNER, ROLES.MANAGER],
   maintenance: [ROLES.OWNER, ROLES.MANAGER],

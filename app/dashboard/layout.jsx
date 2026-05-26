@@ -16,6 +16,7 @@ import {
   Search,
   Settings,
   UserRoundCog,
+  UserSearch,
   UsersRound,
   WalletCards,
   Wrench,
@@ -35,6 +36,7 @@ const navigation = [
   { path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard, permissionKey: "dashboard" },
   { path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2, permissionKey: "rooms" },
   { path: "/dashboard/tenants", label: "Quản lý hồ sơ", icon: UsersRound, permissionKey: "tenants" },
+  { path: "/dashboard/viewing-customers", label: "Khách xem phòng", icon: UserSearch, permissionKey: "viewingCustomers" },
   { path: "/dashboard/accounts", label: "Quản lý tài khoản", icon: UserRoundCog, permissionKey: "accounts" },
   { path: "/dashboard/meter-readings", label: "Nhập số điện nước", icon: Gauge, permissionKey: "meterReadings" },
   { path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench, permissionKey: "maintenance" },
@@ -133,9 +135,8 @@ function Sidebar({ isOpen, onClose }) {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[#172235] bg-[#091426] px-5 py-6 text-white transition-transform duration-300 lg:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:flex`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[#172235] bg-[#091426] px-5 py-6 text-white transition-transform duration-300 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:flex`}
       >
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 px-1">
@@ -173,11 +174,10 @@ function Sidebar({ isOpen, onClose }) {
                   href={item.path}
                   onClick={onClose}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-r-lg border-l-4 px-4 py-3 text-left text-sm transition ${
-                    isActive
+                  className={`flex items-center gap-3 rounded-r-lg border-l-4 px-4 py-3 text-left text-sm transition ${isActive
                       ? "border-emerald-400 bg-[#1e293b] text-white"
                       : "border-transparent text-[#647089] hover:bg-white/5 hover:text-white"
-                  }`}
+                    }`}
                 >
                   <Icon className="h-[18px] w-[18px]" />
                   {item.label}

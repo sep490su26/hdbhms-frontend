@@ -11,26 +11,13 @@ import {
   LayoutGrid,
   Map as MapIcon,
   Maximize2,
-  MessageCircle,
-  Phone,
   Search,
   Users,
   X,
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { floorPlans, floors } from "../../services/roomsService";
-import { createRoomHold, getActiveRoomHolds, getRoomHold } from "../../lib/roomHoldStorage";
-
-const LANDLORD_CONTACT_PHONE = "09770011200";
-const CONTACT_PHONE_HREF = `tel:${LANDLORD_CONTACT_PHONE}`;
-const CONTACT_ZALO_HREF = `https://zalo.me/${LANDLORD_CONTACT_PHONE}`;
-
-function resolveGuestStatus(room, roomHolds) {
-  if (roomHolds[room.id] && room.status === "available") return "deposited";
-  if (room.status === "available") return "available";
-  return "occupied";
-}
+import { fetchPublicRooms, floorPlans, floors, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
 
 function guestStatusCopy(status) {
   const copy = {
@@ -42,61 +29,66 @@ function guestStatusCopy(status) {
   return copy[status] || "Đã thuê";
 }
 
-function roomTone(room) {
-  if (room.status === "deposited") {
-    return "bg-amber-300 border-amber-400 text-[#3f2a03]";
-  }
-
-  if (room.status !== "available") {
-    return "bg-slate-700/70 border-slate-600 text-slate-300";
-  }
-
-  if (room.type === "premium") {
-    return "bg-[#f6c915] border-[#d9ad0a] text-[#151515]";
-  }
-
-  if (room.type === "quiet") {
-    return "bg-emerald-400 border-emerald-500 text-[#052e1a]";
-  }
-
-  return "bg-slate-200 border-slate-300 text-[#1a223d]";
-}
-
 function publicStatusClass(status) {
   if (status === "available") return "border-emerald-400/30 bg-emerald-400/15 text-emerald-100";
   if (status === "deposited") return "border-amber-300/40 bg-amber-300/20 text-amber-100";
   return "border-slate-400/20 bg-slate-900/50 text-slate-200";
 }
 
+function floorPlanStatusStyle(status) {
+  if (status === "available")
+    return {
+      box: "border-2 border-emerald-400 bg-emerald-50/50 text-emerald-700",
+      dot: "bg-emerald-400",
+    };
+  if (status === "deposited")
+    return {
+      box: "border-2 border-amber-500 bg-amber-500/35 text-amber-700",
+      dot: "bg-amber-500",
+    };
+  return {
+    box: "border-2 border-slate-300 bg-slate-100 text-slate-400",
+    dot: "bg-slate-400",
+  };
+}
+
 function FloorPlanRoomBox({ room, isSelected, onSelect }) {
-  const isAvailable = room.status === "available";
-  const accentClass = room.type === "premium" ? "border-amber-400 shadow-amber-400/10" : "border-emerald-500 shadow-emerald-500/10";
-  const dotClass = room.type === "premium" ? "bg-amber-400" : "bg-emerald-500";
+  const canInteract = room.status !== "occupied";
+  const { box, dot } = floorPlanStatusStyle(room.status);
+  const priceShort = room.price ? `${(room.price / 1000000).toFixed(1)}M` : "—";
 
   return (
     <button
       type="button"
       onClick={() => {
-        if (isAvailable) onSelect(room);
+        if (canInteract) onSelect(room);
       }}
-      disabled={!isAvailable}
+      disabled={!canInteract}
       aria-label={`Phòng ${room.id}`}
-      className={`relative flex aspect-[4/3] h-full max-h-[76px] w-full max-w-[112px] items-center justify-center rounded-xl border text-center transition ${
-        isAvailable
-          ? `bg-slate-900 text-white ${accentClass} shadow-lg hover:-translate-y-0.5 hover:bg-slate-800`
-          : "cursor-not-allowed border-gray-700/40 bg-gray-800/40 text-gray-500"
-      } ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`relative flex w-full min-w-[92px] flex-col justify-between rounded-[14px] p-2.5 text-left transition-all ${box} ${
+        canInteract ? "hover:-translate-y-0.5 hover:shadow-md" : "cursor-not-allowed"
+      } ${isSelected ? "ring-[3px] ring-blue-500 ring-offset-1 ring-offset-white shadow-[0_2px_4px_-2px_rgba(219,234,254,1),0_4px_6px_-1px_rgba(219,234,254,1)]" : ""}`}
+      style={{ height: 72 }}
     >
-      {isAvailable && <span className={`absolute right-2 top-2 h-2 w-2 rounded-full ${dotClass}`} />}
-      <span className="text-sm font-black uppercase tracking-wide sm:text-base">{room.id}</span>
+      <div className="flex items-start justify-between">
+        <span className="text-xs font-bold leading-none">{room.id}</span>
+        <span className={`h-[6px] w-[6px] shrink-0 rounded-full ${dot}`} />
+      </div>
+      <div className="mt-auto flex flex-col gap-0.5">
+        <span className="text-[10px] font-medium leading-tight opacity-60">{room.area}m²</span>
+        <span className="text-[11px] font-semibold leading-tight">{priceShort}</span>
+      </div>
     </button>
   );
 }
 
 function StairBox() {
   return (
-    <div className="flex aspect-[4/3] h-full max-h-[76px] w-full max-w-[112px] items-center justify-center rounded-xl border border-dashed border-gray-600 bg-[#1f2937]/40 text-center text-gray-300">
-      <span className="text-xl font-black leading-none">↗</span>
+    <div
+      className="flex w-full min-w-[92px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-slate-100 text-center"
+      style={{ height: 72 }}
+    >
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">CẦU THANG</span>
     </div>
   );
 }
@@ -105,9 +97,12 @@ function RoomListingCard({ room, isSelected, onSelect }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(room)}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${
-        room.status === "available" ? "" : "opacity-75"
+      disabled={room.status === "occupied"}
+      onClick={() => {
+        if (room.status !== "occupied") onSelect(room);
+      }}
+      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition ${
+        room.status === "occupied" ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:border-white/20"
       } ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
@@ -120,9 +115,8 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
         <span
-          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${
-            publicStatusClass(room.status)
-          }`}
+          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${publicStatusClass(room.status)
+            }`}
         >
           {guestStatusCopy(room.status)}
         </span>
@@ -145,15 +139,21 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         </div>
 
         <div className="mt-5 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
-          Xem chi tiết
-          <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+          {room.status === "occupied" ? (
+            "Không thể xem chi tiết"
+          ) : (
+            <>
+              Xem chi tiết
+              <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+            </>
+          )}
         </div>
       </div>
     </button>
   );
 }
 
-function RoomDetail({ room, onClose, compact = false }) {
+function RoomDetail({ room, onClose }) {
   const [activeImage, setActiveImage] = useState(room.images[0]);
 
   return (
@@ -189,10 +189,17 @@ function RoomDetail({ room, onClose, compact = false }) {
         </div>
       </div>
 
-      <div className={`border-b px-5 py-3 ${room.status === "deposited" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
-        <span className={`inline-flex items-center gap-2 text-sm font-bold ${room.status === "deposited" ? "text-amber-800" : "text-emerald-700"}`}>
-          <span className={`h-2 w-2 rounded-full ${room.status === "deposited" ? "bg-amber-500" : "bg-emerald-500"}`} />
-          {room.status === "deposited" ? "Đang đặt cọc - tạm khóa 15 phút" : "Còn trống - sẵn sàng vào ở"}
+      {/* Bọc class động theo từng trạng thái */}
+      <div className={`border-b px-5 py-3 ${
+        room.status === "available" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-100"
+      }`}>
+        <span className={`inline-flex items-center gap-2 text-sm font-bold ${
+          room.status === "available" ? "text-emerald-700" : "text-slate-700"
+        }`}>
+          <span className={`h-2 w-2 rounded-full ${
+            room.status === "available" ? "bg-emerald-500" : "bg-slate-400"
+          }`} />
+          {room.status === "available" ? "Còn trống - sẵn sàng vào ở" : "Đã thuê - không còn trống"}
         </span>
       </div>
 
@@ -203,9 +210,8 @@ function RoomDetail({ room, onClose, compact = false }) {
               key={image}
               type="button"
               onClick={() => setActiveImage(image)}
-              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${
-                activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
-              }`}
+              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
+                }`}
               aria-label={`Xem ảnh phòng ${index + 1}`}
             >
               <Image src={image} alt={`Ảnh ${index + 1} phòng ${room.id}`} fill sizes="96px" className="object-cover" />
@@ -276,55 +282,19 @@ function RoomDetail({ room, onClose, compact = false }) {
       </div>
 
       <div className="border-t border-slate-100 bg-white p-4">
-        {room.status === "available" ? (
-          <div className="grid gap-2 sm:gap-3">
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              <a
-                href={CONTACT_PHONE_HREF}
-                className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-[14px] border border-[#232946] bg-white px-3 py-3 text-center text-sm font-bold leading-tight text-[#232946] transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
-              >
-                <Phone className="h-4 w-4 shrink-0" />
-                <span className="whitespace-nowrap">Gọi điện</span>
-              </a>
-
-              <a
-                href={CONTACT_ZALO_HREF}
-                target="_blank"
-                rel="noreferrer"
-                className="flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-[14px] border border-blue-600 bg-white px-3 py-3 text-center text-sm font-bold leading-tight text-blue-600 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/25"
-              >
-                <MessageCircle className="h-4 w-4 shrink-0" />
-                <span className="whitespace-nowrap">Chat Zalo</span>
-              </a>
-
-            </div>
-
-            <Link
-              href={`/rooms/deposit?roomId=${room.id}`}
-              className="flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-[14px] bg-[#232946] px-4 py-3 text-center text-sm font-bold leading-tight text-white shadow-[0_10px_24px_rgba(35,41,70,0.22)] transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25 sm:gap-3 sm:px-5 sm:text-base"
-            >
-              <span>Gửi yêu cầu đặt cọc</span>
-              <ArrowRight className="h-4 w-4 shrink-0" />
-            </Link>
-          </div>
-        ) : (
-          <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-800">
-            Phòng đang được giữ chỗ, không thể gửi thêm yêu cầu đặt cọc.
-          </div>
-        )}
+        <Link
+          href={getRoomDetailHref(room)}
+          className="flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-[14px] bg-[#232946] px-4 py-3 text-center text-sm font-bold leading-tight text-white shadow-[0_10px_24px_rgba(35,41,70,0.22)] transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25 sm:gap-3 sm:px-5 sm:text-base"
+        >
+          <span>Xem chi tiết phòng</span>
+          <ArrowRight className="h-4 w-4 shrink-0" />
+        </Link>
       </div>
     </div>
   );
 }
 
 export default function RoomsClient({ depositSuccess = false, requestedRoomId = "" }) {
-  const [roomHolds, setRoomHolds] = useState(() => {
-    if (depositSuccess && requestedRoomId && !getRoomHold(requestedRoomId)) {
-      createRoomHold(requestedRoomId, { customerName: "Khách vãng lai" });
-    }
-
-    return getActiveRoomHolds();
-  });
   const [viewMode, setViewMode] = useState("Listing");
   const [activeFloorFilter, setActiveFloorFilter] = useState("Tất cả");
   const [activeFloorPlan, setActiveFloorPlan] = useState("Tầng 1");
@@ -332,73 +302,29 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const [availableOnly, setAvailableOnly] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState(requestedRoomId || null);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setRoomHolds(getActiveRoomHolds());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-    const [apiRooms, setApiRooms] = useState([]);
+  const [apiRooms, setApiRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
   useEffect(() => {
-    const fetchPublicRooms = async () => {
+    const loadPublicRooms = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("https://06b97f40-a965-4019-90c8-0f4cf3eeedea.mock.pstmn.io/api/v1/rooms?size=100");
-        const json = await res.json();
-        
-        if (json.code === 0) {
-          setApiRooms(json.data?.content ?? []);
-          setIsSuccess(true);
-        } else {
-          setIsError(true);
-        }
-      } catch (e) {
+        const roomsData = await fetchPublicRooms();
+        setApiRooms(roomsData);
+        setIsSuccess(true);
+      } catch {
         setIsError(true);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchPublicRooms();
+    loadPublicRooms();
   }, []);
 
   const visibleRooms = useMemo(() => {
-    
-    return apiRooms.map((apiRoom) => {
-      const statusLower = apiRoom.currentStatus?.toLowerCase() ?? "";
-      const mappedStatus = statusLower === "vacant" ? "available" : 
-                           statusLower === "reserved" ? "deposited" : "occupied";
-      const room = {
-        id: apiRoom.roomCode ?? "",
-        roomId: apiRoom.id ?? null,
-        name: apiRoom.name ?? "",
-        status: mappedStatus,
-        type: "standard", 
-        image: apiRoom.firstImageUrl ?? "/placeholder.jpg",
-        images: [apiRoom.firstImageUrl ?? "/placeholder.jpg"],
-        floor: apiRoom.floorName ?? "Tầng 1",
-        floorNumber: parseInt(apiRoom.floorName?.replace(/\D/g, '') || "1", 10),
-        priceLabel: apiRoom.listedPrice ? `${(apiRoom.listedPrice / 1000000).toFixed(1)} trđ/tháng` : "Liên hệ",
-        price: apiRoom.listedPrice ?? 0,
-        area: apiRoom.areaM2 ?? 0,
-        feature: apiRoom.publicNote ?? "Không có",
-        description: apiRoom.publicNote ?? "Không có mô tả",
-        maxPeople: apiRoom.maxOccupants ?? 3,
-        lastMeterReading: { electric: 0, water: 0, recordedAt: "" },
-        amenities: [],
-        buildingFacilities: [],
-position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02")) ? "left" : "right"      };
-      return {
-        ...room,
-        status: resolveGuestStatus(room, roomHolds),
-        holdExpiresAt: roomHolds[room.id]?.expiresAt,
-      };
-    });
-  }, [apiRooms, roomHolds]);
+    return apiRooms.map((apiRoom) => normalizeApiRoom(apiRoom));
+  }, [apiRooms]);
 
   const floorsForPlan = floorPlans.map((plan) => plan.floor);
 
@@ -421,6 +347,7 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
   );
 
   const openRoom = (room) => {
+    if (room.status === "occupied") return;
     setSelectedRoomId(room.id);
   };
 
@@ -461,9 +388,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                           setViewMode(item.key);
                           closePanel();
                         }}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${
-                          viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
-                        }`}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
+                          }`}
                       >
                         <Icon className="h-4 w-4" />
                         {item.label}
@@ -497,9 +423,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                         viewMode === "Listing" ? setActiveFloorFilter(floor) : setActiveFloorPlan(floor);
                         closePanel();
                       }}
-                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${
-                        isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
-                      }`}
+                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
                     >
                       {floor}
                     </button>
@@ -518,9 +443,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                     />
                     <span className={`h-6 w-12 rounded-full transition ${availableOnly ? "bg-emerald-500" : "bg-slate-700"}`} />
                     <span
-                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
-                        availableOnly ? "translate-x-6" : ""
-                      }`}
+                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${availableOnly ? "translate-x-6" : ""
+                        }`}
                     />
                   </span>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Chỉ hiện phòng trống</span>
@@ -542,9 +466,9 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
-                            key={room.id}
+                            key={room.roomCode}
                             room={room}
-                            isSelected={selectedRoom?.id === room.id}
+                            isSelected={selectedRoom?.roomCode === room.roomCode}
                             onSelect={openRoom}
                           />
                         ))}
@@ -556,59 +480,27 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                     )}
                   </div>
                 ) : (
-                  <div className="flex h-[calc(100vh-160px)] min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/5 bg-[#1e2746] p-4 shadow-2xl sm:p-5">
-                    <div className="mb-4 flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                    {/* Floor header */}
+                    <div className="mb-5 flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Sơ đồ tầng</p>
-                        <h2 className="mt-1 text-2xl font-bold text-white">{activeFloorPlan}</h2>
-                      </div>
-                      <div className="flex flex-wrap gap-3 rounded-2xl border border-white/5 bg-[#151b32] px-3 py-2 text-xs font-semibold text-slate-300">
-                        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Trống</span>
-                        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded bg-gray-700" />Đã thuê</span>
-                        <span className="inline-flex items-center gap-2"><i className="h-2.5 w-4 rounded border border-dashed border-gray-600" />Cầu thang</span>
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sơ đồ tầng</p>
+                        <h2 className="mt-1 text-2xl font-bold text-slate-800">{activeFloorPlan}</h2>
                       </div>
                     </div>
 
-                    <div className="mx-auto grid min-h-0 w-full max-w-3xl flex-1 grid-cols-[1fr_28px_1fr] items-stretch gap-3 sm:grid-cols-[1fr_32px_1fr] sm:gap-5">
-                      <div className="flex min-h-0 flex-col gap-2 sm:gap-3">
-  
-  {currentFloorRooms
-    .filter((room) => room.position === "left")
-    .sort((a, b) => b.id.localeCompare(a.id)) // Sắp xếp tăng dần: P201 rồi đến P202
-    .map((room) => (
-      <div key={room.id} className="flex min-h-0 flex-1 items-center justify-center">
-        <FloorPlanRoomBox
-          room={room}
-          isSelected={selectedRoom?.id === room.id}
-          onSelect={openRoom}
-        />
-      </div>
-    ))}
-     <div className="flex min-h-0 flex-1 items-center justify-center">
-    <StairBox />
-  </div>
-
-  {Array.from({ 
-    length: Math.max(0, currentFloorRooms.filter(r => r.position === "right").length - 
-                        currentFloorRooms.filter(r => r.position === "left").length - 1) 
-  }).map((_, index) => (
-    <div key={`spacer-${index}`} className="flex min-h-0 flex-1 invisible" />
-  ))}
-
- 
-
-</div>
-
-                      <div className="flex h-full items-center justify-center rounded-full border border-white/5 bg-[#151b32]">
-                        <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">HÀNH LANG</span>
-                      </div>
-
-                      <div className="flex min-h-0 flex-col gap-2 sm:gap-3">
+                    {/* Floor plan body — horizontal layout */}
+                    <div className="mx-auto flex w-fit flex-1 flex-col items-center justify-center gap-3">
+                      {/* Top row: rooms with suffix >= 03, sorted ascending */}
+                      <div className="flex w-full flex-wrap justify-start gap-[5px]">
                         {currentFloorRooms
-                          .filter((room) => room.position === "right")
-                          .sort((a, b) => a.id.localeCompare(a.id))
+                          .filter((room) => {
+                            const suffix = parseInt(room.id.slice(-2), 10);
+                            return suffix >= 3;
+                          })
+                          .sort((a, b) => a.id.localeCompare(b.id))
                           .map((room) => (
-                            <div key={room.id} className="flex min-h-0 flex-1 items-center justify-center">
+                            <div key={room.id} className="w-[102px]">
                               <FloorPlanRoomBox
                                 room={room}
                                 isSelected={selectedRoom?.id === room.id}
@@ -617,6 +509,48 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                             </div>
                           ))}
                       </div>
+
+                      {/* Corridor divider */}
+                      <div className="flex w-full items-center gap-2 py-1.5">
+                        <div className="h-px flex-1 bg-slate-300" />
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">CORRIDOR</span>
+                        <div className="h-px flex-1 bg-slate-300" />
+                      </div>
+
+                      {/* Bottom row: room 01, room 02, stair box */}
+                      <div className="flex w-full flex-wrap justify-start gap-[5px]">
+                        {currentFloorRooms
+                          .filter((room) => {
+                            const suffix = parseInt(room.id.slice(-2), 10);
+                            return suffix <= 2;
+                          })
+                          .sort((a, b) => a.id.localeCompare(b.id))
+                          .map((room) => (
+                            <div key={room.id} className="w-[102px]">
+                              <FloorPlanRoomBox
+                                room={room}
+                                isSelected={selectedRoom?.id === room.id}
+                                onSelect={openRoom}
+                              />
+                            </div>
+                          ))}
+                        <div className="w-[102px]">
+                          <StairBox />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Legend at bottom */}
+                    <div className="mt-6 flex shrink-0 flex-wrap items-center justify-center gap-6 pt-4">
+                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
+                        <i className="inline-block h-3 w-3 rounded-sm bg-emerald-400" />TRỐNG
+                      </span>
+                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
+                        <i className="inline-block h-3 w-3 rounded-sm border border-slate-300 bg-slate-100" />ĐÃ THUÊ
+                      </span>
+                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
+                        <i className="inline-block h-3 w-3 rounded-sm bg-amber-500" />ĐANG ĐẶT CỌC
+                      </span>
                     </div>
                   </div>
                 )}
@@ -656,7 +590,7 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                   onClick={(event) => event.stopPropagation()}
                   className="max-h-[90vh] w-full overflow-y-auto rounded-t-[2rem]"
                 >
-                  <RoomDetail room={selectedRoom} onClose={closePanel} compact />
+                  <RoomDetail room={selectedRoom} onClose={closePanel} />
                 </motion.div>
               </motion.div>
             )}

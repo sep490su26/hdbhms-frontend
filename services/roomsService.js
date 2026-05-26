@@ -136,7 +136,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     images: uniqueImages.length > 0 ? uniqueImages : [defaultRoomImage],
     floor: floorName,
     floorNumber,
-    priceLabel: listedPrice ? `${(listedPrice / 1000000).toFixed(1)} trđ/tháng` : "Liên hệ",
+    priceLabel: listedPrice ? `${(listedPrice / 1000000).toLocaleString("vi-VN")} tr/tháng` : "Liên hệ",
     price: listedPrice,
     listedPrice,
     deposit: listedPrice,
@@ -198,7 +198,8 @@ export async function fetchPublicRoomById(roomId) {
 
 export function getRoomDetailHref(room) {
   const buildingId = encodeURIComponent(room.buildingId || "hai-dang-house");
-  const roomId = encodeURIComponent(room.roomId || room.id);
+  // Always use room.id which is the roomCode (e.g., P101) for the public endpoint
+  const roomId = encodeURIComponent(room.id);
 
   return `/rooms/${buildingId}/${roomId}`;
 }

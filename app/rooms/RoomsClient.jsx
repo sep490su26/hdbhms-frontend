@@ -81,11 +81,10 @@ function FloorPlanRoomBox({ room, isSelected, onSelect }) {
       }}
       disabled={!isAvailable}
       aria-label={`Phòng ${room.id}`}
-      className={`relative flex aspect-[4/3] h-full max-h-[76px] w-full max-w-[112px] items-center justify-center rounded-xl border text-center transition ${
-        isAvailable
-          ? `bg-slate-900 text-white ${accentClass} shadow-lg hover:-translate-y-0.5 hover:bg-slate-800`
-          : "cursor-not-allowed border-gray-700/40 bg-gray-800/40 text-gray-500"
-      } ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`relative flex aspect-[4/3] h-full max-h-[76px] w-full max-w-[112px] items-center justify-center rounded-xl border text-center transition ${isAvailable
+        ? `bg-slate-900 text-white ${accentClass} shadow-lg hover:-translate-y-0.5 hover:bg-slate-800`
+        : "cursor-not-allowed border-gray-700/40 bg-gray-800/40 text-gray-500"
+        } ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       {isAvailable && <span className={`absolute right-2 top-2 h-2 w-2 rounded-full ${dotClass}`} />}
       <span className="text-sm font-black uppercase tracking-wide sm:text-base">{room.id}</span>
@@ -106,9 +105,8 @@ function RoomListingCard({ room, isSelected, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(room)}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${
-        room.status === "available" ? "" : "opacity-75"
-      } ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${room.status === "available" ? "" : "opacity-75"
+        } ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <Image
@@ -120,9 +118,8 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
         <span
-          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${
-            publicStatusClass(room.status)
-          }`}
+          className={`absolute left-4 top-4 rounded-md border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest shadow-lg shadow-black/20 ${publicStatusClass(room.status)
+            }`}
         >
           {guestStatusCopy(room.status)}
         </span>
@@ -203,9 +200,8 @@ function RoomDetail({ room, onClose, compact = false }) {
               key={image}
               type="button"
               onClick={() => setActiveImage(image)}
-              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${
-                activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
-              }`}
+              className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
+                }`}
               aria-label={`Xem ảnh phòng ${index + 1}`}
             >
               <Image src={image} alt={`Ảnh ${index + 1} phòng ${room.id}`} fill sizes="96px" className="object-cover" />
@@ -340,7 +336,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     return () => window.clearInterval(timer);
   }, []);
 
-    const [apiRooms, setApiRooms] = useState([]);
+  const [apiRooms, setApiRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -348,11 +344,13 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     const fetchPublicRooms = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("https://06b97f40-a965-4019-90c8-0f4cf3eeedea.mock.pstmn.io/api/v1/rooms?size=100");
+        const res = await fetch("http://localhost:8080/api/v1/rooms?size=100");
         const json = await res.json();
-        
+
+        // console.log("Fetched rooms:", json);
+
         if (json.code === 0) {
-          setApiRooms(json.data?.content ?? []);
+          setApiRooms(json.data?.data ?? []);
           setIsSuccess(true);
         } else {
           setIsError(true);
@@ -367,31 +365,31 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   }, []);
 
   const visibleRooms = useMemo(() => {
-    
     return apiRooms.map((apiRoom) => {
-      const statusLower = apiRoom.currentStatus?.toLowerCase() ?? "";
-      const mappedStatus = statusLower === "vacant" ? "available" : 
-                           statusLower === "reserved" ? "deposited" : "occupied";
+      const statusLower = apiRoom.current_status?.toLowerCase() ?? "";
+      const mappedStatus = statusLower === "vacant" ? "available" :
+        statusLower === "reserved" ? "deposited" : "occupied";
       const room = {
-        id: apiRoom.roomCode ?? "",
-        roomId: apiRoom.id ?? null,
+        id: apiRoom.id ?? "",
+        roomCode: apiRoom.room_code ?? null,
         name: apiRoom.name ?? "",
         status: mappedStatus,
-        type: "standard", 
-        image: apiRoom.firstImageUrl ?? "/placeholder.jpg",
-        images: [apiRoom.firstImageUrl ?? "/placeholder.jpg"],
-        floor: apiRoom.floorName ?? "Tầng 1",
-        floorNumber: parseInt(apiRoom.floorName?.replace(/\D/g, '') || "1", 10),
-        priceLabel: apiRoom.listedPrice ? `${(apiRoom.listedPrice / 1000000).toFixed(1)} trđ/tháng` : "Liên hệ",
-        price: apiRoom.listedPrice ?? 0,
-        area: apiRoom.areaM2 ?? 0,
-        feature: apiRoom.publicNote ?? "Không có",
-        description: apiRoom.publicNote ?? "Không có mô tả",
-        maxPeople: apiRoom.maxOccupants ?? 3,
+        type: "standard",
+        image: apiRoom.first_image_url ?? "/placeholder.jpg",
+        images: [apiRoom.first_image_url ?? "/placeholder.jpg"],
+        floor: apiRoom.floor_name ?? "Tầng 1",
+        floorNumber: parseInt(apiRoom.floor_name?.replace(/\D/g, '') || "1", 10),
+        priceLabel: apiRoom.listed_price ? `${(apiRoom.listed_price / 1000000).toFixed(1)} trđ/tháng` : "Liên hệ",
+        price: apiRoom.listed_price ?? 0,
+        area: apiRoom.area_m2 ?? 0,
+        feature: apiRoom.public_note ?? "Không có",
+        description: apiRoom.public_note ?? "Không có mô tả",
+        maxPeople: apiRoom.max_occupants ?? 3,
         lastMeterReading: { electric: 0, water: 0, recordedAt: "" },
         amenities: [],
         buildingFacilities: [],
-position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02")) ? "left" : "right"      };
+        position: (apiRoom.room_code?.endsWith("01") || apiRoom.room_code?.endsWith("02")) ? "left" : "right"
+      };
       return {
         ...room,
         status: resolveGuestStatus(room, roomHolds),
@@ -461,9 +459,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                           setViewMode(item.key);
                           closePanel();
                         }}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${
-                          viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
-                        }`}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
+                          }`}
                       >
                         <Icon className="h-4 w-4" />
                         {item.label}
@@ -497,9 +494,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                         viewMode === "Listing" ? setActiveFloorFilter(floor) : setActiveFloorPlan(floor);
                         closePanel();
                       }}
-                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${
-                        isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
-                      }`}
+                      className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
                     >
                       {floor}
                     </button>
@@ -518,9 +514,8 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                     />
                     <span className={`h-6 w-12 rounded-full transition ${availableOnly ? "bg-emerald-500" : "bg-slate-700"}`} />
                     <span
-                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
-                        availableOnly ? "translate-x-6" : ""
-                      }`}
+                      className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${availableOnly ? "translate-x-6" : ""
+                        }`}
                     />
                   </span>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Chỉ hiện phòng trống</span>
@@ -542,9 +537,9 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
-                            key={room.id}
+                            key={room.roomCode}
                             room={room}
-                            isSelected={selectedRoom?.id === room.id}
+                            isSelected={selectedRoom?.roomCode === room.roomCode}
                             onSelect={openRoom}
                           />
                         ))}
@@ -571,33 +566,33 @@ position: (apiRoom.roomCode?.endsWith("01") || apiRoom.roomCode?.endsWith("02"))
 
                     <div className="mx-auto grid min-h-0 w-full max-w-3xl flex-1 grid-cols-[1fr_28px_1fr] items-stretch gap-3 sm:grid-cols-[1fr_32px_1fr] sm:gap-5">
                       <div className="flex min-h-0 flex-col gap-2 sm:gap-3">
-  
-  {currentFloorRooms
-    .filter((room) => room.position === "left")
-    .sort((a, b) => b.id.localeCompare(a.id)) // Sắp xếp tăng dần: P201 rồi đến P202
-    .map((room) => (
-      <div key={room.id} className="flex min-h-0 flex-1 items-center justify-center">
-        <FloorPlanRoomBox
-          room={room}
-          isSelected={selectedRoom?.id === room.id}
-          onSelect={openRoom}
-        />
-      </div>
-    ))}
-     <div className="flex min-h-0 flex-1 items-center justify-center">
-    <StairBox />
-  </div>
 
-  {Array.from({ 
-    length: Math.max(0, currentFloorRooms.filter(r => r.position === "right").length - 
-                        currentFloorRooms.filter(r => r.position === "left").length - 1) 
-  }).map((_, index) => (
-    <div key={`spacer-${index}`} className="flex min-h-0 flex-1 invisible" />
-  ))}
+                        {currentFloorRooms
+                          .filter((room) => room.position === "left")
+                          .sort((a, b) => b.id.localeCompare(a.id)) // Sắp xếp tăng dần: P201 rồi đến P202
+                          .map((room) => (
+                            <div key={room.id} className="flex min-h-0 flex-1 items-center justify-center">
+                              <FloorPlanRoomBox
+                                room={room}
+                                isSelected={selectedRoom?.id === room.id}
+                                onSelect={openRoom}
+                              />
+                            </div>
+                          ))}
+                        <div className="flex min-h-0 flex-1 items-center justify-center">
+                          <StairBox />
+                        </div>
 
- 
+                        {Array.from({
+                          length: Math.max(0, currentFloorRooms.filter(r => r.position === "right").length -
+                            currentFloorRooms.filter(r => r.position === "left").length - 1)
+                        }).map((_, index) => (
+                          <div key={`spacer-${index}`} className="flex min-h-0 flex-1 invisible" />
+                        ))}
 
-</div>
+
+
+                      </div>
 
                       <div className="flex h-full items-center justify-center rounded-full border border-white/5 bg-[#151b32]">
                         <span className="[writing-mode:vertical-lr] text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">HÀNH LANG</span>

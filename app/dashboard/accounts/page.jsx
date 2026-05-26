@@ -20,7 +20,14 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
-import { createStaffAccount } from "@/services/identityAccessService";
+import {
+  createStaffAccount,
+  deleteUser,
+  fetchUsers as fetchUsersApi,
+  restoreUser,
+  updateUserRole,
+  updateUserStatus,
+} from "@/services/identityAccessService";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
 const DEFAULT_PAGE = 1;
@@ -287,9 +294,11 @@ function normalizeStatus(status) {
 function getFullName(user) {
   return (
     user.fullName ||
+    user.full_name ||
     user.name ||
     user.personName ||
     user.profile?.fullName ||
+    user.profile?.full_name ||
     user.email ||
     user.phone ||
     "Chưa cập nhật"
@@ -307,13 +316,13 @@ function toUserViewModel(user) {
     email: user.email || "",
     role,
     status,
-    emailVerified: Boolean(user.emailVerified),
-    mustChangePassword: Boolean(user.mustChangePassword),
-    lastLoginAt: user.lastLoginAt || null,
-    createdAt: user.createdAt || null,
-    updatedAt: user.updatedAt || null,
-    deletedAt: user.deletedAt || null,
-    personProfileId: user.personProfileId || null,
+    emailVerified: Boolean(user.emailVerified ?? user.email_verified),
+    mustChangePassword: Boolean(user.mustChangePassword ?? user.must_change_password),
+    lastLoginAt: user.lastLoginAt || user.last_login_at || null,
+    createdAt: user.createdAt || user.created_at || null,
+    updatedAt: user.updatedAt || user.updated_at || null,
+    deletedAt: user.deletedAt || user.deleted_at || null,
+    personProfileId: user.personProfileId || user.person_profile_id || null,
   };
 }
 
@@ -472,6 +481,7 @@ export default function AccountsPage() {
   const [roleError, setRoleError] = useState("");
   const [isCreateStaffOpen, setIsCreateStaffOpen] = useState(false);
   const [staffForm, setStaffForm] = useState({
+    fullName: "",
     phone: "",
     email: "",
     role: "MANAGER",
@@ -487,20 +497,13 @@ export default function AccountsPage() {
     setPageError("");
 
     try {
-      const queryString = buildQueryParams({
+      const data = await fetchUsersApi({
         page: DEFAULT_PAGE,
         size: DEFAULT_SIZE,
         status: statusFilter,
         role: roleFilter,
         search,
       });
-      const response = await fetch(`${API_BASE_URL}/users?${queryString}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      });
-      const data = await parseApiResponse(response);
       const content = Array.isArray(data.content) ? data.content : [];
       const nextUsers = content.map(toUserViewModel);
 
@@ -589,15 +592,7 @@ export default function AccountsPage() {
       };
 
       if (!isUsingMock) {
-        const response = await fetch(`${API_BASE_URL}/users/${lockTarget.id}/status`, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-        await parseApiResponse(response);
+        await updateUserStatus(lockTarget.id, body);
       }
 
       updateUserLocally(lockTarget.id, {
@@ -642,15 +637,7 @@ export default function AccountsPage() {
 
     try {
       if (!isUsingMock) {
-        const response = await fetch(`${API_BASE_URL}/users/${roleTarget.id}/role`, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ role: selectedRole }),
-        });
-        await parseApiResponse(response);
+        await updateUserRole(roleTarget.id, selectedRole);
       }
 
       updateUserLocally(roleTarget.id, { role: selectedRole });
@@ -684,13 +671,7 @@ export default function AccountsPage() {
       let deletedAt = new Date().toISOString();
 
       if (!isUsingMock) {
-        const response = await fetch(`${API_BASE_URL}/users/${deleteTarget.id}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-        });
-        const data = await parseApiResponse(response);
+        const data = await deleteUser(deleteTarget.id);
         deletedAt = data.deletedAt || deletedAt;
       }
 
@@ -717,13 +698,7 @@ export default function AccountsPage() {
 
     try {
       if (!isUsingMock) {
-        const response = await fetch(`${API_BASE_URL}/users/${account.id}/restore`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getToken()}`,
-          },
-        });
-        await parseApiResponse(response);
+        await restoreUser(account.id);
       }
 
       updateUserLocally(account.id, { deletedAt: null });
@@ -747,7 +722,7 @@ export default function AccountsPage() {
   function openCreateStaffModal() {
     setPageNotice("");
     setPageError("");
-    setStaffForm({ phone: "", email: "", role: "MANAGER" });
+    setStaffForm({ fullName: "", phone: "", email: "", role: "MANAGER" });
     setStaffFormErrors({});
     setIsCreateStaffOpen(true);
   }
@@ -759,6 +734,10 @@ export default function AccountsPage() {
 
   function validateStaffForm() {
     const nextErrors = {};
+
+    if (!staffForm.fullName.trim()) {
+      nextErrors.fullName = "Vui lòng nhập họ và tên";
+    }
 
     if (!staffForm.phone.trim()) {
       nextErrors.phone = "Vui lòng nhập số điện thoại";
@@ -787,6 +766,7 @@ export default function AccountsPage() {
     try {
       // The response includes temporaryPassword once; keep it in the success notice.
       const createdStaff = await createStaffAccount({
+        fullName: staffForm.fullName.trim(),
         phone: staffForm.phone.trim(),
         email: staffForm.email.trim(),
         role: staffForm.role,
@@ -983,11 +963,10 @@ export default function AccountsPage() {
                           <button
                             type="button"
                             onClick={() => openStatusDialog(account)}
-                            className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold ${
-                              account.status === "DISABLED"
+                            className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold ${account.status === "DISABLED"
                                 ? "border border-emerald-100 text-emerald-700 hover:bg-emerald-50"
                                 : "border border-rose-100 text-rose-700 hover:bg-rose-50"
-                            }`}
+                              }`}
                           >
                             {account.status === "DISABLED" ? (
                               <UnlockKeyhole className="h-4 w-4" />
@@ -1053,6 +1032,20 @@ export default function AccountsPage() {
               Hệ thống sẽ tạo mật khẩu tạm thời và chỉ hiển thị một lần sau khi tạo tài khoản thành công.
             </InlineAlert>
             <label className="grid gap-2">
+              <span className="text-sm font-bold text-[#091426]">Họ và tên</span>
+              <input
+                value={staffForm.fullName}
+                onChange={(event) => updateStaffForm("fullName", event.target.value)}
+                className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426] ${
+                  staffFormErrors.fullName ? "border-rose-300" : "border-[#c5c6cd]"
+                }`}
+                placeholder="Nguyễn Văn A"
+              />
+              {staffFormErrors.fullName && (
+                <span className="text-xs font-bold text-rose-600">{staffFormErrors.fullName}</span>
+              )}
+            </label>
+            <label className="grid gap-2">
               <span className="text-sm font-bold text-[#091426]">Số điện thoại</span>
               <input
                 value={staffForm.phone}
@@ -1067,9 +1060,8 @@ export default function AccountsPage() {
               <input
                 value={staffForm.email}
                 onChange={(event) => updateStaffForm("email", event.target.value)}
-                className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426] ${
-                  staffFormErrors.email ? "border-rose-300" : "border-[#c5c6cd]"
-                }`}
+                className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426] ${staffFormErrors.email ? "border-rose-300" : "border-[#c5c6cd]"
+                  }`}
                 placeholder="manager@example.com"
               />
               {staffFormErrors.email && <span className="text-xs font-bold text-rose-600">{staffFormErrors.email}</span>}
@@ -1145,9 +1137,8 @@ export default function AccountsPage() {
                 type="button"
                 onClick={submitStatusChange}
                 disabled={isMutating}
-                className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
-                  lockTarget.status === "DISABLED" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
-                }`}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-70 ${lockTarget.status === "DISABLED" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                  }`}
               >
                 {isMutating && <Loader2 className="h-4 w-4 animate-spin" />}
                 Xác nhận

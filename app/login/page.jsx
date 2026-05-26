@@ -33,21 +33,22 @@ function LoginForm() {
 
     try {
       const loginData = await loginWithPhonePassword({ phone, password });
-      //const accessToken = loginData?.data?.accessToken || loginData?.accessToken;
-      const accessToken = "mock_jwt_token_for_haidang_dashboard";
-    window.localStorage.setItem("token", accessToken);
+      const accessToken = loginData?.token;
+      const userRole = loginData?.role;
 
       if (!accessToken) {
-        throw new Error("Phản hồi đăng nhập không có accessToken.");
+        throw new Error("Phản hồi đăng nhập không có token.");
       }
 
       window.localStorage.setItem("token", accessToken);
+      if (userRole) {
+        window.localStorage.setItem("userRole", userRole);
+      }
 
       const profile = await getCurrentUserProfile();
-      setUser(profile);
+      setUser({ ...profile, role: userRole || profile.role });
       router.push("/dashboard");
     } catch (submitError) {
-      //window.localStorage.removeItem("token");
       setError(submitError.message || "Số điện thoại hoặc mật khẩu không chính xác.");
     } finally {
       setIsSubmitting(false);

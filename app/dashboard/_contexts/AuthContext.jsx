@@ -2,28 +2,39 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUserProfile } from "@/services/identityAccessService";
+import { getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
 
 const AuthContext = createContext(null);
 
 function getDisplayName(user) {
-  return user?.fullName || user?.name || user?.email || user?.phone || "Nguoi dung";
+  return (
+    user?.fullName ||
+    user?.full_name ||
+    user?.name ||
+    user?.email ||
+    user?.phone ||
+    "Nguoi dung"
+  );
 }
 
-function normalizeUser(user) {
+function normalizeUser(user, fallbackRole = null) {
   if (!user) return null;
 
-  const role = normalizeRole(user.role) || normalizeRole(user.roleName);
+  const role =
+    normalizeRole(user.role) ||
+    normalizeRole(user.roleName) ||
+    normalizeRole(user.role_name) ||
+    normalizeRole(fallbackRole);
   const displayName = getDisplayName(user);
 
   return {
     ...user,
-    fullName: user.fullName || displayName,
+    fullName: user.fullName || user.full_name || displayName,
     name: displayName,
-    avatarUrl: user.avatarUrl || null,
+    avatarUrl: user.avatarUrl || user.avatar_url || null,
     role,
-    roleLabel: ROLE_LABELS[role] || user.role || "Khong ro",
+    roleLabel: ROLE_LABELS[role] || user.role || fallbackRole || "Khong ro",
   };
 }
 
@@ -33,8 +44,9 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
   const [isLoadingUser, setIsLoadingUser] = useState(false);
 
   const refreshUser = useCallback(async (token) => {
-    const accessToken =
-      token || (typeof window !== "undefined" ? window.localStorage.getItem("token") : null);
+    const isBrowser = typeof window !== "undefined";
+    const accessToken = token || (isBrowser ? window.localStorage.getItem("token") : null);
+    const storedRole = isBrowser ? window.localStorage.getItem("userRole") : null;
 
     if (!accessToken) {
       setUserState(null);
@@ -46,14 +58,15 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
     try {
       // Hydrate global dashboard state from GET /users/me for header/sidebar consumers.
       const profile = await getCurrentUserProfile();
-      const normalizedProfile = normalizeUser(profile);
+      const normalizedProfile = normalizeUser(profile, storedRole);
 
       setUserState(normalizedProfile);
       return normalizedProfile;
     } catch (error) {
       setUserState(null);
-      if (typeof window !== "undefined") {
+      if (isBrowser) {
         window.localStorage.removeItem("token");
+        window.localStorage.removeItem("userRole");
       }
       throw error;
     } finally {
@@ -62,12 +75,20 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
   }, []);
 
   const setUser = useCallback((profile) => {
+    console.log(profile);
     setUserState(normalizeUser(profile));
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi();
+    } catch {
+      // Ignore API errors for logout to ensure frontend always clears
+    }
+
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("token");
+      window.localStorage.removeItem("userRole");
     }
 
     setUserState(null);

@@ -1,4 +1,8 @@
-import { authenticatedFetch, parseEnvelope } from "./identityAccessService";
+import {
+  API_BASE_URL,
+  authenticatedFetch,
+  parseEnvelope,
+} from "./identityAccessService";
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "1";
 
@@ -87,45 +91,46 @@ export function isValidVietnamPhone(value) {
 }
 
 export function mapVisitRequest(item) {
-  const appointmentAt = readField(item, "appointmentAt", "appointment_at");
-  const deletedAt = readField(item, "deletedAt", "deleted_at");
-  const roomCode = readField(item, "roomCode", "room_code");
+  const preferredStart = readField(item, "preferredStart", "preferred_start");
+  const createdAt = readField(item, "createdAt", "created_at");
+  const property = readField(item, "property") || {};
+  const room = readField(item, "room") || {};
 
   return {
     id: readField(item, "id"),
-    fullName: readField(item, "customerName", "customer_name"),
-    phone: readField(item, "phone"),
-    propertyId: readField(item, "propertyId", "property_id"),
-    propertyName: readField(item, "propertyName", "property_name") || "—",
-    interestedRoomId: readField(item, "roomId", "room_id"),
-    interestedRoomName: roomCode ? `Phòng ${roomCode}` : "",
-    appointmentAt,
-    appointmentLabel: formatAppointment(appointmentAt),
+    fullName: readField(item, "visitorName", "visitor_name"),
+    phone: readField(item, "visitorPhone", "visitor_phone"),
+    email: readField(item, "visitorEmail", "visitor_email"),
+    propertyId: readField(property, "id"),
+    propertyName: readField(property, "name") || "—",
+    interestedRoomId: readField(room, "id"),
+    interestedRoomName: readField(room, "roomCode", "room_code") || readField(room, "name") || "",
+    appointmentAt: preferredStart,
+    appointmentLabel: formatAppointment(preferredStart),
     status: readField(item, "status"),
-    note: readField(item, "note") || "",
-    deletedAt,
-    deletedLabel: deletedAt ? formatAppointment(deletedAt) : "",
+    note: readField(item, "notes") || "",
+    createdAt,
+    createdLabel: createdAt ? formatAppointment(createdAt) : "",
   };
 }
 
 export async function fetchViewingCustomers({ filters, page, size }) {
   const response = await authenticatedFetch(`/visit-requests${toQuery({
     keyword: filters.keyword,
-    propertyId: filters.propertyId,
-    roomId: filters.roomId,
-    status: filters.status,
-    fromDate: filters.fromDate,
-    toDate: filters.toDate,
-    page,
+    propertyCode: filters.propertyCode,
+    roomCode: filters.roomCode,
+    from: filters.fromDate,
+    to: filters.toDate,
+    page: page - 1, // Backend Pageable is 0-indexed
     size,
   })}`);
   const data = await parseEnvelope(response);
 
   return {
-    items: (data.items || []).map(mapVisitRequest),
-    total: readField(data, "total") || 0,
-    page: readField(data, "page") || 1,
-    size: readField(data, "size") || size,
+    items: (data.data || []).map(mapVisitRequest),
+    total: readField(data, "totalElements", "total_elements") || 0,
+    page: (readField(data, "currentPage", "current_page") || 0),
+    size: readField(data, "pageSize", "page_size") || size,
     totalPages: readField(data, "totalPages", "total_pages") || 0,
   };
 }
@@ -169,19 +174,60 @@ export async function fetchViewingCustomerTrash({ filters, page, size }) {
   };
 }
 
-export async function createViewingCustomer(payload) {
-  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests`, {
+// Logic hỗ trợ parse và mapping cho các service khác sử dụng
+function getNumericId(value) {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  return isNaN(num) ? null : num;
+}
+
+export async function publicCreateViewingCustomer(payload) {
+  const response = await fetch(`${API_BASE_URL}/visit-requests`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json", "X-Client-Type": "web" },
+    body: JSON.stringify({
+      visitor_name: payload.fullName,
+      visitor_phone: payload.phone,
+      visitor_email: payload.email || "",
+      property_id: getNumericId(payload.propertyId),
+      room_id: getNumericId(payload.roomId),
+      preferred_start: payload.appointmentAt,
+      notes: payload.note,
+    }),
+  });
+  const data = await parseEnvelope(response);
+  return mapVisitRequest(data);
+}
+
+export async function createViewingCustomer(payload) {
+  const response = await authenticatedFetch("/visit-requests", {
+    method: "POST",
+    body: JSON.stringify({
+      visitor_name: payload.fullName,
+      visitor_phone: payload.phone,
+      visitor_email: payload.email || "",
+      property_id: getNumericId(payload.propertyId),
+      room_id: getNumericId(payload.roomId),
+      preferred_start: payload.appointmentAt,
+      notes: payload.note,
+    }),
   });
   const data = await parseEnvelope(response);
   return mapVisitRequest(data);
 }
 
 export async function updateViewingCustomer(id, payload) {
-  const response = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}`, {
+  const response = await authenticatedFetch(`/visit-requests/${id}`, {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      visitor_name: payload.fullName,
+      visitor_phone: payload.phone,
+      visitor_email: payload.email || "",
+      property_id: Number(payload.propertyId),
+      room_id: payload.roomId ? Number(payload.roomId) : null,
+      preferred_start: payload.appointmentAt,
+      notes: payload.note,
+    }),
   });
   const data = await parseEnvelope(response);
   return mapVisitRequest(data);

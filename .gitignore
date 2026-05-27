@@ -41,3 +41,4 @@ yarn-error.log*
 next-env.d.ts
 api-spec-file.md
 javascript-only.md
+temp_room.json

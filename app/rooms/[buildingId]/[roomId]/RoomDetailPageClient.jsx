@@ -24,6 +24,10 @@ import {
   findRoomById,
   normalizeApiRoom,
 } from "../../../../services/roomsService";
+import {
+  combineAppointmentParts,
+  publicCreateViewingCustomer,
+} from "../../../../services/viewingCustomersService";
 import { getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
 
 const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
@@ -125,7 +129,7 @@ function BookingCard({ room }) {
     }
   };
 
-  const handleViewingSubmit = (event) => {
+  const handleViewingSubmit = async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const isViewingDateValid = validateViewingDate(viewingForm.viewingDate);
@@ -139,15 +143,25 @@ function BookingCard({ room }) {
       return;
     }
 
-    const payload = {
-      ...viewingForm,
-      room: roomLabel,
-      roomId: room.id,
-    };
+    try {
+      const appointmentAt = combineAppointmentParts(viewingForm.viewingDate, viewingForm.viewingTime);
+      console.log("Current room object:", room);
+      const payload = {
+        fullName: viewingForm.fullName,
+        phone: viewingForm.phone,
+        propertyId: room.buildingId, // Numeric ID or code map
+        roomId: room.roomId,         // Numeric ID
+        appointmentAt,
+        note: `Yêu cầu từ trang chi tiết phòng ${roomLabel}`,
+      };
+      console.log("Submitting payload:", payload);
 
-    console.log("Viewing appointment request:", payload);
-    alert("Thông tin đặt lịch xem phòng đã được ghi nhận.");
-    closeViewingModal();
+      await publicCreateViewingCustomer(payload);
+      alert("Yêu cầu xem phòng của bạn đã được gửi thành công! Chúng tôi sẽ liên hệ lại sớm nhất.");
+      closeViewingModal();
+    } catch (error) {
+      alert("Có lỗi xảy ra: " + (error.message || "Không thể gửi yêu cầu."));
+    }
   };
 
   return (

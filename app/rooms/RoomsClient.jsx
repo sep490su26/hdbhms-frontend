@@ -205,9 +205,9 @@ function RoomDetail({ room, onClose }) {
 
       <div className="custom-scrollbar flex-1 overflow-y-auto bg-white p-5 text-[#091426]">
         <div className="mb-5 grid grid-cols-4 gap-2">
-          {room.images.map((image, index) => (
+            {room.images.map((image, index) => (
             <button
-              key={image}
+              key={`${image}-${index}`}
               type="button"
               onClick={() => setActiveImage(image)}
               className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-[#091426] ring-2 ring-[#091426]/10" : "border-slate-200"
@@ -260,8 +260,8 @@ function RoomDetail({ room, onClose }) {
         <div className="mt-6">
           <h3 className="text-sm font-bold text-slate-700">Tiện ích trong phòng</h3>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {room.amenities.map((amenity) => (
-              <div key={amenity} className="flex items-center gap-2 rounded-[14px] bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            {room.amenities.map((amenity, index) => (
+              <div key={`${amenity}-${index}`} className="flex items-center gap-2 rounded-[14px] bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 <CheckCircle2 className="h-4 w-4 text-blue-500" />
                 {amenity}
               </div>
@@ -272,8 +272,8 @@ function RoomDetail({ room, onClose }) {
         <div className="mt-6 rounded-[14px] border border-blue-100 bg-blue-50 p-4">
           <h3 className="text-sm font-bold uppercase tracking-wide text-blue-800">Tiện ích tòa nhà</h3>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {room.buildingFacilities.map((facility) => (
-              <span key={facility} className="text-xs text-blue-700">
+            {room.buildingFacilities.map((facility, index) => (
+              <span key={`${facility}-${index}`} className="text-xs text-blue-700">
                 {facility}
               </span>
             ))}
@@ -325,6 +325,11 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const visibleRooms = useMemo(() => {
     return apiRooms.map((apiRoom) => normalizeApiRoom(apiRoom));
   }, [apiRooms]);
+
+  const dynamicFloors = useMemo(() => {
+    const uniqueFloors = [...new Set(visibleRooms.map((r) => r.floor))].sort();
+    return ["Tất cả", ...uniqueFloors];
+  }, [visibleRooms]);
 
   const floorsForPlan = floorPlans.map((plan) => plan.floor);
 
@@ -413,7 +418,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
 
             <div className="mb-8 flex flex-col gap-3 rounded-[1.5rem] border border-white/5 bg-[#1e2746]/50 p-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {(viewMode === "Listing" ? floors : floorsForPlan).map((floor) => {
+                {(viewMode === "Listing" ? dynamicFloors : floorsForPlan).map((floor) => {
                   const isActive = viewMode === "Listing" ? activeFloorFilter === floor : activeFloorPlan === floor;
                   return (
                     <button
@@ -466,9 +471,9 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
-                            key={room.roomCode}
+                            key={room.id}
                             room={room}
-                            isSelected={selectedRoom?.roomCode === room.roomCode}
+                            isSelected={selectedRoom?.id === room.id}
                             onSelect={openRoom}
                           />
                         ))}

@@ -19,6 +19,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { createRoomHold } from "../../../lib/roomHoldStorage";
+import { bookRoom } from "../../../services/roomsService";
 
 const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
 
@@ -128,7 +129,8 @@ function DepositInfoForm({ room, onSubmit }) {
   const tomorrowDate = getTomorrowDateString();
   const [dateErrors, setDateErrors] = useState({});
   const [imagePreviews, setImagePreviews] = useState({
-    citizenIdImage: "",
+    citizenIdFront: "",
+    citizenIdBack: "",
     portraitImage: "",
   });
 
@@ -232,21 +234,31 @@ function DepositInfoForm({ room, onSubmit }) {
 
         <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
           <FileUploadZone
-            id="citizen-id-image"
-            name="citizenIdImage"
-            label="Ảnh Căn cước công dân (CCCD)"
-            helperText="Tải lên mặt trước/sau hoặc một ảnh chụp chung rõ thông tin."
-            preview={imagePreviews.citizenIdImage}
-            onChange={handleFileChange("citizenIdImage")}
+            id="citizen-id-front"
+            name="citizenIdFront"
+            label="Mặt trước CCCD"
+            helperText="Mặt hiển thị ảnh và thông tin cá nhân."
+            preview={imagePreviews.citizenIdFront}
+            onChange={handleFileChange("citizenIdFront")}
           />
           <FileUploadZone
-            id="portrait-image"
-            name="portraitImage"
-            label="Ảnh chân dung"
-            helperText="Tải lên ảnh chân dung rõ mặt của khách thuê."
-            preview={imagePreviews.portraitImage}
-            onChange={handleFileChange("portraitImage")}
+            id="citizen-id-back"
+            name="citizenIdBack"
+            label="Mặt sau CCCD"
+            helperText="Mặt hiển thị vân tay và đặc điểm nhận dạng."
+            preview={imagePreviews.citizenIdBack}
+            onChange={handleFileChange("citizenIdBack")}
           />
+          <div className="sm:col-span-2">
+            <FileUploadZone
+              id="portrait-image"
+              name="portraitImage"
+              label="Ảnh chân dung"
+              helperText="Tải lên ảnh chân dung rõ mặt của khách thuê."
+              preview={imagePreviews.portraitImage}
+              onChange={handleFileChange("portraitImage")}
+            />
+          </div>
         </div>
 
         <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -343,6 +355,19 @@ function DepositPaymentStep({ room, customer }) {
 
       <button
         type="button"
+        onClick={async () => {
+          try {
+            const formData = new FormData();
+            Object.entries(customer).forEach(([key, value]) => formData.append(key, value));
+            formData.append("roomId", room.roomId || "");
+            
+            await bookRoom(formData);
+            alert("Báo cáo đã chuyển khoản thành công! Chủ nhà sẽ xác nhận sớm nhất.");
+            window.location.href = "/rooms"; // Basic redirect for now
+          } catch (error) {
+            alert("Lỗi: " + error.message);
+          }
+        }}
         className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a]"
       >
         Tôi đã chuyển khoản đặt cọc

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
+export const API_BASE_URL = "http://localhost:8080/api/v1";
 
 export class ApiError extends Error {
   constructor(message, { code, details, status, payload } = {}) {
@@ -179,11 +179,11 @@ export async function createStaffAccount({ phone, email, fullName, role }) {
   return authenticatedFetch(`${API_BASE_URL}/users/staff`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ 
-      phone, 
-      email, 
-      full_name: fullName, 
-      initial_role: role 
+    body: JSON.stringify({
+      phone,
+      email,
+      full_name: fullName,
+      initial_role: role
     }),
   });
 }

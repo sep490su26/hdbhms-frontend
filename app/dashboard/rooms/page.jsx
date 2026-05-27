@@ -24,7 +24,8 @@ const roomStatus = {
   available: ["Trống", "bg-emerald-50 text-emerald-700"],
   maintenance: ["Bảo trì", "bg-red-50 text-red-700"],
   soonVacant: ["Sắp trống", "bg-orange-50 text-orange-700"],
-  deposited: ["Đang đặt cọc", "bg-amber-50 text-amber-700"],
+  onHolde: ["Đang giữ cọc", "bg-orange-50 text-orange-700"],
+  deposited: ["Đã đặt cọc", "bg-amber-50 text-amber-700"],
   expired: ["Hết hạn", "bg-purple-50 text-purple-700"],
 };
 
@@ -286,11 +287,10 @@ function RoomDetailPanel({ room, tenantList, onClose }) {
             key={tab.id}
             type="button"
             onClick={() => setDetailTab(tab.id)}
-            className={`flex-1 py-2.5 text-xs font-bold transition ${
-              detailTab === tab.id
-                ? "border-b-2 border-[#091426] text-[#091426]"
-                : "text-[#505f76] hover:text-[#091426]"
-            }`}
+            className={`flex-1 py-2.5 text-xs font-bold transition ${detailTab === tab.id
+              ? "border-b-2 border-[#091426] text-[#091426]"
+              : "text-[#505f76] hover:text-[#091426]"
+              }`}
           >
             {tab.label}
           </button>
@@ -413,13 +413,11 @@ function RoomCell({ room, isSelected, onClick, isLarge }) {
       type="button"
       onClick={() => onClick(room)}
       aria-label={`Phòng ${room.id}`}
-      className={`relative flex flex-col justify-between overflow-hidden rounded-xl border text-left transition-all ${
-        isLarge ? "min-h-[110px] p-4" : "min-h-[76px] p-3"
-      } ${bg} ${
-        isSelected
+      className={`relative flex flex-col justify-between overflow-hidden rounded-xl border text-left transition-all ${isLarge ? "min-h-[110px] p-4" : "min-h-[76px] p-3"
+        } ${bg} ${isSelected
           ? "scale-[1.03] border-emerald-400 shadow-lg ring-2 ring-emerald-400/40"
           : "border-white/10 hover:border-white/30 hover:shadow-md"
-      }`}
+        }`}
     >
       <span className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full ${dot} ring-2 ring-[#091426]`} />
       <span className={`font-bold text-white ${isLarge ? "text-base" : "text-sm"}`}>{room.id}</span>
@@ -506,13 +504,13 @@ function FloorMapPage({ tenantList = [] }) {
   function handleRoomClick(room) {
     setSelectedRoom((prev) => (prev?.id === room.id ? null : room));
   }
-/*<PageHeader
-        title="Sơ đồ tầng"
-        description="Xem nhanh trạng thái từng phòng theo tầng. Màu nền = mức giá, chấm tròn = trạng thái."
-      /> */
+  /*<PageHeader
+          title="Sơ đồ tầng"
+          description="Xem nhanh trạng thái từng phòng theo tầng. Màu nền = mức giá, chấm tròn = trạng thái."
+        /> */
   return (
     <>
-      
+
       {isLoading && <div className="py-10 text-center font-bold text-[#505f76]">Đang tải sơ đồ tầng...</div>}
       {isError && (
         <div className="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
@@ -546,11 +544,10 @@ function FloorMapPage({ tenantList = [] }) {
                       setActiveFloor(floor);
                       setSelectedRoom(null);
                     }}
-                    className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${
-                      activeFloor === floor
-                        ? "bg-white text-[#091426] shadow-sm ring-1 ring-[#e2e8f0]"
-                        : "text-[#505f76] hover:text-[#091426]"
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${activeFloor === floor
+                      ? "bg-white text-[#091426] shadow-sm ring-1 ring-[#e2e8f0]"
+                      : "text-[#505f76] hover:text-[#091426]"
+                      }`}
                   >
                     Tầng {floor}
                   </button>
@@ -662,15 +659,15 @@ function RoomsListPage({ query }) {
     });
     downloadTextFile("danh-sach-phong.csv", rows.join("\n"));
   };
-/*<PageHeader
-        title="Quản lý phòng"
-        description={`Manage ${allRooms.length} rooms across 5 floors`}
-        actionLabel="Tạo phòng mới"
-        actionIcon={Building2}
-      />*/
+  /*<PageHeader
+          title="Quản lý phòng"
+          description={`Manage ${allRooms.length} rooms across 5 floors`}
+          actionLabel="Tạo phòng mới"
+          actionIcon={Building2}
+        />*/
   return (
     <>
-      
+
       <FilterBar>
         <SelectPill icon={Map}>Tất cả các tầng</SelectPill>
         <SelectPill icon={ListFilter}>Tất cả trạng thái</SelectPill>
@@ -762,7 +759,7 @@ export function RoomsManagementContent({ initialView = "floor-map", query = "" }
         <div>
           <h1 className="text-2xl font-bold text-[#191c1e]">Quản lý Phòng & Tầng</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
-            Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu vực quản trị.  
+            Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu vực quản trị.
           </p>
         </div>
         <div className="inline-flex w-full rounded-lg border border-[#e2e8f0] bg-white p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
@@ -775,11 +772,10 @@ export function RoomsManagementContent({ initialView = "floor-map", query = "" }
                 key={item.value}
                 type="button"
                 onClick={() => setView(item.value)}
-                className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold transition sm:flex-none ${
-                  isActive
-                    ? "bg-[#091426] text-white shadow-sm"
-                    : "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]"
-                }`}
+                className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold transition sm:flex-none ${isActive
+                  ? "bg-[#091426] text-white shadow-sm"
+                  : "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]"
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}

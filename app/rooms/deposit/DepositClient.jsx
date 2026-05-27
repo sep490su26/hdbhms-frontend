@@ -19,7 +19,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { createRoomHold } from "../../../lib/roomHoldStorage";
-import { bookRoom } from "../../../services/roomsService";
+import { checkoutDeposit, confirmMockPayment } from "../../../services/roomsService";
 
 const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
 
@@ -42,11 +42,10 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
         onChange={onChange}
         onInvalid={onInvalid}
         aria-invalid={error ? "true" : "false"}
-        className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
-          error
-            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-        }`}
+        className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${error
+          ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+          : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+          }`}
       />
       {error && <span className="text-xs font-medium text-rose-600">{error}</span>}
     </label>
@@ -125,13 +124,18 @@ function RoomSummary({ room }) {
   );
 }
 
-function DepositInfoForm({ room, onSubmit }) {
+function DepositInfoForm({ room, onSubmit, isSubmitting }) {
   const tomorrowDate = getTomorrowDateString();
   const [dateErrors, setDateErrors] = useState({});
   const [imagePreviews, setImagePreviews] = useState({
     citizenIdFront: "",
     citizenIdBack: "",
     portraitImage: "",
+  });
+  const [selectedFiles, setSelectedFiles] = useState({
+    citizenIdFront: null,
+    citizenIdBack: null,
+    portraitImage: null,
   });
 
   const validateFutureDate = (name, value) => {
@@ -160,19 +164,16 @@ function DepositInfoForm({ room, onSubmit }) {
     const file = event.target.files?.[0];
 
     if (!file) {
-      setImagePreviews((currentPreviews) => ({
-        ...currentPreviews,
-        [name]: "",
-      }));
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
       return;
     }
 
+    setSelectedFiles((prev) => ({ ...prev, [name]: file }));
+
     const reader = new FileReader();
     reader.onload = () => {
-      setImagePreviews((currentPreviews) => ({
-        ...currentPreviews,
-        [name]: reader.result,
-      }));
+      setImagePreviews((prev) => ({ ...prev, [name]: reader.result }));
     };
     reader.readAsDataURL(file);
   };
@@ -193,7 +194,28 @@ function DepositInfoForm({ room, onSubmit }) {
       return;
     }
 
-    onSubmit(data);
+    const formData = new FormData();
+    const metadata = {
+      room_id: room.roomId || "",
+      full_name: data.fullName,
+      dob: data.birthDate,
+      phone: data.phone,
+      email: data.email,
+      id_number: data.citizenId,
+      id_issue_date: data.idIssueDate,
+      id_issue_place: data.idIssuePlace,
+      permanent_address: data.permanentAddress,
+      expected_lease_sign_date: data.contractDate,
+      expected_move_in_date: data.moveInDate,
+    };
+
+    // Chuẩn bị payload chuẩn theo backend yêu cầu
+    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    if (selectedFiles.citizenIdFront) formData.append("id_front_file", selectedFiles.citizenIdFront);
+    if (selectedFiles.citizenIdBack) formData.append("id_back_file", selectedFiles.citizenIdBack);
+    if (selectedFiles.portraitImage) formData.append("portrait_file", selectedFiles.portraitImage);
+
+    onSubmit(formData, metadata);
   };
 
   return (
@@ -211,6 +233,9 @@ function DepositInfoForm({ room, onSubmit }) {
         <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" />
         <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} />
         <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" />
+        <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" />
+        <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" />
+        <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" />
         <Field
           label="Ngày hẹn ký hợp đồng"
           name="contractDate"
@@ -285,10 +310,15 @@ function DepositInfoForm({ room, onSubmit }) {
 
         <button
           type="submit"
-          className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] sm:col-span-2"
+          disabled={isSubmitting}
+          className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75 sm:col-span-2"
         >
-          Tiếp tục đặt cọc
-          <ArrowRight className="h-5 w-5" />
+          {isSubmitting ? "Đang xử lý..." : (
+            <>
+              Tiếp tục đặt cọc
+              <ArrowRight className="h-5 w-5" />
+            </>
+          )}
         </button>
       </form>
     </section>
@@ -298,6 +328,40 @@ function DepositInfoForm({ room, onSubmit }) {
 function DepositPaymentStep({ room, customer }) {
   const identityDigits = String(customer.phone || customer.citizenId || "00000").replace(/\D/g, "").slice(-5).padStart(5, "0");
   const paymentCode = `HD-${room.id}-${identityDigits}`;
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+
+  const handleConfirmPayment = async () => {
+    try {
+      setIsConfirming(true);
+      await confirmMockPayment(paymentCode);
+      setIsConfirmed(true);
+    } catch (error) {
+      alert("Lỗi: " + error.message);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  if (isConfirmed) {
+    return (
+      <section className="flex flex-col items-center justify-center rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-10 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#ecfdf5]">
+          <BadgeCheck className="h-8 w-8 text-[#006c49]" />
+        </div>
+        <h2 className="mt-5 text-2xl font-bold text-[#091426]">Xác nhận thành công!</h2>
+        <p className="mt-2 max-w-md text-sm leading-6 text-[#45474c]">
+          Yêu cầu đặt cọc phòng {room.id} đã được ghi nhận. Chủ nhà sẽ liên hệ xác nhận trong thời gian sớm nhất.
+        </p>
+        <a
+          href="/rooms"
+          className="mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-[#091426] px-8 text-sm font-bold text-white transition hover:bg-[#16253a]"
+        >
+          Quay lại xem phòng
+        </a>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-6 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
@@ -355,23 +419,16 @@ function DepositPaymentStep({ room, customer }) {
 
       <button
         type="button"
-        onClick={async () => {
-          try {
-            const formData = new FormData();
-            Object.entries(customer).forEach(([key, value]) => formData.append(key, value));
-            formData.append("roomId", room.roomId || "");
-            
-            await bookRoom(formData);
-            alert("Báo cáo đã chuyển khoản thành công! Chủ nhà sẽ xác nhận sớm nhất.");
-            window.location.href = "/rooms"; // Basic redirect for now
-          } catch (error) {
-            alert("Lỗi: " + error.message);
-          }
-        }}
-        className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a]"
+        disabled={isConfirming}
+        onClick={handleConfirmPayment}
+        className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75"
       >
-        Tôi đã chuyển khoản đặt cọc
-        <BadgeCheck className="h-5 w-5" />
+        {isConfirming ? "Đang xác nhận..." : (
+          <>
+            Tôi đã chuyển khoản đặt cọc
+            <BadgeCheck className="h-5 w-5" />
+          </>
+        )}
       </button>
     </section>
   );
@@ -380,17 +437,32 @@ function DepositPaymentStep({ room, customer }) {
 export function DepositClient({ room }) {
   const [customer, setCustomer] = useState({});
   const [step, setStep] = useState("info");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submitDepositRequest = (data) => {
-    setCustomer(data);
-    createRoomHold(room.id, {
-      customerName: data.fullName,
-      phone: data.phone,
-      email: data.email,
-      moveInDate: data.moveInDate,
-      contractDate: data.contractDate,
-    });
-    setStep("deposit");
+  const submitDepositRequest = async (formData, metadata) => {
+    try {
+      setIsSubmitting(true);
+
+      // Gọi API khởi tạo phiên đặt cọc
+      await checkoutDeposit(formData);
+
+      // Lưu state cục bộ phục vụ các bước sau
+      setCustomer(metadata);
+      createRoomHold(room.id, {
+        customerName: metadata.fullName,
+        phone: metadata.phone,
+        email: metadata.email,
+        moveInDate: metadata.moveInDate,
+        contractDate: metadata.contractDate,
+      });
+
+      // Chuyển sang bước hiển thị thanh toán
+      setStep("deposit");
+    } catch (error) {
+      alert("Lỗi: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -403,7 +475,7 @@ export function DepositClient({ room }) {
 
         <div className="grid gap-8 lg:grid-cols-[352px_1fr]">
           <RoomSummary room={room} />
-          {step === "info" && <DepositInfoForm room={room} onSubmit={submitDepositRequest} />}
+          {step === "info" && <DepositInfoForm room={room} onSubmit={submitDepositRequest} isSubmitting={isSubmitting} />}
           {step === "deposit" && <DepositPaymentStep room={room} customer={customer} />}
         </div>
 

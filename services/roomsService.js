@@ -106,7 +106,11 @@ export function mapApiRoomStatus(currentStatus) {
   const statusLower = currentStatus?.toLowerCase() ?? "";
 
   if (statusLower === "vacant" || statusLower === "available") return "available";
+  if (statusLower === "on_hold") return "onHold";
   if (statusLower === "reserved" || statusLower === "deposited") return "deposited";
+  if (statusLower === "soon_vacant") return "soonVacant";
+  if (statusLower === "maintenance") return "maintenance";
+  if (statusLower === "expired") return "expired";
   return "occupied";
 }
 
@@ -206,20 +210,42 @@ export async function fetchPublicRoomById(roomId) {
   return roomsData.find((room) => room.id === roomId || room.roomCode === roomId) ?? null;
 }
 
-export async function bookRoom(formData) {
-  const response = await fetch(`${PUBLIC_ROOMS_API_URL}/book`, {
+export async function checkoutDeposit(formData) {
+  // Use the global API base rather than PUBLIC_ROOMS_API_URL which ends in /rooms
+  const baseUrl = PUBLIC_ROOMS_API_URL.replace("/rooms", "");
+  const response = await fetch(`${baseUrl}/deposit/checkout`, {
     method: "POST",
     headers: {
       "X-Client-Type": "web",
     },
-    // Chú ý: Không set Content-Type, trình duyệt sẽ tự sinh boundary cho FormData
+    // Chú ý: Không set Content-Type, trình duyệt tự sinh boundary cho FormData multipart
     body: formData,
   });
 
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.code !== 0) {
-    throw new Error(payload.message || payload.details || "Không thể gửi yêu cầu đặt cọc.");
+    throw new Error(payload.message || payload.details || "Không thể khởi tạo phiên đặt cọc.");
+  }
+
+  return payload.data ?? null;
+}
+
+export async function confirmMockPayment(paymentCode) {
+  const baseUrl = PUBLIC_ROOMS_API_URL.replace("/rooms", "");
+  const response = await fetch(`${baseUrl}/mock/payment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Type": "web",
+    },
+    body: JSON.stringify({ payment_code: paymentCode }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || "Không thể xác nhận thanh toán.");
   }
 
   return payload.data ?? null;
@@ -240,10 +266,12 @@ export function findRoomById(roomId) {
 export function statusCopy(status) {
   const copy = {
     available: "Trống",
+    onHold: "Đang đặt cọc",
+    deposited: "Đã đặt cọc",
     occupied: "Đã thuê",
-    maintenance: "Bảo trì",
     soonVacant: "Sắp trống",
-    deposited: "Đang đặt cọc",
+    maintenance: "Bảo trì",
+    expired: "Hết hạn",
   };
 
   return copy[status] || "Đang ở";

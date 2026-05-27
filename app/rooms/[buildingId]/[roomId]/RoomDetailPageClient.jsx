@@ -75,6 +75,7 @@ function withDetailDefaults(room) {
 
 function BookingCard({ room }) {
   const isAvailable = room.status === "available";
+  const isOnHold = room.status === "onHold";
   const isDeposited = room.status === "deposited";
   const isOccupied = room.status === "occupied";
   const roomLabel = room.roomCode || room.name || room.id;
@@ -91,7 +92,7 @@ function BookingCard({ room }) {
   // Hàm helper lấy class màu sắc theo trạng thái
   const getStatusClass = () => {
     if (isAvailable) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (isDeposited) return "border-amber-200 bg-amber-50 text-amber-700";
+    if (isOnHold) return "border-amber-200 bg-amber-50 text-amber-700";
     return "border-slate-200 bg-slate-50 text-slate-600";
   };
 
@@ -170,23 +171,24 @@ function BookingCard({ room }) {
         <div className="border-b border-slate-100 pb-6">
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Giá thuê</p>
           <div className="flex flex-col">
-  <p className="text-3xl font-black text-[#006c49]">
-    {room.priceLabel}
-  </p>
+            <p className="text-3xl font-black text-[#006c49]">
+              {room.priceLabel}
+            </p>
 
-  <span className="text-sm font-semibold text-slate-500">
-    VND/tháng
-  </span>
-</div>
+            <span className="text-sm font-semibold text-slate-500">
+              VND/tháng
+            </span>
+          </div>
         </div>
 
         <div className="mt-6">
           {/* Thanh trạng thái động */}
           <div className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}>
-            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isDeposited ? "bg-amber-500" : "bg-slate-400"}`} />
+            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isOnHold ? "bg-amber-500" : "bg-slate-400"}`} />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
-            {isDeposited && "Đang giữ chỗ - Tạm khóa 15 phút"}
+            {isOnHold && "Đang giữ chỗ - Tạm khóa 15 phút"}
             {isOccupied && "Đã thuê - Không còn trống"}
+            {isDeposited && "Đã đặt cọc - Không còn trống"}
           </div>
 
           <div className="grid gap-3">
@@ -199,10 +201,9 @@ function BookingCard({ room }) {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${
-                isDeposited ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-500"
-              }`}>
-                {isDeposited ? "Phòng đang được giữ chỗ, chưa thể gửi thêm yêu cầu đặt cọc." : "Phòng đã được thuê, vui lòng chọn phòng khác."}
+              <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-500"
+                }`}>
+                {isOnHold ? "Phòng đang được giữ chỗ, chưa thể gửi thêm yêu cầu đặt cọc." : "Phòng đã được thuê, vui lòng chọn phòng khác."}
               </div>
             )}
 
@@ -329,11 +330,10 @@ function BookingCard({ room }) {
                     onChange={handleViewingFormChange}
                     onInvalid={handleViewingDateInvalid}
                     aria-invalid={viewingErrors.viewingDate ? "true" : "false"}
-                    className={`min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:ring-2 ${
-                      viewingErrors.viewingDate
-                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                        : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
-                    }`}
+                    className={`min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:ring-2 ${viewingErrors.viewingDate
+                      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                      }`}
                   />
                   {viewingErrors.viewingDate && (
                     <p className="text-xs font-medium text-rose-600">{viewingErrors.viewingDate}</p>
@@ -465,13 +465,13 @@ export function RoomDetailPageClient({ roomId }) {
 
         {/* Khối nền trắng bao bọc toàn bộ nội dung */}
         <div className="rounded-[32px] bg-white p-4 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
-          
+
           {/* Chia layout 2 cột: 70% - 30% */}
           <div className="grid gap-8 lg:grid-cols-[7fr_3fr]">
-            
+
             {/* Cột trái (70%) */}
             <div className="min-w-0 space-y-8">
-              
+
               {/* Box Ảnh */}
               <section className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm">
                 <div className="relative aspect-[16/10] min-h-[280px] bg-slate-900">
@@ -500,9 +500,8 @@ export function RoomDetailPageClient({ roomId }) {
                       type="button"
                       onClick={() => setActiveImage(image)}
                       aria-label={`Xem ảnh phòng ${index + 1}`}
-                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${
-                        activeImage === image ? "border-blue-500 ring-2 ring-blue-500/30" : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
-                      }`}
+                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-blue-500 ring-2 ring-blue-500/30" : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
+                        }`}
                     >
                       <Image src={image} alt={`Ảnh ${index + 1} phòng ${displayRoom.id}`} fill sizes="160px" className="object-cover" />
                     </button>

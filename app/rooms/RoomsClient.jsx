@@ -23,7 +23,11 @@ function guestStatusCopy(status) {
   const copy = {
     available: "Trống",
     occupied: "Đã thuê",
-    deposited: "Đang đặt cọc",
+    onHold: "Đang đặt cọc",
+    deposited: "Đã đặt cọc",
+    soonVacant: "Sắp trống",
+    maintenance: "Bảo trì",
+    expired: "Hết hạn",
   };
 
   return copy[status] || "Đã thuê";
@@ -31,6 +35,7 @@ function guestStatusCopy(status) {
 
 function publicStatusClass(status) {
   if (status === "available") return "border-emerald-400/30 bg-emerald-400/15 text-emerald-100";
+  if (status === "onHold") return "border-orange-400/30 bg-orange-400/15 text-orange-100";
   if (status === "deposited") return "border-amber-300/40 bg-amber-300/20 text-amber-100";
   return "border-slate-400/20 bg-slate-900/50 text-slate-200";
 }
@@ -40,6 +45,11 @@ function floorPlanStatusStyle(status) {
     return {
       box: "border-2 border-emerald-400 bg-emerald-50/50 text-emerald-700",
       dot: "bg-emerald-400",
+    };
+  if (status === "onHold")
+    return {
+      box: "border-2 border-orange-400 bg-orange-50/50 text-orange-700",
+      dot: "bg-orange-400",
     };
   if (status === "deposited")
     return {
@@ -65,9 +75,8 @@ function FloorPlanRoomBox({ room, isSelected, onSelect }) {
       }}
       disabled={!canInteract}
       aria-label={`Phòng ${room.id}`}
-      className={`relative flex w-full min-w-[92px] flex-col justify-between rounded-[14px] p-2.5 text-left transition-all ${box} ${
-        canInteract ? "hover:-translate-y-0.5 hover:shadow-md" : "cursor-not-allowed"
-      } ${isSelected ? "ring-[3px] ring-blue-500 ring-offset-1 ring-offset-white shadow-[0_2px_4px_-2px_rgba(219,234,254,1),0_4px_6px_-1px_rgba(219,234,254,1)]" : ""}`}
+      className={`relative flex w-full min-w-[92px] flex-col justify-between rounded-[14px] p-2.5 text-left transition-all ${box} ${canInteract ? "hover:-translate-y-0.5 hover:shadow-md" : "cursor-not-allowed"
+        } ${isSelected ? "ring-[3px] ring-blue-500 ring-offset-1 ring-offset-white shadow-[0_2px_4px_-2px_rgba(219,234,254,1),0_4px_6px_-1px_rgba(219,234,254,1)]" : ""}`}
       style={{ height: 72 }}
     >
       <div className="flex items-start justify-between">
@@ -101,9 +110,8 @@ function RoomListingCard({ room, isSelected, onSelect }) {
       onClick={() => {
         if (room.status !== "occupied") onSelect(room);
       }}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition ${
-        room.status === "occupied" ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:border-white/20"
-      } ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition ${room.status === "occupied" ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:border-white/20"
+        } ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <Image
@@ -190,22 +198,19 @@ function RoomDetail({ room, onClose }) {
       </div>
 
       {/* Bọc class động theo từng trạng thái */}
-      <div className={`border-b px-5 py-3 ${
-        room.status === "available" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-100"
-      }`}>
-        <span className={`inline-flex items-center gap-2 text-sm font-bold ${
-          room.status === "available" ? "text-emerald-700" : "text-slate-700"
+      <div className={`border-b px-5 py-3 ${room.status === "available" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-100"
         }`}>
-          <span className={`h-2 w-2 rounded-full ${
-            room.status === "available" ? "bg-emerald-500" : "bg-slate-400"
-          }`} />
+        <span className={`inline-flex items-center gap-2 text-sm font-bold ${room.status === "available" ? "text-emerald-700" : "text-slate-700"
+          }`}>
+          <span className={`h-2 w-2 rounded-full ${room.status === "available" ? "bg-emerald-500" : "bg-slate-400"
+            }`} />
           {room.status === "available" ? "Còn trống - sẵn sàng vào ở" : "Đã thuê - không còn trống"}
         </span>
       </div>
 
       <div className="custom-scrollbar flex-1 overflow-y-auto bg-white p-5 text-[#091426]">
         <div className="mb-5 grid grid-cols-4 gap-2">
-            {room.images.map((image, index) => (
+          {room.images.map((image, index) => (
             <button
               key={`${image}-${index}`}
               type="button"
@@ -552,6 +557,9 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                       </span>
                       <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
                         <i className="inline-block h-3 w-3 rounded-sm border border-slate-300 bg-slate-100" />ĐÃ THUÊ
+                      </span>
+                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
+                        <i className="inline-block h-3 w-3 rounded-sm bg-amber-500" />ĐÃ ĐẶT CỌC
                       </span>
                       <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
                         <i className="inline-block h-3 w-3 rounded-sm bg-amber-500" />ĐANG ĐẶT CỌC

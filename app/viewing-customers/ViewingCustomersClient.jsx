@@ -748,7 +748,7 @@ export default function ViewingCustomersClient() {
                     </tr>
                   ))}
                   {customers.length === 0 && (
-                    <tr>
+                    <tr key="empty-customers-row">
                       <td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-[#64748b]">
                         Không có khách xem phòng phù hợp với bộ lọc.
                       </td>

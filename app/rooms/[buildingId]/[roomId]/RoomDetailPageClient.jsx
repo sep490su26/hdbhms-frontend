@@ -150,7 +150,7 @@ function BookingCard({ room }) {
       const payload = {
         fullName: viewingForm.fullName,
         phone: viewingForm.phone,
-        propertyId: room.buildingId, // Numeric ID or code map
+        propertyId: room.propertyId || 1, // Must be numeric for backend
         roomId: room.roomId,         // Numeric ID
         appointmentAt,
         note: `Yêu cầu từ trang chi tiết phòng ${roomLabel}`,

@@ -53,8 +53,11 @@ export async function parseEnvelope(response) {
 }
 
 export async function authenticatedFetch(url, options = {}) {
-  const res = await fetch(url, {
+  const fullUrl = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+  
+  const res = await fetch(fullUrl, {
     ...options,
+    credentials: "include",
     headers: getAuthHeaders(options.headers),
   });
 
@@ -76,8 +79,9 @@ export async function authenticatedFetch(url, options = {}) {
 
     return new Promise((resolve) => {
       subscribeTokenRefresh(async (newToken) => {
-        const retryRes = await fetch(url, {
+        const retryRes = await fetch(fullUrl, {
           ...options,
+          credentials: "include",
           headers: {
             ...getAuthHeaders(options.headers),
             Authorization: `Bearer ${newToken}`,
@@ -137,6 +141,7 @@ export async function loginWithPhonePassword({ phone, password }) {
   } else {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         "X-Client-Type": "web",
@@ -163,7 +168,11 @@ export async function refreshTokenApi() {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    headers: { 
+      "Content-Type": "application/json",
+      "X-Client-Type": "web" 
+    },
     body: JSON.stringify({ token }),
   });
 

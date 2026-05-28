@@ -236,15 +236,15 @@ function Topbar({ search, onSearchChange, onToggleMobileMenu }) {
         <span className="truncate text-sm font-bold text-[#091426]">Hải Đăng</span>
       </div>
 
-      <label className="relative hidden w-full max-w-sm md:block">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />
-        <input
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Tìm phòng, khách thuê, mã cọc..."
-          className="h-9 w-full rounded-full bg-[#f2f4f6] pl-10 pr-4 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#6b7280] focus:ring-2 focus:ring-[#091426]/10"
-        />
-      </label>
+      {/*<label className="relative hidden w-full max-w-sm md:block">*/}
+      {/*  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />*/}
+      {/*  <input*/}
+      {/*    value={search}*/}
+      {/*    onChange={(event) => onSearchChange(event.target.value)}*/}
+      {/*    placeholder="Tìm phòng, khách thuê, mã cọc..."*/}
+      {/*    className="h-9 w-full rounded-full bg-[#f2f4f6] pl-10 pr-4 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#6b7280] focus:ring-2 focus:ring-[#091426]/10"*/}
+      {/*  />*/}
+      {/*</label>*/}
 
       <div className="ml-auto flex items-center gap-3">
         <button type="button" aria-label="Thông báo" className="relative rounded-full p-2 text-[#505f76] hover:bg-[#f2f4f6]">

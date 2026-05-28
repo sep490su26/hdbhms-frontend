@@ -162,7 +162,7 @@ function MaintenanceDetail({ ticket, onStatusChange }) {
           <StatusBadge value={ticket.status} map={ticketStatus} />
         </div>
         <h2 className="mt-2 text-2xl font-bold text-[#091426]">#{ticket.id}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#45474c]">Reported on {ticket.reportedAt} by {ticket.tenant}</p>
+        <p className="mt-2 text-sm leading-6 text-[#45474c]">Reported on {ticket.reportedAt} by {ticket.profile}</p>
       </div>
       <div className="grid gap-6 p-6">
         <SectionTitle>Issue description</SectionTitle>

@@ -97,10 +97,21 @@ export const rooms = floorPlans.flatMap((plan, floorIndex) =>
 
 export const floors = ["Tất cả", ...floorPlans.map((plan) => plan.floor)];
 
-export const PUBLIC_ROOMS_API_URL = "http://localhost:8080/api/v1/rooms";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
+export const PUBLIC_ROOMS_API_URL = `${API_BASE_URL}/rooms`;
 export const LANDLORD_CONTACT_PHONE = "09770011200";
 export const CONTACT_PHONE_HREF = `tel:${LANDLORD_CONTACT_PHONE}`;
 export const CONTACT_ZALO_HREF = `https://zalo.me/${LANDLORD_CONTACT_PHONE}`;
+
+async function readApiResponse(response, fallbackMessage) {
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || fallbackMessage);
+  }
+
+  return payload.data;
+}
 
 export function mapApiRoomStatus(currentStatus) {
   const statusLower = currentStatus?.toLowerCase() ?? "";
@@ -124,7 +135,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   if (/^\d+$/.test(floorName)) {
     floorName = `Tầng ${floorName}`;
   }
-  const floorOrder = apiRoom.floor?.sort_order ?? apiRoom.floor?.sortOrder;
+  const floorOrder = apiRoom.floor?.sort_order ?? apiRoom.floor?.sortOrder ?? apiRoom.floor_sort_order ?? apiRoom.floorSortOrder;
   const floorNumber = floorOrder ?? parseInt(floorName?.replace(/\D/g, "") || "1", 10);
 
   // Handle image collections
@@ -143,7 +154,10 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     id: roomCode, // Key for frontend routing/display (e.g., P101)
     roomId: apiRoom.id ?? null, // Numeric ID for API operations
     roomCode: roomCode,
+    floorId: apiRoom.floor?.id ?? apiRoom.floor_id ?? apiRoom.floorId ?? null,
+    floorCode: apiRoom.floor?.floor_code ?? apiRoom.floor?.floorCode ?? apiRoom.floor_code ?? apiRoom.floorCode ?? null,
     buildingId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
+    propertyId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
     buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? "Hải Đăng House",
     name: apiRoom.name ?? roomCode,
     status,
@@ -183,37 +197,114 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   };
 }
 
-export async function fetchPublicRooms({ size = 100 } = {}) {
-  const res = await fetch(`${PUBLIC_ROOMS_API_URL}?size=${size}`);
-  const json = await res.json();
-
-  if (json.code !== 0) {
-    throw new Error(json.message || "Không thể tải dữ liệu phòng");
-  }
-
-  return json.data?.data ?? [];
+export async function fetchPublicProperties() {
+  const response = await fetch(`${API_BASE_URL}/properties/simple`, { cache: "no-store" });
+  return readApiResponse(response, "Không thể tải danh sách cơ sở");
 }
 
-export async function fetchPublicRoomById(roomId) {
-  try {
-    const res = await fetch(`${PUBLIC_ROOMS_API_URL}/${roomId}`);
-    const json = await res.json();
+export async function fetchPublicFloors(propertyId) {
+  const response = await fetch(`${API_BASE_URL}/floors?propertyId=${encodeURIComponent(propertyId)}`, { cache: "no-store" });
+  return readApiResponse(response, "Không thể tải danh sách tầng");
+}
 
-    if (json.code === 0 && json.data) {
-      return json.data;
-    }
-  } catch {
-    // The detail endpoint is planned; the list endpoint remains the supported fallback.
+export async function fetchPublicRooms({ propertyId = 1, size = 100 } = {}) {
+  const response = await fetch(
+    `${PUBLIC_ROOMS_API_URL}?propertyId=${encodeURIComponent(propertyId)}&size=${encodeURIComponent(size)}`,
+    { cache: "no-store" },
+  );
+  const data = await readApiResponse(response, "Không thể tải dữ liệu phòng");
+
+  return data?.data ?? [];
+}
+
+function sameText(left, right) {
+  return String(left ?? "").trim().toLowerCase() === String(right ?? "").trim().toLowerCase();
+}
+
+function enrichRoomWithFloor(room, floors, property) {
+  const floor = floors.find((item) => sameText(item.name, room.floor_name ?? room.floorName))
+    ?? floors.find((item) => sameText(item.floor_code ?? item.floorCode, room.floor_code ?? room.floorCode))
+    ?? floors.find((item) => {
+      const roomCode = String(room.room_code ?? room.roomCode ?? "");
+      return roomCode.startsWith(String(item.sort_order ?? item.sortOrder ?? ""));
+    })
+    ?? null;
+
+  return {
+    ...room,
+    property_id: property?.id ?? room.property_id ?? room.propertyId ?? null,
+    propertyId: property?.id ?? room.property_id ?? room.propertyId ?? null,
+    property_name: property?.name ?? room.property_name ?? room.propertyName ?? "",
+    propertyName: property?.name ?? room.property_name ?? room.propertyName ?? "",
+    floor_id: floor?.id ?? room.floor_id ?? room.floorId ?? null,
+    floorId: floor?.id ?? room.floor_id ?? room.floorId ?? null,
+    floor_code: floor?.floor_code ?? floor?.floorCode ?? room.floor_code ?? room.floorCode ?? null,
+    floorCode: floor?.floor_code ?? floor?.floorCode ?? room.floor_code ?? room.floorCode ?? null,
+    floor_name: floor?.name ?? room.floor_name ?? room.floorName ?? "",
+    floorName: floor?.name ?? room.floor_name ?? room.floorName ?? "",
+    floor_sort_order: floor?.sort_order ?? floor?.sortOrder ?? room.floor_sort_order ?? room.floorSortOrder ?? null,
+    floorSortOrder: floor?.sort_order ?? floor?.sortOrder ?? room.floor_sort_order ?? room.floorSortOrder ?? null,
+  };
+}
+
+export async function fetchPublicRoomCatalog({ propertyId } = {}) {
+  const properties = await fetchPublicProperties();
+  const property = propertyId
+    ? properties.find((item) => String(item.id) === String(propertyId))
+    : properties[0];
+
+  if (!property) {
+    return { property: null, floors: [], rooms: [] };
   }
 
-  const roomsData = await fetchPublicRooms();
-  return roomsData.find((room) => room.id === roomId || room.roomCode === roomId) ?? null;
+  const [floorsData, roomsData] = await Promise.all([
+    fetchPublicFloors(property.id),
+    fetchPublicRooms({ propertyId: property.id, size: 200 }),
+  ]);
+
+  const sortedFloors = [...floorsData].sort((a, b) => {
+    const left = a.sort_order ?? a.sortOrder ?? 0;
+    const right = b.sort_order ?? b.sortOrder ?? 0;
+    return left - right;
+  });
+  const roomsWithFloor = roomsData.map((room) => enrichRoomWithFloor(room, sortedFloors, property));
+  const floorsWithRooms = sortedFloors.map((floor) => ({
+    ...floor,
+    rooms: roomsWithFloor.filter((room) => String(room.floor_id ?? room.floorId) === String(floor.id)),
+  }));
+
+  return {
+    property,
+    floors: floorsWithRooms,
+    rooms: roomsWithFloor,
+  };
+}
+
+export async function fetchPublicRoomById(roomIdentifier) {
+  if (!roomIdentifier) return null;
+
+  try {
+    const response = await fetch(`${PUBLIC_ROOMS_API_URL}/${encodeURIComponent(roomIdentifier)}`, { cache: "no-store" });
+    const data = await readApiResponse(response, "Không thể tải chi tiết phòng");
+
+    if (data) {
+      return data;
+    }
+  } catch {
+    // Fallback to list lookup for temporary compatibility with old roomId links.
+  }
+
+  const catalog = await fetchPublicRoomCatalog();
+  return catalog.rooms.find((room) => {
+    const id = room.id ?? room.room_id ?? room.roomId;
+    const code = room.room_code ?? room.roomCode;
+    return String(id) === String(roomIdentifier) || String(code) === String(roomIdentifier);
+  }) ?? null;
 }
 
 export async function checkoutDeposit(formData) {
   // Use the global API base rather than PUBLIC_ROOMS_API_URL which ends in /rooms
-  const baseUrl = PUBLIC_ROOMS_API_URL.replace("/rooms", "");
-  const response = await fetch(`${baseUrl}/deposit/checkout`, {
+  const response = await fetch(`${API_BASE_URL}/deposit/checkout`, {
     method: "POST",
     headers: {
       "X-Client-Type": "web",
@@ -225,21 +316,67 @@ export async function checkoutDeposit(formData) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.code !== 0) {
-    throw new Error(payload.message || payload.details || "Không thể khởi tạo phiên đặt cọc.");
+    const error = new Error(payload.message || payload.details || "Không thể khởi tạo phiên đặt cọc.");
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
 
   return payload.data ?? null;
 }
 
-export async function confirmMockPayment(paymentCode) {
-  const baseUrl = PUBLIC_ROOMS_API_URL.replace("/rooms", "");
-  const response = await fetch(`${baseUrl}/mock/payment`, {
+export async function fetchDepositRoomHoldStatus(roomId) {
+  if (!roomId) return null;
+
+  const response = await fetch(`${API_BASE_URL}/deposit/rooms/${encodeURIComponent(roomId)}/hold-status`, {
+    cache: "no-store",
+    headers: {
+      "X-Client-Type": "web",
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || "Không thể kiểm tra trạng thái giữ chỗ.");
+  }
+
+  return payload.data ?? null;
+}
+
+export async function cancelDepositPayment(paymentIntentId) {
+  if (!paymentIntentId) {
+    throw new Error("Thiếu mã phiên thanh toán để hủy giữ chỗ.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/cancel`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Client-Type": "web",
     },
-    body: JSON.stringify({ payment_code: paymentCode }),
+    body: JSON.stringify({}),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || "Không thể hủy phiên giữ chỗ.");
+  }
+
+  return payload.data ?? null;
+}
+
+export async function confirmMockPayment(paymentIntentId) {
+  if (!paymentIntentId) {
+    throw new Error("Thiếu mã phiên thanh toán. Vui lòng tạo lại yêu cầu đặt cọc.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/mock/payments/${encodeURIComponent(paymentIntentId)}/success`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Type": "web",
+    },
+    body: JSON.stringify({}),
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -254,13 +391,13 @@ export async function confirmMockPayment(paymentCode) {
 export function getRoomDetailHref(room) {
   const buildingId = encodeURIComponent(room.buildingId || "hai-dang-house");
   // Always use room.id which is the roomCode (e.g., P101) for the public endpoint
-  const roomId = encodeURIComponent(room.id);
+  const roomId = encodeURIComponent(room.roomCode || room.id);
 
   return `/rooms/${buildingId}/${roomId}`;
 }
 
 export function findRoomById(roomId) {
-  return rooms.find((room) => room.id === roomId) || rooms.find((room) => room.id === "P503") || rooms[0];
+  return rooms.find((room) => room.id === roomId || room.roomCode === roomId) ?? null;
 }
 
 export function statusCopy(status) {

@@ -6,7 +6,7 @@ export default async function RoomsPage({ searchParams }) {
   return (
     <RoomsClient
       depositSuccess={params?.depositSuccess === "1"}
-      requestedRoomId={params?.roomId || ""}
+      requestedRoomId={params?.roomCode || params?.roomId || ""}
     />
   );
 }

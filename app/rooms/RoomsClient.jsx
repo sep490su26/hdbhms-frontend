@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -16,8 +17,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-import { fetchPublicRooms, floorPlans, floors, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
+import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
 
 function guestStatusCopy(status) {
   const copy = {
@@ -63,7 +63,6 @@ function floorPlanStatusStyle(status) {
 }
 
 function FloorPlanRoomBox({ room, isSelected, onSelect }) {
-  const canInteract = room.status !== "occupied";
   const { box, dot } = floorPlanStatusStyle(room.status);
   const priceShort = room.price ? `${(room.price / 1000000).toFixed(1)}M` : "—";
 
@@ -71,12 +70,10 @@ function FloorPlanRoomBox({ room, isSelected, onSelect }) {
     <button
       type="button"
       onClick={() => {
-        if (canInteract) onSelect(room);
+        onSelect(room);
       }}
-      disabled={!canInteract}
       aria-label={`Phòng ${room.id}`}
-      className={`relative flex w-full min-w-[92px] flex-col justify-between rounded-[14px] p-2.5 text-left transition-all ${box} ${canInteract ? "hover:-translate-y-0.5 hover:shadow-md" : "cursor-not-allowed"
-        } ${isSelected ? "ring-[3px] ring-blue-500 ring-offset-1 ring-offset-white shadow-[0_2px_4px_-2px_rgba(219,234,254,1),0_4px_6px_-1px_rgba(219,234,254,1)]" : ""}`}
+      className={`relative flex w-full min-w-[92px] flex-col justify-between rounded-[14px] p-2.5 text-left transition-all ${box} hover:-translate-y-0.5 hover:shadow-md ${isSelected ? "ring-[3px] ring-blue-500 ring-offset-1 ring-offset-white shadow-[0_2px_4px_-2px_rgba(219,234,254,1),0_4px_6px_-1px_rgba(219,234,254,1)]" : ""}`}
       style={{ height: 72 }}
     >
       <div className="flex items-start justify-between">
@@ -106,12 +103,10 @@ function RoomListingCard({ room, isSelected, onSelect }) {
   return (
     <button
       type="button"
-      disabled={room.status === "occupied"}
       onClick={() => {
-        if (room.status !== "occupied") onSelect(room);
+        onSelect(room);
       }}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition ${room.status === "occupied" ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:border-white/20"
-        } ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <Image
@@ -147,14 +142,10 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         </div>
 
         <div className="mt-5 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
-          {room.status === "occupied" ? (
-            "Không thể xem chi tiết"
-          ) : (
-            <>
-              Xem chi tiết
-              <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-            </>
-          )}
+          <>
+            Xem chi tiết
+            <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+          </>
         </div>
       </div>
     </button>
@@ -300,75 +291,90 @@ function RoomDetail({ room, onClose }) {
 }
 
 export default function RoomsClient({ depositSuccess = false, requestedRoomId = "" }) {
+  const allFloorsLabel = "Tất cả";
+  const router = useRouter();
   const [viewMode, setViewMode] = useState("Listing");
-  const [activeFloorFilter, setActiveFloorFilter] = useState("Tất cả");
+  const [activeFloorFilter, setActiveFloorFilter] = useState(allFloorsLabel);
   const [activeFloorPlan, setActiveFloorPlan] = useState("Tầng 1");
   const [searchQuery, setSearchQuery] = useState("");
   const [availableOnly, setAvailableOnly] = useState(false);
-  const [selectedRoomId, setSelectedRoomId] = useState(requestedRoomId || null);
 
   const [apiRooms, setApiRooms] = useState([]);
+  const [catalogFloors, setCatalogFloors] = useState([]);
+  const [property, setProperty] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
-  useEffect(() => {
-    const loadPublicRooms = async () => {
-      try {
-        setIsLoading(true);
-        const roomsData = await fetchPublicRooms();
-        setApiRooms(roomsData);
-        setIsSuccess(true);
-      } catch {
-        setIsError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadPublicRooms();
+  const loadPublicRooms = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setIsError(false);
+      const catalog = await fetchPublicRoomCatalog();
+      setProperty(catalog.property);
+      setCatalogFloors(catalog.floors);
+      setApiRooms(catalog.rooms);
+      setActiveFloorPlan((current) => (
+        catalog.floors.some((floor) => floor.name === current)
+          ? current
+          : catalog.floors[0]?.name || ""
+      ));
+      setIsSuccess(true);
+    } catch {
+      setIsError(true);
+      setIsSuccess(false);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPublicRooms();
+  }, [loadPublicRooms]);
 
   const visibleRooms = useMemo(() => {
     return apiRooms.map((apiRoom) => normalizeApiRoom(apiRoom));
   }, [apiRooms]);
 
   const dynamicFloors = useMemo(() => {
-    const uniqueFloors = [...new Set(visibleRooms.map((r) => r.floor))].sort();
-    return ["Tất cả", ...uniqueFloors];
-  }, [visibleRooms]);
+    const uniqueFloors = catalogFloors.map((floor) => floor.name).filter(Boolean);
+    return [allFloorsLabel, ...uniqueFloors];
+  }, [catalogFloors, allFloorsLabel]);
 
-  const floorsForPlan = floorPlans.map((plan) => plan.floor);
+  const floorsForPlan = useMemo(() => catalogFloors.map((floor) => floor.name).filter(Boolean), [catalogFloors]);
 
   const filteredRooms = useMemo(() => {
     return visibleRooms.filter((room) => {
-      if (activeFloorFilter !== "Tất cả" && room.floor !== activeFloorFilter) return false;
+      if (activeFloorFilter !== allFloorsLabel && room.floor !== activeFloorFilter) return false;
       if (availableOnly && room.status !== "available") return false;
       if (searchQuery && !room.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [activeFloorFilter, availableOnly, searchQuery, visibleRooms]);
+  }, [activeFloorFilter, allFloorsLabel, availableOnly, searchQuery, visibleRooms]);
 
   const currentFloorRooms = useMemo(
     () => visibleRooms.filter((room) => room.floor === activeFloorPlan),
     [activeFloorPlan, visibleRooms],
   );
-  const selectedRoom = useMemo(
-    () => visibleRooms.find((room) => room.id === selectedRoomId) || null,
-    [selectedRoomId, visibleRooms],
-  );
-
   const openRoom = (room) => {
-    if (room.status === "occupied") return;
-    setSelectedRoomId(room.id);
-  };
-
-  const closePanel = () => {
-    setSelectedRoomId(null);
+    router.push(getRoomDetailHref(room));
   };
 
   return (
     <div className="min-h-screen bg-[#091426] px-4 pb-12 pt-28 text-white sm:px-6 lg:px-8">
+      {isError && (
+        <div className="mx-auto mb-6 max-w-xl rounded-[1.5rem] border border-rose-300/20 bg-rose-400/10 px-6 py-8 text-center">
+          <p className="text-sm font-semibold text-rose-100">Không tải được dữ liệu phòng</p>
+          <button
+            type="button"
+            onClick={loadPublicRooms}
+            className="mt-5 h-11 rounded-xl bg-white px-5 text-sm font-bold text-[#091426] transition hover:bg-slate-100"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
       {isLoading && <div className="py-10 text-center">Đang tải danh sách phòng...</div>}
-      {isError && <div className="py-10 text-center text-rose-400">Không thể tải dữ liệu. Vui lòng thử lại.</div>}
       {isSuccess && (
         <>
           <div className="mx-auto w-full max-w-6xl">
@@ -376,7 +382,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               <div>
                 <div className="mb-3 flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-slate-400">
                   <Home className="h-4 w-4" />
-                  Hải Đăng House
+                  {property?.name || "Hải Đăng House"}
                 </div>
                 <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
                   Xem phòng trống và chọn phòng đặt cọc
@@ -396,7 +402,6 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                         type="button"
                         onClick={() => {
                           setViewMode(item.key);
-                          closePanel();
                         }}
                         className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition sm:flex-none ${viewMode === item.key ? "bg-white text-[#1a223d]" : "text-slate-400 hover:text-white"
                           }`}
@@ -431,7 +436,6 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                       type="button"
                       onClick={() => {
                         viewMode === "Listing" ? setActiveFloorFilter(floor) : setActiveFloorPlan(floor);
-                        closePanel();
                       }}
                       className={`h-10 shrink-0 rounded-2xl px-5 text-xs font-bold uppercase tracking-widest transition ${isActive ? "bg-white text-[#1a223d]" : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
@@ -468,8 +472,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               </div>
             )}
 
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-              <section className={selectedRoom ? "min-w-0" : "lg:col-span-2"}>
+            <div className="grid gap-8">
+              <section>
                 {viewMode === "Listing" ? (
                   <div className="mx-auto w-full max-w-6xl">
                     {filteredRooms.length > 0 ? (
@@ -478,14 +482,19 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                           <RoomListingCard
                             key={room.id}
                             room={room}
-                            isSelected={selectedRoom?.id === room.id}
+                            isSelected={false}
                             onSelect={openRoom}
                           />
                         ))}
                       </div>
                     ) : (
                       <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] px-5 py-10 text-center">
-                        <p className="text-sm font-semibold text-slate-300">Không có phòng phù hợp với bộ lọc hiện tại.</p>
+                        {visibleRooms.length === 0 && (
+                          <p className="text-sm font-semibold text-slate-300">Chưa có dữ liệu phòng</p>
+                        )}
+                        {visibleRooms.length > 0 && (
+                          <p className="text-sm font-semibold text-slate-300">Không có phòng phù hợp với bộ lọc hiện tại.</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -513,7 +522,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                             <div key={room.id} className="w-[102px]">
                               <FloorPlanRoomBox
                                 room={room}
-                                isSelected={selectedRoom?.id === room.id}
+                                isSelected={false}
                                 onSelect={openRoom}
                               />
                             </div>
@@ -539,7 +548,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                             <div key={room.id} className="w-[102px]">
                               <FloorPlanRoomBox
                                 room={room}
-                                isSelected={selectedRoom?.id === room.id}
+                                isSelected={false}
                                 onSelect={openRoom}
                               />
                             </div>
@@ -568,46 +577,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                   </div>
                 )}
               </section>
-
-              <AnimatePresence mode="wait">
-                {selectedRoom && (
-                  <motion.aside
-                    key={selectedRoom.id}
-                    initial={{ opacity: 0, x: 24 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 24 }}
-                    transition={{ duration: 0.2 }}
-                    className="hidden h-[calc(100vh-8rem)] lg:sticky lg:top-28 lg:block"
-                  >
-                    <RoomDetail room={selectedRoom} onClose={closePanel} />
-                  </motion.aside>
-                )}
-              </AnimatePresence>
             </div>
           </div>
-
-          <AnimatePresence>
-            {selectedRoom && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-end bg-black/60 p-0 backdrop-blur-sm lg:hidden"
-                onClick={closePanel}
-              >
-                <motion.div
-                  initial={{ y: "100%" }}
-                  animate={{ y: 0 }}
-                  exit={{ y: "100%" }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  onClick={(event) => event.stopPropagation()}
-                  className="max-h-[90vh] w-full overflow-y-auto rounded-t-[2rem]"
-                >
-                  <RoomDetail room={selectedRoom} onClose={closePanel} />
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </>
       )}
     </div>

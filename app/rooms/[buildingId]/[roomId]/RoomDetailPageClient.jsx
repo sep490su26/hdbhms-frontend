@@ -21,7 +21,6 @@ import {
   CONTACT_PHONE_HREF,
   CONTACT_ZALO_HREF,
   fetchPublicRoomById,
-  findRoomById,
   normalizeApiRoom,
 } from "../../../../services/roomsService";
 import {
@@ -37,6 +36,16 @@ const getTomorrowDateString = () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   return tomorrow.toISOString().split("T")[0];
 };
+
+const VIEWING_DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
+const REQUIRED_MESSAGES = {
+  fullName: "Vui lòng nhập họ và tên.",
+  phone: "Vui lòng nhập số điện thoại.",
+  viewingDate: "Vui lòng chọn ngày xem phòng.",
+  viewingTime: "Vui lòng chọn giờ xem phòng.",
+};
+const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
+const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 
 function MetricCard({ icon: Icon, label, value }) {
   return (
@@ -55,6 +64,22 @@ function DetailSection({ title, children }) {
       <div className="mt-5 text-sm leading-relaxed text-slate-600">{children}</div>
     </section>
   );
+}
+
+function RequiredLabel({ htmlFor, children }) {
+  return (
+    <label htmlFor={htmlFor} className="text-sm font-medium text-slate-700">
+      {children} <span className="text-rose-600">*</span>
+    </label>
+  );
+}
+
+function viewingInputClass(error) {
+  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+    error
+      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+  }`;
 }
 
 function withDetailDefaults(room) {
@@ -96,51 +121,80 @@ function BookingCard({ room }) {
     return "border-slate-200 bg-slate-50 text-slate-600";
   };
 
+  const validateViewingField = (name, value) => {
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) {
+      return REQUIRED_MESSAGES[name] || "";
+    }
+
+    if (name === "fullName" && !FULL_NAME_PATTERN.test(normalizedValue)) {
+      return "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
+    }
+
+    if (name === "phone" && !VIETNAM_PHONE_PATTERN.test(normalizedValue)) {
+      return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+    }
+
+    if (name === "viewingDate" && normalizedValue < tomorrowDate) {
+      return VIEWING_DATE_ERROR_MESSAGE;
+    }
+
+    return "";
+  };
+
+  const validateAndSetViewingField = (name, value) => {
+    const message = validateViewingField(name, value);
+    setViewingErrors((currentErrors) => ({
+      ...currentErrors,
+      [name]: message,
+    }));
+    return !message;
+  };
+
   const handleViewingFormChange = (event) => {
     const { name, value } = event.target;
     setViewingForm((currentForm) => ({
       ...currentForm,
       [name]: value,
     }));
+    validateAndSetViewingField(name, value);
+  };
 
-    if (name === "viewingDate") {
-      validateViewingDate(value);
-    }
+  const handleViewingFieldBlur = (event) => {
+    const { name, value } = event.target;
+    validateAndSetViewingField(name, value);
   };
 
   const closeViewingModal = () => {
     setIsViewingModalOpen(false);
+    setViewingErrors({});
   };
 
   const validateViewingDate = (value) => {
-    const hasError = Boolean(value) && value < tomorrowDate;
-    setViewingErrors((currentErrors) => ({
-      ...currentErrors,
-      viewingDate: hasError ? DATE_ERROR_MESSAGE : "",
-    }));
-    return !hasError;
+    return validateAndSetViewingField("viewingDate", value);
   };
 
   const handleViewingDateInvalid = (event) => {
     if (event.target.validity.rangeUnderflow) {
       setViewingErrors((currentErrors) => ({
         ...currentErrors,
-        viewingDate: DATE_ERROR_MESSAGE,
+        viewingDate: VIEWING_DATE_ERROR_MESSAGE,
       }));
     }
   };
 
   const handleViewingSubmit = async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const isViewingDateValid = validateViewingDate(viewingForm.viewingDate);
+    const nextErrors = {
+      fullName: validateViewingField("fullName", viewingForm.fullName),
+      phone: validateViewingField("phone", viewingForm.phone),
+      viewingDate: validateViewingField("viewingDate", viewingForm.viewingDate),
+      viewingTime: validateViewingField("viewingTime", viewingForm.viewingTime),
+    };
+    setViewingErrors(nextErrors);
 
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
-    }
-
-    if (!isViewingDateValid) {
+    if (Object.values(nextErrors).some(Boolean)) {
       return;
     }
 
@@ -148,8 +202,8 @@ function BookingCard({ room }) {
       const appointmentAt = combineAppointmentParts(viewingForm.viewingDate, viewingForm.viewingTime);
       console.log("Current room object:", room);
       const payload = {
-        fullName: viewingForm.fullName,
-        phone: viewingForm.phone,
+        fullName: viewingForm.fullName.trim(),
+        phone: viewingForm.phone.trim(),
         propertyId: room.propertyId || 1, // Must be numeric for backend
         roomId: room.roomId,         // Numeric ID
         appointmentAt,
@@ -194,7 +248,7 @@ function BookingCard({ room }) {
           <div className="grid gap-3">
             {isAvailable ? (
               <Link
-                href={`/rooms/deposit?roomId=${room.id}`}
+                href={`/rooms/deposit?roomCode=${encodeURIComponent(room.roomCode || room.id)}`}
                 className="flex min-h-14 items-center justify-center gap-2 rounded-[16px] bg-[#232946] px-4 py-3 text-center text-sm font-bold text-white shadow-lg shadow-[#232946]/20 transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
               >
                 Gửi yêu cầu đặt cọc
@@ -269,37 +323,49 @@ function BookingCard({ room }) {
               </button>
             </div>
 
-            <form className="mt-7 grid gap-5" onSubmit={handleViewingSubmit}>
+            <form className="mt-7 grid gap-5" onSubmit={handleViewingSubmit} noValidate>
               <div className="grid gap-2">
-                <label htmlFor="viewing-full-name" className="text-sm font-medium text-slate-700">
+                <RequiredLabel htmlFor="viewing-full-name">
                   Họ và tên
-                </label>
+                </RequiredLabel>
                 <input
                   id="viewing-full-name"
                   name="fullName"
                   type="text"
-                  required
                   value={viewingForm.fullName}
                   onChange={handleViewingFormChange}
-                  className="min-h-12 rounded-[14px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  onBlur={handleViewingFieldBlur}
+                  aria-invalid={viewingErrors.fullName ? "true" : "false"}
+                  aria-describedby={viewingErrors.fullName ? "viewing-full-name-error" : undefined}
+                  className={viewingInputClass(viewingErrors.fullName)}
                   placeholder="Nhập họ và tên"
                 />
+                {viewingErrors.fullName && (
+                  <p id="viewing-full-name-error" className="text-xs font-medium text-rose-600">{viewingErrors.fullName}</p>
+                )}
               </div>
 
               <div className="grid gap-2">
-                <label htmlFor="viewing-phone" className="text-sm font-medium text-slate-700">
+                <RequiredLabel htmlFor="viewing-phone">
                   Số điện thoại
-                </label>
+                </RequiredLabel>
                 <input
                   id="viewing-phone"
                   name="phone"
                   type="tel"
-                  required
                   value={viewingForm.phone}
                   onChange={handleViewingFormChange}
-                  className="min-h-12 rounded-[14px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  onBlur={handleViewingFieldBlur}
+                  inputMode="numeric"
+                  maxLength={10}
+                  aria-invalid={viewingErrors.phone ? "true" : "false"}
+                  aria-describedby={viewingErrors.phone ? "viewing-phone-error" : undefined}
+                  className={viewingInputClass(viewingErrors.phone)}
                   placeholder="Nhập số điện thoại"
                 />
+                {viewingErrors.phone && (
+                  <p id="viewing-phone-error" className="text-xs font-medium text-rose-600">{viewingErrors.phone}</p>
+                )}
               </div>
 
               <div className="grid gap-2">
@@ -317,42 +383,45 @@ function BookingCard({ room }) {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <label htmlFor="viewing-date" className="text-sm font-medium text-slate-700">
+                  <RequiredLabel htmlFor="viewing-date">
                     Ngày xem phòng
-                  </label>
+                  </RequiredLabel>
                   <input
                     id="viewing-date"
                     name="viewingDate"
                     type="date"
-                    required
                     min={tomorrowDate}
                     value={viewingForm.viewingDate}
                     onChange={handleViewingFormChange}
+                    onBlur={handleViewingFieldBlur}
                     onInvalid={handleViewingDateInvalid}
                     aria-invalid={viewingErrors.viewingDate ? "true" : "false"}
-                    className={`min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:ring-2 ${viewingErrors.viewingDate
-                      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
-                      }`}
+                    aria-describedby={viewingErrors.viewingDate ? "viewing-date-error" : undefined}
+                    className={viewingInputClass(viewingErrors.viewingDate)}
                   />
                   {viewingErrors.viewingDate && (
-                    <p className="text-xs font-medium text-rose-600">{viewingErrors.viewingDate}</p>
+                    <p id="viewing-date-error" className="text-xs font-medium text-rose-600">{viewingErrors.viewingDate}</p>
                   )}
                 </div>
 
                 <div className="grid gap-2">
-                  <label htmlFor="viewing-time" className="text-sm font-medium text-slate-700">
+                  <RequiredLabel htmlFor="viewing-time">
                     Giờ xem phòng
-                  </label>
+                  </RequiredLabel>
                   <input
                     id="viewing-time"
                     name="viewingTime"
                     type="time"
-                    required
                     value={viewingForm.viewingTime}
                     onChange={handleViewingFormChange}
-                    className="min-h-12 rounded-[14px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    onBlur={handleViewingFieldBlur}
+                    aria-invalid={viewingErrors.viewingTime ? "true" : "false"}
+                    aria-describedby={viewingErrors.viewingTime ? "viewing-time-error" : undefined}
+                    className={viewingInputClass(viewingErrors.viewingTime)}
                   />
+                  {viewingErrors.viewingTime && (
+                    <p id="viewing-time-error" className="text-xs font-medium text-rose-600">{viewingErrors.viewingTime}</p>
+                  )}
                 </div>
               </div>
 
@@ -393,9 +462,8 @@ export function RoomDetailPageClient({ roomId }) {
       try {
         setIsLoading(true);
         const apiRoom = await fetchPublicRoomById(roomId);
-        const fallbackRoom = findRoomById(roomId);
         const currentRoomHolds = getActiveRoomHolds();
-        const nextRoom = apiRoom ? normalizeApiRoom(apiRoom, currentRoomHolds) : fallbackRoom.id === roomId ? withDetailDefaults(fallbackRoom) : null;
+        const nextRoom = apiRoom ? normalizeApiRoom(apiRoom, currentRoomHolds) : null;
 
         if (!isMounted) return;
         if (!nextRoom) throw new Error("Room not found");

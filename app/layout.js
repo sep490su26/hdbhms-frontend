@@ -1,13 +1,14 @@
 import {Geist, Geist_Mono} from "next/font/google";
+import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import {SiteChrome} from "@/components/SiteChrome";
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
-    subsets: ["latin"],
+const fontSans = Be_Vietnam_Pro({
+    subsets: ["vietnamese"],
+    weight: ["400", "500", "600", "700"],
+    variable: "--font-sans",
 });
-
-const geistMono = Geist_Mono({
+const fontMono = Geist_Mono({
     variable: "--font-geist-mono",
     subsets: ["latin"],
 });
@@ -20,8 +21,8 @@ export const metadata = {
 export default function RootLayout({children}) {
     return (
         <html
-            lang="en"
-            className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+            lang="vi"
+            className={`${fontSans.variable} ${fontMono.variable} h-full antialiased`}
         >
         <body className="min-h-full flex flex-col font-sans">
         <SiteChrome>{children}</SiteChrome>

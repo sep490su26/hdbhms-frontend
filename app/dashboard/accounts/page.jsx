@@ -48,38 +48,28 @@ const statusOptions = [
     {value: "all", label: "Tất cả trạng thái"},
     {value: "ACTIVE", label: "Đang hoạt động"},
     {value: "DISABLED", label: "Đã khóa"},
-    {value: "PENDING_CONTRACT", label: "Chờ hợp đồng"},
+    // {value: "PENDING_CONTRACT", label: "Chờ hợp đồng"},
 ];
 
 const roleMeta = {
     OWNER: {
         label: "Chủ trọ",
-        group: "Nhân sự",
-        idPrefix: "OWN",
         className: "bg-slate-900 text-white ring-slate-900",
     },
     MANAGER: {
         label: "Quản lý",
-        group: "Nhân sự",
-        idPrefix: "EMP",
         className: "bg-blue-50 text-blue-700 ring-blue-100",
     },
     ACCOUNTANT: {
         label: "Kế toán",
-        group: "Nhân sự",
-        idPrefix: "ACC",
         className: "bg-indigo-50 text-indigo-700 ring-indigo-100",
     },
     TENANT: {
         label: "Khách thuê",
-        group: "Khách thuê",
-        idPrefix: "TEN",
         className: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     },
     LEAD: {
         label: "Khách tìm hiểu",
-        group: "Lead",
-        idPrefix: "LEA",
         className: "bg-amber-50 text-amber-700 ring-amber-100",
     },
 };
@@ -100,11 +90,8 @@ const statusMeta = {
 };
 
 const assignableRoleOptions = [
-    {value: "LEAD", label: "Khách tìm hiểu"},
-    {value: "TENANT", label: "Khách thuê"},
     {value: "MANAGER", label: "Quản lý"},
     {value: "ACCOUNTANT", label: "Kế toán"},
-    {value: "OWNER", label: "Chủ trọ"},
 ];
 
 const staffCreationRoleOptions = [
@@ -372,8 +359,6 @@ function RoleBadge({role}) {
     return (
         <span
             className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${meta.className}`}>
-      {meta.group}
-            <span className="h-1 w-1 rounded-full bg-current opacity-60"/>
             {meta.label}
     </span>
     );
@@ -387,12 +372,6 @@ function StatusBadge({status, mustChangePassword}) {
       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${meta.className}`}>
         {meta.label}
       </span>
-            {mustChangePassword && (
-                <span
-                    className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-100">
-          Chưa kích hoạt
-        </span>
-            )}
         </div>
     );
 }
@@ -823,10 +802,9 @@ export default function AccountsPage() {
                 )}
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
                 <MetricCard icon={UsersRound} label="Tổng nhân sự" value={metrics.totalStaff}/>
                 <MetricCard icon={ShieldCheck} label="Đang hoạt động" value={metrics.active} tone="emerald"/>
-                <MetricCard icon={UserRoundCog} label="Chờ duyệt" value={metrics.pending} tone="amber"/>
                 <MetricCard icon={LockKeyhole} label="Đã khóa" value={metrics.disabled} tone="rose"/>
             </section>
 
@@ -903,9 +881,6 @@ export default function AccountsPage() {
                             <th className="px-5 py-4">Số điện thoại</th>
                             <th className="px-5 py-4">Email</th>
                             <th className="px-5 py-4">Trạng thái</th>
-                            <th className="px-5 py-4">Ngày tạo</th>
-                            <th className="px-5 py-4">Đăng nhập gần nhất</th>
-                            <th className="px-5 py-4">Hồ sơ</th>
                             <th className="px-5 py-4 text-right">Thao tác</th>
                         </tr>
                         </thead>
@@ -939,14 +914,6 @@ export default function AccountsPage() {
                         Đã xóa mềm
                       </span>
                                     )}
-                                </td>
-                                <td className="px-5 py-4 text-[#45474c]">{formatDateTime(account.createdAt)}</td>
-                                <td className="px-5 py-4 text-[#45474c]">{formatDateTime(account.lastLoginAt)}</td>
-                                <td className="px-5 py-4">
-                    <span
-                        className="inline-flex rounded-full bg-[#f2f4f6] px-2.5 py-1 text-xs font-bold text-[#505f76]">
-                      {account.personProfileId ? `PROFILE-${String(account.personProfileId).padStart(3, "0")}` : "Chưa liên kết"}
-                    </span>
                                 </td>
                                 <td className="px-5 py-4">
                                     <div className="flex justify-end gap-2">
@@ -987,15 +954,6 @@ export default function AccountsPage() {
                                                         <LockKeyhole className="h-4 w-4"/>
                                                     )}
                                                     {account.status === "DISABLED" ? "Mở khóa" : "Khóa"}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openDeleteDialog(account)}
-                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                                                    aria-label={`Xóa mềm ${account.fullName}`}
-                                                    title="Xóa mềm"
-                                                >
-                                                    <Trash2 className="h-4 w-4"/>
                                                 </button>
                                             </>
                                         )}

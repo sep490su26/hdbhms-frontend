@@ -2,323 +2,810 @@
 
 import {useState} from "react";
 import {
-    CalendarClock,
-    Check,
-    Edit3,
-    FileText,
-    Mail,
-    Phone,
-    Trash2,
-    UserPlus,
-    WalletCards,
-    X,
-} from "lucide-react";
-import {tenants} from "@/services/dashboardService";
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger
+} from "@/components/ui/dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
-const money = new Intl.NumberFormat("vi-VN");
+const TENANTS = [
+    {
+        id: 1,
+        initials: "NH",
+        color: "bg-indigo-100 text-indigo-700",
+        name: "Nguyễn Văn Hưng",
+        phone: "0901 234 567",
+        email: "vinhung@gmail.com",
+        rooms: 102,
+        people: 2,
+        detail: {
+            fullName: "Nguyễn Văn Hoàng",
+            dob: "15/05/1992",
+            gender: "Nam",
+            idNumber: "0123456789001",
+            idDate: "24/10/2021",
+            idPlace: "Cục CS QLHC",
+            address: "123 Đường Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh",
+            branch: "Hải Đăng 1",
+            roomNumber: "P.102",
+            coTenant: "Trần Thị B",
+            coTenantYear: "1995",
+            coTenantPhone: "0987 654 321",
+            vehicle: "Honda Airblade",
+            plate: "59-X1123.45",
+            vehicleCount: "01",
+            contract: "HD-2024-H102",
+            contractDuration: "12 tháng",
+            contractStart: "01/01/2024",
+            contractEnd: "31/12/2024",
+            cccdFront: true,
+            cccdBack: false,
+            hasCCCD: true,
+            hasPhoto: true,
+            phone: "090 123 4567",
+            email: "hoang.nguyen@email.com",
+        },
+    },
+    {
+        id: 2,
+        initials: "LT",
+        color: "bg-teal-100 text-teal-700",
+        name: "Lê Thị Thu",
+        phone: "0912 333 444",
+        email: "thithu@gmail.com",
+        rooms: 105,
+        people: 1,
+        detail: {
+            fullName: "Lê Thị Thu",
+            dob: "22/08/1995",
+            gender: "Nữ",
+            idNumber: "0987654321001",
+            idDate: "10/06/2020",
+            idPlace: "Cục CS QLHC",
+            address: "45 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
+            branch: "Hải Đăng 1",
+            roomNumber: "P.105",
+            coTenant: null,
+            coTenantYear: null,
+            coTenantPhone: null,
+            vehicle: "Yamaha Exciter",
+            plate: "51-B99876",
+            vehicleCount: "01",
+            contract: "HD-2024-H105",
+            contractDuration: "6 tháng",
+            contractStart: "01/03/2024",
+            contractEnd: "31/08/2024",
+            cccdFront: true,
+            cccdBack: true,
+            hasCCCD: true,
+            hasPhoto: true,
+            phone: "0912 333 444",
+            email: "thithu@gmail.com",
+        },
+    },
+    {
+        id: 3,
+        initials: "PM",
+        color: "bg-orange-100 text-orange-700",
+        name: "Phạm Minh Tuấn",
+        phone: "0933 111 222",
+        email: "minhtuanpham@gmail.com",
+        rooms: 201,
+        people: 3,
+        detail: {
+            fullName: "Phạm Minh Tuấn",
+            dob: "05/03/1990",
+            gender: "Nam",
+            idNumber: "0112233445566",
+            idDate: "01/01/2019",
+            idPlace: "Cục CS QLHC",
+            address: "88 Trần Hưng Đạo, Quận 5, TP. Hồ Chí Minh",
+            branch: "Hải Đăng 2",
+            roomNumber: "P.201",
+            coTenant: "Nguyễn Thị C",
+            coTenantYear: "1992",
+            coTenantPhone: "0966 778 899",
+            vehicle: "Honda Winner",
+            plate: "59-AA5678",
+            vehicleCount: "01",
+            contract: "HD-2024-H201",
+            contractDuration: "12 tháng",
+            contractStart: "15/02/2024",
+            contractEnd: "14/02/2025",
+            cccdFront: true,
+            cccdBack: true,
+            hasCCCD: true,
+            hasPhoto: false,
+            phone: "0933 111 222",
+            email: "minhtuanpham@gmail.com",
+        },
+    },
+];
 
-function formatMoney(value) {
-    return `${money.format(value)} đ`;
+const FLOORS = [
+    {label: "Tầng 2", rooms: ["101", "102", "103", "104"]},
+    {label: "Tầng 3", rooms: ["201", "202", "203", "204"]},
+    {label: "Tầng 4", rooms: ["301", "302", "303", "304"]},
+];
+
+function getPageNumbers(currentPage, totalPages, maxVisible = 5) {
+    const pages = [];
+    if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+        const start = Math.max(2, currentPage - 1);
+        const end = Math.min(totalPages - 1, currentPage + 1);
+        pages.push(1);
+        if (start > 2) pages.push("...");
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (end < totalPages - 1) pages.push("...");
+        pages.push(totalPages);
+    }
+    return pages;
 }
 
-function Modal({title, children, onClose, footer}) {
+function PaginationFooter({
+                              startIndex,
+                              pageSize,
+                              totalItems,
+                              currentPage,
+                              totalPages,
+                              onPageChange,
+                              onPageSizeChange,
+                          }) {
+    const pages = getPageNumbers(currentPage, totalPages);
+
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-        >
-            <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-                    <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        aria-label="Đóng"
-                        className="rounded-md p-2 text-[#505f76] hover:bg-[#f2f4f6]"
-                    >
-                        <X className="h-5 w-5"/>
-                    </button>
-                </div>
-                <div className="max-h-[68vh] overflow-y-auto p-6 custom-scrollbar">{children}</div>
-                {footer && <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>}
-            </div>
-        </div>
-    );
-}
-
-function IconButton({label, icon: Icon, onClick, tone = "neutral"}) {
-    const tones = {
-        neutral: "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]",
-        good: "text-emerald-600 hover:bg-emerald-50",
-        warn: "text-blue-600 hover:bg-blue-50",
-        bad: "text-rose-600 hover:bg-rose-50",
-    };
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-label={label}
-            className={`rounded-md p-2 transition ${tones[tone]}`}
-        >
-            <Icon className="h-4 w-4"/>
-        </button>
-    );
-}
-
-function PageHeader({title, description, actionLabel, actionIcon: ActionIcon = Check, onAction}) {
-    return (
-        <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-                <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">{title}</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">{description}</p>
-            </div>
-            {actionLabel && (
-                <button
-                    type="button"
-                    onClick={onAction}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a]"
-                >
-                    <ActionIcon className="h-4 w-4"/>
-                    {actionLabel}
-                </button>
-            )}
-        </section>
-    );
-}
-
-function Card({children, className = ""}) {
-    return (
-        <section
-            className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}>
-            {children}
-        </section>
-    );
-}
-
-function InfoMetric({icon: Icon, label, value}) {
-    return (
-        <div className="flex items-center gap-3">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f2f4f6] text-[#505f76]">
-        <Icon className="h-4 w-4"/>
+            className="border-t border-gray-100 px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+      <span className="text-xs text-gray-500 whitespace-nowrap">
+        Hiển thị {startIndex + 1}–{Math.min(startIndex + pageSize, totalItems)} trong {totalItems} kết quả
       </span>
-            <span>
-        <span className="block text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">{label}</span>
-        <span className="block text-sm font-bold text-[#091426]">{value}</span>
-      </span>
-        </div>
-    );
-}
-
-function InfoBlock({label, value}) {
-    return (
-        <div>
-            <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">{label}</p>
-            <p className="mt-1 text-sm font-bold text-[#091426]">{value}</p>
-        </div>
-    );
-}
-
-function SectionTitle({children}) {
-    return <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#45474c]">{children}</h3>;
-}
-
-function TenantProfile({profile}) {
-    const [preview, setPreview] = useState(null);
-    const contract = {
-        code: `HD-${profile.roomId}-2025`,
-        landlord: "Hải Đăng Boarding House",
-        startDate: profile.moveInDate,
-        endDate: "14/01/2026",
-        paymentCycle: "Thanh toán hàng tháng, trước ngày 05",
-    };
-
-    return (
-        <Card className="overflow-hidden">
-            <div className="bg-[#091426] p-6 text-white">
-                <div className="flex items-start justify-between">
-          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-xl font-bold">
-            {profile.initials}
-          </span>
-                    <div className="flex gap-2">
-                        <IconButton label="Sửa khách thuê" icon={Edit3}/>
-                        <IconButton label="Xóa khách thuê" icon={Trash2} tone="bad"/>
-                    </div>
-                </div>
-                <h2 className="mt-5 text-2xl font-bold">{profile.name}</h2>
-                <p className="mt-1 text-sm text-slate-300">ID: {profile.citizenId}</p>
-            </div>
-            <div className="grid gap-6 p-6">
-                <SectionTitle>Thông tin cơ bản</SectionTitle>
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <InfoBlock label="Ngày sinh" value={profile.birthDate}/>
-                    <InfoBlock label="Ngày vào ở" value={profile.moveInDate}/>
-                    <InfoBlock label="SĐT người thân" value={profile.relativePhone}/>
-                    <InfoBlock label="Biển số xe" value={profile.vehiclePlate}/>
-                </div>
-                <SectionTitle>Liên hệ</SectionTitle>
-                <div className="grid gap-3">
-                    <InfoMetric icon={Phone} label="Số điện thoại" value={profile.phone}/>
-                    <InfoMetric icon={Mail} label="Email" value={profile.email}/>
-                </div>
-                <SectionTitle>Hồ sơ đính kèm</SectionTitle>
-                <div className="grid gap-3 sm:grid-cols-3">
-                    {[
-                        {id: "front", label: "CCCD mặt trước", meta: profile.citizenId},
-                        {id: "back", label: "CCCD mặt sau", meta: `Ngày sinh ${profile.birthDate}`},
-                        {id: "contract", label: "Hợp đồng thuê", meta: contract.code},
-                    ].map((doc) => (
-                        <button
-                            key={doc.id}
-                            type="button"
-                            onClick={() => setPreview(doc.id)}
-                            className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 text-left hover:border-[#091426]"
-                        >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#505f76]">
-                <FileText className="h-4 w-4"/>
-              </span>
-                            <span className="mt-3 block text-sm font-bold text-[#091426]">{doc.label}</span>
-                            <span className="mt-1 block text-xs text-[#6b7280]">{doc.meta}</span>
-                        </button>
-                    ))}
-                </div>
-                <div className="grid gap-3 border-t border-[#e2e8f0] pt-5 sm:grid-cols-2">
-                    <button
-                        type="button"
-                        className="h-12 rounded-lg border border-[#c5c6cd] text-sm font-bold text-[#091426] hover:border-[#091426]"
-                    >
-                        Gia hạn hợp đồng
-                    </button>
-                    <button
-                        type="button"
-                        className="h-12 rounded-lg bg-[#091426] text-sm font-bold text-white hover:bg-[#16253a]"
-                    >
-                        Gửi thông báo
-                    </button>
-                </div>
-            </div>
-            {preview && (
-                <Modal
-                    title={preview === "contract" ? "Chi tiết hợp đồng thuê" : `Xem ${preview === "front" ? "CCCD mặt trước" : "CCCD mặt sau"}`}
-                    onClose={() => setPreview(null)}
-                >
-                    {preview === "contract" ? (
-                        <div className="grid gap-4">
-                            <div className="rounded-xl border border-[#e2e8f0] bg-[#f7f9fb] p-5">
-                                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">Thông tin
-                                    hai bên</p>
-                                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                                    <InfoBlock label="Bên cho thuê" value={contract.landlord}/>
-                                    <InfoBlock label="Bên thuê" value={profile.name}/>
-                                    <InfoBlock label="SĐT bên thuê" value={profile.phone}/>
-                                    <InfoBlock label="Email bên thuê" value={profile.email}/>
-                                </div>
-                            </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <InfoBlock label="Phòng" value={profile.roomId}/>
-                                <InfoBlock label="Ngày bắt đầu" value={contract.startDate}/>
-                                <InfoBlock label="Ngày kết thúc" value={contract.endDate}/>
-                                <InfoBlock label="Giá thuê" value={formatMoney(profile.monthlyRent)}/>
-                                <InfoBlock label="Chu kỳ thanh toán" value={contract.paymentCycle}/>
-                                <InfoBlock label="Tiền cọc" value={formatMoney(profile.deposit)}/>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="grid gap-5 md:grid-cols-[1.2fr_1fr]">
-                            <div
-                                className="flex aspect-[1.58] items-center justify-center rounded-xl border border-[#c5c6cd] bg-[#eef2f7]">
-                                <div className="w-[82%] rounded-lg border border-[#c5c6cd] bg-white p-5 shadow-sm">
-                                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">Căn cước
-                                        công dân</p>
-                                    <p className="mt-8 text-xl font-bold text-[#091426]">{profile.name}</p>
-                                    <p className="mt-2 text-sm text-[#45474c]">Số: {profile.citizenId}</p>
-                                    <p className="mt-1 text-sm text-[#45474c]">Ngày sinh: {profile.birthDate}</p>
-                                </div>
-                            </div>
-                            <div className="grid content-start gap-3">
-                                <InfoBlock label="Họ tên" value={profile.name}/>
-                                <InfoBlock label="CCCD" value={profile.citizenId}/>
-                                <InfoBlock label="Phòng" value={profile.roomId}/>
-                                <InfoBlock label="SĐT" value={profile.phone}/>
-                            </div>
-                        </div>
-                    )}
-                </Modal>
-            )}
-        </Card>
-    );
-}
-
-export default function TenantsPage() {
-    const [selectedTenantId, setSelectedTenantId] = useState(tenants[0]?.id ?? null);
-    const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || tenants[0];
-
-    return (
-        <>
-            <PageHeader
-                title="Khách thuê"
-                description="Quản lý danh sách và hồ sơ khách thuê đang ở tại Hải Đăng."
-                actionLabel="Thêm khách thuê"
-                actionIcon={UserPlus}
-            />
-            <div className="flex flex-wrap gap-2">
-                {["Tất cả", "Đang ở", "Nợ phí", "Sắp hết hạn", "Thiếu hồ sơ", "Đã rời"].map((filter, index) => (
-                    <button
-                        key={filter}
-                        type="button"
-                        className={`rounded-lg px-5 py-2 text-sm font-bold ${
-                            index === 0 ? "bg-[#091426] text-white" : "border border-[#e2e8f0] bg-white text-[#505f76]"
-                        }`}
-                    >
-                        {filter}
-                    </button>
+            <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(e.target.value)}
+                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-100"
+            >
+                {[5, 10, 20, 50].map((size) => (
+                    <option key={size} value={size}>
+                        {size} / trang
+                    </option>
                 ))}
-            </div>
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,626px)_minmax(360px,1fr)]">
-                <div className="grid gap-4">
-                    {tenants.map((tenant, index) => {
-                        const active = tenant.id === selectedTenant.id;
+            </select>
+            <Pagination>
+                <PaginationContent>
+                    <PaginationItem>
+                        <PaginationPrevious
+                            onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                    </PaginationItem>
+                    {pages.map((page, idx) =>
+                        page === "..." ? (
+                            <PaginationItem key={`ellipsis-${idx}`}>
+                                <span className="px-2 text-gray-400 text-sm">…</span>
+                            </PaginationItem>
+                        ) : (
+                            <PaginationItem key={page}>
+                                <PaginationLink
+                                    isActive={currentPage === page}
+                                    onClick={() => onPageChange(page)}
+                                >
+                                    {page}
+                                </PaginationLink>
+                            </PaginationItem>
+                        )
+                    )}
+                    <PaginationItem>
+                        <PaginationNext
+                            onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                    </PaginationItem>
+                </PaginationContent>
+            </Pagination>
+        </div>
+    );
+}
 
-                        return (
-                            <button
-                                key={tenant.id}
-                                type="button"
-                                onClick={() => setSelectedTenantId(tenant.id)}
-                                className={`rounded-xl border bg-white p-5 text-left shadow-[0_1px_2px_rgba(9,20,38,0.06)] transition ${
-                                    active ? "border-[#091426] ring-2 ring-[#091426]/5" : "border-[#e2e8f0] hover:border-[#091426]"
-                                }`}
-                            >
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                    <span
-                        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d3e4fe] text-sm font-bold text-[#091426]">
-                      {tenant.initials}
-                    </span>
-                                        <span>
-                      <span className="block font-bold text-[#091426]">{tenant.name}</span>
-                      <span className="mt-1 block text-xs text-[#45474c]">{tenant.roomId} · {tenant.phone}</span>
-                    </span>
-                                    </div>
-                                    <span className="text-right">
-                    <span className="block font-bold text-[#091426]">{formatMoney(tenant.monthlyRent)}</span>
-                    <span className="text-xs text-[#6b7280]">/ tháng</span>
-                  </span>
+function SectionTitle({icon, title}) {
+    return (
+        <div className="flex items-center gap-2 mb-3">
+            <div className="text-gray-500">{icon}</div>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</span>
+        </div>
+    );
+}
+
+function InfoRow({label, value}) {
+    return (
+        <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] text-gray-400">{label}</span>
+            <span className="text-sm text-gray-800 font-medium">{value || "—"}</span>
+        </div>
+    );
+}
+
+
+function DetailModal({tenant, open, onOpenChange}) {
+    if (!tenant) return null;
+    const d = tenant.detail;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogTrigger>
+            </DialogTrigger>
+            <DialogContent
+                className="max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden flex flex-col [&>button.absolute]:hidden">
+                {/* Modal header */}
+                <DialogHeader className="px-5 py-4 bg-white border-b border-gray-200 rounded-t-2xl sticky top-0 z-10">
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                            </div>
+                            <DialogTitle className="text-lg font-semibold text-gray-800">Chi tiết hồ sơ khách
+                                thuê</DialogTitle>
+                        </div>
+                        <button
+                            onClick={() => onOpenChange(false)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </DialogHeader>
+                <DialogDescription className="sr-only">
+                    Thông tin chi tiết về khách thuê {d.fullName}, bao gồm hồ sơ cá nhân, hợp đồng thuê, và thông tin
+                    liên lạc.
+                </DialogDescription>
+                {/* Body – responsive grid: 1 col on mobile, 3 cols on lg+ */}
+                <div
+                    className="flex-1 overflow-y-auto px-2 py-2
+            [&::-webkit-scrollbar]:w-1.5
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            [&::-webkit-scrollbar-thumb]:bg-gray-300
+            [&::-webkit-scrollbar-track]:bg-gray-100"
+                >
+                    <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* LEFT: full width on mobile, 2/3 on desktop */}
+                        <div className="lg:col-span-2 space-y-4">
+                            {/* Thông tin cá nhân */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <SectionTitle
+                                    icon={
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    }
+                                    title="Thông tin cá nhân"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                                    <InfoRow label="Họ và tên" value={d.fullName}/>
+                                    <InfoRow label="Ngày sinh" value={d.dob}/>
+                                    <InfoRow label="Giới tính" value={d.gender}/>
                                 </div>
-                                {index === 0 && (
-                                    <div className="mt-5 grid gap-3 border-t border-[#e2e8f0] pt-5 sm:grid-cols-2">
-                                        <InfoMetric icon={CalendarClock} label="Ngày vào ở" value={tenant.moveInDate}/>
-                                        <InfoMetric icon={WalletCards} label="Tiền cọc"
-                                                    value={formatMoney(tenant.deposit)}/>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                                    <InfoRow label="Số CCCD/CMND" value={d.idNumber}/>
+                                    <InfoRow label="Ngày cấp" value={d.idDate}/>
+                                    <InfoRow label="Nơi cấp" value={d.idPlace}/>
+                                </div>
+                                <InfoRow label="Địa chỉ thường trú" value={d.address}/>
+                            </div>
+
+                            {/* Nơi cư trú */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <SectionTitle
+                                    icon={
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                                        </svg>
+                                    }
+                                    title="Nơi cư trú"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <InfoRow label="Tên cơ sở" value={d.branch}/>
+                                    <InfoRow label="Số phòng" value={d.roomNumber}/>
+                                </div>
+                            </div>
+
+                            {/* Thông tin bạn cùng phòng */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <SectionTitle
+                                    icon={
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        </svg>
+                                    }
+                                    title="Thông tin bạn cùng phòng"
+                                />
+                                {d.coTenant ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <InfoRow label="Họ và tên" value={d.coTenant}/>
+                                        <InfoRow label="Năm sinh" value={d.coTenantYear}/>
+                                        <InfoRow label="Số điện thoại" value={d.coTenantPhone}/>
                                     </div>
+                                ) : (
+                                    <p className="text-sm text-gray-400 italic">Không có bạn cùng phòng.</p>
                                 )}
-                            </button>
-                        );
-                    })}
+                            </div>
+
+                            {/* Thông tin xe */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <SectionTitle
+                                    icon={
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                  d="M8 16l-1.447-.724A1 1 0 016 14.382V11a5 5 0 0110 0v3.382a1 1 0 01-.553.894L14 16m-6 0h6m-6 0l-1 3h8l-1-3"/>
+                                        </svg>
+                                    }
+                                    title="Thông tin xe"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <InfoRow label="Hãng xe" value={d.vehicle}/>
+                                    <InfoRow label="Biển số" value={d.plate}/>
+                                    <InfoRow label="Số lượng xe" value={d.vehicleCount}/>
+                                </div>
+                            </div>
+
+                            {/* Ảnh căn cước công dân */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <SectionTitle
+                                    icon={
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                  d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
+                                        </svg>
+                                    }
+                                    title="Ảnh căn cước công dân"
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Front CCCD */}
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-blue-50 p-3">
+                                        <div className="text-center mb-2">
+                                            <p className="text-xs font-bold text-blue-800">Nhà Trọ HẢI ĐĂNG 1</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 justify-center text-[9px] text-gray-500">
+                                            {FLOORS.map((f) => (
+                                                <div key={f.label} className="flex flex-col items-center gap-0.5">
+                                                    <span className="font-semibold text-gray-600">{f.label}</span>
+                                                    {f.rooms.map((r) => (
+                                                        <div
+                                                            key={r}
+                                                            className="w-6 h-4 bg-blue-200 border border-blue-300 rounded-sm flex items-center justify-center text-[8px] text-blue-700"
+                                                        >
+                                                            {r}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Back CCCD */}
+                                    {d.cccdBack ? (
+                                        <div
+                                            className="border border-gray-200 rounded-xl bg-gray-100 flex items-center justify-center h-28">
+                                            <div className="text-center">
+                                                <svg className="w-8 h-8 text-gray-300 mx-auto mb-1" fill="none"
+                                                     stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                                                          d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5"/>
+                                                </svg>
+                                                <p className="text-xs text-gray-400">Mặt sau</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className="border-2 border-dashed border-red-200 rounded-xl bg-red-50 flex flex-col items-center justify-center h-28 gap-1">
+                                            <svg className="w-7 h-7 text-red-300" fill="none" stroke="currentColor"
+                                                 viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01"/>
+                                            </svg>
+                                            <p className="text-xs text-red-400">Không tải được ảnh, thử lại sau</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT: full width on mobile, 1/3 on desktop */}
+                        <div className="space-y-4">
+                            {/* Hợp đồng thuê */}
+                            <div className="bg-gray-900 rounded-xl p-4 text-white">
+                                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Hợp đồng thuê</p>
+                                <p className="text-xl font-bold mb-1">{d.contract}</p>
+                                <p className="text-xs text-gray-400 mb-0.5">Thời hạn: {d.contractDuration}</p>
+                                <p className="text-xs text-gray-400 mb-3">{d.contractStart} – {d.contractEnd}</p>
+                                <button
+                                    className="w-full flex items-center justify-center gap-2 border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white text-xs font-medium py-2 rounded-lg transition-colors">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    Xem chi tiết
+                                </button>
+                            </div>
+
+                            {/* Danh mục hồ sơ */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Danh mục
+                                    hồ
+                                    sơ</p>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
+                                                 viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                            CCCD
+                                        </div>
+                                        {d.hasCCCD ? (
+                                            <span
+                                                className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
+                          strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                      Hoàn tất
+                    </span>
+                                        ) : (
+                                            <span
+                                                className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Thiếu</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
+                                                 viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                            </svg>
+                                            Ảnh chân dung
+                                        </div>
+                                        {d.hasPhoto ? (
+                                            <span
+                                                className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
+                          strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                      Hoàn tất
+                    </span>
+                                        ) : (
+                                            <span
+                                                className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Thiếu</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Liên lạc */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-4">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Liên
+                                    lạc</p>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
+                                            <svg className="w-3.5 h-3.5 text-green-500" fill="none"
+                                                 stroke="currentColor"
+                                                 viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-gray-400">Điện thoại</p>
+                                            <p className="text-sm font-semibold text-gray-800">{d.phone}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
+                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor"
+                                                 viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-gray-400">Email</p>
+                                            <p className="text-sm font-semibold text-gray-800 break-all">{d.email}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    {/*<div className=" px-5 pb-5 flex justify-end">*/}
+                    {/*    <button*/}
+                    {/*        onClick={() => onOpenChange(false)}*/}
+                    {/*        className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-xl transition-colors"*/}
+                    {/*    >*/}
+                    {/*        Đóng*/}
+                    {/*    </button>*/}
+                    {/*</div>*/}
                 </div>
-                <TenantProfile profile={selectedTenant}/>
-            </section>
-        </>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default function TenantProfiles() {
+    const [search, setSearch] = useState("");
+    const [selected, setSelected] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const filtered = TENANTS.filter(
+        (t) =>
+            t.name.toLowerCase().includes(search.toLowerCase()) ||
+            t.phone.includes(search)
+    );
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+    const handlePageSizeChange = (newSize) => {
+        setPageSize(Number(newSize));
+        setCurrentPage(1);
+    };
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedData = filtered.slice(startIndex, startIndex + pageSize);
+    return (
+        <div className="min-h-screen bg-gray-50 font-sans">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Hồ sơ khách thuê</h1>
+
+            {/* Filters – wrap on mobile */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
+                {/* Search */}
+                <div className="relative w-full sm:flex-1 sm:max-w-sm">
+                    <svg
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"
+                        />
+                    </svg>
+                    <input
+                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
+                        placeholder="Tìm kiếm theo tên hoặc SĐT"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+
+                {/* Dropdowns */}
+                <select
+                    className="w-full sm:w-auto text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700">
+                    <option>Phòng (Tất cả)</option>
+                    <option>P.102</option>
+                    <option>P.105</option>
+                    <option>P.201</option>
+                </select>
+
+                <select
+                    className="w-full sm:w-auto text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700">
+                    <option>Cơ sở (Tất cả)</option>
+                    <option>Hải Đăng 1</option>
+                    <option>Hải Đăng 2</option>
+                </select>
+
+                <button
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium px-4 py-2 rounded-xl border border-indigo-200 transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
+                        />
+                    </svg>
+                    Lọc
+                </button>
+            </div>
+
+            {/* ======================= */}
+            {/* DESKTOP TABLE (hidden on mobile) */}
+            {/* ======================= */}
+            <div className="hidden sm:block rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-gray-50 hover:bg-gray-50">
+                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
+                                Họ Tên
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
+                                Số Điện Thoại
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
+                                Email
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
+                                Phòng
+                            </TableHead>
+                            <TableHead
+                                className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4 text-right">
+                                Người Ở
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedData.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-12 text-gray-400">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor"
+                                             viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                                  d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+                                        </svg>
+                                        <span>Không tìm thấy khách thuê</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            paginatedData.map((t) => (
+                                <TableRow
+                                    key={t.id}
+                                    className="cursor-pointer hover:bg-blue-50/40 transition-colors border-gray-100 last:border-0"
+                                    onClick={() => setSelected(t)}
+                                >
+                                    {/* Name + Avatar */}
+                                    <TableCell className="py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${t.color}`}
+                                            >
+                                                {t.initials}
+                                            </div>
+                                            <span className="font-medium text-gray-900">{t.name}</span>
+                                        </div>
+                                    </TableCell>
+
+                                    {/* Phone */}
+                                    <TableCell className="text-sm text-gray-600 py-4">{t.phone}</TableCell>
+
+                                    {/* Email */}
+                                    <TableCell className="text-sm text-gray-600 py-4 truncate max-w-[180px]">
+                                        {t.email}
+                                    </TableCell>
+
+                                    {/* Room – with a subtle badge */}
+                                    <TableCell className="py-4">
+                    <span
+                        className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                      P.{t.rooms}
+                    </span>
+                                    </TableCell>
+
+                                    {/* People – aligned right with icon hint */}
+                                    <TableCell className="text-sm text-gray-600 py-4 text-right">
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                        {t.people} người
+                    </span>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+                {totalItems > pageSize && (
+                    <PaginationFooter
+                        startIndex={startIndex}
+                        pageSize={pageSize}
+                        totalItems={totalItems}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                    />
+                )}
+            </div>
+            {/* ======================= */}
+            {/* MOBILE CARDS (visible only on small screens) */}
+            {/* ======================= */}
+            <div className="sm:hidden space-y-4">
+                {paginatedData.length === 0 ? (
+                    <p className="text-center py-10 text-gray-400">Không tìm thấy khách thuê.</p>
+                ) : (
+                    paginatedData.map((t) => (
+                        <div
+                            key={t.id}
+                            className="bg-white border border-gray-200 rounded-2xl p-4 active:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => setSelected(t)}
+                        >
+                            <div className="flex items-center gap-3 mb-3">
+                                <div
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${t.color}`}
+                                >
+                                    {t.initials}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-900">{t.name}</p>
+                                    <p className="text-sm text-gray-500">{t.phone}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 text-sm border-t pt-3 mt-2">
+                                <div>
+                                    <span className="text-xs text-gray-400">Email</span>
+                                    <p className="font-medium text-gray-700 truncate">{t.email}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-gray-400">Phòng</span>
+                                    <p className="font-medium text-gray-700">{t.rooms}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-gray-400">Người ở</span>
+                                    <p className="font-medium text-gray-700">{t.people}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+                {totalItems > pageSize && (
+                    <PaginationFooter
+                        startIndex={startIndex}
+                        pageSize={pageSize}
+                        totalItems={totalItems}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                    />
+                )}
+            </div>
+
+            {/* Detail Modal */}
+            <DetailModal
+                tenant={selected}
+                open={!!selected}
+                onOpenChange={(open) => {
+                    if (!open) setSelected(null);
+                }}
+            />
+        </div>
     );
 }

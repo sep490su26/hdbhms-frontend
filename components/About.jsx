@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Button } from "./ui/Button";
 import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
+import {Button} from "@/components/ui/button";
 
 export function About() {
   return (

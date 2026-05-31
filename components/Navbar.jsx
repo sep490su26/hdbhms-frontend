@@ -4,12 +4,15 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Home, LogIn, Menu, X } from 'lucide-react';
+import { ChevronDown, Home, LayoutDashboard, LogIn, Menu, X } from 'lucide-react';
+
+const STAFF_ROLES = new Set(['OWNER', 'MANAGER', 'owner', 'manager']);
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [staffRole, setStaffRole] = useState(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -22,6 +25,23 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    const syncAuthState = () => {
+      const token = window.localStorage.getItem('token');
+      const role = window.localStorage.getItem('userRole');
+      setStaffRole(token && STAFF_ROLES.has(role) ? role : null);
+    };
+
+    syncAuthState();
+    window.addEventListener('storage', syncAuthState);
+    window.addEventListener('focus', syncAuthState);
+
+    return () => {
+      window.removeEventListener('storage', syncAuthState);
+      window.removeEventListener('focus', syncAuthState);
+    };
+  }, []);
+
   const navLinks = [
     { name: 'Giới thiệu', href: '/about' },
     { name: 'Phòng trọ', href: '/rooms' },
@@ -30,18 +50,19 @@ export function Navbar() {
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((current) => !current);
   const toggleDropdown = () => setIsDropdownOpen((current) => !current);
-  const goToLogin = () => {
+  const goToPrimaryAction = () => {
     setIsMobileMenuOpen(false);
-    router.push('/login');
+    router.push(staffRole === 'MANAGER' || staffRole === 'manager' ? '/dashboard/rooms' : staffRole ? '/dashboard' : '/login');
   };
+  const primaryActionLabel = staffRole ? 'Quản lý trọ' : 'Đăng nhập';
+  const PrimaryActionIcon = staffRole ? LayoutDashboard : LogIn;
 
   return (
     <nav
-      className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'border-b border-white/5 bg-[#1a223d]/70 py-4 shadow-lg shadow-black/5 backdrop-blur-md'
-          : 'bg-transparent py-6'
-      }`}
+      className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${scrolled
+        ? 'border-b border-white/5 bg-[#1a223d]/70 py-4 shadow-lg shadow-black/5 backdrop-blur-md'
+        : 'bg-transparent py-6'
+        }`}
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center justify-between">
@@ -67,9 +88,8 @@ export function Navbar() {
                     className="group relative px-1 py-2 text-sm font-medium transition-colors"
                   >
                     <span
-                      className={`relative z-10 transition-colors duration-200 ${
-                        isActive ? 'font-bold text-white' : 'text-slate-300 group-hover:text-white'
-                      }`}
+                      className={`relative z-10 transition-colors duration-200 ${isActive ? 'font-bold text-white' : 'text-slate-300 group-hover:text-white'
+                        }`}
                     >
                       {link.name}
                     </span>
@@ -92,11 +112,10 @@ export function Navbar() {
                   aria-expanded={isDropdownOpen}
                   aria-haspopup="true"
                   aria-label="Xem thêm trang"
-                  className={`flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                    isDropdownOpen
-                      ? 'bg-white/10 text-white'
-                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                  }`}
+                  className={`flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-all ${isDropdownOpen
+                    ? 'bg-white/10 text-white'
+                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                    }`}
                 >
                   Khác
                   <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -127,11 +146,11 @@ export function Navbar() {
 
             <button
               type="button"
-              onClick={goToLogin}
+              onClick={goToPrimaryAction}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#1a223d] shadow-sm transition-all duration-200 hover:bg-slate-100 hover:shadow-md"
             >
-              <LogIn className="h-4 w-4" />
-              Đăng nhập
+              <PrimaryActionIcon className="h-4 w-4" />
+              {primaryActionLabel}
             </button>
           </div>
 
@@ -165,9 +184,8 @@ export function Navbar() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className={`block rounded-xl px-4 py-3 text-base font-medium transition-colors ${
-                      isActive ? 'bg-white/10 font-bold text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                    }`}
+                    className={`block rounded-xl px-4 py-3 text-base font-medium transition-colors ${isActive ? 'bg-white/10 font-bold text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                      }`}
                   >
                     {link.name}
                   </Link>
@@ -182,11 +200,11 @@ export function Navbar() {
               </Link>
               <button
                 type="button"
-                onClick={goToLogin}
+                onClick={goToPrimaryAction}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-base font-bold text-[#1a223d] transition-colors hover:bg-slate-100"
               >
-                <LogIn className="h-4 w-4" />
-                Đăng nhập
+                <PrimaryActionIcon className="h-4 w-4" />
+                {primaryActionLabel}
               </button>
             </div>
           </motion.div>

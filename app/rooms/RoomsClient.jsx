@@ -8,12 +8,14 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  DoorOpen,
   Home,
   LayoutGrid,
   Map as MapIcon,
   Maximize2,
   Search,
   Users,
+  Wallet,
   X,
   Zap,
 } from "lucide-react";
@@ -95,6 +97,388 @@ function StairBox() {
       style={{ height: 72 }}
     >
       <span className="text-xs font-bold uppercase tracking-wide text-slate-500">CẦU THANG</span>
+    </div>
+  );
+}
+
+const FLOOR_PLAN_STATUS_META = {
+  VACANT: {
+    label: "Còn trống",
+    dot: "bg-emerald-500",
+    fill: "#ecfdf5",
+    stroke: "#10b981",
+    text: "text-emerald-600",
+  },
+  HOLDING: {
+    label: "Đang đặt cọc",
+    dot: "bg-amber-500",
+    fill: "#fffbeb",
+    stroke: "#f59e0b",
+    text: "text-amber-600",
+  },
+  RESERVED: {
+    label: "Đặt cọc",
+    dot: "bg-orange-500",
+    fill: "#fff7ed",
+    stroke: "#f97316",
+    text: "text-orange-600",
+  },
+  OCCUPIED: {
+    label: "Đã thuê",
+    dot: "bg-blue-500",
+    fill: "#eff6ff",
+    stroke: "#3b82f6",
+    text: "text-blue-600",
+  },
+};
+
+function getFloorPlanStatus(room) {
+  if (room.status === "available") return "VACANT";
+  if (room.status === "onHold") return "HOLDING";
+  if (room.status === "deposited") return "RESERVED";
+  return "OCCUPIED";
+}
+
+function getRoomCode(room) {
+  return String(room.roomCode || room.id || room.name || "");
+}
+
+function getRoomSuffix(room) {
+  const digits = getRoomCode(room).match(/\d+/g)?.join("") || "";
+  if (!digits) return 0;
+  return Number(digits.slice(-2)) || Number(digits) || 0;
+}
+
+function sortRoomsByCode(left, right) {
+  return getRoomSuffix(left) - getRoomSuffix(right) || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
+}
+
+function buildFloorLayoutRooms(rooms) {
+  const sortedRooms = [...rooms].sort(sortRoomsByCode);
+  const leftCandidates = sortedRooms.filter((room) => {
+    const suffix = getRoomSuffix(room);
+    return suffix === 1 || suffix === 2;
+  });
+  const fallbackLeft = leftCandidates.length > 0 ? leftCandidates : sortedRooms.slice(0, 2);
+  const leftCodes = new Set(fallbackLeft.map(getRoomCode));
+  const rightRooms = sortedRooms.filter((room) => !leftCodes.has(getRoomCode(room)));
+
+  return {
+    leftRooms: [...fallbackLeft].sort((a, b) => sortRoomsByCode(b, a)),
+    rightRooms,
+  };
+}
+
+function Door({ x, y, side = "left", radius = 24 }) {
+  if (side === "right") {
+    return (
+      <g>
+        <line x1={x} y1={y} x2={x} y2={y + radius} stroke="#cbd5e1" strokeWidth="2.5" />
+        <path d={`M ${x} ${y + radius} A ${radius} ${radius} 0 0 0 ${x - radius} ${y}`} fill="none" stroke="#cbd5e1" strokeWidth="2.5" />
+      </g>
+    );
+  }
+
+  return (
+    <g>
+      <line x1={x} y1={y} x2={x} y2={y + radius} stroke="#cbd5e1" strokeWidth="2.5" />
+      <path d={`M ${x} ${y + radius} A ${radius} ${radius} 0 0 1 ${x + radius} ${y}`} fill="none" stroke="#cbd5e1" strokeWidth="2.5" />
+    </g>
+  );
+}
+
+function WindowLine({ x, y, width = 52 }) {
+  return <line x1={x} y1={y} x2={x + width} y2={y} stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />;
+}
+
+function VerticalWindowLine({ x, y, height = 46 }) {
+  return <line x1={x} y1={y} x2={x} y2={y + height} stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />;
+}
+
+function Stair({ x, y }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {[0, 1, 2, 3, 4, 5].map((step) => {
+        const sx = step * 12;
+        const sy = 70 - step * 10;
+        return (
+          <path
+            key={step}
+            d={`M ${sx} ${sy} H ${sx + 12} V ${sy - 10}`}
+            fill="none"
+            stroke="#111827"
+            strokeWidth="5"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+  const statusKey = getFloorPlanStatus(room);
+  const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
+  const isVertical = orientation === "vertical";
+  const suffix = getRoomSuffix(room);
+  const roomCode = getRoomCode(room);
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(room);
+    }
+  };
+
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem phòng ${roomCode}`}
+      onClick={() => onSelect(room)}
+      onKeyDown={handleKeyDown}
+      className="cursor-pointer transition hover:drop-shadow-lg focus:outline-none"
+    >
+      <rect x={x} y={y} width={w} height={h} fill={meta.fill} stroke="#111827" strokeWidth="3" />
+      <rect
+        x={x + 9}
+        y={y + 9}
+        width={w - 18}
+        height={h - 18}
+        fill="none"
+        stroke={meta.stroke}
+        strokeWidth="1.5"
+        strokeDasharray="4 7"
+        opacity="0.28"
+      />
+
+      {isVertical ? (
+        <>
+          <Door x={x + w} y={y + h - 42} side="right" radius={24} />
+          {suffix === 2 && <WindowLine x={x + 18} y={y + 4} width={w - 36} />}
+          {suffix === 1 && <VerticalWindowLine x={x + 4} y={y + h - 62} height={48} />}
+        </>
+      ) : (
+        <>
+          <Door x={x} y={y + h * 0.42} side="left" radius={22} />
+          <VerticalWindowLine x={x + w - 4} y={y + h / 2 - 23} height={46} />
+          {suffix === 3 && <WindowLine x={x + w / 2 - 26} y={y + 4} width={52} />}
+          {isLastRightRoom && <WindowLine x={x + w / 2 - 26} y={y + h - 4} width={52} />}
+        </>
+      )}
+
+      <text x={x + w / 2} y={y + h / 2 + 6} textAnchor="middle" fontSize="18" fontWeight="900" fill="#111827">
+        {roomCode}
+      </text>
+      <circle cx={x + w - 13} cy={y + 13} r="7" fill={meta.stroke} />
+    </g>
+  );
+}
+
+function FloorBlueprint({ rooms, onSelect }) {
+  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
+
+  if (rooms.length === 0) {
+    return (
+      <div className="rounded-[2rem] bg-[#e9e9e9] px-6 py-16 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+        Chưa có dữ liệu phòng cho tầng này.
+      </div>
+    );
+  }
+
+  const LEFT_ROOM_W = 92;
+  const LEFT_ROOM_H = 118;
+  const LEFT_GAP = 8;
+  const TOTAL_LEFT_HEIGHT = LEFT_ROOM_H * Math.max(leftRooms.length, 2) + LEFT_GAP * Math.max(leftRooms.length - 1, 1);
+  const RIGHT_ROOM_W = 146;
+  const RIGHT_GAP = 8;
+  const visibleRightRows = Math.min(Math.max(rightRooms.length, 1), 3);
+  const RIGHT_ROOM_H = Math.max(70, (LEFT_ROOM_H * 2 + LEFT_GAP - RIGHT_GAP * (visibleRightRows - 1)) / visibleRightRows);
+  const START_Y = 68;
+  const LEFT_X = 90;
+  const HALL_X = 210;
+  const RIGHT_X = 300;
+  const extraRightCount = Math.max(0, rightRooms.length - 3);
+  const svgHeight = Math.max(430, START_Y + TOTAL_LEFT_HEIGHT + 42 + extraRightCount * (RIGHT_ROOM_H + RIGHT_GAP) + 96);
+  const lastRightRoomY =
+    rightRooms.length <= 3
+      ? START_Y + Math.max(0, rightRooms.length - 1) * (RIGHT_ROOM_H + RIGHT_GAP)
+      : START_Y + TOTAL_LEFT_HEIGHT + RIGHT_GAP + Math.max(0, rightRooms.length - 4) * (RIGHT_ROOM_H + RIGHT_GAP);
+  const hallTop = START_Y;
+  const hallBottom = Math.max(START_Y + TOTAL_LEFT_HEIGHT, lastRightRoomY + RIGHT_ROOM_H);
+  const hallHeight = hallBottom - hallTop;
+
+  return (
+    <div className="overflow-x-auto rounded-[2rem] bg-[#e9e9e9] p-6 ring-1 ring-slate-200">
+      <div className="mx-auto min-w-[620px] max-w-[760px]">
+        <svg viewBox={`0 0 560 ${svgHeight}`} className="mx-auto block h-auto w-full max-w-[700px]">
+          <defs>
+            <linearGradient id="hallGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f8fafc" />
+              <stop offset="100%" stopColor="#dbe3ee" />
+            </linearGradient>
+            <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="8" stdDeviation="7" floodColor="#64748b" floodOpacity="0.18" />
+            </filter>
+          </defs>
+
+          <rect x={HALL_X} y={hallTop} width="54" height={hallHeight} rx="18" fill="url(#hallGradient)" stroke="#cbd5e1" strokeWidth="2" filter="url(#softShadow)" />
+          <line x1={HALL_X + 27} y1={hallTop + 14} x2={HALL_X + 27} y2={hallTop + hallHeight / 2 - 62} stroke="#94a3b8" strokeWidth="2" strokeDasharray="7 9" opacity="0.65" />
+          <line x1={HALL_X + 27} y1={hallTop + hallHeight / 2 + 62} x2={HALL_X + 27} y2={hallBottom - 14} stroke="#94a3b8" strokeWidth="2" strokeDasharray="7 9" opacity="0.65" />
+          <text
+            x={HALL_X + 27}
+            y={hallTop + hallHeight / 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="12"
+            fontWeight="900"
+            fill="#64748b"
+            letterSpacing="3"
+            transform={`rotate(-90 ${HALL_X + 27} ${hallTop + hallHeight / 2})`}
+          >
+            HÀNH LANG
+          </text>
+          <line x1={HALL_X + 11} y1={hallTop + 14} x2={HALL_X + 11} y2={hallBottom - 14} stroke="#e2e8f0" strokeWidth="1.5" opacity="0.9" />
+          <line x1={HALL_X + 43} y1={hallTop + 14} x2={HALL_X + 43} y2={hallBottom - 14} stroke="#e2e8f0" strokeWidth="1.5" opacity="0.9" />
+
+          {leftRooms.map((room, index) => (
+            <BlueprintRoomShape
+              key={getRoomCode(room)}
+              room={room}
+              x={LEFT_X}
+              y={START_Y + index * (LEFT_ROOM_H + LEFT_GAP)}
+              w={LEFT_ROOM_W}
+              h={LEFT_ROOM_H}
+              orientation="vertical"
+              onSelect={onSelect}
+            />
+          ))}
+
+          <Stair x={LEFT_X - 8} y={START_Y + TOTAL_LEFT_HEIGHT + 28} />
+
+          {rightRooms.slice(0, 3).map((room, index) => (
+            <BlueprintRoomShape
+              key={getRoomCode(room)}
+              room={room}
+              x={RIGHT_X}
+              y={START_Y + index * (RIGHT_ROOM_H + RIGHT_GAP)}
+              w={RIGHT_ROOM_W}
+              h={RIGHT_ROOM_H}
+              orientation="horizontal"
+              onSelect={onSelect}
+              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+            />
+          ))}
+
+          {rightRooms.slice(3).map((room, index) => (
+            <BlueprintRoomShape
+              key={getRoomCode(room)}
+              room={room}
+              x={RIGHT_X}
+              y={START_Y + TOTAL_LEFT_HEIGHT + RIGHT_GAP + index * (RIGHT_ROOM_H + RIGHT_GAP)}
+              w={RIGHT_ROOM_W}
+              h={RIGHT_ROOM_H}
+              orientation="horizontal"
+              onSelect={onSelect}
+              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+            />
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function FloorPlanTabs({ floors, selectedFloor, onSelect }) {
+  return (
+    <div className="flex gap-3 overflow-x-auto rounded-[1.7rem] bg-[#19243a] p-2 shadow-inner">
+      {floors.map((floor) => {
+        const active = floor === selectedFloor;
+        return (
+          <button
+            key={floor}
+            type="button"
+            onClick={() => onSelect(floor)}
+            className={`h-12 min-w-[120px] rounded-2xl px-6 text-sm font-black uppercase tracking-wide transition ${
+              active ? "bg-white text-[#172033] shadow" : "text-slate-200 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {floor}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FloorPlanLegend() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {Object.entries(FLOOR_PLAN_STATUS_META).map(([key, meta]) => (
+        <div key={key} className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200">
+          <span className={`h-3 w-3 rounded-full ${meta.dot}`} />
+          {meta.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FloorPlanSummaryCards({ rooms }) {
+  const stats = useMemo(() => {
+    return rooms.reduce(
+      (result, room) => {
+        const status = getFloorPlanStatus(room);
+        result.total += 1;
+        if (status === "VACANT") result.vacant += 1;
+        if (status === "HOLDING") result.holding += 1;
+        if (status === "RESERVED") result.reserved += 1;
+        if (status === "OCCUPIED") result.occupied += 1;
+        return result;
+      },
+      { total: 0, vacant: 0, holding: 0, reserved: 0, occupied: 0 },
+    );
+  }, [rooms]);
+
+  const items = [
+    { label: "Tổng phòng", value: stats.total, icon: Building2, color: "text-slate-950" },
+    { label: "Còn trống", value: stats.vacant, icon: DoorOpen, color: "text-emerald-600" },
+    { label: "Đang đặt cọc", value: stats.holding, icon: Wallet, color: "text-amber-600" },
+    { label: "Đặt cọc", value: stats.reserved, icon: Wallet, color: "text-orange-600" },
+    { label: "Đã thuê", value: stats.occupied, icon: Home, color: "text-blue-600" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <div key={item.label} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <Icon className="mb-3 text-blue-500" size={22} />
+            <p className="truncate text-xs font-black uppercase tracking-widest text-slate-400">{item.label}</p>
+            <p className={`mt-1 text-2xl font-black ${item.color}`}>{item.value}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FloorPlanPanel({ floors, selectedFloor, rooms, onSelectFloor, onSelectRoom }) {
+  return (
+    <div className="space-y-6 rounded-[2rem] bg-[#f3f5f8] p-5 text-slate-950 shadow-sm md:p-7">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Sơ đồ tầng</p>
+          <h2 className="mt-1 text-3xl font-black text-slate-950">{selectedFloor || "Chưa có tầng"}</h2>
+        </div>
+        <FloorPlanLegend />
+      </div>
+
+      <FloorPlanSummaryCards rooms={rooms} />
+      {floors.length > 0 && <FloorPlanTabs floors={floors} selectedFloor={selectedFloor} onSelect={onSelectFloor} />}
+      <FloorBlueprint rooms={rooms} onSelect={onSelectRoom} />
     </div>
   );
 }
@@ -413,6 +797,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                   })}
                 </div>
 
+                {viewMode === "Listing" && (
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                   <input
@@ -423,9 +808,11 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     className="h-11 w-full rounded-2xl border border-white/10 bg-[#1e2746] pl-11 pr-4 text-sm font-medium text-white outline-none transition focus:border-white/30"
                   />
                 </div>
+                )}
               </div>
             </div>
 
+            {viewMode === "Listing" && (
             <div className="mb-8 flex flex-col gap-3 rounded-[1.5rem] border border-white/5 bg-[#1e2746]/50 p-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-2 overflow-x-auto no-scrollbar">
                 {(viewMode === "Listing" ? dynamicFloors : floorsForPlan).map((floor) => {
@@ -446,7 +833,6 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                 })}
               </div>
 
-              {viewMode === "Listing" && (
                 <label className="flex h-11 shrink-0 cursor-pointer items-center gap-4 rounded-2xl px-4 transition hover:bg-white/5">
                   <span className="relative flex h-6 items-center">
                     <input
@@ -463,8 +849,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                   </span>
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Chỉ hiện phòng trống</span>
                 </label>
-              )}
             </div>
+            )}
 
             {depositSuccess && (
               <div className="mb-8 rounded-[1.25rem] border border-emerald-400/25 bg-emerald-400/10 px-5 py-4 text-sm font-semibold text-emerald-100">
@@ -499,82 +885,13 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     )}
                   </div>
                 ) : (
-                  <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                    {/* Floor header */}
-                    <div className="mb-5 flex shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Sơ đồ tầng</p>
-                        <h2 className="mt-1 text-2xl font-bold text-slate-800">{activeFloorPlan}</h2>
-                      </div>
-                    </div>
-
-                    {/* Floor plan body — horizontal layout */}
-                    <div className="mx-auto flex w-fit flex-1 flex-col items-center justify-center gap-3">
-                      {/* Top row: rooms with suffix >= 03, sorted ascending */}
-                      <div className="flex w-full flex-wrap justify-start gap-[5px]">
-                        {currentFloorRooms
-                          .filter((room) => {
-                            const suffix = parseInt(room.id.slice(-2), 10);
-                            return suffix >= 3;
-                          })
-                          .sort((a, b) => a.id.localeCompare(b.id))
-                          .map((room) => (
-                            <div key={room.id} className="w-[102px]">
-                              <FloorPlanRoomBox
-                                room={room}
-                                isSelected={false}
-                                onSelect={openRoom}
-                              />
-                            </div>
-                          ))}
-                      </div>
-
-                      {/* Corridor divider */}
-                      <div className="flex w-full items-center gap-2 py-1.5">
-                        <div className="h-px flex-1 bg-slate-300" />
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">CORRIDOR</span>
-                        <div className="h-px flex-1 bg-slate-300" />
-                      </div>
-
-                      {/* Bottom row: room 01, room 02, stair box */}
-                      <div className="flex w-full flex-wrap justify-start gap-[5px]">
-                        {currentFloorRooms
-                          .filter((room) => {
-                            const suffix = parseInt(room.id.slice(-2), 10);
-                            return suffix <= 2;
-                          })
-                          .sort((a, b) => a.id.localeCompare(b.id))
-                          .map((room) => (
-                            <div key={room.id} className="w-[102px]">
-                              <FloorPlanRoomBox
-                                room={room}
-                                isSelected={false}
-                                onSelect={openRoom}
-                              />
-                            </div>
-                          ))}
-                        <div className="w-[102px]">
-                          <StairBox />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Legend at bottom */}
-                    <div className="mt-6 flex shrink-0 flex-wrap items-center justify-center gap-6 pt-4">
-                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
-                        <i className="inline-block h-3 w-3 rounded-sm bg-emerald-400" />TRỐNG
-                      </span>
-                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
-                        <i className="inline-block h-3 w-3 rounded-sm border border-slate-300 bg-slate-100" />ĐÃ THUÊ
-                      </span>
-                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
-                        <i className="inline-block h-3 w-3 rounded-sm bg-amber-500" />ĐÃ ĐẶT CỌC
-                      </span>
-                      <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.05em] text-slate-500">
-                        <i className="inline-block h-3 w-3 rounded-sm bg-amber-500" />ĐANG ĐẶT CỌC
-                      </span>
-                    </div>
-                  </div>
+                  <FloorPlanPanel
+                    floors={floorsForPlan}
+                    selectedFloor={activeFloorPlan}
+                    rooms={currentFloorRooms}
+                    onSelectFloor={setActiveFloorPlan}
+                    onSelectRoom={openRoom}
+                  />
                 )}
               </section>
             </div>

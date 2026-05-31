@@ -7,15 +7,15 @@ import {
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "1";
 
 export const VIEWING_STATUSES = {
-    PENDING: "Chờ xem",
+    NOT_VIEWED: "Chờ xem",
     VIEWED: "Đã xem",
-    CANCELLED: "Hủy hẹn",
+    DISMISSED: "Hủy hẹn",
 };
 
 export const STATUS_OPTIONS = [
-    {value: "PENDING", label: "Chờ xem"},
+    {value: "NOT_VIEWED", label: "Chờ xem"},
     {value: "VIEWED", label: "Đã xem"},
-    {value: "CANCELLED", label: "Hủy hẹn"},
+    {value: "DISMISSED", label: "Hủy hẹn"},
 ];
 
 
@@ -31,6 +31,13 @@ function toQuery(params) {
     });
     const queryString = query.toString();
     return queryString ? `?${queryString}` : "";
+}
+
+function normalizeVisitStatus(status) {
+    const normalized = String(status || "NOT_VIEWED").toUpperCase();
+    if (normalized === "PENDING") return "NOT_VIEWED";
+    if (normalized === "CANCELLED") return "DISMISSED";
+    return normalized;
 }
 
 export function getCurrentLocalDateTimeInputValue() {
@@ -97,6 +104,8 @@ export function isValidVietnamPhone(value) {
 export function mapVisitRequest(item) {
     const preferredStart = readField(item, "preferredStart", "preferred_start");
     const createdAt = readField(item, "createdAt", "created_at");
+    const property = readField(item, "property") || {};
+    const room = readField(item, "room") || {};
 
 
     return {
@@ -104,13 +113,14 @@ export function mapVisitRequest(item) {
         fullName: readField(item, "visitorName", "visitor_name") || "",
         phone: readField(item, "visitorPhone", "visitor_phone") || "",
         email: readField(item, "visitorEmail", "visitor_email") || "",
-        // propertyId: readField(property, "id"),
-        propertyName: readField(item, "propertyName", "property_name") || "—",
-        interestedRoomName: readField(item, "roomName", "room_name") || "",
+        propertyId: readField(item, "propertyId", "property_id") ?? readField(property, "id"),
+        propertyName: readField(item, "propertyName", "property_name") || readField(property, "name") || "—",
+        interestedRoomId: readField(item, "roomId", "room_id") ?? readField(room, "id"),
+        interestedRoomName: readField(item, "roomName", "room_name") || readField(room, "name") || "",
         appointmentAt: preferredStart,
         appointmentLabel: formatAppointment(preferredStart),
-        status: readField(item, "status") || "PENDING",
-        note: readField(item, "notes") || "",
+        status: normalizeVisitStatus(readField(item, "status")),
+        note: readField(item, "notes") ?? readField(item, "note") ?? "",
         createdAt,
         createdLabel: createdAt ? formatAppointment(createdAt) : "",
     };
@@ -123,8 +133,11 @@ export function mapVisitRequest(item) {
 export async function fetchViewingCustomers({filters, page, size}) {
     const data = await authenticatedFetch(`/visit-requests${toQuery({
         keyword: filters.keyword,
-        propertyCode: filters.propertyId !== "all" ? filters.propertyId : undefined,
-        roomCode: filters.roomId !== "all" ? filters.roomId : undefined,
+        propertyId: filters.propertyId !== "all" ? filters.propertyId : undefined,
+        roomId: filters.roomId !== "all" ? filters.roomId : undefined,
+        propertyCode: filters.propertyCode,
+        roomCode: filters.roomCode,
+        status: filters.status !== "all" ? filters.status : undefined,
         from: filters.fromDate ? `${filters.fromDate}T00:00:00` : undefined,
         to: filters.toDate ? `${filters.toDate}T23:59:59` : undefined,
         page: page - 1,
@@ -158,7 +171,7 @@ export async function fetchViewingCustomerStats() {
 
         for (const item of items) {
             if (item.appointmentAt && item.appointmentAt.startsWith(todayStr)) todayCount++;
-            if (item.status === "PENDING") pendingCount++;
+            if (item.status === "NOT_VIEWED") pendingCount++;
             if (item.status === "VIEWED") viewedCount++;
         }
 
@@ -249,8 +262,9 @@ export async function updateViewingCustomer(id, payload) {
  */
 export async function updateViewingCustomerStatus(id, status) {
     try {
-        const data = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/status`, {
+        const data = await authenticatedFetch(`/visit-requests/${id}/status`, {
             method: "PATCH",
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify({status}),
         });
         return mapVisitRequest(data);
@@ -305,7 +319,7 @@ export async function fetchViewingProperties() {
         return propertiesArray.map((property) => ({
             id: property.id,
             name: property.name,
-            propertyCode: property.property_code,   // snake_case → camelCase
+            propertyCode: property.propertyCode ?? property.property_code,
         }));
     } catch {
         // Fallback only if the API truly fails (network error)
@@ -324,9 +338,9 @@ export async function fetchViewingRooms(propertyId) {
         return propertiesArray.map((room) => ({
             id: room.id,
             propertyId: room.property?.id ?? propertyId,   // nested object
-            roomCode: room.room_code,
-            name: room.name || `Phòng ${room.room_code}`,
-            status: room.current_status,
+            roomCode: room.roomCode ?? room.room_code,
+            name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
+            status: room.currentStatus ?? room.current_status,
         }));
     } catch {
         return [];

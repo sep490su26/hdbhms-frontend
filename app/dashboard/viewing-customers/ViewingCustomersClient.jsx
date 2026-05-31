@@ -40,7 +40,7 @@ const emptyForm = {
     appointmentDate: "",
     appointmentTime: "",
     note: "",
-    status: "PENDING",
+    status: "NOT_VIEWED",
 };
 
 
@@ -68,16 +68,16 @@ function MetricCard({icon: Icon, label, value, tone}) {
 
 function StatusSelect({status, onChange}) {
     const styles = {
-        PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+        NOT_VIEWED: "border-amber-200 bg-amber-50 text-amber-700",
         VIEWED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        CANCELLED: "border-gray-200 bg-gray-50 text-gray-600",
+        DISMISSED: "border-gray-200 bg-gray-50 text-gray-600",
     };
 
     return (
         <select
             value={status}
             onChange={(event) => onChange(event.target.value)}
-            className={`h-8 rounded-full border px-3 text-xs font-bold outline-none ${styles[status] || styles.PENDING}`}
+            className={`h-8 rounded-full border px-3 text-xs font-bold outline-none ${styles[status] || styles.NOT_VIEWED}`}
         >
             {STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -377,13 +377,10 @@ export default function ViewingCustomersClient() {
 
     const loadCustomers = useCallback(async (nextPage = 1) => {
         try {
-            const selectedProperty = properties.find((p) => String(p.id) === String(filters.propertyId));
-            const propertyCode = selectedProperty ? selectedProperty.propertyCode : undefined;
-
             const selectedRoom = filterRooms.find((r) => String(r.id) === String(filters.roomId));
             const roomCode = selectedRoom ? selectedRoom.roomCode : undefined;
 
-            const apiFilters = {...filters, propertyCode, roomCode};
+            const apiFilters = {...filters, roomCode};
 
             const [listData, statsData] = await Promise.all([
                 fetchViewingCustomers({filters: apiFilters, page: nextPage, size: pageSize}),
@@ -396,7 +393,7 @@ export default function ViewingCustomersClient() {
         } catch (error) {
             setErrorMessage(error.message);
         }
-    }, [filters, pageSize, properties, filterRooms]);
+    }, [filters, pageSize, filterRooms]);
 
     const loadTrash = useCallback(async (nextPage = 1) => {
         try {
@@ -474,7 +471,7 @@ export default function ViewingCustomersClient() {
             propertyId: Number(form.propertyId),
             roomId,
             appointmentAt,
-            status: form.status || "PENDING",
+            status: form.status || "NOT_VIEWED",
             note: form.note.trim(),
         };
 
@@ -620,14 +617,16 @@ export default function ViewingCustomersClient() {
                             {/*        <option key={room.id} value={room.id}>{room.name}</option>*/}
                             {/*    ))}*/}
                             {/*</select>*/}
-                            {/* STATUS FILTER - Disabled as backend does not support status yet
-              <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)} className="h-9 rounded border border-[#cfd5de] bg-white px-3 text-xs font-medium text-[#111827]">
-                <option value="all">Tất cả trạng thái</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
-                ))}
-              </select>
-              */}
+                            <select
+                                value={filters.status}
+                                onChange={(event) => updateFilter("status", event.target.value)}
+                                className="h-9 rounded border border-[#cfd5de] bg-white px-3 text-xs font-medium text-[#111827]"
+                            >
+                                <option value="all">Tất cả trạng thái</option>
+                                {STATUS_OPTIONS.map((status) => (
+                                    <option key={status.value} value={status.value}>{status.label}</option>
+                                ))}
+                            </select>
                             <span className="font-semibold text-[#111827]">Thời gian:</span>
                             <input type="date" value={filters.fromDate}
                                    onChange={(event) => updateFilter("fromDate", event.target.value)}
@@ -644,7 +643,7 @@ export default function ViewingCustomersClient() {
                         </div>
 
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[980px] text-left">
+                            <table className="w-full min-w-[1180px] text-left">
                                 <thead
                                     className="bg-[#f1f3f5] text-[11px] font-bold uppercase tracking-[0.04em] text-[#4b5563]">
                                 <tr>
@@ -652,8 +651,9 @@ export default function ViewingCustomersClient() {
                                     <th className="px-5 py-4">Số điện thoại</th>
                                     <th className="px-5 py-4">Cơ sở</th>
                                     <th className="px-5 py-4">Phòng quan tâm</th>
+                                    <th className="px-5 py-4">Ghi chú</th>
                                     <th className="px-5 py-4">Ngày giờ xem</th>
-                                    {/* <th className="px-5 py-4">Trạng thái</th> */}
+                                    <th className="px-5 py-4">Trạng thái</th>
                                     <th className="px-5 py-4">Thao tác</th>
                                 </tr>
                                 </thead>
@@ -667,13 +667,6 @@ export default function ViewingCustomersClient() {
                                                 <div className="min-w-0">
                                                     <span
                                                         className="block max-w-[180px] truncate font-bold leading-5 text-[#111827]">{customer.fullName}</span>
-                                                    {customer.note && (
-                                                        <span
-                                                            className="note-preview mt-1 block max-w-[300px] text-xs font-medium leading-5 text-[#64748b]"
-                                                            title={customer.note}>
-                                Ghi chú: {customer.note}
-                              </span>
-                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -692,11 +685,19 @@ export default function ViewingCustomersClient() {
                                         </td>
                                         <td className="px-5 py-4">
                                             <span
+                                                className="note-preview block max-w-[260px] text-sm font-medium leading-5 text-[#475569]"
+                                                title={customer.note || undefined}
+                                            >
+                                                {customer.note || "—"}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span
                                                 className="block font-bold text-[#111827]">{customer.appointmentLabel || "—"}</span>
                                         </td>
-                                        {/* <td className="px-5 py-4">
-                        <StatusSelect status={customer.status} onChange={(status) => changeStatus(customer, status)} />
-                      </td> */}
+                                        <td className="px-5 py-4">
+                                            <StatusSelect status={customer.status} onChange={(status) => changeStatus(customer, status)} />
+                                        </td>
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-2">
                                                 <button type="button" onClick={() => openEdit(customer)}
@@ -715,7 +716,7 @@ export default function ViewingCustomersClient() {
                                 ))}
                                 {customers.length === 0 && (
                                     <tr key="empty-customers-row">
-                                        <td colSpan={7}
+                                        <td colSpan={8}
                                             className="px-5 py-10 text-center text-sm font-semibold text-[#64748b]">
                                             Không có khách xem phòng phù hợp với bộ lọc.
                                         </td>

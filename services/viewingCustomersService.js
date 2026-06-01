@@ -4,8 +4,6 @@ import {
     parseEnvelope,
 } from "./identityAccessService";
 
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "1";
-
 export const VIEWING_STATUSES = {
     NOT_VIEWED: "Chờ xem",
     VIEWED: "Đã xem",
@@ -104,6 +102,7 @@ export function isValidVietnamPhone(value) {
 export function mapVisitRequest(item) {
     const preferredStart = readField(item, "preferredStart", "preferred_start");
     const createdAt = readField(item, "createdAt", "created_at");
+    const deletedAt = readField(item, "deletedAt", "deleted_at");
     const property = readField(item, "property") || {};
     const room = readField(item, "room") || {};
 
@@ -123,6 +122,8 @@ export function mapVisitRequest(item) {
         note: readField(item, "notes") ?? readField(item, "note") ?? "",
         createdAt,
         createdLabel: createdAt ? formatAppointment(createdAt) : "",
+        deletedAt,
+        deletedLabel: deletedAt ? formatAppointment(deletedAt) : "",
     };
 }
 
@@ -182,24 +183,20 @@ export async function fetchViewingCustomerStats() {
 }
 
 /**
- * Trash endpoint doesn't exist in the backend yet — return empty results gracefully.
+ * GET /api/v1/visit-requests/trash
  */
 export async function fetchViewingCustomerTrash({page, size}) {
-    try {
-        const data = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/trash${toQuery({
-            page,
-            size,
-        })}`);
-        return {
-            items: (data.items || []).map(mapVisitRequest),
-            total: readField(data, "total") || 0,
-            page: readField(data, "page") || 1,
-            size: readField(data, "size") || size,
-            totalPages: readField(data, "totalPages", "total_pages") || 0,
-        };
-    } catch {
-        return {items: [], total: 0, page: 1, size, totalPages: 0};
-    }
+    const data = await authenticatedFetch(`/visit-requests/trash${toQuery({
+        page: page - 1,
+        size,
+    })}`);
+    return {
+        items: (data.data || []).map(mapVisitRequest),
+        total: readField(data, "totalElements", "total_elements") || 0,
+        page: readField(data, "currentPage", "current_page") || 1,
+        size: readField(data, "pageSize", "page_size") || size,
+        totalPages: readField(data, "totalPages", "total_pages") || 0,
+    };
 }
 
 // Logic hỗ trợ parse và mapping cho các service khác sử dụng
@@ -274,37 +271,25 @@ export async function updateViewingCustomerStatus(id, status) {
 }
 
 /**
- * DELETE endpoint doesn't exist yet — stub gracefully.
+ * DELETE /api/v1/visit-requests/{id} moves the visit request to trash.
  */
 export async function deleteViewingCustomer(id) {
-    try {
-        await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}`, {
-            method: "DELETE",
-        });
-    } catch {
-        // Endpoint not available yet
-    }
+    return authenticatedFetch(`/visit-requests/${id}`, {
+        method: "DELETE",
+    });
 }
 
 export async function restoreViewingCustomer(id) {
-    try {
-        const data = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/restore`, {
-            method: "POST",
-        });
-        return mapVisitRequest(data);
-    } catch {
-        return null;
-    }
+    const data = await authenticatedFetch(`/visit-requests/${id}/restore`, {
+        method: "POST",
+    });
+    return mapVisitRequest(data);
 }
 
 export async function forceDeleteViewingCustomer(id) {
-    try {
-        await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/force`, {
-            method: "DELETE",
-        });
-    } catch {
-        // Endpoint not available yet
-    }
+    return authenticatedFetch(`/visit-requests/${id}/force`, {
+        method: "DELETE",
+    });
 }
 
 /**

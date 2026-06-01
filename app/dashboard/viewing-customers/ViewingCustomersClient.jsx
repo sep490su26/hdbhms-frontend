@@ -314,6 +314,41 @@ function TrashModal({rows, pagination, onClose, onRestore, onForceDelete, onPage
     );
 }
 
+function NoteModal({customer, onClose}) {
+    if (!customer) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
+             role="dialog" aria-modal="true">
+            <div className="w-full max-w-xl overflow-hidden rounded-lg bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-[#091426]">Ghi chú khách xem phòng</h2>
+                        <p className="mt-1 text-sm text-[#64748b]">
+                            {customer.fullName} · {customer.interestedRoomName || "Chưa chọn phòng"}
+                        </p>
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Đóng"
+                            className="rounded-md p-2 text-[#64748b] hover:bg-[#f1f3f5]">
+                        <X className="h-5 w-5"/>
+                    </button>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto p-6">
+                    <div className="rounded-lg border border-[#d9dde5] bg-[#f8fafc] p-4 text-sm leading-6 text-[#091426]">
+                        <p className="whitespace-pre-wrap break-words">{customer.note || "Không có ghi chú."}</p>
+                    </div>
+                </div>
+                <div className="flex justify-end border-t border-[#e2e8f0] px-6 py-4">
+                    <button type="button" onClick={onClose}
+                            className="h-10 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#13243d]">
+                        Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function ViewingCustomersClient() {
     const pageSize = 10;
     const [customers, setCustomers] = useState([]);
@@ -336,6 +371,7 @@ export default function ViewingCustomersClient() {
     const [errorMessage, setErrorMessage] = useState("");
     const [modalMode, setModalMode] = useState(null);
     const [editingId, setEditingId] = useState(null);
+    const [noteCustomer, setNoteCustomer] = useState(null);
     const [form, setForm] = useState(emptyForm);
     const [errors, setErrors] = useState({});
     const [minDateTime, setMinDateTime] = useState("");
@@ -684,12 +720,19 @@ export default function ViewingCustomersClient() {
                         </span>
                                         </td>
                                         <td className="px-5 py-4">
-                                            <span
-                                                className="note-preview block max-w-[260px] text-sm font-medium leading-5 text-[#475569]"
-                                                title={customer.note || undefined}
+                                            <button
+                                                type="button"
+                                                onClick={() => customer.note && setNoteCustomer(customer)}
+                                                disabled={!customer.note}
+                                                className={`note-preview block max-w-[260px] text-left text-sm font-medium leading-5 ${
+                                                    customer.note
+                                                        ? "cursor-pointer text-[#475569] hover:text-[#091426] hover:underline"
+                                                        : "cursor-default text-[#94a3b8]"
+                                                }`}
+                                                title={customer.note ? "Xem đầy đủ ghi chú" : undefined}
                                             >
                                                 {customer.note || "—"}
-                                            </span>
+                                            </button>
                                         </td>
                                         <td className="px-5 py-4">
                                             <span
@@ -791,6 +834,13 @@ export default function ViewingCustomersClient() {
                     onRestore={restoreCustomer}
                     onForceDelete={forceDeleteCustomer}
                     onPageChange={loadTrash}
+                />
+            )}
+
+            {noteCustomer && (
+                <NoteModal
+                    customer={noteCustomer}
+                    onClose={() => setNoteCustomer(null)}
                 />
             )}
 

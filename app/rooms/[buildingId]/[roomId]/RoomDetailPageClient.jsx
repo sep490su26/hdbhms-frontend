@@ -20,6 +20,7 @@ import {
 import {
   CONTACT_PHONE_HREF,
   CONTACT_ZALO_HREF,
+  fetchDepositRoomHoldStatus,
   fetchPublicRoomById,
   normalizeApiRoom,
 } from "../../../../services/roomsService";
@@ -27,7 +28,21 @@ import {
   combineAppointmentParts,
   publicCreateViewingCustomer,
 } from "../../../../services/viewingCustomersService";
-import { getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+import { formatHoldMinutes, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+
+const normalizeHoldStatus = (status) => {
+  if (!status) return null;
+  const remainingSeconds = Number(status.remainingSeconds ?? status.remaining_seconds ?? 0);
+
+  return {
+    canBook: Boolean(status.canBook ?? status.can_book),
+    roomStatus: status.roomStatus ?? status.room_status ?? "",
+    holdStatus: status.holdStatus ?? status.hold_status ?? null,
+    holdExpiresAt: status.holdExpiresAt ?? status.hold_expires_at ?? null,
+    remainingMs: Number.isFinite(remainingSeconds) ? Math.max(0, remainingSeconds * 1000) : 0,
+    message: status.message ?? "",
+  };
+};
 
 const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
 
@@ -103,6 +118,7 @@ function BookingCard({ room }) {
   const isOnHold = room.status === "onHold";
   const isDeposited = room.status === "deposited";
   const isOccupied = room.status === "occupied";
+  const holdMinutesLabel = formatHoldMinutes(room.holdRemainingMs ?? 0);
   const roomLabel = room.roomCode || room.name || room.id;
   const tomorrowDate = getTomorrowDateString();
   const [isViewingModalOpen, setIsViewingModalOpen] = useState(false);
@@ -240,7 +256,7 @@ function BookingCard({ room }) {
           <div className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}>
             <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isOnHold ? "bg-amber-500" : "bg-slate-400"}`} />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
-            {isOnHold && "Đang giữ chỗ - Tạm khóa 15 phút"}
+            {isOnHold && `Đang giữ chỗ - còn ${holdMinutesLabel}`}
             {isOccupied && "Đã thuê - Không còn trống"}
             {isDeposited && "Đã đặt cọc - Không còn trống"}
           </div>
@@ -257,7 +273,7 @@ function BookingCard({ room }) {
             ) : (
               <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}>
-                {isOnHold ? "Phòng đang được giữ chỗ, chưa thể gửi thêm yêu cầu đặt cọc." : "Phòng đã được thuê, vui lòng chọn phòng khác."}
+                {isOnHold ? `Phòng đang được giữ chỗ, vui lòng chờ khoảng ${holdMinutesLabel}.` : "Phòng đã được thuê, vui lòng chọn phòng khác."}
               </div>
             )}
 
@@ -452,6 +468,8 @@ export function RoomDetailPageClient({ roomId }) {
   const [room, setRoom] = useState(null);
   const [activeImage, setActiveImage] = useState("");
   const [roomHolds, setRoomHolds] = useState(() => getActiveRoomHolds());
+  const [serverHoldStatus, setServerHoldStatus] = useState(null);
+  const [nowMs, setNowMs] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
 
@@ -462,8 +480,7 @@ export function RoomDetailPageClient({ roomId }) {
       try {
         setIsLoading(true);
         const apiRoom = await fetchPublicRoomById(roomId);
-        const currentRoomHolds = getActiveRoomHolds();
-        const nextRoom = apiRoom ? normalizeApiRoom(apiRoom, currentRoomHolds) : null;
+        const nextRoom = apiRoom ? normalizeApiRoom(apiRoom) : null;
 
         if (!isMounted) return;
         if (!nextRoom) throw new Error("Room not found");
@@ -485,22 +502,87 @@ export function RoomDetailPageClient({ roomId }) {
   }, [roomId]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setRoomHolds(getActiveRoomHolds());
+    const refreshLocalHolds = () => {
+      const nextTime = Date.now();
+      setNowMs(nextTime);
+      setRoomHolds(getActiveRoomHolds(nextTime));
+    };
+
+    const initialTimer = window.setTimeout(refreshLocalHolds, 0);
+    const timer = window.setInterval(refreshLocalHolds, 1000);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!room) return undefined;
+
+    let isMounted = true;
+    const roomIdentifier = room.roomId ?? room.roomCode ?? room.id;
+
+    const refreshHoldStatus = async () => {
+      try {
+        const status = await fetchDepositRoomHoldStatus(roomIdentifier);
+        if (isMounted) setServerHoldStatus(normalizeHoldStatus(status));
+      } catch {
+        if (isMounted) setServerHoldStatus(null);
+      }
+    };
+
+    refreshHoldStatus();
+    const pollingTimer = window.setInterval(refreshHoldStatus, 2000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(pollingTimer);
+    };
+  }, [room]);
+
+  useEffect(() => {
+    if (!serverHoldStatus || serverHoldStatus.canBook || serverHoldStatus.remainingMs <= 0) {
+      return undefined;
+    }
+
+    const countdownTimer = window.setInterval(() => {
+      setServerHoldStatus((currentStatus) => {
+        if (!currentStatus || currentStatus.canBook) return currentStatus;
+        const nextRemainingMs = Math.max(0, currentStatus.remainingMs - 1000);
+        return {
+          ...currentStatus,
+          canBook: nextRemainingMs <= 0 ? true : currentStatus.canBook,
+          remainingMs: nextRemainingMs,
+        };
+      });
     }, 1000);
 
-    return () => window.clearInterval(timer);
-  }, []);
+    return () => window.clearInterval(countdownTimer);
+  }, [serverHoldStatus]);
 
   const displayRoom = useMemo(() => {
     if (!room) return null;
+    const localHold = roomHolds[room.id];
+    const hasServerHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs > 0;
+    const isServerReserved = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.roomStatus === "RESERVED";
+    const isServerBookable = serverHoldStatus?.canBook === true;
+    const isExpiredHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs <= 0;
+    const localRemainingMs = localHold && nowMs ? Math.max(0, Number(localHold.expiresAt) - nowMs) : 0;
+    const hasLocalHold = Boolean(localHold && localRemainingMs > 0);
 
     return {
       ...room,
-      status: roomHolds[room.id] && room.status === "available" ? "deposited" : room.status,
-      holdExpiresAt: roomHolds[room.id]?.expiresAt,
+      status: isServerBookable || isExpiredHold
+        ? "available"
+        : isServerReserved
+          ? "deposited"
+          : hasServerHold || (hasLocalHold && room.status === "available")
+            ? "onHold"
+            : room.status,
+      holdExpiresAt: serverHoldStatus?.holdExpiresAt ?? localHold?.expiresAt,
+      holdRemainingMs: hasServerHold ? serverHoldStatus.remainingMs : localRemainingMs,
     };
-  }, [room, roomHolds]);
+  }, [nowMs, room, roomHolds, serverHoldStatus]);
 
   if (isLoading) {
     return (

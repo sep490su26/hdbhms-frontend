@@ -343,6 +343,26 @@ export async function fetchDepositRoomHoldStatus(roomId) {
   return payload.data ?? null;
 }
 
+export async function fetchDepositPaymentStatus(paymentIntentId) {
+  if (!paymentIntentId) {
+    throw new Error("Thiếu mã phiên thanh toán.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/status`, {
+    cache: "no-store",
+    headers: {
+      "X-Client-Type": "web",
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || "Không thể kiểm tra trạng thái thanh toán.");
+  }
+
+  return payload.data ?? null;
+}
+
 export async function cancelDepositPayment(paymentIntentId) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán để hủy giữ chỗ.");

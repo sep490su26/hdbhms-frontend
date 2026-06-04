@@ -60,7 +60,7 @@ const beforeAssets = [
 ];
 
 const repairItems = [
-  { name: "Chân LED 12W", quantity: 1, price: 120000 },
+  { name: "Chân LED 12W", quantity: 1, price: 12000 },
   { name: "Dây đồng (m)", quantity: 2, price: 15000 },
 ];
 

@@ -1,460 +1,438 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  AlertCircle,
-  CheckCircle2,
-  FileSignature,
-  KeyRound,
-  Loader2,
-  Mail,
-  RefreshCw,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  LockKeyhole,
   Search,
-  Send,
-  ShieldCheck,
-  UserCheck,
-  UserRound,
-  X,
+  UnlockKeyhole,
+  UserPlus,
+  UsersRound,
+  UserRoundCheck,
+  Ban,
 } from "lucide-react";
-import {
-  fetchTenantAccountCandidates,
-  sendTenantAccountCredentials,
-} from "@/services/identityAccessService";
 
-const statusFilters = [
-  { value: "ALL", label: "Tất cả trạng thái" },
-  { value: "WAITING", label: "Chưa cấp tài khoản" },
-  { value: "SENT", label: "Đã gửi tài khoản" },
-  { value: "ACTIVATED", label: "Đã kích hoạt" },
-  { value: "MISSING_EMAIL", label: "Thiếu email" },
+const facilities = ["Tất cả", "Hải Đăng 1", "Hải Đăng 2", "Hải Đăng 3"];
+const accountTypes = ["Tất cả", "Chủ trọ", "Quản lý", "Khách thuê", "Kế toán"];
+const statuses = ["Tất cả", "Đang hoạt động", "Đã khóa"];
+
+const initialAccounts = [
+  {
+    id: "ACC-001",
+    name: "Nguyễn Văn Hiếu",
+    email: "hieu.nv@email.com",
+    facility: "",
+    room: "-",
+    type: "Chủ trọ",
+    phone: "0912 345 678",
+    status: "Đang hoạt động",
+    createdAt: "12/10/2023",
+  },
+  {
+    id: "ACC-002",
+    name: "Trần Thị Lan",
+    email: "lan.tt@email.com",
+    facility: "Hải Đăng 1",
+    room: "-",
+    type: "Quản lý",
+    phone: "0988 765 432",
+    status: "Đang hoạt động",
+    createdAt: "05/01/2024",
+  },
+  {
+    id: "ACC-003",
+    name: "Phạm Tuấn Anh",
+    email: "anh.pt@email.com",
+    facility: "Hải Đăng 1",
+    room: "P.205",
+    type: "Khách thuê",
+    phone: "0909 112 233",
+    status: "Đã khóa",
+    createdAt: "20/02/2024",
+  },
+  {
+    id: "ACC-004",
+    name: "Lê Minh Khang",
+    email: "khang.lm@email.com",
+    facility: "Hải Đăng 2",
+    room: "P.301",
+    type: "Khách thuê",
+    phone: "0934 556 789",
+    status: "Đang hoạt động",
+    createdAt: "02/03/2024",
+  },
+  {
+    id: "ACC-005",
+    name: "Đặng Ngọc Mai",
+    email: "mai.dn@email.com",
+    facility: "Hải Đăng 2",
+    room: "-",
+    type: "Kế toán",
+    phone: "0977 001 245",
+    status: "Đang hoạt động",
+    createdAt: "18/03/2024",
+  },
+  {
+    id: "ACC-006",
+    name: "Hoàng Quốc Việt",
+    email: "viet.hq@email.com",
+    facility: "Hải Đăng 3",
+    room: "P.104",
+    type: "Khách thuê",
+    phone: "0966 330 118",
+    status: "Đã khóa",
+    createdAt: "04/04/2024",
+  },
+  {
+    id: "ACC-007",
+    name: "Bùi Thanh Tâm",
+    email: "tam.bt@email.com",
+    facility: "Hải Đăng 1",
+    room: "P.402",
+    type: "Khách thuê",
+    phone: "0903 228 556",
+    status: "Đang hoạt động",
+    createdAt: "16/04/2024",
+  },
+  {
+    id: "ACC-008",
+    name: "Võ Anh Quân",
+    email: "quan.va@email.com",
+    facility: "Hải Đăng 3",
+    room: "-",
+    type: "Quản lý",
+    phone: "0919 765 001",
+    status: "Đang hoạt động",
+    createdAt: "22/04/2024",
+  },
+  {
+    id: "ACC-009",
+    name: "Ngô Bảo Châu",
+    email: "chau.nb@email.com",
+    facility: "Hải Đăng 2",
+    room: "P.208",
+    type: "Khách thuê",
+    phone: "0981 440 027",
+    status: "Đang hoạt động",
+    createdAt: "01/05/2024",
+  },
+  {
+    id: "ACC-010",
+    name: "Trịnh Gia Hân",
+    email: "han.tg@email.com",
+    facility: "Hải Đăng 1",
+    room: "P.502",
+    type: "Khách thuê",
+    phone: "0922 610 406",
+    status: "Đang hoạt động",
+    createdAt: "10/05/2024",
+  },
+  {
+    id: "ACC-011",
+    name: "Đỗ Thành Long",
+    email: "long.dt@email.com",
+    facility: "Hải Đăng 3",
+    room: "P.203",
+    type: "Khách thuê",
+    phone: "0945 109 222",
+    status: "Đang hoạt động",
+    createdAt: "18/05/2024",
+  },
+  {
+    id: "ACC-012",
+    name: "Mai Phương Linh",
+    email: "linh.mp@email.com",
+    facility: "Hải Đăng 2",
+    room: "-",
+    type: "Quản lý",
+    phone: "0908 777 901",
+    status: "Đang hoạt động",
+    createdAt: "25/05/2024",
+  },
 ];
 
-function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("vi-VN");
-}
-
-function normalizeText(value) {
+function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function resolveAccountState(item) {
-  if (!item.emailAvailable) {
-    return {
-      key: "MISSING_EMAIL",
-      label: "Thiếu email",
-      className: "border-rose-200 bg-rose-50 text-rose-700",
-      description: "Bổ sung email trước khi gửi tài khoản.",
-    };
-  }
-
-  if (!item.accountProvisioned) {
-    return {
-      key: "WAITING",
-      label: "Chưa cấp",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
-      description: "Hợp đồng đã hiệu lực, có thể gửi tài khoản.",
-    };
-  }
-
-  if (item.lastLoginAt || item.mustChangePassword === false) {
-    return {
-      key: "ACTIVATED",
-      label: "Đã kích hoạt",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-      description: "Khách đã đăng nhập hoặc đã đổi mật khẩu đầu tiên.",
-    };
-  }
-
-  return {
-    key: "SENT",
-    label: "Đã gửi",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
-    description: "Đã gửi mật khẩu tạm, chờ khách đăng nhập mobile.",
-  };
+function getInitials(name) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 }
 
-function MetricCard({ icon: Icon, label, value, tone = "slate" }) {
-  const tones = {
-    slate: "bg-slate-100 text-slate-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    rose: "bg-rose-50 text-rose-700",
-  };
+function MetricCard({ icon: Icon, label, value, tone }) {
+  const toneClass = {
+    blue: "bg-[#dbe7ff] text-[#0f2748]",
+    indigo: "bg-[#dfe3ff] text-[#3757b5]",
+    red: "bg-[#ffdeda] text-[#c91616]",
+  }[tone];
 
   return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${tones[tone]}`}>
+    <article className="flex min-h-[98px] items-center gap-4 rounded-xl border border-[#c8ceda] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
         <Icon className="h-5 w-5" />
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-[#091426]">{value}</p>
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">{label}</p>
+        <p className={`mt-1 text-2xl font-bold leading-none ${tone === "red" ? "text-[#c91616]" : tone === "indigo" ? "text-[#3757b5]" : "text-[#0f2748]"}`}>
+          {value}
+        </p>
       </div>
     </article>
   );
 }
 
-function InlineAlert({ tone = "error", children }) {
-  const styles = {
-    error: "border-rose-100 bg-rose-50 text-rose-700",
-    success: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    info: "border-blue-100 bg-blue-50 text-blue-700",
-  };
-  const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
-
+function SelectFilter({ label, value, options, onChange }) {
   return (
-    <div className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm font-semibold ${styles[tone]}`}>
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{children}</span>
-    </div>
+    <label className="grid gap-1.5">
+      <span className="text-[11px] font-medium text-[#a2a9b8]">{label}</span>
+      <span className="relative block">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-full min-w-[140px] appearance-none rounded-[4px] border border-[#c8ceda] bg-[#eef3fb] px-3 pr-9 text-sm font-medium text-[#1b2840] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#687184]" />
+      </span>
+    </label>
   );
 }
 
-function Modal({ title, children, footer, onClose }) {
+function StatusBadge({ status }) {
+  const isLocked = status === "Đã khóa";
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+    <span
+      className={`inline-flex min-w-[72px] items-center justify-center rounded-lg px-2.5 py-1 text-center text-[11px] font-bold leading-tight ${
+        isLocked ? "bg-[#ffdeda] text-[#d71919]" : "bg-[#dfe3ff] text-[#3757b5]"
+      }`}
     >
-      <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-          <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="rounded-md p-2 text-[#505f76] hover:bg-[#f2f4f6]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
-        {footer && <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>}
-      </div>
-    </div>
+      {status}
+    </span>
+  );
+}
+
+function ActionButton({ account, onToggle }) {
+  const isLocked = account.status === "Đã khóa";
+  const Icon = isLocked ? UnlockKeyhole : LockKeyhole;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(account.id)}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-bold transition ${
+        isLocked ? "text-[#168334] hover:bg-emerald-50" : "text-[#d71919] hover:bg-red-50"
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      {isLocked ? "Mở khóa" : "Khóa"}
+    </button>
   );
 }
 
 export default function AccountsPage() {
-  const [items, setItems] = useState([]);
-  const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMutating, setIsMutating] = useState(false);
-  const [pageError, setPageError] = useState("");
-  const [pageNotice, setPageNotice] = useState("");
-  const [sendTarget, setSendTarget] = useState(null);
+  const [accounts, setAccounts] = useState(initialAccounts);
+  const [query, setQuery] = useState("");
+  const [facility, setFacility] = useState("Tất cả");
+  const [accountType, setAccountType] = useState("Tất cả");
+  const [status, setStatus] = useState("Tất cả");
 
-  useEffect(() => {
-    let isActive = true;
+  const filteredAccounts = useMemo(() => {
+    const keyword = normalize(query);
 
-    async function loadInitialData() {
-      try {
-        const data = await fetchTenantAccountCandidates();
-        if (!isActive) return;
-        setItems(Array.isArray(data) ? data : []);
-        setPageError("");
-      } catch (error) {
-        if (!isActive) return;
-        setItems([]);
-        setPageError(error.message || "Không tải được danh sách tài khoản cần cấp.");
-      } finally {
-        if (isActive) setIsLoading(false);
-      }
-    }
+    return accounts.filter((account) => {
+      const matchesQuery =
+        !keyword ||
+        normalize(account.name).includes(keyword) ||
+        normalize(account.email).includes(keyword) ||
+        normalize(account.phone).includes(keyword);
+      const matchesFacility = facility === "Tất cả" || account.facility === facility;
+      const matchesType = accountType === "Tất cả" || account.type === accountType;
+      const matchesStatus = status === "Tất cả" || account.status === status;
 
-    loadInitialData();
-    return () => {
-      isActive = false;
-    };
-  }, []);
+      return matchesQuery && matchesFacility && matchesType && matchesStatus;
+    });
+  }, [accountType, accounts, facility, query, status]);
 
-  const loadCandidates = useCallback(async () => {
-    setIsLoading(true);
-    setPageError("");
-    try {
-      const data = await fetchTenantAccountCandidates();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (error) {
-      setItems([]);
-      setPageError(error.message || "Không tải được danh sách tài khoản cần cấp.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const metrics = useMemo(
+    () => ({
+      total: accounts.length,
+      active: accounts.filter((account) => account.status === "Đang hoạt động").length,
+      locked: accounts.filter((account) => account.status === "Đã khóa").length,
+    }),
+    [accounts],
+  );
 
-  const rows = useMemo(() => {
-    const search = normalizeText(keyword);
-    return items
-      .map((item) => ({ ...item, accountState: resolveAccountState(item) }))
-      .filter((item) => {
-        const matchesStatus = statusFilter === "ALL" || item.accountState.key === statusFilter;
-        const matchesSearch =
-          !search ||
-          normalizeText(item.fullName).includes(search) ||
-          normalizeText(item.phone).includes(search) ||
-          normalizeText(item.email).includes(search) ||
-          normalizeText(item.roomCode).includes(search) ||
-          normalizeText(item.contractCode).includes(search);
-        return matchesStatus && matchesSearch;
-      });
-  }, [items, keyword, statusFilter]);
-
-  const metrics = useMemo(() => {
-    const states = items.map(resolveAccountState);
-    return {
-      total: items.length,
-      waiting: states.filter((state) => state.key === "WAITING").length,
-      sent: states.filter((state) => state.key === "SENT").length,
-      activated: states.filter((state) => state.key === "ACTIVATED").length,
-      missingEmail: states.filter((state) => state.key === "MISSING_EMAIL").length,
-    };
-  }, [items]);
-
-  async function submitSendAccount() {
-    if (!sendTarget) return;
-    setIsMutating(true);
-    setPageError("");
-    setPageNotice("");
-    try {
-      const updated = await sendTenantAccountCredentials(sendTarget.contractId);
-      setItems((current) =>
-        current.map((item) => (item.contractId === updated.contractId ? { ...item, ...updated } : item)),
-      );
-      setPageNotice(`Đã gửi tài khoản và mật khẩu tạm đến email ${sendTarget.email}.`);
-      setSendTarget(null);
-    } catch (error) {
-      setPageError(error.message || "Không gửi được tài khoản. Vui lòng thử lại.");
-    } finally {
-      setIsMutating(false);
-    }
-  }
+  const toggleLock = (accountId) => {
+    setAccounts((currentAccounts) =>
+      currentAccounts.map((account) =>
+        account.id === accountId
+          ? {
+              ...account,
+              status: account.status === "Đã khóa" ? "Đang hoạt động" : "Đã khóa",
+            }
+          : account,
+      ),
+    );
+  };
 
   return (
-    <>
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="grid gap-7 text-[#0f1d33]">
+      <section className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#505f76]">Admin Dashboard</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-[-0.01em] text-[#091426]">
-            Quản lý tài khoản khách thuê
+          <div className="flex items-center gap-2 text-xs text-[#3d4759]">
+            <span>Hệ thống</span>
+            <span>/</span>
+            <span className="font-bold text-[#0f1d33]">Quản lý tài khoản</span>
+          </div>
+          <h1 className="mt-4 text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">
+            Quản lý tài khoản
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#45474c]">
-            Cấp tài khoản mobile sau khi hợp đồng thuê offline đã ký và hợp đồng đã được kích hoạt.
-          </p>
         </div>
         <button
           type="button"
-          onClick={loadCandidates}
-          disabled={isLoading}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-70"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#0f1d33] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842]"
         >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          Làm mới
+          <UserPlus className="h-5 w-5" />
+          Thêm tài khoản mới
         </button>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard icon={FileSignature} label="Hợp đồng hiệu lực" value={metrics.total} />
-        <MetricCard icon={KeyRound} label="Chưa cấp" value={metrics.waiting} tone="amber" />
-        <MetricCard icon={Mail} label="Đã gửi" value={metrics.sent} tone="blue" />
-        <MetricCard icon={ShieldCheck} label="Đã kích hoạt" value={metrics.activated} tone="emerald" />
-        <MetricCard icon={AlertCircle} label="Thiếu email" value={metrics.missingEmail} tone="rose" />
+      <section className="grid gap-5 md:grid-cols-3">
+        <MetricCard icon={UsersRound} label="Tổng tài khoản" value={metrics.total} tone="blue" />
+        <MetricCard icon={UserRoundCheck} label="Đang hoạt động" value={metrics.active} tone="indigo" />
+        <MetricCard icon={Ban} label="Đã khóa" value={metrics.locked} tone="red" />
       </section>
 
-      {(pageNotice || pageError) && (
-        <section className="grid gap-3">
-          {pageNotice && <InlineAlert tone="success">{pageNotice}</InlineAlert>}
-          {pageError && <InlineAlert>{pageError}</InlineAlert>}
-        </section>
-      )}
-
-      <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_240px]">
-          <label className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />
+      <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-6 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(260px,1fr)_150px_150px_150px_auto] xl:items-end">
+          <label className="relative block">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184]" />
             <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Tìm theo tên khách, SĐT, email, phòng hoặc mã hợp đồng"
-              className="h-11 w-full rounded-lg border border-[#e2e8f0] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#6b7280] focus:border-[#091426]"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm theo tên, email hoặc số điện thoại..."
+              className="h-10 w-full rounded-[4px] border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
             />
           </label>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="h-11 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
+
+          <SelectFilter label="Cơ sở" value={facility} options={facilities} onChange={setFacility} />
+          <SelectFilter label="Loại tài khoản" value={accountType} options={accountTypes} onChange={setAccountType} />
+          <SelectFilter label="Trạng thái" value={status} options={statuses} onChange={setStatus} />
+
+          <button
+            type="button"
+            aria-label="Bộ lọc nâng cao"
+            className="flex h-10 w-10 items-center justify-center rounded-[4px] border border-[#c8ceda] bg-white text-[#0f1d33] transition hover:bg-[#eef3fb]"
           >
-            {statusFilters.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <Filter className="h-5 w-5" />
+          </button>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] px-5 py-4">
-          <div>
-            <h2 className="font-bold text-[#091426]">Danh sách cấp tài khoản</h2>
-            <p className="mt-1 text-sm text-[#6b7280]">
-              Chỉ hiển thị người ký chính của các hợp đồng thuê đang hiệu lực.
-            </p>
-          </div>
-          <span className="rounded-full bg-[#091426] px-3 py-1 text-xs font-bold text-white">{rows.length}</span>
-        </div>
-
+      <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left text-sm">
-            <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-[#eef3fb] text-[11px] font-bold uppercase tracking-[0.06em] text-[#3d4759]">
               <tr>
-                <th className="px-5 py-4">Khách thuê</th>
-                <th className="px-5 py-4">Hợp đồng</th>
+                <th className="px-5 py-4">Họ tên</th>
+                <th className="px-5 py-4">Cơ sở</th>
                 <th className="px-5 py-4">Phòng</th>
-                <th className="px-5 py-4">Số điện thoại</th>
-                <th className="px-5 py-4">Email nhận tài khoản</th>
-                <th className="px-5 py-4">Trạng thái</th>
-                <th className="px-5 py-4">Ngày ký</th>
-                <th className="px-5 py-4 text-right">Thao tác</th>
+                <th className="px-5 py-4">Loại tài khoản</th>
+                <th className="px-5 py-4">SĐT</th>
+                <th className="px-5 py-4 text-center">Trạng thái</th>
+                <th className="px-5 py-4">Ngày tạo</th>
+                <th className="px-5 py-4 text-center">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#e2e8f0]">
-              {isLoading && (
-                <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm font-semibold text-[#6b7280]">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang tải danh sách tài khoản...
-                    </span>
-                  </td>
-                </tr>
-              )}
-
-              {!isLoading &&
-                rows.map((item) => (
-                  <tr key={item.contractId} className="align-top hover:bg-[#f7f9fb]">
+            <tbody className="divide-y divide-[#c8ceda]">
+              {filteredAccounts.slice(0, 10).map((account) => {
+                return (
+                  <tr key={account.id} className="bg-white align-middle">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d3e4fe] text-xs font-bold text-[#091426]">
-                          {String(item.fullName || "K").slice(0, 1).toUpperCase()}
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                            account.status === "Đã khóa"
+                              ? "bg-[#ffdeda] text-[#d71919]"
+                              : "bg-[#dbe7ff] text-[#0f2748]"
+                          }`}
+                        >
+                          {getInitials(account.name)}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-bold text-[#091426]">{item.fullName || "Chưa cập nhật"}</p>
-                          <p className="text-xs text-[#6b7280]">Hồ sơ #{item.profileId}</p>
+                          <p className="max-w-[160px] truncate font-bold text-[#0f1d33]">{account.name}</p>
+                          <p className="mt-0.5 max-w-[170px] truncate text-xs text-[#687184]">{account.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <p className="font-bold text-[#091426]">{item.contractCode}</p>
-                      <p className="text-xs text-[#6b7280]">{item.contractStatus}</p>
+                    <td className="px-5 py-4 font-medium text-[#0f1d33]">
+                      {account.type === "Chủ trọ" ? "" : account.facility}
                     </td>
-                    <td className="px-5 py-4">
-                      <p className="font-bold text-[#091426]">Phòng {item.roomCode}</p>
-                      <p className="text-xs text-[#6b7280]">{item.propertyName}</p>
-                    </td>
-                    <td className="px-5 py-4 font-semibold text-[#45474c]">{item.phone || "Chưa cập nhật"}</td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-2 font-semibold text-[#45474c]">
-                        <Mail className="h-4 w-4 text-[#6b7280]" />
-                        {item.email || "Chưa có email"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="grid gap-1">
-                        <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold ${item.accountState.className}`}>
-                          {item.accountState.label}
+                    <td className="px-5 py-4 font-medium text-[#0f1d33]">{account.room}</td>
+                    <td className="px-5 py-4 font-medium text-[#0f1d33]">{account.type}</td>
+                    <td className="px-5 py-4 font-medium leading-6 text-[#0f1d33]">
+                      {account.phone.split(" ").map((part) => (
+                        <span key={`${account.id}-${part}`} className="block">
+                          {part}
                         </span>
-                        <span className="text-xs text-[#6b7280]">{item.accountState.description}</span>
-                      </div>
+                      ))}
                     </td>
-                    <td className="px-5 py-4 text-[#45474c]">{formatDate(item.signedAt || item.startDate)}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setSendTarget(item)}
-                          disabled={!item.emailAvailable || item.accountState.key === "ACTIVATED" || isMutating}
-                          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-4 text-xs font-bold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:bg-[#c5c6cd]"
-                        >
-                          <Send className="h-4 w-4" />
-                          {item.accountState.key === "ACTIVATED"
-                            ? "Đã kích hoạt"
-                            : item.accountProvisioned
-                              ? "Gửi lại tài khoản"
-                              : "Gửi tài khoản"}
-                        </button>
-                      </div>
+                    <td className="px-5 py-4 text-center">
+                      <StatusBadge status={account.status} />
+                    </td>
+                    <td className="px-5 py-4 font-medium text-[#0f1d33]">{account.createdAt}</td>
+                    <td className="px-5 py-4 text-center">
+                      {account.type === "Chủ trọ" ? (
+                        <span className="text-xs font-semibold text-[#9aa3b2]">-</span>
+                      ) : (
+                        <ActionButton account={account} onToggle={toggleLock} />
+                      )}
                     </td>
                   </tr>
-                ))}
+                );
+              })}
 
-              {!isLoading && rows.length === 0 && (
+              {filteredAccounts.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
-                    <UserRound className="mx-auto h-10 w-10 text-[#94a3b8]" />
-                    <p className="mt-3 text-sm font-semibold text-[#6b7280]">
-                      Không có hợp đồng hiệu lực phù hợp để cấp tài khoản.
-                    </p>
+                  <td colSpan={8} className="px-5 py-12 text-center text-sm font-semibold text-[#687184]">
+                    Không có tài khoản phù hợp với bộ lọc hiện tại.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
 
-      {sendTarget && (
-        <Modal
-          title="Gửi tài khoản khách thuê"
-          onClose={() => setSendTarget(null)}
-          footer={
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setSendTarget(null)}
-                className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={submitSendAccount}
-                disabled={isMutating}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isMutating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Xác nhận gửi
-              </button>
-            </div>
-          }
-        >
-          <div className="grid gap-4">
-            <InlineAlert tone="info">
-              Hệ thống sẽ sinh mật khẩu tạm, lưu BCrypt và gửi thông tin đăng nhập qua email. Mật khẩu tạm không hiển thị trên web.
-            </InlineAlert>
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4">
-              <p className="text-sm font-bold text-[#091426]">{sendTarget.fullName}</p>
-              <p className="mt-1 text-sm text-[#45474c]">
-                Phòng {sendTarget.roomCode} · Hợp đồng {sendTarget.contractCode}
-              </p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[#45474c]">
-                <Mail className="h-4 w-4" />
-                {sendTarget.email}
-              </p>
-            </div>
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
-              <UserCheck className="mr-2 inline h-4 w-4" />
-              Khách sẽ dùng số điện thoại {sendTarget.phone || "đã đăng ký"} và mật khẩu tạm để đăng nhập mobile.
-            </div>
+        <div className="flex flex-col gap-3 border-t border-[#c8ceda] bg-[#eef3fb] px-5 py-4 text-xs font-medium text-[#3d4759] sm:flex-row sm:items-center sm:justify-between">
+          <span>Hiển thị 1-10 trên {accounts.length * 2} tài khoản</span>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md text-[#9aa3b2]">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button type="button" className="h-8 w-8 rounded-md bg-[#0f1d33] text-xs font-bold text-white">1</button>
+            <button type="button" className="h-8 w-8 rounded-md text-xs font-bold text-[#0f1d33] transition hover:bg-white">2</button>
+            <button type="button" className="h-8 w-8 rounded-md text-xs font-bold text-[#0f1d33] transition hover:bg-white">3</button>
+            <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md text-[#0f1d33] transition hover:bg-white">
+              <ChevronRight className="h-5 w-5" />
+            </button>
           </div>
-        </Modal>
-      )}
-    </>
+        </div>
+      </section>
+    </div>
   );
 }

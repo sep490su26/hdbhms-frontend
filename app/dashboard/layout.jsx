@@ -11,6 +11,7 @@ import {
   Gauge,
   Home,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Menu,
   Search,
@@ -296,28 +297,58 @@ function Topbar({ search, onSearchChange, onToggleMobileMenu }) {
 function DashboardLayoutShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser, isLoadingUser } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
+  const effectiveRole = user?.role || (process.env.NODE_ENV === "development" ? "owner" : "");
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
-  const isAllowed = permissionKey ? canAccessRole(user?.role, SECTION_PERMISSIONS[permissionKey] || []) : false;
+  const isAllowed = permissionKey ? canAccessRole(effectiveRole, SECTION_PERMISSIONS[permissionKey] || []) : false;
 
   useEffect(() => {
+    let isActive = true;
+
+    async function hydrateUser() {
+      const token = typeof window !== "undefined" ? window.localStorage.getItem("token") : "";
+
+      if (!token) {
+        if (isActive) setHasHydratedAuth(true);
+        return;
+      }
+
+      try {
+        await refreshUser(token);
+      } catch {
+        // refreshUser already clears invalid local credentials.
+      } finally {
+        if (isActive) setHasHydratedAuth(true);
+      }
+    }
+
+    hydrateUser();
+
+    return () => {
+      isActive = false;
+    };
+  }, [refreshUser]);
+
+  useEffect(() => {
+    if (!hasHydratedAuth) return;
     if (!activeNavigationItem) return;
     if (!isAllowed) {
-      router.replace(getFirstAllowedPath(user?.role));
+      router.replace(getFirstAllowedPath(effectiveRole));
     }
-  }, [activeNavigationItem, isAllowed, router, user?.role]);
+  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, router]);
 
   const contextValue = useMemo(
     () => ({
-      activeRole: user?.role,
+      activeRole: effectiveRole,
       query,
       setQuery,
     }),
-    [query, user?.role],
+    [effectiveRole, query],
   );
 
   return (
@@ -334,7 +365,18 @@ function DashboardLayoutShell({ children }) {
         />
         <main className="px-4 py-6 sm:px-6 lg:ml-[280px]">
           <div className="mx-auto grid max-w-[1440px] gap-8">
-            {isAllowed ? children : <AccessDeniedPage />}
+            {!hasHydratedAuth || isLoadingUser ? (
+              <section className="flex min-h-[360px] items-center justify-center rounded-xl border border-[#e2e8f0] bg-white">
+                <span className="inline-flex items-center gap-2 text-sm font-bold text-[#505f76]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Đang kiểm tra quyền truy cập...
+                </span>
+              </section>
+            ) : isAllowed ? (
+              children
+            ) : (
+              <AccessDeniedPage />
+            )}
           </div>
         </main>
       </div>

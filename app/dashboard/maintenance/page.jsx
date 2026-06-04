@@ -1,544 +1,749 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  Banknote,
+  ArrowLeft,
+  BriefcaseBusiness,
+  CalendarDays,
+  Camera,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
   ChevronRight,
-  ClipboardCheck,
-  Loader2,
-  RefreshCw,
-  Save,
+  ClipboardList,
+  CircleGauge,
+  CircleHelp,
+  Droplets,
+  EllipsisVertical,
+  Filter,
+  Hammer,
+  History,
+  Info,
+  Printer,
+  PlusCircle,
+  RotateCcw,
+  Star,
+  Upload,
+  Video,
+  Wrench,
+  X,
 } from "lucide-react";
-import {
-  approveMaintenanceTicket,
-  completeMaintenanceTicket,
-  fetchMaintenanceTicket,
-  fetchMaintenanceTickets,
-  updateMaintenanceProgress,
-} from "@/services/maintenanceService";
 
-const money = new Intl.NumberFormat("vi-VN");
+const statuses = ["Tất cả", "Chờ tiếp nhận", "Đang xử lý", "Hoàn tất", "Từ chối"];
+const rooms = ["Tất cả", "P.102", "P.305", "Hành lang tầng 2", "Khu để xe"];
+const priorities = ["Tất cả", "Cao", "Trung bình", "Thấp"];
 
-const statusMeta = {
-  PENDING_ACCEPTANCE: ["Chờ tiếp nhận", "bg-amber-50 text-amber-700 ring-amber-200"],
-  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-700 ring-blue-200"],
-  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-700 ring-indigo-200"],
-  WAITING_CONFIRMATION: ["Chờ khách xác nhận", "bg-violet-50 text-violet-700 ring-violet-200"],
-  COMPLETED: ["Hoàn tất", "bg-emerald-50 text-emerald-700 ring-emerald-200"],
-  REJECTED: ["Từ chối", "bg-rose-50 text-rose-700 ring-rose-200"],
-  CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-600 ring-slate-200"],
-};
-
-const priorityLabel = {
-  LOW: "Thấp",
-  MEDIUM: "Trung bình",
-  HIGH: "Cao",
-  URGENT: "Khẩn cấp",
-};
-
-const scopeOptions = [
-  ["TENANT_ROOM", "Sự cố phòng thuê"],
-  ["COMMON_AREA", "Khu vực chung"],
-  ["PROPERTY_OPERATION", "Vận hành cơ sở"],
+const initialTickets = [
+  {
+    id: "T-1001",
+    type: "Điện nước",
+    icon: Droplets,
+    position: "P.102",
+    createdAt: "22/05/2024",
+    priority: "Cao",
+    status: "Chờ tiếp nhận",
+    creator: "",
+  },
+  {
+    id: "T-1004",
+    type: "Khác",
+    icon: CircleHelp,
+    position: "Khu để xe",
+    createdAt: "22/05/2024",
+    priority: "Cao",
+    status: "Chờ tiếp nhận",
+    creator: "",
+  },
+  {
+    id: "T-1002",
+    type: "Thiết bị",
+    icon: Hammer,
+    position: "Hành lang tầng 2",
+    createdAt: "21/05/2024",
+    priority: "Trung bình",
+    status: "Đang xử lý",
+    creator: "Nguyễn Văn A",
+    creatorInitials: "NV",
+  },
+  {
+    id: "T-1003",
+    type: "Nội thất",
+    icon: BriefcaseBusiness,
+    position: "P.305",
+    createdAt: "20/05/2024",
+    priority: "Thấp",
+    status: "Hoàn tất",
+    creator: "Trần Thị B",
+    creatorInitials: "TT",
+  },
 ];
 
-const rootCauseOptions = [
-  ["NATURAL_WEAR", "Hao mòn tự nhiên"],
-  ["TENANT_FAULT", "Lỗi do khách"],
-  ["OWNER_FAULT", "Lỗi kỹ thuật/chủ trọ"],
-  ["OTHER", "Khác"],
-];
-
-const paidByOptions = [
-  ["LANDLORD", "Chủ trọ"],
-  ["TENANT", "Khách thuê"],
-  ["MANAGER", "Quản lý"],
-  ["OTHER", "Khác"],
-];
-
-function formatMoney(value) {
-  return `${money.format(Number(value) || 0)} đ`;
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
-function formatDateTime(value) {
-  if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function labelFromOptions(options, value) {
-  return options.find(([key]) => key === value)?.[1] || value || "Chưa chọn";
-}
-
-function StatusBadge({ value }) {
-  const [label, className] = statusMeta[value] || ["Không rõ", "bg-slate-100 text-slate-700 ring-slate-200"];
+function SelectFilter({ label, value, options, onChange }) {
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
-      {label}
-    </span>
-  );
-}
-
-function PageHeader({ onRefresh, loading }) {
-  return (
-    <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.1em] text-[#315f9c]">Quản lý vận hành</p>
-        <h1 className="mt-2 text-2xl font-bold text-[#191c1e]">Báo cáo sự cố & Bảo trì</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
-          Theo dõi phiếu sự cố tenant gửi từ mobile, phân loại nguyên nhân và ghi nhận người chịu chi phí.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={loading}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-60"
+    <label className="relative block">
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full min-w-[170px] appearance-none rounded-[4px] border border-[#cbd3df] bg-[#f4f7fb] px-3 pr-9 text-xs font-medium text-[#172235] outline-none transition focus:border-[#0f1d33] focus:ring-2 focus:ring-[#0f1d33]/10"
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        Làm mới
-      </button>
-    </section>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {label}: {option}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#697386]" />
+    </label>
   );
 }
 
-function KpiCard({ icon: Icon, label, value, subtext, tone = "blue" }) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
-  };
+function MetricCard({ icon: Icon, label, value, tone }) {
+  const styles = {
+    blue: {
+      icon: "bg-[#dfeaff] text-[#18345f]",
+      value: "text-[#0f1d33]",
+      border: "border-[#d6dce7]",
+    },
+    orange: {
+      icon: "bg-[#ffd9b6] text-[#1f2937]",
+      value: "text-[#0f1d33]",
+      border: "border-[#f4a35d] shadow-[0_8px_18px_rgba(244,163,93,0.12)]",
+    },
+    indigo: {
+      icon: "bg-[#dfe3ff] text-[#173da8]",
+      value: "text-[#173da8]",
+      border: "border-[#d6dce7]",
+    },
+    green: {
+      icon: "bg-[#d9f8e7] text-[#138444]",
+      value: "text-[#138444]",
+      border: "border-[#d6dce7]",
+    },
+  }[tone];
 
   return (
-    <article className="flex min-h-[104px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-6 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
+    <article className={`flex min-h-[94px] items-center gap-4 rounded-[6px] border bg-white px-6 py-4 ${styles.border}`}>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] ${styles.icon}`}>
         <Icon className="h-5 w-5" />
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-[#191c1e]">{value}</p>
-        {subtext && <p className="mt-1 truncate text-xs text-[#6b7280]">{subtext}</p>}
+      <div>
+        <p className="text-[11px] font-bold text-[#495365]">{label}</p>
+        <p className={`mt-1 text-2xl font-bold leading-none ${styles.value}`}>{value}</p>
       </div>
     </article>
   );
 }
 
-function Card({ children, className = "" }) {
+function PriorityBadge({ priority }) {
+  const styles = {
+    Cao: "bg-[#ffd9d9] text-[#e11111]",
+    "Trung bình": "bg-[#ffead5] text-[#e45800]",
+    Thấp: "bg-[#dcecff] text-[#7690bd]",
+  };
+
   return (
-    <section className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}>
+    <span className={`inline-flex rounded-[2px] px-2 py-1 text-[11px] font-medium ${styles[priority]}`}>
+      {priority}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  if (status === "Chờ tiếp nhận") {
+    return (
+      <span className="inline-flex min-w-[82px] justify-center rounded-[8px] border border-[#fee682] bg-[#fff6bf] px-3 py-2 text-center text-xs font-medium leading-tight text-[#815b00]">
+        Chờ<br />tiếp nhận
+      </span>
+    );
+  }
+
+  if (status === "Đang xử lý") {
+    return (
+      <span className="inline-flex min-w-[82px] justify-center rounded-[8px] bg-[#2563eb] px-3 py-2 text-center text-xs font-medium leading-tight text-white">
+        Đang<br />xử lý
+      </span>
+    );
+  }
+
+  if (status === "Từ chối") {
+    return (
+      <span className="inline-flex min-w-[82px] items-center justify-center rounded-[8px] bg-[#ffd9d9] px-3 py-2 text-xs font-medium text-[#c5161d]">
+        Từ chối
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex min-w-[82px] items-center justify-center gap-1 rounded-[8px] bg-[#d9f8e7] px-3 py-2 text-xs font-medium text-[#138444]">
+      <Check className="h-3 w-3" />
+      Hoàn tất
+    </span>
+  );
+}
+
+function TicketActions({ ticket, onAccept, onReject }) {
+  if (ticket.status === "Chờ tiếp nhận") {
+    return (
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAccept(ticket.id);
+          }}
+          className="h-9 rounded-[2px] bg-[#3156b6] px-3 text-xs font-bold text-white transition hover:bg-[#24489f]"
+        >
+          Tiếp nhận
+        </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onReject(ticket);
+          }}
+          className="h-9 rounded-[2px] border border-[#ff4d4f] bg-white px-3 text-xs font-bold text-[#ff1f1f] transition hover:bg-red-50"
+        >
+          Từ chối
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={`Thao tác ${ticket.id}`}
+      onClick={(event) => event.stopPropagation()}
+      className="flex h-9 w-9 items-center justify-center rounded-[4px] text-[#0f1d33] transition hover:bg-[#eef3fb]"
+    >
+      <EllipsisVertical className="h-5 w-5" />
+    </button>
+  );
+}
+
+function RejectTicketModal({ ticket, reason, onReasonChange, onClose, onConfirm }) {
+  if (!ticket) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 backdrop-blur-[1px]">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reject-ticket-title"
+        className="w-full max-w-[520px] overflow-hidden rounded-xl border border-[#cbd3df] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.35)]"
+      >
+        <header className="flex items-center justify-between border-b border-[#d7deea] bg-[#f7f9fe] px-6 py-5">
+          <h2 id="reject-ticket-title" className="text-2xl font-bold tracking-[-0.02em] text-[#0f1d33]">
+            Xác nhận từ chối ticket
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-[#3e4654] transition hover:bg-[#e8edf6]"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </header>
+
+        <div className="px-6 py-6">
+          <label className="grid gap-3">
+            <span className="text-sm font-bold text-[#4b5563]">Lý do từ chối</span>
+            <textarea
+              value={reason}
+              onChange={(event) => onReasonChange(event.target.value)}
+              placeholder="Nhập lý do từ chối xử lý sự cố này..."
+              className="min-h-[128px] resize-none rounded-md border border-[#bfc7d5] bg-[#eef3fb] px-4 py-3 text-base leading-7 text-[#0f1d33] outline-none placeholder:text-[#7b8495] focus:border-[#0f1d33] focus:ring-2 focus:ring-[#0f1d33]/10"
+            />
+          </label>
+
+          <p className="mt-5 text-base leading-7 text-[#4b5563]">
+            Lưu ý: Hành động này sẽ thông báo cho khách thuê và chuyển ticket sang trạng thái Đã từ chối.
+          </p>
+        </div>
+
+        <footer className="flex justify-end gap-3 bg-[#eef3fb] px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 min-w-[78px] rounded-md border border-[#bfc7d5] bg-[#f7f9fe] px-5 text-sm font-bold text-[#4b5563] transition hover:bg-white"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="h-11 rounded-md bg-[#c5161d] px-5 text-sm font-bold text-white transition hover:bg-[#a90f15]"
+          >
+            Xác nhận từ chối
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function CompactStatusBadge({ status }) {
+  const className =
+    status === "Đang xử lý"
+      ? "bg-[#ffe6c9] text-[#9a5a00]"
+      : status === "Hoàn tất"
+        ? "bg-[#d9f8e7] text-[#138444]"
+        : status === "Từ chối"
+          ? "bg-[#ffd9d9] text-[#c5161d]"
+          : "bg-[#fff6bf] text-[#815b00]";
+
+  return <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${className}`}>{status}</span>;
+}
+
+function DetailCard({ title, icon: Icon, children, action }) {
+  return (
+    <section className="rounded-[6px] border border-[#cbd3df] bg-white p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="inline-flex items-center gap-2 text-base font-bold text-[#0f1d33]">
+          <Icon className="h-5 w-5 text-[#3156b6]" />
+          {title}
+        </h2>
+        {action}
+      </div>
       {children}
     </section>
   );
 }
 
-function MaintenanceDetail({ ticket, form, setForm, onAccept, onSaveProgress, onComplete, busy, error }) {
-  if (!ticket) {
-    return (
-      <Card className="flex min-h-[420px] items-center justify-center p-6 text-sm font-bold text-[#505f76]">
-        Chọn một phiếu để xem chi tiết.
-      </Card>
-    );
-  }
+function BeforeRepairMedia() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <div
+        className="relative min-h-[168px] overflow-hidden rounded-[4px] bg-cover bg-center"
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=600&q=80')" }}
+      />
+      <div
+        className="relative min-h-[168px] overflow-hidden rounded-[4px] bg-cover bg-center"
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=600&q=80')" }}
+      >
+        <div className="absolute bottom-0 left-0 right-0 bg-[#0f1d33]/75 px-3 py-2 text-center text-xs font-medium text-[#bfc7d5]">
+          Tủ điện
+        </div>
+      </div>
+      <div className="flex min-h-[168px] flex-col items-center justify-center rounded-[4px] border border-dashed border-[#aeb8c8] bg-[#f7f9fe] text-center">
+        <Video className="h-8 w-8 text-[#697386]" />
+        <p className="mt-3 max-w-[150px] break-all text-xs font-medium text-[#172235]">Video_Minh_Chung.mp4</p>
+      </div>
+    </div>
+  );
+}
+
+function MaintenanceTicketDetail({ ticket, onBack }) {
+  const isDone = ticket.status === "Hoàn tất";
 
   return (
-    <Card className="overflow-hidden">
-      <div className="border-b border-[#e2e8f0] p-6">
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">Chi tiết phiếu</p>
-          <StatusBadge value={ticket.status} />
-        </div>
-        <h2 className="mt-2 text-2xl font-bold text-[#091426]">{ticket.ticketCode}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#45474c]">
-          Phòng {ticket.roomCode || "chưa rõ"} · Tạo lúc {formatDateTime(ticket.createdAt)}
-        </p>
-      </div>
-
-      <div className="grid gap-5 p-6">
-        <div className="grid gap-2">
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#45474c]">Mô tả sự cố</p>
-          <p className="rounded-lg bg-[#f7f9fb] p-4 text-sm leading-6 text-[#45474c]">
-            {ticket.description || "Chưa có mô tả"}
+    <div className="grid gap-5 text-[#0f1d33]">
+      <section className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-[#495365] transition hover:text-[#0f1d33]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại danh sách
+          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">Ticket {ticket.id}</h1>
+            <CompactStatusBadge status={ticket.status} />
+          </div>
+          <p className="mt-2 inline-flex items-center gap-2 text-sm text-[#495365]">
+            <CalendarDays className="h-4 w-4" />
+            Ngày tạo: 24/10/2023 - 09:15 AM
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#45474c]">Phân loại</span>
-            <select
-              value={form.ticketScope}
-              onChange={(event) => setForm((current) => ({ ...current, ticketScope: event.target.value }))}
-              className="h-10 rounded-lg border border-[#c5c6cd] bg-white px-3 text-sm text-[#091426]"
-            >
-              {scopeOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#45474c]">Nguyên nhân</span>
-            <select
-              value={form.rootCause}
-              onChange={(event) => setForm((current) => ({ ...current, rootCause: event.target.value }))}
-              className="h-10 rounded-lg border border-[#c5c6cd] bg-white px-3 text-sm text-[#091426]"
-            >
-              {rootCauseOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[#45474c]">Người sửa</span>
-          <input
-            value={form.workerName}
-            onChange={(event) => setForm((current) => ({ ...current, workerName: event.target.value }))}
-            placeholder="Nhập tên thợ hoặc nhân sự xử lý"
-            className="h-10 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
-          />
-        </label>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[#45474c]">Hạng mục sửa chữa</span>
-          <textarea
-            value={form.repairItems}
-            onChange={(event) => setForm((current) => ({ ...current, repairItems: event.target.value }))}
-            placeholder="Ví dụ: thay bóng đèn, kiểm tra công tắc..."
-            className="min-h-24 rounded-lg border border-[#c5c6cd] p-3 text-sm text-[#091426]"
-          />
-        </label>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#45474c]">Chi phí sửa/thay</span>
-            <input
-              type="number"
-              min="0"
-              value={form.costAmount}
-              onChange={(event) => setForm((current) => ({ ...current, costAmount: event.target.value }))}
-              className="h-10 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
-            />
-          </label>
-          <label className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#45474c]">Người chịu phí</span>
-            <select
-              value={form.paidBy}
-              onChange={(event) => setForm((current) => ({ ...current, paidBy: event.target.value }))}
-              className="h-10 rounded-lg border border-[#c5c6cd] bg-white px-3 text-sm text-[#091426]"
-            >
-              {paidByOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[#45474c]">Mô tả chi phí</span>
-          <input
-            value={form.costDescription}
-            onChange={(event) => setForm((current) => ({ ...current, costDescription: event.target.value }))}
-            placeholder="Ví dụ: bóng LED + công thay"
-            className="h-10 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
-          />
-        </label>
-
-        <div className="rounded-lg bg-[#f7f9fb] p-4 text-sm leading-6 text-[#45474c]">
-          <b>Kết luận hiện tại:</b> {labelFromOptions(scopeOptions, form.ticketScope)} ·{" "}
-          {labelFromOptions(rootCauseOptions, form.rootCause)} · Chi phí do{" "}
-          {labelFromOptions(paidByOptions, form.paidBy).toLowerCase()} chịu.
-        </div>
-
-        {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p>}
-
-        <div className="grid grid-cols-1 gap-3 border-t border-[#e2e8f0] pt-5 sm:grid-cols-3">
+        <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={onAccept}
-            disabled={busy || ticket.status !== "PENDING_ACCEPTANCE"}
-            className="h-11 rounded-lg border border-[#c5c6cd] text-sm font-bold text-[#091426] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] border border-[#7b8495] bg-white px-4 text-xs font-bold text-[#0f1d33] transition hover:bg-[#eef3fb]"
           >
-            Tiếp nhận
+            <RotateCcw className="h-4 w-4" />
+            Cập nhật tiến độ
           </button>
           <button
             type="button"
-            onClick={onSaveProgress}
-            disabled={busy}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c5c6cd] text-sm font-bold text-[#091426] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-black px-4 text-xs font-bold text-white transition hover:bg-[#172235]"
           >
-            <Save className="h-4 w-4" />
-            Lưu xử lý
-          </button>
-          <button
-            type="button"
-            onClick={onComplete}
-            disabled={busy}
-            className="h-11 rounded-lg bg-[#091426] text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Hoàn tất sửa
+            <CheckCircle2 className="h-4 w-4" />
+            Đánh dấu hoàn tất
           </button>
         </div>
-      </div>
-    </Card>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="grid gap-5">
+          <DetailCard title="Chi tiết sự cố" icon={Info}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="bg-[#eef3fb] px-4 py-3">
+                <p className="text-[10px] font-bold uppercase text-[#697386]">Loại sự cố</p>
+                <p className="mt-1 text-sm font-bold text-[#0f1d33]">{ticket.type}</p>
+              </div>
+              <div className="bg-[#eef3fb] px-4 py-3">
+                <p className="text-[10px] font-bold uppercase text-[#697386]">Vị trí/Phòng</p>
+                <p className="mt-1 text-sm font-bold text-[#0f1d33]">
+                  {ticket.position === "Hành lang tầng 2" ? "P.102 (Tầng 1)" : ticket.position}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="text-[10px] font-bold uppercase text-[#697386]">Mô tả</p>
+              <p className="mt-2 rounded-[4px] border border-[#d7deea] bg-[#f7f9fe] px-4 py-3 text-sm leading-6 text-[#172235]">
+                Đèn nhấp nháy liên tục ở khu vực phòng khách. Người thuê báo cáo tình trạng này xảy ra thường xuyên hơn khi bật điều hòa. Có thể do lỏng kết nối trong tủ điện hoặc hỏng chấn lưu LED.
+              </p>
+            </div>
+          </DetailCard>
+
+          <DetailCard
+            title="Trước khi sửa"
+            icon={Camera}
+            action={<span className="rounded-[2px] bg-[#dfeaff] px-2 py-1 text-[10px] font-bold text-[#3156b6]">3 tệp</span>}
+          >
+            <BeforeRepairMedia />
+          </DetailCard>
+
+          <DetailCard title="Sau khi sửa" icon={CheckCircle2}>
+            <div className="flex min-h-[170px] flex-col items-center justify-center rounded-[4px] border border-dashed border-[#bfc7d5] bg-[#f7f9fe] text-center">
+              <Upload className="h-10 w-10 text-[#b5bdca]" />
+              <p className="mt-3 text-sm text-[#7b8495]">
+                {isDone ? "Ảnh sau sửa chữa đã được cập nhật." : "Chưa có ảnh sau khi sửa chữa"}
+              </p>
+              {!isDone && (
+                <button type="button" className="mt-3 text-xs font-bold text-[#3156b6]">
+                  Tải ảnh hoàn tất
+                </button>
+              )}
+            </div>
+          </DetailCard>
+
+          <DetailCard title="Chi tiết thực hiện" icon={Wrench}>
+            <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="grid gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-[#697386]">Thợ sửa</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dfeaff] text-xs font-bold text-[#3156b6]">
+                      NV
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-[#0f1d33]">Nguyễn Văn A</p>
+                      <p className="text-xs text-[#697386]">Thợ điện bậc cao</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-[#697386]">Hạng mục thay thế</p>
+                  <div className="mt-2 grid gap-2 text-sm text-[#172235]">
+                    <div className="flex justify-between border-b border-[#eef3fb] pb-2">
+                      <span>Chấn lưu LED 12W</span>
+                      <span>1 x 120k</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Dây đồng (m)</span>
+                      <span>2 x 15k</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[6px] border border-[#b9c7ff] bg-[#e8edff] px-5 py-4">
+                <p className="text-[10px] font-bold uppercase text-[#3156b6]">Tổng chi phí thực tế</p>
+                <p className="mt-3 text-3xl font-bold text-[#3156b6]">150.000 <span className="text-base">VND</span></p>
+              </div>
+            </div>
+          </DetailCard>
+
+          <DetailCard title="Đánh giá của khách" icon={Star}>
+            <div className="rounded-[4px] bg-[#eef3fb] px-5 py-5 text-center">
+              <div className="flex justify-center gap-1 text-[#b5bdca]">
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <Star key={item} className="h-5 w-5" />
+                ))}
+              </div>
+              <p className="mt-4 text-sm italic text-[#697386]">
+                &ldquo;Khách thuê chưa gửi đánh giá. Yêu cầu đánh giá sẽ được gửi sau khi hoàn tất.&rdquo;
+              </p>
+            </div>
+          </DetailCard>
+        </div>
+
+        <aside className="h-fit rounded-[6px] bg-[#0f1d33] p-5 text-white shadow-[0_10px_30px_rgba(15,29,51,0.18)]">
+          <h2 className="inline-flex items-center gap-2 text-lg font-bold">
+            <History className="h-5 w-5" />
+            Tiến độ xử lý
+          </h2>
+          <div className="mt-6 grid gap-6 border-l border-[#31506f] pl-5">
+            <div className="relative opacity-45">
+              <span className="absolute -left-[29px] top-1 h-3 w-3 rounded-full bg-[#7990aa]" />
+              <p className="text-sm font-bold">Đã hoàn thành</p>
+              <p className="mt-1 text-xs text-[#8fa2ba]">Đang chờ giải quyết...</p>
+            </div>
+            <div className="relative">
+              <span className="absolute -left-[34px] top-0 flex h-8 w-8 items-center justify-center rounded-full bg-[#dfe3ff] text-[#3156b6]">
+                <Wrench className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-bold">Đang xử lý</p>
+              <p className="text-sm">24/10, 10:45 AM</p>
+              <p className="mt-1 text-xs text-[#8fa2ba]">Thợ: Nguyễn Văn A</p>
+            </div>
+            <div className="relative">
+              <span className="absolute -left-[29px] top-1 h-3 w-3 rounded-full bg-[#7990aa]" />
+              <p className="text-sm font-bold">Đã tiếp nhận</p>
+              <p className="text-sm">24/10, 09:40 AM</p>
+              <p className="mt-1 text-xs text-[#8fa2ba]">Bởi Quản lý tòa nhà</p>
+            </div>
+            <div className="relative">
+              <span className="absolute -left-[29px] top-1 h-3 w-3 rounded-full bg-[#7990aa]" />
+              <p className="text-sm font-bold">Ngày tạo</p>
+              <p className="text-sm">24/10, 09:15 AM</p>
+              <p className="mt-1 text-xs text-[#8fa2ba]">Khách thuê: Trần Thị B</p>
+            </div>
+          </div>
+          <div className="mt-7 border-t border-[#263d5c] pt-5">
+            <button
+              type="button"
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[3px] bg-[#263d5c] text-sm font-bold text-white transition hover:bg-[#31506f]"
+            >
+              <Printer className="h-4 w-4" />
+              In phiếu sửa chữa
+            </button>
+          </div>
+        </aside>
+      </section>
+    </div>
   );
 }
 
 export default function MaintenancePage() {
-  const [tickets, setTickets] = useState([]);
-  const [selectedTicketId, setSelectedTicketId] = useState(null);
-  const [statusView, setStatusView] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const selectedTicketIdRef = useRef(null);
-  const [form, setForm] = useState({
-    ticketScope: "TENANT_ROOM",
-    rootCause: "NATURAL_WEAR",
-    workerName: "",
-    repairItems: "",
-    costAmount: "",
-    costDescription: "",
-    paidBy: "LANDLORD",
-  });
+  const [tickets, setTickets] = useState(initialTickets);
+  const [status, setStatus] = useState("Tất cả");
+  const [room, setRoom] = useState("Tất cả");
+  const [priority, setPriority] = useState("Tất cả");
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
-  const selectedTicket = useMemo(
-    () => tickets.find((ticket) => ticket.id === selectedTicketId) || tickets[0] || null,
-    [selectedTicketId, tickets],
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((ticket) => {
+      const matchesStatus = status === "Tất cả" || ticket.status === status;
+      const matchesRoom = room === "Tất cả" || normalize(ticket.position) === normalize(room);
+      const matchesPriority = priority === "Tất cả" || ticket.priority === priority;
+      return matchesStatus && matchesRoom && matchesPriority;
+    });
+  }, [priority, room, status, tickets]);
+
+  const metrics = useMemo(
+    () => ({
+      total: 156,
+      pending: tickets.filter((ticket) => ticket.status === "Chờ tiếp nhận").length + 6,
+      processing: tickets.filter((ticket) => ticket.status === "Đang xử lý").length + 11,
+      done: 136,
+    }),
+    [tickets],
   );
 
-  const visibleTickets = useMemo(() => {
-    if (statusView === "open") {
-      return tickets.filter((ticket) => !["COMPLETED", "REJECTED", "CANCELLED"].includes(ticket.status));
-    }
-    return tickets;
-  }, [statusView, tickets]);
-
-  const stats = useMemo(() => {
-    const open = tickets.filter((ticket) => ["PENDING_ACCEPTANCE", "ACCEPTED", "IN_PROGRESS"].includes(ticket.status)).length;
-    const done = tickets.filter((ticket) => ticket.status === "COMPLETED").length;
-    const landlordCost = tickets
-      .filter((ticket) => ticket.paidBy === "LANDLORD")
-      .reduce((sum, ticket) => sum + (Number(ticket.costAmount) || 0), 0);
-    return { open, done, landlordCost };
-  }, [tickets]);
-
-  const syncForm = useCallback((ticket) => {
-    if (!ticket) return;
-    setForm({
-      ticketScope: ticket.ticketScope || "TENANT_ROOM",
-      rootCause: ticket.rootCause || "NATURAL_WEAR",
-      workerName: ticket.workerName || "",
-      repairItems: ticket.repairItems || "",
-      costAmount: ticket.costAmount ? String(ticket.costAmount) : "",
-      costDescription: ticket.costDescription || "",
-      paidBy: ticket.paidBy || "LANDLORD",
-    });
-  }, []);
-
-  const loadTickets = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await fetchMaintenanceTickets({ size: 100 });
-      setTickets(data.tickets);
-      const first = data.tickets[0] || null;
-      const currentSelected = selectedTicketIdRef.current;
-      const nextSelected = currentSelected && data.tickets.some((ticket) => ticket.id === currentSelected)
-        ? currentSelected
-        : first?.id ?? null;
-      selectedTicketIdRef.current = nextSelected;
-      setSelectedTicketId(nextSelected);
-      syncForm(data.tickets.find((ticket) => ticket.id === nextSelected) || first);
-    } catch (err) {
-      setError(err.message || "Không tải được danh sách phiếu sự cố.");
-      setTickets([]);
-      selectedTicketIdRef.current = null;
-      setSelectedTicketId(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [syncForm]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadTickets();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadTickets]);
-
-  const applyUpdatedTicket = (updated) => {
-    setTickets((current) => current.map((ticket) => (ticket.id === updated.id ? { ...ticket, ...updated } : ticket)));
-    selectedTicketIdRef.current = updated.id;
-    setSelectedTicketId(updated.id);
-    syncForm(updated);
+  const acceptTicket = (ticketId) => {
+    setTickets((currentTickets) =>
+      currentTickets.map((ticket) =>
+        ticket.id === ticketId
+          ? {
+              ...ticket,
+              status: "Đang xử lý",
+              creator: "Nguyễn Văn A",
+              creatorInitials: "NV",
+            }
+          : ticket,
+      ),
+    );
   };
 
-  const selectTicket = async (ticketId) => {
-    selectedTicketIdRef.current = ticketId;
-    setSelectedTicketId(ticketId);
-    const fallback = tickets.find((ticket) => ticket.id === ticketId);
-    syncForm(fallback);
-    try {
-      const detail = await fetchMaintenanceTicket(ticketId);
-      applyUpdatedTicket(detail);
-    } catch {
-      // List data is enough for the dashboard; detail fetch failure should not block selection.
-    }
+  const openRejectModal = (ticket) => {
+    setRejectTarget(ticket);
+    setRejectReason("");
   };
 
-  const withAction = async (action) => {
-    if (!selectedTicket) return;
-    setBusy(true);
-    setActionError("");
-    try {
-      const updated = await action(selectedTicket.id);
-      applyUpdatedTicket(updated);
-    } catch (err) {
-      setActionError(err.message || "Không xử lý được phiếu sự cố.");
-    } finally {
-      setBusy(false);
-    }
+  const closeRejectModal = () => {
+    setRejectTarget(null);
+    setRejectReason("");
   };
 
-  const actionPayload = () => ({
-    ticketScope: form.ticketScope,
-    rootCause: form.rootCause,
-    workerName: form.workerName.trim(),
-    repairItems: form.repairItems.trim(),
-    costType: "OTHER",
-    costDescription: form.costDescription.trim(),
-    amount: Number(form.costAmount) || 0,
-    paidBy: form.paidBy,
-  });
+  const confirmRejectTicket = () => {
+    if (!rejectTarget) return;
+
+    setTickets((currentTickets) =>
+      currentTickets.map((ticket) =>
+        ticket.id === rejectTarget.id
+          ? {
+              ...ticket,
+              status: "Từ chối",
+              rejectReason: rejectReason.trim(),
+            }
+          : ticket,
+      ),
+    );
+    closeRejectModal();
+  };
+
+  if (selectedTicket) {
+    const latestTicket = tickets.find((ticket) => ticket.id === selectedTicket.id) || selectedTicket;
+
+    return <MaintenanceTicketDetail ticket={latestTicket} onBack={() => setSelectedTicket(null)} />;
+  }
 
   return (
-    <>
-      <PageHeader onRefresh={loadTickets} loading={loading} />
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={ClipboardCheck} label="Tổng phiếu" value={tickets.length} subtext="Dữ liệu từ backend" />
-        <KpiCard icon={AlertTriangle} label="Đang mở" value={stats.open} subtext="Cần tiếp nhận/xử lý" tone="rose" />
-        <KpiCard icon={CheckCircle2} label="Đã hoàn tất" value={stats.done} subtext="Tenant đã xác nhận" tone="emerald" />
-        <KpiCard icon={Banknote} label="Chủ trọ chịu" value={formatMoney(stats.landlordCost)} tone="amber" />
+    <div className="grid gap-5 text-[#0f1d33]">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">Danh sách bảo trì</h1>
+          <p className="mt-6 text-sm text-[#697386]">Tổng cộng 24 yêu cầu cần xử lý hôm nay</p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-[4px] bg-black px-5 text-xs font-bold text-white shadow-[0_8px_16px_rgba(0,0,0,0.18)] transition hover:bg-[#172235]"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Tạo ticket mới
+        </button>
       </section>
 
-      {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</p>}
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={ClipboardList} label="Tổng ticket" value={metrics.total} tone="blue" />
+        <MetricCard icon={CircleGauge} label="Chờ tiếp nhận" value={String(metrics.pending).padStart(2, "0")} tone="orange" />
+        <MetricCard icon={BriefcaseBusiness} label="Đang xử lý" value={String(metrics.processing).padStart(2, "0")} tone="indigo" />
+        <MetricCard icon={CheckCircle2} label="Hoàn tất" value={metrics.done} tone="green" />
+      </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-            <div>
-              <h2 className="font-bold text-[#091426]">Danh sách phiếu sự cố</h2>
-              <p className="mt-1 text-xs text-[#6b7280]">Phiếu tenant tạo trên mobile sẽ hiển thị tại đây.</p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStatusView("all")}
-                className={`rounded-full px-3 py-1 text-xs font-bold ${statusView === "all" ? "bg-[#091426] text-white" : "border border-[#e2e8f0] text-[#505f76]"}`}
-              >
-                Tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusView("open")}
-                className={`rounded-full px-3 py-1 text-xs font-bold ${statusView === "open" ? "bg-[#091426] text-white" : "border border-[#e2e8f0] text-[#505f76]"}`}
-              >
-                Đang mở
-              </button>
-            </div>
+      <section className="rounded-[6px] border border-[#cbd3df] bg-white px-5 py-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase text-[#495365]">
+              <Filter className="h-4 w-4" />
+              Bộ lọc:
+            </span>
+            <SelectFilter label="Trạng thái" value={status} options={statuses} onChange={setStatus} />
+            <SelectFilter label="Phòng" value={room} options={rooms} onChange={setRoom} />
+            <SelectFilter label="Mức độ" value={priority} options={priorities} onChange={setPriority} />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left">
-              <thead className="text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[4px] border border-[#cbd3df] bg-[#eef3fb] px-4 text-xs font-medium text-[#172235]"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Tháng 05, 2024
+          </button>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[6px] border border-[#bfc9d8] bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm">
+            <thead className="bg-[#dfeaff] text-[11px] font-bold uppercase tracking-[0.05em] text-[#3e4b60]">
+              <tr>
+                <th className="px-5 py-4">Mã ticket</th>
+                <th className="px-5 py-4">Loại sự cố</th>
+                <th className="px-5 py-4">Vị trí</th>
+                <th className="px-5 py-4">Ngày tạo</th>
+                <th className="px-5 py-4">Mức độ</th>
+                <th className="px-5 py-4 text-center">Trạng thái</th>
+                <th className="px-5 py-4">Người tạo</th>
+                <th className="px-5 py-4 text-center">Hành động</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#d7deea]">
+              {filteredTickets.map((ticket) => {
+                const Icon = ticket.icon;
+                const isPending = ticket.status === "Chờ tiếp nhận";
+
+                return (
+                  <tr
+                    key={ticket.id}
+                    onClick={() => setSelectedTicket(ticket)}
+                    className={`cursor-pointer bg-white align-middle transition hover:bg-[#f7f9fe] ${isPending ? "border-l-2 border-l-[#ffd21f]" : ""}`}
+                  >
+                    <td className="px-5 py-5 text-xs font-bold text-black">{ticket.id}</td>
+                    <td className="px-5 py-5">
+                      <span className="inline-flex items-center gap-2 text-xs font-medium text-[#0f1d33]">
+                        <Icon className="h-4 w-4 text-[#3156b6]" />
+                        <span className="max-w-[80px] leading-5">{ticket.type}</span>
+                      </span>
+                    </td>
+                    <td className="px-5 py-5 text-xs font-medium leading-5 text-[#0f1d33]">
+                      {ticket.position}
+                    </td>
+                    <td className="px-5 py-5 text-xs font-medium text-[#495365]">{ticket.createdAt}</td>
+                    <td className="px-5 py-5">
+                      <PriorityBadge priority={ticket.priority} />
+                    </td>
+                    <td className="px-5 py-5 text-center">
+                      <StatusBadge status={ticket.status} />
+                    </td>
+                    <td className="px-5 py-5">
+                      {ticket.creator ? (
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#dfeaff] text-[10px] font-bold text-[#3156b6]">
+                            {ticket.creatorInitials}
+                          </span>
+                          <span className="max-w-[96px] text-xs leading-5 text-[#495365]">{ticket.creator}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-[#7b8495]">--</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-5">
+                      <div className="flex justify-center">
+                        <TicketActions ticket={ticket} onAccept={acceptTicket} onReject={openRejectModal} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredTickets.length === 0 && (
                 <tr>
-                  <th className="px-6 py-4">Ticket</th>
-                  <th className="px-6 py-4">Phòng</th>
-                  <th className="px-6 py-4">Loại</th>
-                  <th className="px-6 py-4">Ưu tiên</th>
-                  <th className="px-6 py-4">Nguyên nhân</th>
-                  <th className="px-6 py-4">Chịu phí</th>
-                  <th className="px-6 py-4">Trạng thái</th>
-                  <th className="px-6 py-4"></th>
+                  <td colSpan={8} className="px-5 py-12 text-center text-sm font-semibold text-[#697386]">
+                    Không có ticket phù hợp với bộ lọc hiện tại.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td className="px-6 py-10 text-center text-sm font-bold text-[#505f76]" colSpan={8}>
-                      Đang tải phiếu sự cố...
-                    </td>
-                  </tr>
-                )}
-                {!loading && visibleTickets.length === 0 && (
-                  <tr>
-                    <td className="px-6 py-10 text-center text-sm font-bold text-[#505f76]" colSpan={8}>
-                      Chưa có phiếu sự cố phù hợp.
-                    </td>
-                  </tr>
-                )}
-                {!loading &&
-                  visibleTickets.map((ticket) => (
-                    <tr key={ticket.id} className={`border-t border-[#e2e8f0] ${ticket.id === selectedTicket?.id ? "bg-[#f7f9fb]" : ""}`}>
-                      <td className="px-6 py-4 text-sm font-bold text-[#091426]">{ticket.ticketCode}</td>
-                      <td className="px-6 py-4 text-sm">{ticket.roomCode || "Chưa rõ"}</td>
-                      <td className="px-6 py-4 text-sm">{labelFromOptions(scopeOptions, ticket.ticketScope)}</td>
-                      <td className="px-6 py-4">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-[#505f76]">
-                          {priorityLabel[ticket.priority] || ticket.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">{labelFromOptions(rootCauseOptions, ticket.rootCause)}</td>
-                      <td className="px-6 py-4 text-sm">{labelFromOptions(paidByOptions, ticket.paidBy)}</td>
-                      <td className="px-6 py-4">
-                        <StatusBadge value={ticket.status} />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => selectTicket(ticket.id)}
-                          aria-label={`Xem ${ticket.ticketCode}`}
-                          className="rounded-md p-2 text-[#505f76] hover:bg-white hover:text-[#091426]"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        <MaintenanceDetail
-          ticket={selectedTicket}
-          form={form}
-          setForm={setForm}
-          busy={busy}
-          error={actionError}
-          onAccept={() => withAction((id) => approveMaintenanceTicket(id))}
-          onSaveProgress={() => withAction((id) => updateMaintenanceProgress(id, actionPayload()))}
-          onComplete={() => withAction((id) => completeMaintenanceTicket(id, actionPayload()))}
-        />
+        <div className="flex flex-col gap-3 border-t border-[#d7deea] bg-[#eef3fb] px-5 py-4 text-xs font-medium text-[#0f1d33] sm:flex-row sm:items-center sm:justify-between">
+          <span>Hiển thị 4 trên 156 ticket</span>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button type="button" className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-[#cbd3df] text-[#495365] transition hover:bg-white">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button type="button" className="h-9 w-9 rounded-[4px] bg-black text-sm font-bold text-white">1</button>
+            <button type="button" className="h-9 w-9 rounded-[4px] border border-[#cbd3df] text-sm font-medium text-[#495365] transition hover:bg-white">2</button>
+            <button type="button" className="h-9 w-9 rounded-[4px] border border-[#cbd3df] text-sm font-medium text-[#495365] transition hover:bg-white">3</button>
+            <button type="button" className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-[#cbd3df] text-[#495365] transition hover:bg-white">
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
       </section>
-    </>
+
+      <RejectTicketModal
+        ticket={rejectTarget}
+        reason={rejectReason}
+        onReasonChange={setRejectReason}
+        onClose={closeRejectModal}
+        onConfirm={confirmRejectTicket}
+      />
+    </div>
   );
 }

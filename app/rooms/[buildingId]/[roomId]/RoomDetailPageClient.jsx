@@ -134,6 +134,7 @@ function BookingCard({ room }) {
   const getStatusClass = () => {
     if (isAvailable) return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (isOnHold) return "border-amber-200 bg-amber-50 text-amber-700";
+    if (isDeposited) return "border-orange-200 bg-orange-50 text-orange-700";
     return "border-slate-200 bg-slate-50 text-slate-600";
   };
 
@@ -254,7 +255,7 @@ function BookingCard({ room }) {
         <div className="mt-6">
           {/* Thanh trạng thái động */}
           <div className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}>
-            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isOnHold ? "bg-amber-500" : "bg-slate-400"}`} />
+            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`} />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
             {isOnHold && `Đang giữ chỗ - còn ${holdMinutesLabel}`}
             {isOccupied && "Đã thuê - Không còn trống"}
@@ -271,7 +272,7 @@ function BookingCard({ room }) {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-500"
+              <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : isDeposited ? "border-orange-200 bg-orange-50 text-orange-700" : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}>
                 {isOnHold ? `Phòng đang được giữ chỗ, vui lòng chờ khoảng ${holdMinutesLabel}.` : "Phòng đã được thuê, vui lòng chọn phòng khác."}
               </div>
@@ -563,22 +564,27 @@ export function RoomDetailPageClient({ roomId }) {
   const displayRoom = useMemo(() => {
     if (!room) return null;
     const localHold = roomHolds[room.id];
+    const serverRoomStatus = String(serverHoldStatus?.roomStatus || "").toUpperCase();
     const hasServerHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs > 0;
-    const isServerReserved = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.roomStatus === "RESERVED";
-    const isServerBookable = serverHoldStatus?.canBook === true;
+    const isServerReserved = serverRoomStatus === "RESERVED";
+    const isServerOccupied = serverRoomStatus === "OCCUPIED";
+    const isServerVacant = serverRoomStatus === "VACANT";
+    const isServerBookable = serverHoldStatus?.canBook === true && isServerVacant;
     const isExpiredHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs <= 0;
     const localRemainingMs = localHold && nowMs ? Math.max(0, Number(localHold.expiresAt) - nowMs) : 0;
     const hasLocalHold = Boolean(localHold && localRemainingMs > 0);
 
     return {
       ...room,
-      status: isServerBookable || isExpiredHold
-        ? "available"
-        : isServerReserved
-          ? "deposited"
-          : hasServerHold || (hasLocalHold && room.status === "available")
-            ? "onHold"
-            : room.status,
+      status: isServerReserved || room.status === "deposited"
+        ? "deposited"
+        : isServerOccupied || room.status === "occupied"
+          ? "occupied"
+          : isServerBookable || (isExpiredHold && isServerVacant)
+            ? "available"
+            : hasServerHold || (hasLocalHold && room.status === "available")
+              ? "onHold"
+              : room.status,
       holdExpiresAt: serverHoldStatus?.holdExpiresAt ?? localHold?.expiresAt,
       holdRemainingMs: hasServerHold ? serverHoldStatus.remainingMs : localRemainingMs,
     };

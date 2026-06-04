@@ -414,6 +414,8 @@ const buildDepositMetadata = (room, data) => ({
   id_issue_date: data.idIssueDate || null,
   id_issue_place: String(data.idIssuePlace || "").trim(),
   permanent_address: String(data.permanentAddress || "").trim(),
+  deposit_months: 1,
+  payment_cycle_months: 1,
   expected_lease_sign_date: data.contractDate || null,
   expected_move_in_date: data.moveInDate || null,
 });

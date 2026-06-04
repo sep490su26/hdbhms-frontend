@@ -1,7 +1,9 @@
-export const API_BASE_URL = "http://localhost:8080/api/v1";
+import { API_BASE_URL } from "@/lib/apiConfig";
+
+export { API_BASE_URL };
 
 export class ApiError extends Error {
-    constructor(message, {code, details, status, payload} = {}) {
+    constructor(message, { code, details, status, payload } = {}) {
         super(message || details || "Khong the xu ly yeu cau.");
         this.name = "ApiError";
         this.code = code;
@@ -122,7 +124,7 @@ export async function getCurrentUserProfile() {
     }
 }
 
-export async function loginWithPhonePassword({phone, password}) {
+export async function loginWithPhonePassword({ phone, password }) {
     const IS_MOCK_MODE = false;
 
     if (IS_MOCK_MODE) {
@@ -146,7 +148,7 @@ export async function loginWithPhonePassword({phone, password}) {
                 "Content-Type": "application/json",
                 "X-Client-Type": "web",
             },
-            body: JSON.stringify({phone, password}),
+            body: JSON.stringify({ phone, password }),
         });
         return parseEnvelope(response);
     }
@@ -157,7 +159,7 @@ export async function logout() {
     try {
         return authenticatedFetch(`${API_BASE_URL}/auth/logout`, {
             method: "POST",
-            body: JSON.stringify({token}),
+            body: JSON.stringify({ token }),
         });
     } catch {
         return null;
@@ -173,7 +175,7 @@ export async function refreshTokenApi() {
             "Content-Type": "application/json",
             "X-Client-Type": "web"
         },
-        body: JSON.stringify({token}),
+        body: JSON.stringify({ token }),
     });
 
     const data = await parseEnvelope(response);
@@ -184,10 +186,10 @@ export async function refreshTokenApi() {
     throw new Error("Không thể làm mới phiên đăng nhập");
 }
 
-export async function createStaffAccount({phone, email, fullName, role}) {
+export async function createStaffAccount({ phone, email, fullName, role }) {
     return authenticatedFetch(`${API_BASE_URL}/users/staff`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             phone,
             email,
@@ -197,7 +199,7 @@ export async function createStaffAccount({phone, email, fullName, role}) {
     });
 }
 
-export async function fetchUsers({page, size, status, role, search}) {
+export async function fetchUsers({ page, size, status, role, search }) {
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
@@ -209,19 +211,19 @@ export async function fetchUsers({page, size, status, role, search}) {
     return authenticatedFetch(`${API_BASE_URL}/users?${params.toString()}`);
 }
 
-export async function updateUserStatus(userId, {status}) {
+export async function updateUserStatus(userId, { status }) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/status`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({status}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
     });
 }
 
 export async function updateUserRole(userId, role) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/role`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({role}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
     });
 }
 
@@ -233,6 +235,18 @@ export async function deleteUser(userId) {
 
 export async function restoreUser(userId) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/restore`, {
+        method: "POST",
+    });
+}
+
+export async function fetchTenantAccountCandidates() {
+    return authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
+        method: "GET",
+    });
+}
+
+export async function sendTenantAccountCredentials(contractId) {
+    return authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send`, {
         method: "POST",
     });
 }

@@ -21,6 +21,7 @@ import {
   fetchDepositAgreements,
   openDepositContractPdf,
   toApiAssetUrl,
+  updateDepositAgreementManagementInfo,
   updateDepositAgreementStatus,
 } from "@/services/depositContractsService";
 
@@ -34,6 +35,7 @@ const STATUS_OPTIONS = [
 ];
 
 const MANAGED_DEPOSIT_STATUSES = new Set(STATUS_OPTIONS.map((status) => status.value));
+const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set(["PENDING_PAYMENT", "PAID", "CONFIRMED", "EXTENDED"]);
 
 const STATUS_LABELS = {
   PAID: STATUS_OPTIONS[0],
@@ -53,6 +55,14 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
   return date.toLocaleDateString("vi-VN");
+}
+
+function toInputDate(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 function formatDateTime(value) {
@@ -85,10 +95,13 @@ function normalizeAgreement(item) {
     depositorFullName: item.depositorFullName || item.depositor_full_name || "Khách đặt cọc",
     depositorPhone: item.depositorPhone || item.depositor_phone || "Chưa có SĐT",
     depositorEmail: item.depositorEmail || item.depositor_email || "",
+    depositorPermanentAddress: item.depositorPermanentAddress || item.depositor_permanent_address || item.permanentAddress || item.permanent_address || "",
     amount: Number(item.amount || 0),
     createdAt: item.createdAt || item.created_at || null,
     status,
     confirmedAt: item.confirmedAt || item.confirmed_at || null,
+    expectedLeaseSignDate: item.expectedLeaseSignDate || item.expected_lease_sign_date || null,
+    expectedMoveInDate: item.expectedMoveInDate || item.expected_move_in_date || null,
     contractFileId: item.contractFileId || item.contract_file_id || null,
     contractDownloadUrl: item.contractDownloadUrl || item.contract_download_url || null,
   };
@@ -167,10 +180,74 @@ function SensitiveImage({ title, url }) {
   );
 }
 
-function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadContract }) {
-  if (!agreement) return null;
-  const details = agreement.details || agreement;
+function valueOf(object, camelKey, snakeKey) {
+  return object?.[camelKey] ?? object?.[snakeKey] ?? null;
+}
+
+function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadContract, onSaveManagementInfo }) {
+  const safeAgreement = agreement || {};
+  const details = safeAgreement.details || safeAgreement;
   const room = details.room || {};
+  const expectedLeaseSignDate = valueOf(details, "expectedLeaseSignDate", "expected_lease_sign_date")
+    || safeAgreement.expectedLeaseSignDate;
+  const expectedMoveInDate = valueOf(details, "expectedMoveInDate", "expected_move_in_date")
+    || safeAgreement.expectedMoveInDate;
+  const depositorPermanentAddress = valueOf(details, "depositorPermanentAddress", "depositor_permanent_address")
+    || safeAgreement.depositorPermanentAddress
+    || "";
+  const canEditManagementInfo = MANAGEMENT_INFO_EDITABLE_STATUSES.has(safeAgreement.status);
+  const formDefaults = useMemo(() => ({
+    depositorPhone: safeAgreement.depositorPhone || "",
+    permanentAddress: depositorPermanentAddress || "",
+    expectedLeaseSignDate: toInputDate(expectedLeaseSignDate),
+    expectedMoveInDate: toInputDate(expectedMoveInDate),
+  }), [safeAgreement.depositorPhone, depositorPermanentAddress, expectedLeaseSignDate, expectedMoveInDate]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState(null);
+  const activeForm = form || formDefaults;
+
+  if (!agreement) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...(current || formDefaults), [field]: value }));
+  };
+  const validateForm = () => {
+    const phone = activeForm.depositorPhone.replace(/[\s.-]/g, "");
+    if (!/^0\d{9}$/.test(phone)) return "Số điện thoại phải bắt đầu bằng 0 và có đúng 10 chữ số.";
+    if (!activeForm.permanentAddress.trim()) return "Địa chỉ không được để trống.";
+    if (!activeForm.expectedLeaseSignDate) return "Vui lòng chọn ngày ký hợp đồng dự kiến.";
+    if (activeForm.expectedLeaseSignDate < today) return "Ngày ký hợp đồng dự kiến không được là ngày quá khứ.";
+    if (!activeForm.expectedMoveInDate) return "Vui lòng chọn ngày vào ở dự kiến.";
+    if (activeForm.expectedMoveInDate < today) return "Ngày vào ở dự kiến không được là ngày quá khứ.";
+    if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate) return "Ngày vào ở dự kiến không được trước ngày ký hợp đồng dự kiến.";
+    return "";
+  };
+  const handleSave = async () => {
+    const error = validateForm();
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setIsSaving(true);
+    setFormError("");
+    try {
+      await onSaveManagementInfo(agreement, {
+        depositorPhone: activeForm.depositorPhone.replace(/[\s.-]/g, ""),
+        permanentAddress: activeForm.permanentAddress.trim(),
+        expectedLeaseSignDate: activeForm.expectedLeaseSignDate,
+        expectedMoveInDate: activeForm.expectedMoveInDate,
+      });
+      setForm(null);
+      setIsEditing(false);
+    } catch (error) {
+      setFormError(error.message || "Không thể cập nhật thông tin hợp đồng cọc.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
@@ -195,18 +272,72 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
               <section className="grid gap-6">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <DetailField label="Khách hàng" value={agreement.depositorFullName} />
-                  <DetailField label="Số điện thoại" value={agreement.depositorPhone} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Số điện thoại</span>
+                      <input
+                        value={activeForm.depositorPhone}
+                        onChange={(event) => updateField("depositorPhone", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Số điện thoại" value={agreement.depositorPhone} />
+                  )}
                   <DetailField label="Email" value={agreement.depositorEmail || "Không có"} />
                   <DetailField label="Phòng" value={agreement.roomCode || room.roomCode} />
                   <DetailField label="Cơ sở" value={agreement.propertyName} />
-                  <DetailField label="Địa chỉ" value={details.propertyAddress} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Địa chỉ</span>
+                      <input
+                        value={activeForm.permanentAddress}
+                        onChange={(event) => updateField("permanentAddress", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Địa chỉ" value={depositorPermanentAddress} />
+                  )}
                   <DetailField label="Tiền cọc" value={formatMoney(agreement.amount)} />
                   <DetailField label="Ngày tạo" value={formatDateTime(agreement.createdAt)} />
                   <DetailField label="Ngày xác nhận" value={formatDateTime(agreement.confirmedAt)} />
-                  <DetailField label="Ngày ký HĐ dự kiến" value={formatDate(details.expectedLeaseSignDate)} />
-                  <DetailField label="Ngày vào ở dự kiến" value={formatDate(details.expectedMoveInDate)} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày ký HĐ dự kiến</span>
+                      <input
+                        type="date"
+                        min={today}
+                        value={activeForm.expectedLeaseSignDate}
+                        onChange={(event) => updateField("expectedLeaseSignDate", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Ngày ký HĐ dự kiến" value={formatDate(expectedLeaseSignDate)} />
+                  )}
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày vào ở dự kiến</span>
+                      <input
+                        type="date"
+                        min={today}
+                        value={activeForm.expectedMoveInDate}
+                        onChange={(event) => updateField("expectedMoveInDate", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Ngày vào ở dự kiến" value={formatDate(expectedMoveInDate)} />
+                  )}
                   <DetailField label="Ghi chú" value={details.note || "Không có ghi chú"} />
                 </div>
+
+                {formError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+                    {formError}
+                  </div>
+                )}
 
                 <section className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-5">
                   <div className="flex items-center justify-between gap-3">
@@ -233,6 +364,44 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
                   <StatusBadge status={agreement.status} />
                 </div>
                 <div className="mt-6 grid gap-3">
+                  {canEditManagementInfo && (
+                    isEditing ? (
+                      <div className="grid gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="inline-flex h-12 items-center justify-center rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setFormError("");
+                            setForm(null);
+                          }}
+                          disabled={isSaving}
+                          className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Hủy chỉnh sửa
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm(formDefaults);
+                          setFormError("");
+                          setIsEditing(true);
+                        }}
+                        className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
+                      >
+                        Chỉnh sửa thông tin
+                      </button>
+                    )
+                  )}
                   <button
                     type="button"
                     onClick={() => onOpenContract(agreement)}
@@ -249,6 +418,11 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
                     <Download className="h-4 w-4" />
                     Tải PDF
                   </button>
+                  {!canEditManagementInfo && (
+                    <p className="rounded-lg bg-[#f7f9fc] p-3 text-sm font-semibold text-[#5a6678]">
+                      Thông tin cọc đã khóa vì trạng thái hiện tại không còn trong giai đoạn chờ ký.
+                    </p>
+                  )}
                 </div>
               </aside>
             </div>
@@ -347,6 +521,19 @@ export default function DepositsPage() {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleSaveManagementInfo = async (agreement, payload) => {
+    if (!agreement?.id) {
+      throw new Error("Chưa có mã hợp đồng đặt cọc để cập nhật.");
+    }
+    setNotice("");
+    const details = await updateDepositAgreementManagementInfo(agreement.id, payload);
+    const merged = mergeAgreement(agreement, details);
+    setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
+    setSelectedAgreement(merged);
+    setNotice("Đã cập nhật thông tin hợp đồng cọc và tạo lại file PDF.");
+    return merged;
   };
 
   const handleOpenContract = async (agreement) => {
@@ -565,6 +752,7 @@ export default function DepositsPage() {
         onClose={() => setSelectedAgreement(null)}
         onOpenContract={handleOpenContract}
         onDownloadContract={handleDownloadContract}
+        onSaveManagementInfo={handleSaveManagementInfo}
       />
     </>
   );

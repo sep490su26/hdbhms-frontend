@@ -123,6 +123,22 @@ export async function updateDepositAgreementStatus(depositAgreementId, status) {
   return readEnvelope(response, "Không thể cập nhật trạng thái cọc.");
 }
 
+export async function updateDepositAgreementManagementInfo(depositAgreementId, payload) {
+  if (!depositAgreementId) {
+    throw new Error("Thiếu mã hợp đồng đặt cọc.");
+  }
+
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/management-info`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return readEnvelope(response, "Không thể cập nhật thông tin hợp đồng cọc.");
+}
+
 export async function fetchDepositContractBlob(depositAgreementId) {
   if (!depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");

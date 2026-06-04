@@ -2,6 +2,7 @@ export const ROLES = {
   OWNER: "owner",
   MANAGER: "manager",
   ACCOUNTANT: "accountant",
+  PUBLIC: "public",
 };
 
 export const ROLE_LABELS = {
@@ -18,7 +19,7 @@ export const ROLE_ALIASES = {
 };
 
 export const SECTION_PERMISSIONS = {
-  dashboard: [ROLES.OWNER],
+  dashboard: [ROLES.PUBLIC],
   floor: [ROLES.OWNER, ROLES.MANAGER],
   rooms: [ROLES.OWNER, ROLES.MANAGER],
   tenants: [ROLES.OWNER, ROLES.MANAGER],
@@ -51,7 +52,15 @@ export function normalizeRole(role) {
 
 export function canAccessRole(role, allowedRoles = []) {
   const normalizedRole = normalizeRole(role);
-  const normalizedAllowedRoles = allowedRoles.map(normalizeRole).filter(Boolean);
+  const normalizedAllowedRoles = allowedRoles.map((allowedRole) => String(allowedRole || "").toLowerCase()).filter(Boolean);
+
+  if (normalizedAllowedRoles.includes(ROLES.PUBLIC)) {
+    return true;
+  }
+
+  if (!normalizedRole) {
+    return normalizedAllowedRoles.includes(ROLES.PUBLIC);
+  }
 
   return normalizedAllowedRoles.includes(normalizedRole);
 }

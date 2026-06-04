@@ -27,7 +27,7 @@ function subscribeTokenRefresh(cb) {
 }
 
 function onTokenRefreshed(newToken) {
-    refreshSubscribers.forEach((cb) => cb(newToken));
+    // refreshSubscribers.forEach((cb) => cb(newToken));
     refreshSubscribers = [];
 }
 
@@ -65,18 +65,18 @@ export async function authenticatedFetch(url, options = {}) {
 
     if (res.status === 401) {
         if (!isRefreshing) {
-            isRefreshing = true;
-            refreshTokenApi()
-                .then((newToken) => {
-                    isRefreshing = false;
-                    onTokenRefreshed(newToken);
-                })
-                .catch(() => {
-                    isRefreshing = false;
-                    window.localStorage.removeItem("token");
-                    window.localStorage.removeItem("userRole");
-                    window.location.href = "/login?reason=expired";
-                });
+            // isRefreshing = true;
+            // refreshTokenApi()
+            //     .then((newToken) => {
+            //         isRefreshing = false;
+            //         onTokenRefreshed(newToken);
+            //     })
+            //     .catch(() => {
+            //         isRefreshing = false;
+            //         window.localStorage.removeItem("token");
+            //         window.localStorage.removeItem("userRole");
+            //         window.location.href = "/login?reason=expired";
+            //     });
         }
 
         return new Promise((resolve) => {

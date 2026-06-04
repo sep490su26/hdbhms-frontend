@@ -92,7 +92,7 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
     }
 
     setUserState(null);
-    router.push("/login");
+    // router.push("/login");
   }, [router]);
 
   const value = useMemo(

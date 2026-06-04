@@ -46,6 +46,19 @@ const navigation = [
   { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings, permissionKey: "settings" },
 ];
 
+const specialRoutePermissions = [
+  {
+    prefix: "/dashboard/maintenance-details/test",
+    permissionKey: "dashboard",
+    navigationPath: "/dashboard",
+  },
+  {
+    prefix: "/dashboard/maintenance-details",
+    permissionKey: "maintenance",
+    navigationPath: "/dashboard/maintenance",
+  },
+];
+
 function getAllowedRoles(item) {
   return SECTION_PERMISSIONS[item.permissionKey] || [];
 }
@@ -59,9 +72,23 @@ function isNavigationPathActive(pathname, path) {
 }
 
 function getNavigationItemForPath(pathname) {
+  const specialRoute = specialRoutePermissions.find((item) => pathname?.startsWith(item.prefix));
+  if (specialRoute) {
+    return navigation.find((item) => item.path === specialRoute.navigationPath);
+  }
+
   return navigation
     .filter((item) => isNavigationPathActive(pathname, item.path))
     .sort((a, b) => b.path.length - a.path.length)[0];
+}
+
+function getPermissionKeyForPath(pathname) {
+  const specialRoute = specialRoutePermissions.find((item) => pathname?.startsWith(item.prefix));
+  if (specialRoute) {
+    return specialRoute.permissionKey;
+  }
+
+  return getNavigationItemForPath(pathname)?.permissionKey || "";
 }
 
 function getFirstAllowedPath(role) {
@@ -274,9 +301,8 @@ function DashboardLayoutShell({ children }) {
   const [query, setQuery] = useState("");
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
-  const isAllowed = activeNavigationItem
-    ? canAccessRole(user?.role, getAllowedRoles(activeNavigationItem))
-    : false;
+  const permissionKey = getPermissionKeyForPath(pathname);
+  const isAllowed = permissionKey ? canAccessRole(user?.role, SECTION_PERMISSIONS[permissionKey] || []) : false;
 
   useEffect(() => {
     if (!activeNavigationItem) return;

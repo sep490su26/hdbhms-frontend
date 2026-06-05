@@ -99,7 +99,7 @@ export const floors = ["Tất cả", ...floorPlans.map((plan) => plan.floor)];
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
 export const PUBLIC_ROOMS_API_URL = `${API_BASE_URL}/rooms`;
-export const LANDLORD_CONTACT_PHONE = "09770011200";
+export const LANDLORD_CONTACT_PHONE = "0914339682";
 export const CONTACT_PHONE_HREF = `tel:${LANDLORD_CONTACT_PHONE}`;
 export const CONTACT_ZALO_HREF = `https://zalo.me/${LANDLORD_CONTACT_PHONE}`;
 

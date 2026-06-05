@@ -19,22 +19,17 @@ export function getAuthToken() {
     return window.localStorage.getItem("token") || "";
 }
 
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-function subscribeTokenRefresh(cb) {
-    refreshSubscribers.push(cb);
-}
-
-function onTokenRefreshed(newToken) {
-    // refreshSubscribers.forEach((cb) => cb(newToken));
-    refreshSubscribers = [];
+export function clearAuthSession() {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("token");
+    window.localStorage.removeItem("userRole");
 }
 
 function getAuthHeaders(extraHeaders = {}) {
+    const token = getAuthToken();
     return {
-        "Authorization": `Bearer ${getAuthToken()}`,
         "X-Client-Type": "web",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...extraHeaders,
     };
 }
@@ -56,45 +51,49 @@ export async function parseEnvelope(response) {
 
 export async function authenticatedFetch(url, options = {}) {
     const fullUrl = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
-
-    const res = await fetch(fullUrl, {
+    const requestOptions = {
         ...options,
         credentials: "include",
         headers: getAuthHeaders(options.headers),
-    });
+    };
 
-    if (res.status === 401) {
-        if (!isRefreshing) {
-            // isRefreshing = true;
-            // refreshTokenApi()
-            //     .then((newToken) => {
-            //         isRefreshing = false;
-            //         onTokenRefreshed(newToken);
-            //     })
-            //     .catch(() => {
-            //         isRefreshing = false;
-            //         window.localStorage.removeItem("token");
-            //         window.localStorage.removeItem("userRole");
-            //         window.location.href = "/login?reason=expired";
-            //     });
+    const res = await fetch(fullUrl, requestOptions);
+
+    if (res.status !== 401) {
+        return parseEnvelope(res);
+    }
+
+    let newToken;
+    try {
+        newToken = await refreshTokenApi();
+    } catch (error) {
+        clearAuthSession();
+        if (error?.isApiError) {
+            throw error;
         }
-
-        return new Promise((resolve) => {
-            subscribeTokenRefresh(async (newToken) => {
-                const retryRes = await fetch(fullUrl, {
-                    ...options,
-                    credentials: "include",
-                    headers: {
-                        ...getAuthHeaders(options.headers),
-                        Authorization: `Bearer ${newToken}`,
-                    },
-                });
-                resolve(parseEnvelope(retryRes));
-            });
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", {
+            status: 401,
+            details: error?.message,
         });
     }
 
-    return parseEnvelope(res);
+    const retryRes = await fetch(fullUrl, {
+        ...options,
+        credentials: "include",
+        headers: {
+            ...getAuthHeaders(options.headers),
+            Authorization: `Bearer ${newToken}`,
+        },
+    });
+
+    if (retryRes.status === 401) {
+        clearAuthSession();
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", {
+            status: 401,
+        });
+    }
+
+    return parseEnvelope(retryRes);
 }
 
 export async function getCurrentUserProfile() {
@@ -167,7 +166,6 @@ export async function logout() {
 }
 
 export async function refreshTokenApi() {
-    const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
         credentials: "include",
@@ -175,7 +173,7 @@ export async function refreshTokenApi() {
             "Content-Type": "application/json",
             "X-Client-Type": "web"
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({}),
     });
 
     const data = await parseEnvelope(response);
@@ -254,10 +252,14 @@ function normalizeTenantAccountCandidate(item = {}) {
         roomCode: item.roomCode ?? item.room_code ?? "",
         roomStatus: item.roomStatus ?? item.room_status ?? null,
         profileId: item.profileId ?? item.profile_id ?? null,
+        roomRole: item.roomRole ?? item.room_role ?? null,
+        roomOccupantCount: item.roomOccupantCount ?? item.room_occupant_count ?? null,
+        roomMaxOccupants: item.roomMaxOccupants ?? item.room_max_occupants ?? null,
         userId: item.userId ?? item.user_id ?? null,
         fullName: item.fullName ?? item.full_name ?? "",
         phone: item.phone ?? "",
         email: item.email ?? "",
+        recipientEmail: item.recipientEmail ?? item.recipient_email ?? "",
         role: item.role ?? null,
         accountStatus: item.accountStatus ?? item.account_status ?? null,
         mustChangePassword: item.mustChangePassword ?? item.must_change_password ?? null,

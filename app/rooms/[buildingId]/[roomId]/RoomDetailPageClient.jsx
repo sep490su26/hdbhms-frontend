@@ -8,10 +8,10 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  Clock3,
   Home,
   Maximize2,
-  MessageCircle,
-  Phone,
+  PhoneCall,
   ShieldCheck,
   Users,
   Wifi,
@@ -20,6 +20,7 @@ import {
 import {
   CONTACT_PHONE_HREF,
   CONTACT_ZALO_HREF,
+  LANDLORD_CONTACT_PHONE,
   fetchDepositRoomHoldStatus,
   fetchPublicRoomById,
   normalizeApiRoom,
@@ -89,12 +90,97 @@ function RequiredLabel({ htmlFor, children }) {
   );
 }
 
+function ZaloLogo({ className = "" }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="48" height="48" rx="12" fill="#0068FF" />
+      <path
+        d="M8.8 25.2C8.8 15.3 17.4 8 28.1 8h.6C38.3 8.3 45 14.9 45 24.1c0 9.9-8.2 16.8-19.2 16.8-2.4 0-4.8-.3-7-1L9.9 43.2l3.1-7.8c-3-2.7-4.2-6.1-4.2-10.2Z"
+        fill="#fff"
+      />
+      <path
+        d="M14.6 30.7h8.9v-2.4h-5.2l5-6.4v-2.2h-8.1v2.4h4.7l-5.3 6.7v2Zm14.3.1c1.2 0 2.2-.4 2.9-1.2v1h2.6v-7.9h-2.6v1c-.7-.8-1.7-1.2-2.9-1.2-2.2 0-4 1.8-4 4.1s1.8 4.2 4 4.2Zm.6-2.3c-1.1 0-1.9-.8-1.9-1.9s.8-1.9 1.9-1.9 1.9.8 1.9 1.9-.8 1.9-1.9 1.9Zm6.5 2.1h2.7V19.3H36v11.3Z"
+        fill="#0068FF"
+      />
+    </svg>
+  );
+}
+
+function formatContactPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  return value || "0914 339 682";
+}
+
+function ContactInfoRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-100 py-4 last:border-b-0">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div>
+        <p className="text-xs font-bold text-slate-400">{label}</p>
+        <p className="mt-1 text-sm font-black text-[#243247]">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ContactCard() {
+  return (
+    <div className="mt-5 rounded-[24px] border border-slate-100 bg-white p-6 text-[#091426] shadow-xl shadow-slate-100/50 ring-1 ring-slate-100/80">
+      <h2 className="text-xl font-black">Thông Tin Liên Hệ</h2>
+
+      <div className="mt-5">
+        <ContactInfoRow
+          icon={PhoneCall}
+          label="Số điện thoại quản lý"
+          value={formatContactPhone(LANDLORD_CONTACT_PHONE)}
+        />
+        <ContactInfoRow
+          icon={Clock3}
+          label="Thời gian hỗ trợ"
+          value="24/7"
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <a
+          href={CONTACT_PHONE_HREF}
+          className="flex min-h-12 items-center justify-center rounded-[14px] bg-blue-600 px-3 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/25"
+        >
+          Gọi điện
+        </a>
+        <a
+          href={CONTACT_ZALO_HREF}
+          target="_blank"
+          rel="noreferrer"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-blue-600 bg-white px-3 py-3 text-sm font-extrabold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/25"
+        >
+          <ZaloLogo className="h-5 w-5 shrink-0" />
+          Chat Zalo
+        </a>
+      </div>
+
+      <p className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-xs font-medium leading-5 text-slate-500">
+        Quản lý sẽ hỗ trợ tư vấn phòng, lịch xem phòng, đặt cọc và ký hợp đồng thuê.
+      </p>
+    </div>
+  );
+}
+
 function viewingInputClass(error) {
-  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
-    error
-      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
-  }`;
+  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${error
+    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+    : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+    }`;
 }
 
 function withDetailDefaults(room) {
@@ -278,20 +364,21 @@ function BookingCard({ room }) {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => setIsViewingModalOpen(true)}
-              className="flex min-h-14 items-center justify-center rounded-[16px] border border-[#232946]/20 bg-white px-4 py-3 text-center text-sm font-bold text-[#232946] shadow-sm transition hover:border-[#232946]/40 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/20"
-            >
-              Đặt lịch xem phòng
-            </button>
+            {!isOccupied && (
+              <button
+                type="button"
+                onClick={() => setIsViewingModalOpen(true)}
+                className="flex min-h-14 items-center justify-center rounded-[16px] border border-[#232946]/20 bg-white px-4 py-3 text-center text-sm font-bold text-[#232946] shadow-sm transition hover:border-[#232946]/40 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/20"
+              >
+                Đặt lịch xem phòng
+              </button>
+            )}
 
-            <div className="mt-2 grid grid-cols-2 gap-3">
+            <div className="hidden">
               <a
                 href={CONTACT_PHONE_HREF}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-[#232946] transition hover:border-[#232946] hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
+                className="flex min-h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-[#232946] transition hover:border-[#232946] hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
               >
-                <Phone className="h-4 w-4 shrink-0" />
                 Gọi điện
               </a>
               <a
@@ -300,13 +387,15 @@ function BookingCard({ room }) {
                 rel="noreferrer"
                 className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-blue-600 bg-blue-50 px-3 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/25"
               >
-                <MessageCircle className="h-4 w-4 shrink-0" />
+                <ZaloLogo className="h-5 w-5 shrink-0" />
                 Chat Zalo
               </a>
             </div>
           </div>
         </div>
       </div>
+
+      <ContactCard />
 
       {isViewingModalOpen && (
         <div

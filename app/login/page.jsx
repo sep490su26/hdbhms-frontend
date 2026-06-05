@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Eye, EyeOff, Loader2, LockKeyhole, Phone } from "lucide-react";
 import { AuthProvider, useAuth } from "@/app/dashboard/_contexts/AuthContext";
-import { getCurrentUserProfile, loginWithPhonePassword } from "@/services/identityAccessService";
+import { clearAuthSession, getCurrentUserProfile, loginWithPhonePassword } from "@/services/identityAccessService";
 
 function LoginForm() {
   const router = useRouter();
@@ -22,7 +22,7 @@ function LoginForm() {
     if (token) {
       refreshUser(token)
         .then(() => router.replace("/dashboard"))
-        .catch(() => window.localStorage.removeItem("token"));
+        .catch(() => clearAuthSession());
     }
   }, [refreshUser, router]);
 

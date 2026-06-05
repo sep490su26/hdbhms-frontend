@@ -301,7 +301,7 @@ function DashboardLayoutShell({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
-  const effectiveRole = user?.role || (process.env.NODE_ENV === "development" ? "owner" : "");
+  const effectiveRole = user?.role || "";
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
@@ -321,7 +321,10 @@ function DashboardLayoutShell({ children }) {
       try {
         await refreshUser(token);
       } catch {
-        // refreshUser already clears invalid local credentials.
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("token");
+          window.localStorage.removeItem("userRole");
+        }
       } finally {
         if (isActive) setHasHydratedAuth(true);
       }
@@ -336,11 +339,16 @@ function DashboardLayoutShell({ children }) {
 
   useEffect(() => {
     if (!hasHydratedAuth) return;
+    if (!user) {
+      const redirect = pathname ? `?redirect=${encodeURIComponent(pathname)}` : "";
+      router.replace(`/login${redirect}`);
+      return;
+    }
     if (!activeNavigationItem) return;
     if (!isAllowed) {
       router.replace(getFirstAllowedPath(effectiveRole));
     }
-  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, router]);
+  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, pathname, router, user]);
 
   const contextValue = useMemo(
     () => ({

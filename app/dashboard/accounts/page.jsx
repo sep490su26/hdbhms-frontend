@@ -178,16 +178,18 @@ export default function AccountsPage() {
 
   useEffect(() => {
     let active = true;
-    fetchTenantAccountCandidates()
-      .then((data) => {
+    const loadInitialData = async () => {
+      try {
+        const data = await fetchTenantAccountCandidates();
         if (active) setItems(data);
-      })
-      .catch((loadError) => {
+      } catch (loadError) {
         if (active) setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    };
+
+    void loadInitialData();
 
     return () => {
       active = false;

@@ -164,6 +164,19 @@ const roomOccupancyText = (profile) => {
   return `${current}/${max}`;
 };
 
+const profileRowKey = (profile, index) => {
+  const profileId = valueOf(profile, "id", "profileId", "profile_id");
+  if (profileId) return `profile-${profileId}`;
+  return [
+    "profile-row",
+    valueOf(profile, "contractId", "contract_id") || "contract",
+    valueOf(profile, "roomRole", "room_role") || "role",
+    valueOf(profile, "phone") || "phone",
+    valueOf(profile, "fullName", "full_name") || "name",
+    index,
+  ].join("-");
+};
+
 function Badge({ children, className = "" }) {
   return (
     <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${className}`}>
@@ -351,8 +364,8 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e2e8f0]">
-                      {roommates.map((roommate) => (
-                        <tr key={valueOf(roommate, "id")}>
+                      {roommates.map((roommate, index) => (
+                        <tr key={valueOf(roommate, "id") || `${valueOf(roommate, "roomRole", "room_role")}-${valueOf(roommate, "phone")}-${index}`}>
                           <td className="px-4 py-3 font-bold text-[#091426]">{valueOf(roommate, "fullName", "full_name")}</td>
                           <td className="px-4 py-3">{formatYear(valueOf(roommate, "dob"))}</td>
                           <td className="px-4 py-3">{valueOf(roommate, "phone") || "Chưa cập nhật"}</td>
@@ -717,8 +730,8 @@ export default function TenantsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e2e8f0]">
-                      {roomProfiles.map((profile) => (
-                        <tr key={valueOf(profile, "id")} className="hover:bg-[#f8fafc]">
+                      {roomProfiles.map((profile, index) => (
+                        <tr key={profileRowKey(profile, index)} className="hover:bg-[#f8fafc]">
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-black text-[#1d4ed8]">

@@ -11,6 +11,7 @@ import {
     Download,
     Edit3,
     Eye,
+    FileText,
     Grid3X3,
     Home,
     ImageIcon,
@@ -24,6 +25,7 @@ import {tenants} from "@/services/dashboardService";
 import {statusCopy} from "@/services/roomsService";
 import {useDashboardLayout} from "../_contexts/DashboardLayoutContext";
 import {authenticatedFetch} from "@/services/identityAccessService";
+import {fetchManagementRoomRentalHistory} from "@/services/leaseContractsService";
 import {floorTabs, mockFloorPlanData} from "./mockFloorPlanData";
 
 const money = new Intl.NumberFormat("vi-VN");
@@ -45,6 +47,20 @@ const views = [
 
 function formatMoney(value) {
     return `${money.format(value)} đ`;
+}
+
+function formatDate(value) {
+    if (!value) return "Chưa có";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Chưa có";
+    return date.toLocaleDateString("vi-VN");
+}
+
+function formatCycle(value) {
+    const cycle = Number(value);
+    if (cycle === 1) return "1 tháng/lần";
+    if (cycle === 3) return "3 tháng/lần";
+    return "Chưa có";
 }
 
 function downloadTextFile(filename, content, type = "text/csv;charset=utf-8") {
@@ -458,9 +474,157 @@ function RoomGrid({rooms, selectedRoom, onRoomClick}) {
     );
 }
 
+const CONTRACT_STATUS_LABELS = {
+    ACTIVE: "Đang hiệu lực",
+    DRAFT: "Bản nháp",
+    PENDING_SIGNATURE: "Chờ ký",
+    EXPIRING_SOON: "Sắp hết hạn",
+    TERMINATION_PENDING: "Chờ thanh lý",
+    LIQUIDATED: "Đã thanh lý",
+    EXPIRED: "Hết hạn",
+    RENEWED: "Đã gia hạn",
+    CANCELLED: "Đã hủy",
+};
+
+const OCCUPANT_ROLE_LABELS = {
+    PRIMARY: "Người ký chính",
+    CO_OCCUPANT: "Người ở cùng",
+};
+
+function contractStatusLabel(status) {
+    return CONTRACT_STATUS_LABELS[status] || status || "Chưa rõ";
+}
+
+function RentalHistoryPanel({history, isLoading, error}) {
+    if (isLoading) {
+        return (
+            <div className="mt-5 rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
+                <div className="h-6 w-40 animate-pulse rounded bg-slate-100"/>
+                <div className="mt-4 space-y-3">
+                    {[1, 2, 3].map((item) => (
+                        <div key={item} className="h-24 animate-pulse rounded-2xl bg-slate-100"/>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="mt-5 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700">
+                {error}
+            </div>
+        );
+    }
+
+    const contracts = history?.contracts || [];
+    if (contracts.length === 0) {
+        return (
+            <div className="mt-5 rounded-3xl border border-white bg-white p-5 text-center shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
+                <FileText className="mx-auto h-9 w-9 text-slate-400"/>
+                <p className="mt-3 text-sm font-black text-[#091426]">Chưa có lịch sử thuê</p>
+                <p className="mt-1 text-sm text-[#607089]">Phòng này chưa có hợp đồng thuê được ghi nhận.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-5 space-y-4">
+            {contracts.map((contract, index) => {
+                const isCurrent = contract.status === "ACTIVE";
+                return (
+                    <article
+                        key={contract.contractId || `${contract.contractCode}-${index}`}
+                        className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]"
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+                                    {isCurrent ? "Hợp đồng hiện tại" : "Hợp đồng cũ"}
+                                </p>
+                                <h3 className="mt-1 truncate text-lg font-black text-[#091426]">
+                                    {contract.contractCode || "Chưa có mã HĐ"}
+                                </h3>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ring-1 ${
+                                isCurrent
+                                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                    : "bg-slate-50 text-slate-600 ring-slate-200"
+                            }`}>
+                                {contractStatusLabel(contract.status)}
+                            </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-2xl bg-[#f7f9fb] p-3">
+                                <p className="text-[10px] font-black uppercase text-[#6b7280]">Thời hạn HĐ</p>
+                                <p className="mt-1 font-black text-[#091426]">{formatDate(contract.startDate)} - {formatDate(contract.endDate)}</p>
+                            </div>
+                            <div className="rounded-2xl bg-[#f7f9fb] p-3">
+                                <p className="text-[10px] font-black uppercase text-[#6b7280]">Ngày tính tiền</p>
+                                <p className="mt-1 font-black text-[#091426]">{formatDate(contract.rentStartDate)}</p>
+                            </div>
+                            <div className="rounded-2xl bg-[#f7f9fb] p-3">
+                                <p className="text-[10px] font-black uppercase text-[#6b7280]">Giá thuê</p>
+                                <p className="mt-1 font-black text-[#091426]">{formatMoney(contract.monthlyRent || 0)}/tháng</p>
+                            </div>
+                            <div className="rounded-2xl bg-[#f7f9fb] p-3">
+                                <p className="text-[10px] font-black uppercase text-[#6b7280]">Chu kỳ</p>
+                                <p className="mt-1 font-black text-[#091426]">{formatCycle(contract.paymentCycleMonths)}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-[#e2e8f0] bg-white p-3">
+                            <p className="text-[10px] font-black uppercase text-[#6b7280]">Người thuê chính</p>
+                            <p className="mt-1 text-sm font-black text-[#091426]">{contract.primaryTenant?.fullName || "Chưa có"}</p>
+                            <p className="text-xs font-semibold text-[#607089]">{contract.primaryTenant?.phone || "Chưa có SĐT"}</p>
+                        </div>
+
+                        <div className="mt-4">
+                            <p className="text-[10px] font-black uppercase text-[#6b7280]">Người ở trong phòng</p>
+                            <div className="mt-2 space-y-2">
+                                {(contract.occupants || []).map((occupant, occupantIndex) => (
+                                    <div
+                                        key={occupant.tenantProfileId || `${occupant.occupantRole}-${occupant.fullName}-${occupantIndex}`}
+                                        className="rounded-2xl bg-[#f7f9fb] p-3 text-sm"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="truncate font-black text-[#091426]">{occupant.fullName || "Chưa có tên"}</p>
+                                                <p className="mt-0.5 truncate text-xs font-semibold text-[#607089]">{occupant.phone || "Chưa có SĐT"}</p>
+                                            </div>
+                                            <span className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">
+                                                {OCCUPANT_ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold text-[#607089]">
+                                            <span>Vào: {formatDate(occupant.moveInDate)}</span>
+                                            <span>Rời: {occupant.moveOutDate ? formatDate(occupant.moveOutDate) : "Đang ở"}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {contract.contractFile?.fileId && (
+                            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+                                Có file hợp đồng scan/PDF.
+                            </div>
+                        )}
+                    </article>
+                );
+            })}
+        </div>
+    );
+}
+
 function RoomDetailDrawer({room, tenantList, activeRole, onClose}) {
     const [roomDetail, setRoomDetail] = useState(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState("overview");
+    const [rentalHistory, setRentalHistory] = useState(null);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState("");
     const tenant = room ? tenantList.find((item) => item.roomId === room.displayCode || item.roomId === room.roomCode) : null;
     const meta = room ? mapStatusToColor(room.status) : STATUS_META.OCCUPIED;
     const canCreateMaintenance = activeRole === "owner" || activeRole === "manager";
@@ -486,6 +650,37 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose}) {
         }
 
         fetchRoomDetail();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [room?.roomId]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadRentalHistory() {
+            if (!room?.roomId) {
+                setRentalHistory(null);
+                return;
+            }
+
+            try {
+                setIsHistoryLoading(true);
+                setHistoryError("");
+                const data = await fetchManagementRoomRentalHistory(room.roomId);
+                if (isMounted) setRentalHistory(data);
+            } catch (error) {
+                if (isMounted) {
+                    setRentalHistory(null);
+                    setHistoryError(error.message || "Không tải được lịch sử thuê của phòng.");
+                }
+            } finally {
+                if (isMounted) setIsHistoryLoading(false);
+            }
+        }
+
+        loadRentalHistory();
 
         return () => {
             isMounted = false;
@@ -542,7 +737,27 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose}) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-                    <div className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
+                    <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 shadow-[0_8px_24px_rgba(6,16,32,0.06)]">
+                        {[
+                            ["overview", "Tổng quan"],
+                            ["history", "Lịch sử thuê"],
+                        ].map(([value, label]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setActiveTab(value)}
+                                className={`h-10 rounded-xl text-sm font-black transition ${
+                                    activeTab === value
+                                        ? "bg-[#091426] text-white"
+                                        : "text-[#607089] hover:bg-[#f7f9fb] hover:text-[#091426]"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className={`${activeTab === "overview" ? "" : "hidden"} rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]`}>
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-bold text-[#6b7280]">Mã phòng</p>
@@ -598,6 +813,9 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose}) {
                             </div>
                         )}
                     </div>
+                    {activeTab === "history" && (
+                        <RentalHistoryPanel history={rentalHistory} isLoading={isHistoryLoading} error={historyError}/>
+                    )}
                 </div>
 
                 <div className="grid gap-3 border-t border-[#dfe5ee] bg-white p-5">
@@ -734,6 +952,7 @@ function FloorPlanPage({tenantList = [], activeRole = "owner"}) {
 
             {selectedRoom && (
                 <RoomDetailDrawer
+                    key={selectedRoom.id}
                     room={selectedRoom}
                     tenantList={tenantList}
                     activeRole={activeRole}

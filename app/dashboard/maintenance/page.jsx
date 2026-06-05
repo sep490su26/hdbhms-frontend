@@ -62,17 +62,26 @@ function Modal({ title, children, onClose, footer }) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[68vh] overflow-y-auto p-6 custom-scrollbar">{children}</div>
-        {footer && <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>}
+        <div className="max-h-[68vh] overflow-y-auto p-6 custom-scrollbar">
+          {children}
+        </div>
+        {footer && (
+          <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>
+        )}
       </div>
     </div>
   );
 }
 
 function StatusBadge({ value, map }) {
-  const [label, className] = map[value] || ["Không rõ", "bg-slate-100 text-slate-700"];
+  const [label, className] = map[value] || [
+    "Không rõ",
+    "bg-slate-100 text-slate-700",
+  ];
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}
+    >
       {label}
     </span>
   );
@@ -98,12 +107,22 @@ function IconButton({ label, icon: Icon, onClick, tone = "neutral" }) {
   );
 }
 
-function PageHeader({ title, description, actionLabel, actionIcon: ActionIcon = Check, onAction }) {
+function PageHeader({
+  title,
+  description,
+  actionLabel,
+  actionIcon: ActionIcon = Check,
+  onAction,
+}) {
   return (
     <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">{description}</p>
+        <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">
+          {title}
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
+          {description}
+        </p>
       </div>
       {actionLabel && (
         <button
@@ -129,13 +148,21 @@ function KpiCard({ icon: Icon, label, value, subtext, tone = "blue" }) {
 
   return (
     <article className="flex min-h-[104px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-6 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}
+      >
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-        <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#191c1e]">{value}</p>
-        {subtext && <p className="mt-1 truncate text-xs text-[#6b7280]">{subtext}</p>}
+        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#191c1e]">
+          {value}
+        </p>
+        {subtext && (
+          <p className="mt-1 truncate text-xs text-[#6b7280]">{subtext}</p>
+        )}
       </div>
     </article>
   );
@@ -143,14 +170,20 @@ function KpiCard({ icon: Icon, label, value, subtext, tone = "blue" }) {
 
 function Card({ children, className = "" }) {
   return (
-    <section className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}>
+    <section
+      className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}
+    >
       {children}
     </section>
   );
 }
 
 function SectionTitle({ children }) {
-  return <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#45474c]">{children}</h3>;
+  return (
+    <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#45474c]">
+      {children}
+    </h3>
+  );
 }
 
 function MaintenanceDetail({ ticket, onStatusChange }) {
@@ -158,18 +191,26 @@ function MaintenanceDetail({ ticket, onStatusChange }) {
     <Card className="overflow-hidden">
       <div className="border-b border-[#e2e8f0] p-6">
         <div className="flex items-center justify-between gap-4">
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">Incident Detail</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">
+            Incident Detail
+          </p>
           <StatusBadge value={ticket.status} map={ticketStatus} />
         </div>
         <h2 className="mt-2 text-2xl font-bold text-[#091426]">#{ticket.id}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#45474c]">Reported on {ticket.reportedAt} by {ticket.profile}</p>
+        <p className="mt-2 text-sm leading-6 text-[#45474c]">
+          Reported on {ticket.reportedAt} by {ticket.profile}
+        </p>
       </div>
       <div className="grid gap-6 p-6">
         <SectionTitle>Issue description</SectionTitle>
-        <p className="rounded-lg bg-[#f7f9fb] p-4 text-sm leading-6 text-[#45474c]">{ticket.description}</p>
+        <p className="rounded-lg bg-[#f7f9fb] p-4 text-sm leading-6 text-[#45474c]">
+          {ticket.description}
+        </p>
         <SectionTitle>Maintenance action</SectionTitle>
         <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[#45474c]">Technician Name</span>
+          <span className="text-xs font-bold text-[#45474c]">
+            Technician Name
+          </span>
           <input
             value={ticket.assignee}
             readOnly
@@ -177,7 +218,9 @@ function MaintenanceDetail({ ticket, onStatusChange }) {
           />
         </label>
         <label className="grid gap-1.5">
-          <span className="text-xs font-bold text-[#45474c]">Actual Repair Cost (VND)</span>
+          <span className="text-xs font-bold text-[#45474c]">
+            Actual Repair Cost (VND)
+          </span>
           <input
             value={money.format(ticket.estimatedCost)}
             readOnly
@@ -223,7 +266,9 @@ function MaintenanceDetail({ ticket, onStatusChange }) {
 
 export default function MaintenancePage() {
   const [tickets, setTickets] = useState(maintenanceTickets);
-  const [selectedTicketId, setSelectedTicketId] = useState(maintenanceTickets[0]?.id ?? null);
+  const [selectedTicketId, setSelectedTicketId] = useState(
+    maintenanceTickets[0]?.id ?? null,
+  );
   const [statusView, setStatusView] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [ticketDraft, setTicketDraft] = useState({
@@ -234,15 +279,29 @@ export default function MaintenancePage() {
     uploadStatus: "idle",
     uploadError: "",
   });
-  const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId) || tickets[0];
-  const visibleTickets = statusView === "all" ? tickets : tickets.filter((ticket) => ticket.status !== "done");
-  const pending = tickets.filter((ticket) => ticket.status === "pending").length;
+  const selectedTicket =
+    tickets.find((ticket) => ticket.id === selectedTicketId) || tickets[0];
+  const visibleTickets =
+    statusView === "all"
+      ? tickets
+      : tickets.filter((ticket) => ticket.status !== "done");
+  const pending = tickets.filter(
+    (ticket) => ticket.status === "pending",
+  ).length;
   const done = tickets.filter((ticket) => ticket.status === "done").length;
+
+  const fetchTickets = async () => {
+    a;
+  };
 
   const uploadTicketAttachments = async (files) => {
     const selectedFiles = Array.from(files || []).slice(0, 3);
     if (selectedFiles.length === 0) return;
-    setTicketDraft((current) => ({ ...current, uploadStatus: "uploading", uploadError: "" }));
+    setTicketDraft((current) => ({
+      ...current,
+      uploadStatus: "uploading",
+      uploadError: "",
+    }));
     try {
       const result = await uploadFiles(selectedFiles);
       setTicketDraft((current) => ({
@@ -294,7 +353,11 @@ export default function MaintenancePage() {
           ? {
               ...ticket,
               status: nextStatus,
-              assignee: nextStatus === "inProgress" && ticket.assignee === "Chờ tiếp nhận" ? "Nguyễn Văn Hùng" : ticket.assignee,
+              assignee:
+                nextStatus === "inProgress" &&
+                ticket.assignee === "Chờ tiếp nhận"
+                  ? "Nguyễn Văn Hùng"
+                  : ticket.assignee,
             }
           : ticket,
       ),
@@ -311,13 +374,32 @@ export default function MaintenancePage() {
         onAction={() => setShowCreate(true)}
       />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={ClipboardCheck} label="Tổng phiếu" value={tickets.length} subtext="Trong tháng này" />
-        <KpiCard icon={AlertTriangle} label="Đang chờ" value={pending} subtext="Cần phân công" tone="rose" />
-        <KpiCard icon={Wrench} label="Đã hoàn tất" value={done} subtext="Đã ghi chi phí" tone="emerald" />
+        <KpiCard
+          icon={ClipboardCheck}
+          label="Tổng phiếu"
+          value={tickets.length}
+          subtext="Trong tháng này"
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          label="Đang chờ"
+          value={pending}
+          subtext="Cần phân công"
+          tone="rose"
+        />
+        <KpiCard
+          icon={Wrench}
+          label="Đã hoàn tất"
+          value={done}
+          subtext="Đã ghi chi phí"
+          tone="emerald"
+        />
         <KpiCard
           icon={Banknote}
           label="Chi phí dự kiến"
-          value={formatMoney(tickets.reduce((sum, item) => sum + item.estimatedCost, 0))}
+          value={formatMoney(
+            tickets.reduce((sum, item) => sum + item.estimatedCost, 0),
+          )}
           tone="amber"
         />
       </section>
@@ -357,7 +439,9 @@ export default function MaintenancePage() {
               <tbody>
                 {visibleTickets.map((ticket) => (
                   <tr key={ticket.id} className="border-t border-[#e2e8f0]">
-                    <td className="px-6 py-4 text-sm font-bold text-[#091426]">{ticket.id}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-[#091426]">
+                      {ticket.id}
+                    </td>
                     <td className="px-6 py-4 text-sm">{ticket.roomId}</td>
                     <td className="px-6 py-4">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-[#505f76]">
@@ -369,7 +453,11 @@ export default function MaintenancePage() {
                       <StatusBadge value={ticket.status} map={ticketStatus} />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <IconButton label={`Xem ${ticket.id}`} icon={ChevronRight} onClick={() => setSelectedTicketId(ticket.id)} />
+                      <IconButton
+                        label={`Xem ${ticket.id}`}
+                        icon={ChevronRight}
+                        onClick={() => setSelectedTicketId(ticket.id)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -377,7 +465,10 @@ export default function MaintenancePage() {
             </table>
           </div>
         </Card>
-        <MaintenanceDetail ticket={selectedTicket} onStatusChange={updateTicketStatus} />
+        <MaintenanceDetail
+          ticket={selectedTicket}
+          onStatusChange={updateTicketStatus}
+        />
       </section>
       {showCreate && (
         <Modal
@@ -405,10 +496,17 @@ export default function MaintenancePage() {
           <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1.5">
-                <span className="text-xs font-bold text-[#45474c]">Loại sự cố</span>
+                <span className="text-xs font-bold text-[#45474c]">
+                  Loại sự cố
+                </span>
                 <select
                   value={ticketDraft.type}
-                  onChange={(event) => setTicketDraft((current) => ({ ...current, type: event.target.value }))}
+                  onChange={(event) =>
+                    setTicketDraft((current) => ({
+                      ...current,
+                      type: event.target.value,
+                    }))
+                  }
                   className="h-10 rounded-lg border border-[#c5c6cd] bg-white px-3 text-sm text-[#091426]"
                 >
                   <option>Phòng</option>
@@ -416,19 +514,33 @@ export default function MaintenancePage() {
                 </select>
               </label>
               <label className="grid gap-1.5">
-                <span className="text-xs font-bold text-[#45474c]">Phòng / khu vực</span>
+                <span className="text-xs font-bold text-[#45474c]">
+                  Phòng / khu vực
+                </span>
                 <input
                   value={ticketDraft.roomId}
-                  onChange={(event) => setTicketDraft((current) => ({ ...current, roomId: event.target.value }))}
+                  onChange={(event) =>
+                    setTicketDraft((current) => ({
+                      ...current,
+                      roomId: event.target.value,
+                    }))
+                  }
                   className="h-10 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
                 />
               </label>
             </div>
             <label className="grid gap-1.5">
-              <span className="text-xs font-bold text-[#45474c]">Mô tả vấn đề</span>
+              <span className="text-xs font-bold text-[#45474c]">
+                Mô tả vấn đề
+              </span>
               <textarea
                 value={ticketDraft.description}
-                onChange={(event) => setTicketDraft((current) => ({ ...current, description: event.target.value }))}
+                onChange={(event) =>
+                  setTicketDraft((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
                 className="min-h-28 rounded-lg border border-[#c5c6cd] p-3 text-sm text-[#091426]"
               />
             </label>
@@ -436,19 +548,34 @@ export default function MaintenancePage() {
               <div className="flex items-center gap-3">
                 <CloudUpload className="h-5 w-5 text-[#505f76]" />
                 <div>
-                  <p className="text-sm font-bold text-[#091426]">Đính kèm ảnh/video tối đa 3 ảnh</p>
-                  <p className="text-xs text-[#6b7280]">Sau khi gửi, hệ thống tạo mã ticket và thông báo cho các bên.</p>
+                  <p className="text-sm font-bold text-[#091426]">
+                    Đính kèm ảnh/video tối đa 3 ảnh
+                  </p>
+                  <p className="text-xs text-[#6b7280]">
+                    Sau khi gửi, hệ thống tạo mã ticket và thông báo cho các
+                    bên.
+                  </p>
                 </div>
               </div>
               <input
                 type="file"
                 multiple
                 accept="image/*,video/*"
-                onChange={(event) => uploadTicketAttachments(event.target.files)}
+                onChange={(event) =>
+                  uploadTicketAttachments(event.target.files)
+                }
                 className="mt-4 block w-full text-sm text-[#45474c] file:mr-4 file:rounded-lg file:border-0 file:bg-[#091426] file:px-4 file:py-2 file:text-sm file:font-bold file:text-white"
               />
-              {ticketDraft.uploadStatus === "uploading" && <p className="mt-3 text-xs font-bold text-blue-700">Đang tải file lên backend...</p>}
-              {ticketDraft.uploadError && <p className="mt-3 text-xs font-bold text-rose-700">{ticketDraft.uploadError}</p>}
+              {ticketDraft.uploadStatus === "uploading" && (
+                <p className="mt-3 text-xs font-bold text-blue-700">
+                  Đang tải file lên backend...
+                </p>
+              )}
+              {ticketDraft.uploadError && (
+                <p className="mt-3 text-xs font-bold text-rose-700">
+                  {ticketDraft.uploadError}
+                </p>
+              )}
               {ticketDraft.attachments.length > 0 && (
                 <div className="mt-3 grid gap-2">
                   {ticketDraft.attachments.map((file) => (

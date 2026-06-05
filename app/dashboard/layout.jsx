@@ -34,6 +34,7 @@ import {
 
 const navigation = [
     {path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard, permissionKey: "dashboard"},
+    {path: "/dashboard/facilities", label: "Quản lý cơ sở", icon: Building2, permissionKey: "facilities"},
     {path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2, permissionKey: "rooms"},
     {path: "/dashboard/tenants", label: "Quản lý hồ sơ", icon: UsersRound, permissionKey: "tenants"},
     {

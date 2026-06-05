@@ -19,6 +19,7 @@ export const ROLE_ALIASES = {
 
 export const SECTION_PERMISSIONS = {
     dashboard: [ROLES.OWNER],
+    facilities: [ROLES.OWNER],
     floor: [ROLES.OWNER, ROLES.MANAGER],
     rooms: [ROLES.OWNER, ROLES.MANAGER],
     tenants: [ROLES.OWNER, ROLES.MANAGER],

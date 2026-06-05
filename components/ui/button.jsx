@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cva } from "class-variance-authority";
+import { cva } from "class-variance-authority"
 import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
@@ -46,9 +46,28 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  icon,
+  iconPosition = "left",
+  children,
   ...props
 }) {
   const Comp = asChild ? Slot.Root : "button"
+  const renderedIcon = React.isValidElement(icon)
+    ? React.cloneElement(icon, {
+        "data-icon":
+          iconPosition === "right" ? "inline-end" : "inline-start",
+      })
+    : icon
+      ? (
+          <span
+            data-icon={
+              iconPosition === "right" ? "inline-end" : "inline-start"
+            }
+          >
+            {icon}
+          </span>
+        )
+      : null
 
   return (
     <Comp
@@ -56,7 +75,18 @@ function Button({
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
-      {...props} />
+      {...props}
+    >
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {iconPosition !== "right" && renderedIcon}
+          {children}
+          {iconPosition === "right" && renderedIcon}
+        </>
+      )}
+    </Comp>
   );
 }
 

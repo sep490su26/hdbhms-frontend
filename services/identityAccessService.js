@@ -97,7 +97,7 @@ export async function authenticatedFetch(url, options = {}) {
 
 export async function getCurrentUserProfile() {
     // Đổi thành false khi Backend đã sẵn sàng chạy thật
-    const IS_MOCK_MODE = false;
+    const IS_MOCK_MODE = true;
 
     if (IS_MOCK_MODE) {
         // fix cung
@@ -123,7 +123,7 @@ export async function getCurrentUserProfile() {
 }
 
 export async function loginWithPhonePassword({phone, password}) {
-    const IS_MOCK_MODE = false;
+    const IS_MOCK_MODE = true;
 
     if (IS_MOCK_MODE) {
         return {

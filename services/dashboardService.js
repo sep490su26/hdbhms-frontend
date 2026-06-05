@@ -4,17 +4,20 @@ export const roles = [
   {
     id: "owner",
     label: "Chủ trọ",
-    description: "Theo dõi công suất, doanh thu, công nợ và các rủi ro vận hành.",
+    description:
+      "Theo dõi công suất, doanh thu, công nợ và các rủi ro vận hành.",
   },
   {
     id: "manager",
     label: "Quản lý",
-    description: "Xử lý phòng, khách thuê, duyệt cọc, bàn giao và phiếu bảo trì.",
+    description:
+      "Xử lý phòng, khách thuê, duyệt cọc, bàn giao và phiếu bảo trì.",
   },
   {
     id: "accountant",
     label: "Kế toán",
-    description: "Đối soát tiền cọc, tiền thuê, hóa đơn, hoàn cọc và báo cáo tài chính.",
+    description:
+      "Đối soát tiền cọc, tiền thuê, hóa đơn, hoàn cọc và báo cáo tài chính.",
   },
 ];
 
@@ -164,7 +167,8 @@ export const maintenanceTickets = [
     reportedAt: "22/01/2024 14:30",
     assignee: "Nguyễn Văn Hùng",
     estimatedCost: 250000,
-    description: "Máy lạnh làm mát yếu, có nước nhỏ từ dàn lạnh sau khoảng 20 phút sử dụng.",
+    description:
+      "Máy lạnh làm mát yếu, có nước nhỏ từ dàn lạnh sau khoảng 20 phút sử dụng.",
   },
   {
     id: "DM-8922",
@@ -190,7 +194,8 @@ export const maintenanceTickets = [
     reportedAt: "23/01/2024 09:20",
     assignee: "Kế toán vận hành",
     estimatedCost: 0,
-    description: "Chỉ số tháng này cao bất thường, cần kiểm tra rò rỉ hoặc ghi sai số.",
+    description:
+      "Chỉ số tháng này cao bất thường, cần kiểm tra rò rỉ hoặc ghi sai số.",
   },
   {
     id: "DM-8924",
@@ -208,10 +213,38 @@ export const maintenanceTickets = [
 ];
 
 export const invoices = [
-  { id: "INV-2401", roomId: "P201", tenant: "Nguyễn Văn An", dueDate: "05/02/2024", amount: 2520000, status: "paid" },
-  { id: "INV-2402", roomId: "P205", tenant: "Trần Thị Bích", dueDate: "05/02/2024", amount: 2450000, status: "unpaid" },
-  { id: "INV-2403", roomId: "P105", tenant: "Phạm Thị Dung", dueDate: "05/02/2024", amount: 3200000, status: "overdue" },
-  { id: "INV-2404", roomId: "P302", tenant: "Lê Văn Cường", dueDate: "05/02/2024", amount: 2580000, status: "paid" },
+  {
+    id: "INV-2401",
+    roomId: "P201",
+    tenant: "Nguyễn Văn An",
+    dueDate: "05/02/2024",
+    amount: 2520000,
+    status: "paid",
+  },
+  {
+    id: "INV-2402",
+    roomId: "P205",
+    tenant: "Trần Thị Bích",
+    dueDate: "05/02/2024",
+    amount: 2450000,
+    status: "unpaid",
+  },
+  {
+    id: "INV-2403",
+    roomId: "P105",
+    tenant: "Phạm Thị Dung",
+    dueDate: "05/02/2024",
+    amount: 3200000,
+    status: "overdue",
+  },
+  {
+    id: "INV-2404",
+    roomId: "P302",
+    tenant: "Lê Văn Cường",
+    dueDate: "05/02/2024",
+    amount: 2580000,
+    status: "paid",
+  },
 ];
 
 export const contractTemplates = [
@@ -239,14 +272,36 @@ export const contractTemplates = [
 ];
 
 export const systemUsers = [
-  { id: "USR-01", name: "Admin User", role: "Chủ trọ", email: "admin@dormmanager.vn", status: "Hoạt động" },
-  { id: "USR-02", name: "Linh Kế toán", role: "Kế toán", email: "linh@haidang.vn", status: "Hoạt động" },
-  { id: "USR-03", name: "Hùng Quản lý", role: "Quản lý", email: "hung@haidang.vn", status: "Tạm khóa" },
+  {
+    id: "USR-01",
+    name: "Admin User",
+    role: "Chủ trọ",
+    email: "admin@dormmanager.vn",
+    status: "Hoạt động",
+  },
+  {
+    id: "USR-02",
+    name: "Linh Kế toán",
+    role: "Kế toán",
+    email: "linh@haidang.vn",
+    status: "Hoạt động",
+  },
+  {
+    id: "USR-03",
+    name: "Hùng Quản lý",
+    role: "Quản lý",
+    email: "hung@haidang.vn",
+    status: "Tạm khóa",
+  },
 ];
 
 export const collectionItems = [
   { label: "Tiền thuê tháng này", value: 68400000, delta: "+8.2%" },
-  { label: "Tiền cọc đang giữ", value: depositContracts.reduce((total, item) => total + item.amount, 0), delta: "+2 hồ sơ" },
+  {
+    label: "Tiền cọc đang giữ",
+    value: depositContracts.reduce((total, item) => total + item.amount, 0),
+    delta: "+2 hồ sơ",
+  },
   { label: "Công nợ cần thu", value: 7200000, delta: "6 phòng" },
 ];
 

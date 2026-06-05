@@ -13,6 +13,7 @@ import {
 
 export const navigation = [
     {path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard},
+    {path: "/dashboard/facilities", label: "Quản lý cơ sở", icon: Building2},
     {path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2},
     {path: "/dashboard/tenants", label: "Quản lý khách thuê", icon: UsersRound},
     {path: "/dashboard/accounts", label: "Quản lý nhân sự", icon: UserRoundCog},
@@ -26,6 +27,7 @@ export const navigation = [
 
 export const navigationPermissionKeys = {
     "/dashboard": "dashboard",
+    "/dashboard/facilities": "facilities",
     "/dashboard/rooms": "rooms",
     "/dashboard/tenants": "tenants",
     "/dashboard/accounts": "accounts",

@@ -156,6 +156,11 @@ const REQUIRED_DEPOSIT_MESSAGES = {
   citizenIdFront: "Vui lòng tải lên ảnh mặt trước CCCD.",
   citizenIdBack: "Vui lòng tải lên ảnh mặt sau CCCD.",
   portraitImage: "Vui lòng tải lên ảnh chân dung.",
+  occupantCount: "Vui lòng chọn số lượng người ở.",
+  coOccupant1FullName: "Vui lòng nhập họ tên người ở cùng 1.",
+  coOccupant1Phone: "Vui lòng nhập số điện thoại người ở cùng 1.",
+  coOccupant2FullName: "Vui lòng nhập họ tên người ở cùng 2.",
+  coOccupant2Phone: "Vui lòng nhập số điện thoại người ở cùng 2.",
   terms: "Vui lòng xác nhận cam kết thông tin.",
 };
 
@@ -184,6 +189,12 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
   id_front_file: "citizenIdFront",
   id_back_file: "citizenIdBack",
   portrait_file: "portraitImage",
+  occupantCount: "occupantCount",
+  occupant_count: "occupantCount",
+  coOccupants: "coOccupants",
+  co_occupants: "coOccupants",
+  coOccupantInformationValid: "occupantCount",
+  co_occupant_information_valid: "occupantCount",
   metadata: "terms",
 };
 
@@ -201,6 +212,7 @@ const API_ERROR_HINTS = [
   { pattern: /id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
   { pattern: /id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
   { pattern: /portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
+  { pattern: /occupant|co_occupants|người\s*ở/i, field: "occupantCount" },
 ];
 
 const DEPOSIT_FIELD_LABELS = {
@@ -217,6 +229,8 @@ const DEPOSIT_FIELD_LABELS = {
   citizenIdFront: "ảnh mặt trước CCCD",
   citizenIdBack: "ảnh mặt sau CCCD",
   portraitImage: "ảnh chân dung",
+  occupantCount: "số lượng người ở",
+  coOccupants: "thông tin người ở cùng",
   terms: "hợp đồng đặt cọc",
 };
 
@@ -277,7 +291,7 @@ const extractDepositApiFieldErrors = (error) => {
 };
 
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
-const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
+const VIETNAM_PHONE_PATTERN = /^0[35789]\d{8}$/;
 const CITIZEN_ID_PATTERN = /^\d{12}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
@@ -291,6 +305,11 @@ const DEPOSIT_DRAFT_FIELDS = [
   "contractDate",
   "moveInDate",
   "note",
+  "occupantCount",
+  "coOccupant1FullName",
+  "coOccupant1Phone",
+  "coOccupant2FullName",
+  "coOccupant2Phone",
 ];
 const DepositFormErrorContext = createContext({
   errors: {},
@@ -354,15 +373,45 @@ const buildDepositDraftFromForm = (form) => {
   if (!form) return {};
 
   const formData = new FormData(form);
-  return DEPOSIT_DRAFT_FIELDS.reduce((draft, fieldName) => {
-    draft[fieldName] = String(formData.get(fieldName) || "");
-    return draft;
+  const draft = DEPOSIT_DRAFT_FIELDS.reduce((nextDraft, fieldName) => {
+    nextDraft[fieldName] = String(formData.get(fieldName) || "");
+    return nextDraft;
   }, {});
+  const occupantCount = Number(draft.occupantCount || 1);
+  if (occupantCount < 2) {
+    draft.coOccupant1FullName = "";
+    draft.coOccupant1Phone = "";
+  }
+  if (occupantCount < 3) {
+    draft.coOccupant2FullName = "";
+    draft.coOccupant2Phone = "";
+  }
+  return draft;
+};
+
+const collectDepositFormData = (form) => {
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData);
+  const occupantCount = Number(data.occupantCount || 1);
+  if (occupantCount < 2) {
+    data.coOccupant1FullName = "";
+    data.coOccupant1Phone = "";
+  }
+  if (occupantCount < 3) {
+    data.coOccupant2FullName = "";
+    data.coOccupant2Phone = "";
+  }
+  return data;
 };
 
 const hasDepositDraftValue = (draft) => Object.values(draft || {}).some((value) => String(value || "").trim());
 
 const getTodayDateString = () => new Date().toISOString().split("T")[0];
+
+const normalizePhoneValue = (value) => {
+  const cleaned = String(value || "").replace(/[\s.\-()]/g, "");
+  return cleaned.startsWith("+84") ? `0${cleaned.slice(3)}` : cleaned;
+};
 
 const validateDepositValue = (name, value) => {
   const normalizedValue = String(value || "").trim();
@@ -379,6 +428,14 @@ const validateDepositValue = (name, value) => {
 
   if (name === "phone" && !VIETNAM_PHONE_PATTERN.test(normalizedValue)) {
     return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+  }
+
+  if (name === "occupantCount" && !["1", "2", "3"].includes(normalizedValue)) {
+    return "Số lượng người ở chỉ được chọn từ 1 đến 3.";
+  }
+
+  if ((name === "coOccupant1Phone" || name === "coOccupant2Phone") && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
+    return "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
   }
 
   if (name === "email" && normalizedValue && !EMAIL_PATTERN.test(normalizedValue)) {
@@ -404,6 +461,54 @@ const validateDepositValue = (name, value) => {
   return "";
 };
 
+const validateOccupancyData = (data) => {
+  const nextErrors = {};
+  const occupantCount = Number(data.occupantCount || 0);
+
+  if (![1, 2, 3].includes(occupantCount)) {
+    nextErrors.occupantCount = "Số lượng người ở chỉ được chọn từ 1 đến 3.";
+    return nextErrors;
+  }
+
+  const mainPhone = normalizePhoneValue(data.phone);
+  const coOccupantPhones = [];
+
+  for (let displayOrder = 1; displayOrder < occupantCount; displayOrder += 1) {
+    const fullNameField = `coOccupant${displayOrder}FullName`;
+    const phoneField = `coOccupant${displayOrder}Phone`;
+    const fullName = String(data[fullNameField] || "").trim();
+    const phone = normalizePhoneValue(data[phoneField]);
+
+    if (!fullName) {
+      nextErrors[fullNameField] = REQUIRED_DEPOSIT_MESSAGES[fullNameField];
+    }
+
+    if (!phone) {
+      nextErrors[phoneField] = REQUIRED_DEPOSIT_MESSAGES[phoneField];
+      continue;
+    }
+
+    if (!VIETNAM_PHONE_PATTERN.test(phone)) {
+      nextErrors[phoneField] = "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+      continue;
+    }
+
+    if (phone === mainPhone) {
+      nextErrors[phoneField] = "Số điện thoại người ở cùng không được trùng với số điện thoại người đặt cọc chính.";
+      continue;
+    }
+
+    if (coOccupantPhones.includes(phone)) {
+      nextErrors[phoneField] = "Số điện thoại người ở cùng không được trùng nhau.";
+      continue;
+    }
+
+    coOccupantPhones.push(phone);
+  }
+
+  return nextErrors;
+};
+
 const buildDepositMetadata = (room, data) => ({
   room_id: room.roomId || "",
   full_name: String(data.fullName || "").trim(),
@@ -416,6 +521,14 @@ const buildDepositMetadata = (room, data) => ({
   permanent_address: String(data.permanentAddress || "").trim(),
   deposit_months: 1,
   payment_cycle_months: 1,
+  occupant_count: Number(data.occupantCount || 1),
+  co_occupants: [1, 2]
+    .filter((displayOrder) => Number(data.occupantCount || 1) > displayOrder)
+    .map((displayOrder) => ({
+      full_name: String(data[`coOccupant${displayOrder}FullName`] || "").trim(),
+      phone: normalizePhoneValue(data[`coOccupant${displayOrder}Phone`] || ""),
+      display_order: displayOrder,
+    })),
   expected_lease_sign_date: data.contractDate || null,
   expected_move_in_date: data.moveInDate || null,
 });
@@ -620,6 +733,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [acceptedContract, setAcceptedContract] = useState(false);
   const [acceptedSignature, setAcceptedSignature] = useState("");
+  const [occupantCount, setOccupantCount] = useState("1");
+  const [coOccupants, setCoOccupants] = useState({
+    1: { fullName: "", phone: "" },
+    2: { fullName: "", phone: "" },
+  });
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -627,6 +745,17 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       if (!hasDepositDraftValue(draft)) return;
 
       setSavedDraft(draft);
+      setOccupantCount(["1", "2", "3"].includes(draft.occupantCount) ? draft.occupantCount : "1");
+      setCoOccupants({
+        1: {
+          fullName: draft.coOccupant1FullName || "",
+          phone: draft.coOccupant1Phone || "",
+        },
+        2: {
+          fullName: draft.coOccupant2FullName || "",
+          phone: draft.coOccupant2Phone || "",
+        },
+      });
       setDraftVersion((currentVersion) => currentVersion + 1);
     }, 0);
 
@@ -676,6 +805,34 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     validateAndSetDepositField(name, value);
   };
 
+  const handleOccupantCountChange = (event) => {
+    const nextCount = event.target.value;
+    setOccupantCount(nextCount);
+    setCoOccupants((currentCoOccupants) => ({
+      1: Number(nextCount) >= 2 ? currentCoOccupants[1] : { fullName: "", phone: "" },
+      2: Number(nextCount) >= 3 ? currentCoOccupants[2] : { fullName: "", phone: "" },
+    }));
+    setFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      occupantCount: validateDepositField("occupantCount", nextCount),
+      ...(Number(nextCount) < 2 ? { coOccupant1FullName: "", coOccupant1Phone: "" } : {}),
+      ...(Number(nextCount) < 3 ? { coOccupant2FullName: "", coOccupant2Phone: "" } : {}),
+    }));
+  };
+
+  const handleCoOccupantChange = (displayOrder, fieldName) => (event) => {
+    const value = event.target.value;
+    const formFieldName = `coOccupant${displayOrder}${fieldName === "fullName" ? "FullName" : "Phone"}`;
+    setCoOccupants((currentCoOccupants) => ({
+      ...currentCoOccupants,
+      [displayOrder]: {
+        ...currentCoOccupants[displayOrder],
+        [fieldName]: value,
+      },
+    }));
+    validateAndSetDepositField(formFieldName, value);
+  };
+
   const handleDraftChange = (event) => {
     writeDepositDraftCookie(buildDepositDraftFromForm(event.currentTarget));
   };
@@ -715,6 +872,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       "idIssueDate",
       "idIssuePlace",
       "permanentAddress",
+      "occupantCount",
       "contractDate",
       "moveInDate",
     ];
@@ -724,6 +882,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       const message = validateDepositField(fieldName, data[fieldName]);
       if (message) nextErrors[fieldName] = message;
     });
+
+    Object.assign(nextErrors, validateOccupancyData(data));
 
     if (includeFiles) {
       ["citizenIdFront", "citizenIdBack", "portraitImage"].forEach((fieldName) => {
@@ -747,7 +907,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   const handlePreviewContract = async () => {
     if (!formRef.current) return;
 
-    const data = Object.fromEntries(new FormData(formRef.current));
+    const data = collectDepositFormData(formRef.current);
     const nextErrors = validateFormData(data, {
       includeFiles: false,
       includeContractAcceptance: false,
@@ -774,7 +934,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   const handleSubmit = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
+    const data = collectDepositFormData(form);
     const nextErrors = validateFormData(data);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -823,6 +983,86 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" />
           <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
+          <div className="grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2">
+            <div className="flex items-center gap-3">
+              <Home className="h-5 w-5 text-[#4f46e5]" />
+              <h2 className="text-lg font-bold text-[#091426]">Thông tin số người ở</h2>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                  Số lượng người ở <span className="text-rose-600">*</span>
+                </span>
+                <select
+                  name="occupantCount"
+                  value={occupantCount}
+                  required
+                  onChange={handleOccupantCountChange}
+                  aria-invalid={fieldErrors.occupantCount ? "true" : "false"}
+                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.occupantCount
+                    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                    : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                    }`}
+                >
+                  <option value="1">1 người</option>
+                  <option value="2">2 người</option>
+                  <option value="3">3 người</option>
+                </select>
+                {fieldErrors.occupantCount && <span className="text-xs font-medium text-rose-600">{fieldErrors.occupantCount}</span>}
+              </label>
+              <div className="rounded-lg border border-[#d8dde6] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-[#5a6678]">
+                <p className="font-bold text-[#091426]">Người đặt cọc chính sẽ là người ký chính.</p>
+                <p>Người ở cùng chỉ cần nhập tên và số điện thoại ở bước đặt cọc. CCCD và hồ sơ đầy đủ sẽ bổ sung sau khi ký hợp đồng.</p>
+              </div>
+            </div>
+
+            {[1, 2].map((displayOrder) => Number(occupantCount) > displayOrder && (
+              <div key={displayOrder} className="rounded-xl border border-[#d8dde6] bg-white p-5">
+                <h3 className="text-base font-bold text-[#091426]">Người ở cùng {displayOrder}</h3>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                      Họ tên <span className="text-rose-600">*</span>
+                    </span>
+                    <input
+                      name={`coOccupant${displayOrder}FullName`}
+                      value={coOccupants[displayOrder].fullName}
+                      onChange={handleCoOccupantChange(displayOrder, "fullName")}
+                      placeholder={`Nhập họ tên người ở cùng ${displayOrder}`}
+                      aria-invalid={fieldErrors[`coOccupant${displayOrder}FullName`] ? "true" : "false"}
+                      className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${fieldErrors[`coOccupant${displayOrder}FullName`]
+                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                        : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                        }`}
+                    />
+                    {fieldErrors[`coOccupant${displayOrder}FullName`] && (
+                      <span className="text-xs font-medium text-rose-600">{fieldErrors[`coOccupant${displayOrder}FullName`]}</span>
+                    )}
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                      Số điện thoại <span className="text-rose-600">*</span>
+                    </span>
+                    <input
+                      name={`coOccupant${displayOrder}Phone`}
+                      type="tel"
+                      value={coOccupants[displayOrder].phone}
+                      onChange={handleCoOccupantChange(displayOrder, "phone")}
+                      placeholder="Nhập số điện thoại"
+                      aria-invalid={fieldErrors[`coOccupant${displayOrder}Phone`] ? "true" : "false"}
+                      className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${fieldErrors[`coOccupant${displayOrder}Phone`]
+                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                        : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                        }`}
+                    />
+                    {fieldErrors[`coOccupant${displayOrder}Phone`] && (
+                      <span className="text-xs font-medium text-rose-600">{fieldErrors[`coOccupant${displayOrder}Phone`]}</span>
+                    )}
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
           <Field
             label="Ngày hẹn ký hợp đồng"
             name="contractDate"

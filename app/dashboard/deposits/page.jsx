@@ -6,10 +6,8 @@ import {
   Download,
   Eye,
   FileText,
-  Filter,
   ImageIcon,
   LockKeyhole,
-  RefreshCw,
   Search,
   UserRound,
   WalletCards,
@@ -560,12 +558,6 @@ export default function DepositsPage() {
     }
   };
 
-  const resetFilters = () => {
-    setCustomerFilter("");
-    setStatusFilter("all");
-    setFloorFilter("all");
-  };
-
   return (
     <>
       <section className="grid gap-8">
@@ -594,7 +586,7 @@ export default function DepositsPage() {
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] bg-white p-8 shadow-[0_14px_30px_rgba(9,20,38,0.08)]">
-          <div className="grid gap-5 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
+          <div className="grid gap-5 xl:grid-cols-3 xl:items-end">
             <label className="grid gap-2">
               <span className="text-base font-bold text-[#4b5563]">Tên khách hàng</span>
               <span className="relative">
@@ -633,33 +625,19 @@ export default function DepositsPage() {
                 ))}
               </select>
             </label>
-            <button
-              type="button"
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-lg bg-[#dbe8ff] px-7 text-base font-extrabold text-[#102033]"
-            >
-              <Filter className="h-5 w-5" />
-              Lọc dữ liệu
-            </button>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex h-14 w-14 items-center justify-center rounded-lg border border-[#c4cad6] text-[#102033] hover:bg-[#f4f7fb]"
-              aria-label="Xóa bộ lọc"
-            >
-              <RefreshCw className="h-6 w-6" />
-            </button>
           </div>
         </section>
 
         <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_14px_30px_rgba(9,20,38,0.08)]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] border-collapse text-left">
+            <table className="w-full min-w-[1250px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-base font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
                   <th className="px-8 py-6">Phòng</th>
                   <th className="px-8 py-6">Tên khách hàng</th>
                   <th className="px-8 py-6">Số tiền cọc</th>
                   <th className="px-8 py-6">Ngày tạo</th>
+                  <th className="px-8 py-6">Ngày hẹn ký HĐ</th>
                   <th className="px-8 py-6">Trạng thái</th>
                   <th className="px-8 py-6 text-center">Hành động</th>
                 </tr>
@@ -667,7 +645,7 @@ export default function DepositsPage() {
               <tbody>
                 {filteredAgreements.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-8 py-12 text-center text-base font-bold text-[#6b7280]">
+                    <td colSpan={7} className="px-8 py-12 text-center text-base font-bold text-[#6b7280]">
                       Không có hợp đồng đặt cọc phù hợp.
                     </td>
                   </tr>
@@ -690,6 +668,7 @@ export default function DepositsPage() {
                       </td>
                       <td className="px-8 py-7 text-lg font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
                       <td className="px-8 py-7 text-lg font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
+                      <td className="px-8 py-7 text-lg font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
                       <td className="px-8 py-7">
                         <select
                           value={STATUS_OPTIONS.some((status) => status.value === agreement.status) ? agreement.status : ""}
@@ -706,32 +685,32 @@ export default function DepositsPage() {
                         </select>
                       </td>
                       <td className="px-8 py-7">
-	                        <div className="flex items-center justify-center gap-3">
-	                          <button
-	                            type="button"
-	                            onClick={() => openDetails(agreement)}
-	                            className="rounded-full p-2 text-[#4160ad] hover:bg-[#eef4ff]"
-	                            aria-label={`Xem chi tiết ${agreement.depositCode}`}
-	                          >
-	                            <Eye className="h-7 w-7" />
-	                          </button>
-	                          <button
-	                            type="button"
-	                            onClick={() => handleOpenContract(agreement)}
-	                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
-	                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
-	                          >
-	                            <FileText className="h-6 w-6" />
-	                          </button>
-	                          <button
-	                            type="button"
-	                            onClick={() => handleDownloadContract(agreement)}
-	                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
-	                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
-	                          >
-	                            <Download className="h-6 w-6" />
-	                          </button>
-	                        </div>
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => openDetails(agreement)}
+                            className="rounded-full p-2 text-[#4160ad] hover:bg-[#eef4ff]"
+                            aria-label={`Xem chi tiết ${agreement.depositCode}`}
+                          >
+                            <Eye className="h-7 w-7" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenContract(agreement)}
+                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
+                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
+                          >
+                            <FileText className="h-6 w-6" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadContract(agreement)}
+                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
+                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
+                          >
+                            <Download className="h-6 w-6" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

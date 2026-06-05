@@ -239,14 +239,50 @@ export async function restoreUser(userId) {
     });
 }
 
+function normalizeTenantAccountCandidate(item = {}) {
+    return {
+        ...item,
+        contractId: item.contractId ?? item.contract_id ?? null,
+        contractCode: item.contractCode ?? item.contract_code ?? "",
+        contractStatus: item.contractStatus ?? item.contract_status ?? null,
+        startDate: item.startDate ?? item.start_date ?? null,
+        endDate: item.endDate ?? item.end_date ?? null,
+        signedAt: item.signedAt ?? item.signed_at ?? null,
+        propertyId: item.propertyId ?? item.property_id ?? null,
+        propertyName: item.propertyName ?? item.property_name ?? "",
+        roomId: item.roomId ?? item.room_id ?? null,
+        roomCode: item.roomCode ?? item.room_code ?? "",
+        roomStatus: item.roomStatus ?? item.room_status ?? null,
+        profileId: item.profileId ?? item.profile_id ?? null,
+        userId: item.userId ?? item.user_id ?? null,
+        fullName: item.fullName ?? item.full_name ?? "",
+        phone: item.phone ?? "",
+        email: item.email ?? "",
+        role: item.role ?? null,
+        accountStatus: item.accountStatus ?? item.account_status ?? null,
+        mustChangePassword: item.mustChangePassword ?? item.must_change_password ?? null,
+        lastLoginAt: item.lastLoginAt ?? item.last_login_at ?? null,
+        accountCreatedAt: item.accountCreatedAt ?? item.account_created_at ?? null,
+        accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
+        emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+        message: item.message ?? "",
+    };
+}
+
+function normalizeTenantAccountCandidates(data) {
+    return Array.isArray(data) ? data.map(normalizeTenantAccountCandidate) : [];
+}
+
 export async function fetchTenantAccountCandidates() {
-    return authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
         method: "GET",
     });
+    return normalizeTenantAccountCandidates(data);
 }
 
 export async function sendTenantAccountCredentials(contractId) {
-    return authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send`, {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send`, {
         method: "POST",
     });
+    return normalizeTenantAccountCandidate(data);
 }

@@ -42,7 +42,7 @@ const navigation = [
   { path: "/dashboard/meter-readings", label: "Nhập số điện nước", icon: Gauge, permissionKey: "meterReadings" },
   { path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench, permissionKey: "maintenance" },
   { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2, permissionKey: "deposits" },
-  { path: "/dashboard/contract-template", label: "Mẫu hợp đồng", icon: FileText, permissionKey: "contract" },
+  { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText, permissionKey: "contract" },
   { path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards, permissionKey: "finance" },
   { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings, permissionKey: "settings" },
 ];

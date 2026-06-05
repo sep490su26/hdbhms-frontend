@@ -301,7 +301,8 @@ function DashboardLayoutShell({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
-  const effectiveRole = user?.role || "";
+  const isDevelopmentPreview = process.env.NODE_ENV === "development";
+  const effectiveRole = user?.role || (isDevelopmentPreview ? "owner" : "");
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
@@ -339,7 +340,7 @@ function DashboardLayoutShell({ children }) {
 
   useEffect(() => {
     if (!hasHydratedAuth) return;
-    if (!user) {
+    if (!user && !isDevelopmentPreview) {
       const redirect = pathname ? `?redirect=${encodeURIComponent(pathname)}` : "";
       router.replace(`/login${redirect}`);
       return;
@@ -348,7 +349,7 @@ function DashboardLayoutShell({ children }) {
     if (!isAllowed) {
       router.replace(getFirstAllowedPath(effectiveRole));
     }
-  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, pathname, router, user]);
+  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, isDevelopmentPreview, pathname, router, user]);
 
   const contextValue = useMemo(
     () => ({

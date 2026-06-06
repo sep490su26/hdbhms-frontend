@@ -6,6 +6,7 @@ import {usePathname, useRouter} from "next/navigation";
 import {
     Bell,
     Building2,
+    ChevronDown,
     FileCheck2,
     FileText,
     Gauge,
@@ -15,6 +16,7 @@ import {
     Menu,
     Search,
     Settings,
+    UserRound,
     UserRoundCog,
     UserSearch,
     UsersRound,
@@ -22,6 +24,13 @@ import {
     Wrench,
     X,
 } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {AuthProvider, useAuth} from "./_contexts/AuthContext";
 import {DashboardLayoutProvider} from "./_contexts/DashboardLayoutContext";
 import {PermissionGuard} from "./_components/PermissionGuard";
@@ -201,7 +210,7 @@ function Sidebar({isOpen, onClose}) {
 }
 
 function Topbar({search, onSearchChange, onToggleMobileMenu}) {
-    const {user} = useAuth();
+    const {user, logout} = useAuth();
 
     return (
         <header
@@ -237,17 +246,58 @@ function Topbar({search, onSearchChange, onToggleMobileMenu}) {
                     <Bell className="h-5 w-5"/>
                     <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500"/>
                 </button>
-                <div className="hidden items-center gap-3 border-l border-[#e2e8f0] pl-3 sm:flex">
-          <span
-              className="rounded-full border border-[#e2e8f0] bg-[#f7f9fb] px-3 py-2 text-xs font-bold text-[#091426]">
-            {ROLE_LABELS[user?.role] || user?.roleLabel || "User"}
-          </span>
-                    <span className="min-w-0 text-right">
-            <span className="block truncate text-xs font-bold text-[#091426]">{user?.fullName || user?.name}</span>
-            <span className="block max-w-44 truncate text-xs text-[#6b7280]">{user?.email}</span>
-          </span>
-                    <UserAvatar user={user} size="sm"/>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            className="flex items-center gap-3 border-l border-[#e2e8f0] pl-3 outline-none"
+                            aria-label="Mở menu tài khoản"
+                        >
+                            <span className="hidden min-w-0 text-right sm:block">
+                                <span className="block max-w-44 truncate text-xs font-bold text-[#091426]">
+                                    {user?.fullName || user?.name}
+                                </span>
+                                <span className="block max-w-44 truncate text-xs text-[#6b7280]">
+                                    {ROLE_LABELS[user?.role] || user?.roleLabel || "User"}
+                                </span>
+                            </span>
+                            <UserAvatar user={user} size="sm"/>
+                            <ChevronDown className="hidden h-4 w-4 text-[#6b7280] sm:block"/>
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        align="end"
+                        sideOffset={10}
+                        className="w-56 rounded-lg border border-[#e2e8f0] bg-white p-2 shadow-xl"
+                    >
+                        <DropdownMenuItem
+                            asChild
+                            className="cursor-pointer rounded-md px-3 py-2.5 font-semibold"
+                        >
+                            <Link href="/dashboard/profile">
+                                <UserRound className="h-4 w-4"/>
+                                Hồ sơ của tôi
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            asChild
+                            className="cursor-pointer rounded-md px-3 py-2.5 font-semibold"
+                        >
+                            <Link href="/dashboard/settings">
+                                <Settings className="h-4 w-4"/>
+                                Cài đặt tài khoản
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="my-1"/>
+                        <DropdownMenuItem
+                            className="cursor-pointer rounded-md px-3 py-2.5 font-semibold text-rose-700 focus:bg-rose-50 focus:text-rose-700"
+                            onSelect={() => logout()}
+                        >
+                            <LogOut className="h-4 w-4"/>
+                            Đăng xuất
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
     );
@@ -261,9 +311,10 @@ function DashboardLayoutShell({children}) {
     const [query, setQuery] = useState("");
 
     const activeNavigationItem = getNavigationItemForPath(pathname);
-    const isAllowed = activeNavigationItem
+    const isUtilityPath = pathname === "/dashboard/profile";
+    const isAllowed = isUtilityPath || (activeNavigationItem
         ? canAccessRole(user?.role, getAllowedRoles(activeNavigationItem))
-        : false;
+        : false);
 
     useEffect(() => {
         if (!activeNavigationItem) return;

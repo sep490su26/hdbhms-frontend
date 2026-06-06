@@ -1,4 +1,22 @@
-export const API_BASE_URL = "http://localhost:8080/api/v1";
+export const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
+const IS_MOCK_MODE = process.env.NEXT_PUBLIC_USE_MOCK_API !== "false";
+
+let mockCurrentUser = {
+    id: 42,
+    phone: "0901234567",
+    email: "admin@haidang.vn",
+    role: "OWNER",
+    status: "ACTIVE",
+    emailVerified: true,
+    fullName: "Phạm Thành Công",
+    avatarUrl: "https://i.pravatar.cc/300?img=33",
+    assignedBranch: "Cơ sở Quận 7 - Sky Tower",
+    position: "Chủ quản hệ thống",
+    startDate: "2022-06-15",
+    lastLoginAt: "2026-05-25T12:10:00",
+    createdAt: "2026-05-22T12:00:00",
+};
 
 export class ApiError extends Error {
     constructor(message, {code, details, status, payload} = {}) {
@@ -96,48 +114,71 @@ export async function authenticatedFetch(url, options = {}) {
 }
 
 export async function getCurrentUserProfile() {
-    // Đổi thành false khi Backend đã sẵn sàng chạy thật
-    const IS_MOCK_MODE = true;
-
     if (IS_MOCK_MODE) {
-        // fix cung
-        await new Promise((resolve) => setTimeout(resolve, 400)); // Giả lập delay mạng
-
-        return {
-            id: 42,
-            phone: "0901234567",
-            email: "admin@haidang.vn", //
-            role: "OWNER",
-            status: "ACTIVE",
-            emailVerified: true,
-            fullName: "Phạm Thành Công", // Đổ lên Top-bar
-            avatarUrl: "https://i.pravatar.cc/150?img=33",
-            lastLoginAt: "2026-05-25T12:10:00",
-            createdAt: "2026-05-22T12:00:00"
-        };
-    } else {
-        return authenticatedFetch(`${API_BASE_URL}/person-profiles/me`, {
-            method: "GET",
-        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        return {...mockCurrentUser};
     }
+
+    return authenticatedFetch("/users/me", {
+        method: "GET",
+    });
+}
+
+export async function updateCurrentUserProfile({phone, email}) {
+    if (IS_MOCK_MODE) {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        mockCurrentUser = {
+            ...mockCurrentUser,
+            phone,
+            email,
+            updatedAt: new Date().toISOString(),
+        };
+        return {...mockCurrentUser};
+    }
+
+    return authenticatedFetch("/users/me", {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({phone, email}),
+    });
+}
+
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Khong the doc file anh."));
+        reader.readAsDataURL(file);
+    });
+}
+
+export async function uploadCurrentUserAvatar(file) {
+    if (IS_MOCK_MODE) {
+        await new Promise((resolve) => setTimeout(resolve, 900));
+        const avatarUrl = await fileToDataUrl(file);
+        mockCurrentUser = {...mockCurrentUser, avatarUrl};
+        return {avatarUrl};
+    }
+
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const result = await authenticatedFetch("/person-profiles/me/avatar", {
+        method: "POST",
+        body: formData,
+    });
+    const avatarUrl =
+        result.avatarUrl ||
+        result.avatar_url ||
+        result.url ||
+        await fileToDataUrl(file);
+
+    return {...result, avatarUrl};
 }
 
 export async function loginWithPhonePassword({phone, password}) {
-    const IS_MOCK_MODE = true;
-
     if (IS_MOCK_MODE) {
-        return {
-            id: 42,
-            phone: "0901234567",
-            email: "admin@haidang.vn", // Khớp với email góc phải trên UI
-            role: "OWNER",
-            status: "ACTIVE",
-            emailVerified: true,
-            fullName: "Phạm Thành Công", // Đổ dữ liệu động thay cho chữ Chủ trọ tĩnh
-            avatarUrl: "https://i.pravatar.cc/150?img=33", // Đổ ảnh lên Avatar góc phải/trái
-            lastLoginAt: "2026-05-25T12:10:00",
-            createdAt: "2026-05-22T12:00:00"
-        };
+        return {...mockCurrentUser};
     } else {
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
             method: "POST",

@@ -181,7 +181,7 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span className={`inline-flex min-w-[76px] justify-center rounded-[8px] px-3 py-2 text-center text-xs font-medium leading-tight ${styles[status]}`}>
+    <span className={`inline-flex max-w-full justify-center rounded-[8px] px-3 py-2 text-center text-xs font-medium leading-tight ${styles[status]}`}>
       {status}
     </span>
   );
@@ -309,14 +309,14 @@ export default function MeterReadingsPage() {
           </h1>
         </div>
 
-        <div className="grid gap-3 lg:min-w-[330px]">
-          <div className="flex items-center gap-3">
+        <div className="grid w-full min-w-0 gap-3 lg:max-w-[330px]">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-[#0f1d33]">Tiến độ: 12/24 phòng</span>
-            <div className="h-2 min-w-[140px] flex-1 overflow-hidden rounded-full bg-[#dceaff]">
+            <div className="h-2 min-w-0 flex-1 basis-36 overflow-hidden rounded-full bg-[#dceaff]">
               <div className="h-full w-1/2 bg-[#3156b6]" />
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsFilterOpen(true)}
@@ -344,15 +344,15 @@ export default function MeterReadingsPage() {
       </section>
 
       <section className="overflow-hidden rounded-[6px] border border-[#bfc9d8] bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left text-sm">
+        <div className="dashboard-table">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-[#dfeaff] text-xs font-bold uppercase tracking-[0.04em] text-[#3e4b60]">
-                <th rowSpan={2} className="w-[190px] px-4 py-4 align-middle">Phòng</th>
+                <th rowSpan={2} className="min-w-44 px-4 py-4 align-middle">Phòng</th>
                 <th colSpan={3} className="border-l border-[#bfc9d8] px-4 py-3 text-center">Chỉ số điện (kWh)</th>
                 <th colSpan={3} className="border-l border-[#bfc9d8] px-4 py-3 text-center">Chỉ số nước (m³)</th>
                 <th rowSpan={2} className="border-l border-[#bfc9d8] px-4 py-4 text-center align-middle">Trạng thái</th>
-                <th rowSpan={2} className="w-12 px-4 py-4 align-middle" />
+                <th rowSpan={2} className="min-w-16 px-4 py-4 align-middle" />
               </tr>
               <tr className="bg-[#eef3fb] text-xs font-bold text-[#3e4b60]">
                 <th className="border-l border-[#bfc9d8] px-4 py-3 text-center">Cũ</th>
@@ -368,12 +368,12 @@ export default function MeterReadingsPage() {
                 const index = rows.indexOf(row);
                 return (
                 <tr key={`${row.id}-${index}`} className="bg-white align-middle">
-                  <td className="px-4 py-4">
+                  <td data-label="Phòng" className="px-4 py-4">
                     <p className="text-sm font-bold text-[#0f1d33]">{row.id}</p>
                     <p className="mt-0.5 max-w-[100px] text-sm leading-4 text-[#3e4b60]">{row.tenant}</p>
                   </td>
-                  <td className="border-l border-[#bfc9d8] px-4 py-4 text-center text-sm font-medium text-[#4b5563]">{row.oldElectric}</td>
-                  <td className="px-4 py-4">
+                  <td data-label="Điện cũ" className="border-l border-[#bfc9d8] px-4 py-4 text-center text-sm font-medium text-[#4b5563]">{row.oldElectric}</td>
+                  <td data-label="Điện mới" className="px-4 py-4">
                     <ReadingInput
                       value={row.newElectric}
                       placeholder="Nhập số"
@@ -381,23 +381,23 @@ export default function MeterReadingsPage() {
                       onChange={(value) => updateValue(index, "newElectric", value)}
                     />
                   </td>
-                  <td className="px-4 py-4 text-center">
+                  <td data-label="Minh chứng điện" className="px-4 py-4 text-center">
                     <ProofButton active={row.electricProof} />
                   </td>
-                  <td className="border-l border-[#bfc9d8] px-4 py-4 text-center text-sm font-medium text-[#4b5563]">{row.oldWater}</td>
-                  <td className="px-4 py-4">
+                  <td data-label="Nước cũ" className="border-l border-[#bfc9d8] px-4 py-4 text-center text-sm font-medium text-[#4b5563]">{row.oldWater}</td>
+                  <td data-label="Nước mới" className="px-4 py-4">
                     <ReadingInput
                       value={row.newWater}
                       onChange={(value) => updateValue(index, "newWater", value)}
                     />
                   </td>
-                  <td className="px-4 py-4 text-center">
+                  <td data-label="Minh chứng nước" className="px-4 py-4 text-center">
                     <ProofButton active={row.waterProof} />
                   </td>
-                  <td className="border-l border-[#bfc9d8] px-4 py-4 text-center">
+                  <td data-label="Trạng thái" className="border-l border-[#bfc9d8] px-4 py-4 text-center">
                     <StatusBadge status={row.status} />
                   </td>
-                  <td className="px-3 py-4 text-center">
+                  <td data-label="Thao tác" className="px-3 py-4 text-center">
                     <button
                       type="button"
                       aria-label={`Thao tác ${row.id}`}
@@ -423,7 +423,7 @@ export default function MeterReadingsPage() {
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#d7deea] bg-white/95 px-4 py-4 shadow-[0_-8px_22px_rgba(15,23,42,0.08)] backdrop-blur lg:left-[280px]">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-[#4b5563]">• Đang lưu tự động...</p>
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-wrap justify-end gap-3">
             <button
               type="button"
               className="h-11 rounded-[4px] border border-[#3156b6] bg-white px-7 text-sm font-bold text-[#3156b6] transition hover:bg-[#eef3fb]"

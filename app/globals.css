@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   --background: #091426;
   --foreground: #ffffff;
@@ -34,10 +40,252 @@
   }
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.dashboard-shell,
+.dashboard-main,
+.dashboard-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-shell,
+.dashboard-content {
+  width: 100%;
+}
+
+.dashboard-shell {
+  overflow-x: clip;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main {
+    width: calc(100% - 280px);
+  }
+}
+
+.dashboard-content > *,
+.dashboard-content :where(.grid, .flex) > * {
+  min-width: 0;
+}
+
+.dashboard-content :where(h1, h2, h3, h4, p, a, td) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.dashboard-content :where(button, select, option, th),
+.dashboard-content :where(span.inline-flex, a.inline-flex),
+.dashboard-content [class~="rounded-full"] {
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.dashboard-content :where(button, select) {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.dashboard-content button {
+  overflow: hidden;
+}
+
+.dashboard-content :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.dashboard-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.dashboard-table th {
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+.dashboard-table td,
+.dashboard-table td > * {
+  min-width: 0;
+}
+
+.dashboard-table td:is(
+  [data-label^="Mã"],
+  [data-label^="Ngày"],
+  [data-label^="Số"],
+  [data-label="ID"],
+  [data-label="STT"],
+  [data-label="Phòng"],
+  [data-label="Tầng"],
+  [data-label="Diện tích"],
+  [data-label="Hạn thu"],
+  [data-label="Thời hạn"],
+  [data-label="Vai trò"],
+  [data-label="Mức độ"],
+  [data-label="Trạng thái"],
+  [data-label="File"],
+  [data-label="Xem"],
+  [data-label="Chi tiết"],
+  [data-label="Thao tác"],
+  [data-label="Hành động"]
+) {
+  overflow: hidden;
+  min-width: max-content;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.dashboard-table td:is(
+  [data-label="Vai trò"],
+  [data-label="Mức độ"],
+  [data-label="Trạng thái"],
+  [data-label="File"],
+  [data-label="Xem"],
+  [data-label="Chi tiết"],
+  [data-label="Thao tác"],
+  [data-label="Hành động"]
+) > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1279px) {
+  .dashboard-table {
+    overflow: visible;
+  }
+
+  .dashboard-table table,
+  .dashboard-table tbody,
+  .dashboard-table tr,
+  .dashboard-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard-table thead {
+    display: none;
+  }
+
+  .dashboard-table tbody {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .dashboard-table tbody tr {
+    overflow: hidden;
+    border: 1px solid #dfe5ef;
+    border-radius: 0.75rem;
+    background: #fff;
+  }
+
+  .dashboard-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+    border: 0;
+    border-bottom: 1px solid #edf1f6;
+    padding: 0.75rem 1rem;
+    text-align: left;
+  }
+
+  .dashboard-table tbody td:is(
+    [data-label^="Mã"],
+    [data-label^="Ngày"],
+    [data-label^="Số"],
+    [data-label="ID"],
+    [data-label="STT"],
+    [data-label="Phòng"],
+    [data-label="Tầng"],
+    [data-label="Diện tích"],
+    [data-label="Hạn thu"],
+    [data-label="Thời hạn"],
+    [data-label="Vai trò"],
+    [data-label="Mức độ"],
+    [data-label="Trạng thái"],
+    [data-label="File"],
+    [data-label="Xem"],
+    [data-label="Chi tiết"],
+    [data-label="Thao tác"],
+    [data-label="Hành động"]
+  ) {
+    min-width: 0;
+  }
+
+  .dashboard-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.25rem;
+    text-transform: uppercase;
+  }
+
+  .dashboard-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .dashboard-table tbody td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .dashboard-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .dashboard-table tbody td > * {
+    min-width: 0;
+    max-width: 100%;
+    justify-self: start;
+  }
+
+  .dashboard-table tbody td:is(
+    [data-label^="Mã"],
+    [data-label^="Ngày"],
+    [data-label^="Số"],
+    [data-label="ID"],
+    [data-label="STT"],
+    [data-label="Phòng"],
+    [data-label="Tầng"],
+    [data-label="Diện tích"],
+    [data-label="Hạn thu"],
+    [data-label="Thời hạn"]
+  ) {
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 479px) {
+  .dashboard-table tbody td {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
 }
 
 /* Accessible keyboard focus ring */
@@ -89,5 +337,6 @@ body {
   -webkit-line-clamp: 2;
   overflow: hidden;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }

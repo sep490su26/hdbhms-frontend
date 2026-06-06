@@ -193,8 +193,8 @@ export default function FinancePage() {
           <div className="border-b border-[#e2e8f0] p-6">
             <h2 className="font-bold text-[#091426]">Hóa đơn tháng này</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left">
+          <div className="dashboard-table">
+            <table className="w-full text-left">
               <thead className="text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
                 <tr>
                   <th className="px-6 py-4">Mã hóa đơn</th>
@@ -209,15 +209,15 @@ export default function FinancePage() {
               <tbody>
                 {invoices.map((invoice) => (
                   <tr key={invoice.id} className="border-t border-[#e2e8f0]">
-                    <td className="px-6 py-4 font-bold text-[#091426]">{invoice.id}</td>
-                    <td className="px-6 py-4">{invoice.tenant}</td>
-                    <td className="px-6 py-4">{invoice.roomId}</td>
-                    <td className="px-6 py-4">{invoice.dueDate}</td>
-                    <td className="px-6 py-4 text-right font-bold">{formatMoney(invoice.amount)}</td>
-                    <td className="px-6 py-4">
+                    <td data-label="Mã hóa đơn" className="px-6 py-4 font-bold text-[#091426]">{invoice.id}</td>
+                    <td data-label="Khách thuê" className="px-6 py-4">{invoice.tenant}</td>
+                    <td data-label="Phòng" className="px-6 py-4">{invoice.roomId}</td>
+                    <td data-label="Hạn thu" className="px-6 py-4">{invoice.dueDate}</td>
+                    <td data-label="Số tiền" className="px-6 py-4 text-right font-bold">{formatMoney(invoice.amount)}</td>
+                    <td data-label="Trạng thái" className="px-6 py-4">
                       <StatusBadge value={invoice.status} map={invoiceStatus} />
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td data-label="Chi tiết" className="px-6 py-4 text-right">
                       <button
                         type="button"
                         onClick={() => setSelectedInvoiceId(invoice.id)}

@@ -42,7 +42,7 @@ function Sidebar({ isOpen, onClose }) {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[#172235] bg-[#091426] px-5 py-6 text-white transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[min(280px,calc(100vw_-_2rem))] max-w-full flex-col border-r border-[#172235] bg-[#091426] px-5 py-6 text-white transition-transform duration-300 lg:w-[280px] lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:flex`}
       >
@@ -128,7 +128,7 @@ function Sidebar({ isOpen, onClose }) {
 
 function Topbar({ activeRole, onRoleChange, search, onSearchChange, onToggleMobileMenu }) {
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b border-[#e2e8f0] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6 lg:ml-[280px]">
+    <header className="sticky top-0 z-20 flex min-h-16 min-w-0 flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-4 py-2 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6 lg:ml-[280px]">
       <div className="flex min-w-0 items-center gap-3 lg:hidden">
         <button
           type="button"
@@ -154,7 +154,7 @@ function Topbar({ activeRole, onRoleChange, search, onSearchChange, onToggleMobi
         />
       </label>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
         <PermissionGuard
           allowedRoles={ACTION_PERMISSIONS.changeOwnRole}
           fallback={
@@ -227,7 +227,7 @@ export function DashboardLayoutClient({ children }) {
   return (
     <AuthProvider user={{ role: activeRole, name: "Admin User", email: "admin@haidang.vn" }}>
       <DashboardLayoutProvider value={contextValue}>
-        <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e]">
+        <div className="dashboard-shell min-h-screen bg-[#f7f9fb] text-[#191c1e]">
           <Sidebar
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
@@ -239,8 +239,8 @@ export function DashboardLayoutClient({ children }) {
             onSearchChange={setQuery}
             onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
           />
-          <main className="px-4 py-6 sm:px-6 lg:ml-[280px]">
-            <div className="mx-auto grid max-w-[1440px] gap-8">
+          <main className="dashboard-main px-4 py-6 sm:px-6 lg:ml-[280px]">
+            <div className="dashboard-content mx-auto grid w-full max-w-[1440px] gap-8">
               {isAllowed ? children : <AccessDeniedPage />}
             </div>
           </main>

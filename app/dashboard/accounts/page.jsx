@@ -20,6 +20,101 @@ import {
 
 const ALL_VALUE = "Tất cả";
 
+const MOCK_TENANT_ACCOUNT_CANDIDATES = [
+  {
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    signedAt: "2026-01-03T09:30:00",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    profileId: 1001,
+    roomRole: "PRIMARY",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    userId: 9001,
+    fullName: "Nguyen Minh Anh",
+    phone: "0901234567",
+    email: "minh.anh@example.com",
+    recipientEmail: "minh.anh@example.com",
+    accountStatus: "ACTIVE",
+    mustChangePassword: false,
+    accountProvisioned: true,
+    emailAvailable: true,
+  },
+  {
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    signedAt: "2026-01-03T09:30:00",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    profileId: 1002,
+    roomRole: "CO_OCCUPANT",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    userId: 9002,
+    fullName: "Tran Thu Ha",
+    phone: "0987654321",
+    email: "thu.ha@example.com",
+    recipientEmail: "minh.anh@example.com",
+    accountStatus: "PENDING",
+    mustChangePassword: true,
+    accountProvisioned: true,
+    emailAvailable: true,
+  },
+  {
+    contractId: 5002,
+    contractCode: "HD-2026-014",
+    contractStatus: "ACTIVE",
+    signedAt: "2026-05-20T14:00:00",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    roomId: 205,
+    roomCode: "B205",
+    profileId: 1003,
+    roomRole: "PRIMARY",
+    roomOccupantCount: 1,
+    roomMaxOccupants: 2,
+    userId: null,
+    fullName: "Le Quang Huy",
+    phone: "0978123456",
+    email: "quang.huy@example.com",
+    recipientEmail: "quang.huy@example.com",
+    accountStatus: null,
+    mustChangePassword: null,
+    accountProvisioned: false,
+    emailAvailable: true,
+  },
+  {
+    contractId: 5003,
+    contractCode: "HD-2026-020",
+    contractStatus: "ACTIVE",
+    signedAt: "2026-06-01T10:15:00",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    roomId: 301,
+    roomCode: "C301",
+    profileId: 1004,
+    roomRole: "PRIMARY",
+    roomOccupantCount: 1,
+    roomMaxOccupants: 3,
+    userId: null,
+    fullName: "Pham Gia Bao",
+    phone: "0966123456",
+    email: "",
+    recipientEmail: "",
+    accountStatus: null,
+    mustChangePassword: null,
+    accountProvisioned: false,
+    emailAvailable: false,
+  },
+];
+
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -153,7 +248,7 @@ function rowKey(item, index) {
 }
 
 export default function AccountsPage() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(MOCK_TENANT_ACCOUNT_CANDIDATES);
   const [query, setQuery] = useState("");
   const [propertyFilter, setPropertyFilter] = useState(ALL_VALUE);
   const [stateFilter, setStateFilter] = useState(ALL_VALUE);
@@ -299,7 +394,7 @@ export default function AccountsPage() {
         </button>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
         <MetricCard icon={Home} label="Hợp đồng hiệu lực" value={metrics.contracts} tone="slate" />
         <MetricCard icon={KeyRound} label="Chưa cấp" value={metrics.notSent} tone="amber" />
         <MetricCard icon={Mail} label="Đã gửi" value={metrics.sent} tone="blue" />
@@ -408,8 +503,8 @@ export default function AccountsPage() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1080px] text-left text-sm">
+                  <div className="dashboard-table">
+                    <table className="w-full text-left text-sm">
                       <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
                         <tr>
                           <th className="px-5 py-4">Khách thuê</th>
@@ -425,7 +520,7 @@ export default function AccountsPage() {
                           const state = resolveAccountState(item);
                           return (
                             <tr key={rowKey(item, index)}>
-                              <td className="px-5 py-4">
+                              <td data-label="Khách thuê" className="px-5 py-4">
                                 <div className="flex items-center gap-3">
                                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dbe7ff] text-xs font-extrabold text-[#3157b7]">
                                     {getInitials(item.fullName)}
@@ -440,15 +535,15 @@ export default function AccountsPage() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-5 py-4">
+                              <td data-label="Vai trò" className="px-5 py-4">
                                 <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}>
                                   {roleLabel(item.roomRole)}
                                 </span>
                               </td>
-                              <td className="px-5 py-4 font-semibold text-[#0f1d33]">{item.phone || "Chưa có"}</td>
-                              <td className="px-5 py-4 font-semibold text-[#0f1d33]">{item.email || "Không có"}</td>
-                              <td className="px-5 py-4 font-semibold text-[#0f1d33]">{formatDate(item.signedAt)}</td>
-                              <td className="px-5 py-4">
+                              <td data-label="SĐT" className="px-5 py-4 font-semibold text-[#0f1d33]">{item.phone || "Chưa có"}</td>
+                              <td data-label="Email cá nhân" className="break-words px-5 py-4 font-semibold text-[#0f1d33]">{item.email || "Không có"}</td>
+                              <td data-label="Ngày ký" className="px-5 py-4 font-semibold text-[#0f1d33]">{formatDate(item.signedAt)}</td>
+                              <td data-label="Trạng thái" className="px-5 py-4">
                                 <div className="grid gap-1">
                                   <StatusBadge item={item} />
                                   <span className="text-xs text-[#687184]">{state.hint}</span>

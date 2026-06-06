@@ -350,13 +350,13 @@ function getRoomDetailHref(room) {
 
 function FloorTabs({activeFloor, onChange}) {
     return (
-        <div className="flex gap-2 overflow-x-auto rounded-2xl bg-white/10 p-1 no-scrollbar">
+        <div className="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-1">
             {floorTabs.map((floor) => (
                 <button
                     key={floor.id}
                     type="button"
                     onClick={() => onChange(floor.id)}
-                    className={`h-11 shrink-0 rounded-xl px-5 text-sm font-bold transition ${
+                    className={`min-w-0 flex-1 basis-28 rounded-xl px-3 py-3 text-sm font-bold transition sm:flex-none sm:px-5 ${
                         activeFloor === floor.id
                             ? "bg-white text-[#091426] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
                             : "text-slate-200 hover:bg-white/10 hover:text-white"
@@ -383,7 +383,7 @@ function FloorSummary({rooms}) {
     }, [rooms]);
 
     return (
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3">
             {stats.map(({label, value, tone, icon: Icon}) => (
                 <article
                     key={label}
@@ -433,7 +433,7 @@ function RoomCard({room, isSelected, onClick}) {
                 <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ${meta.icon}`}>
                     <BedDouble className="h-5 w-5"/>
                 </span>
-                <span className={`max-w-[112px] truncate rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${meta.badge}`}>
+                <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${meta.badge}`}>
                     {meta.label}
                 </span>
             </div>
@@ -1062,8 +1062,8 @@ function RoomsListPage({query}) {
 
             {!isLoading && !isError && (
                 <Card className="overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[900px] border-collapse text-left">
+                    <div className="dashboard-table">
+                        <table className="w-full border-collapse text-left">
                             <thead className="bg-[#f2f4f6]">
                             <tr className="text-xs font-bold uppercase tracking-[0.08em] text-[#505f76]">
                                 <th className="px-6 py-4">Mã phòng</th>
@@ -1078,21 +1078,21 @@ function RoomsListPage({query}) {
                             <tbody>
                             {filteredRooms.map((room) => (
                                 <tr key={room.room_code} className="border-t border-[#e2e8f0]">
-                                    <td className="px-6 py-4 text-sm font-bold text-[#091426]">{room.room_code}</td>
-                                    <td className="px-6 py-4">
+                                    <td data-label="Mã phòng" className="px-6 py-4 text-sm font-bold text-[#091426]">{room.room_code}</td>
+                                    <td data-label="Đặc điểm" className="px-6 py-4">
                       <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[#3c475a]">
                         Dành cho {room.max_occupants} người ở
                       </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-[#45474c]">{room.floor_name}</td>
-                                    <td className="px-6 py-4 text-sm text-[#45474c]">{room.area_m2} m²</td>
-                                    <td className="px-6 py-4 text-sm font-semibold text-[#091426]">
+                                    <td data-label="Tầng" className="px-6 py-4 text-sm text-[#45474c]">{room.floor_name}</td>
+                                    <td data-label="Diện tích" className="px-6 py-4 text-sm text-[#45474c]">{room.area_m2} m²</td>
+                                    <td data-label="Giá niêm yết" className="px-6 py-4 text-sm font-semibold text-[#091426]">
                                         {formatMoney(room.listed_price)}
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td data-label="Trạng thái" className="px-6 py-4">
                                         <StatusBadge value={room.current_status} map={roomStatus}/>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td data-label="Thao tác" className="px-6 py-4">
                                         <div className="flex justify-end gap-1">
                                             <IconButton label={`Xem ${room.id}`} icon={Eye}/>
                                             <IconButton label={`Sửa ${room.id}`} icon={Edit3}/>
@@ -1164,7 +1164,7 @@ export function RoomsManagementContent({initialView = "floor-map", query = "", a
                     </p>
                 </div>
                 <div
-                    className="inline-flex w-full rounded-lg border border-[#e2e8f0] bg-white p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
+                    className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] bg-white p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
                     {views.map((item) => {
                         const Icon = item.icon;
                         const isActive = view === item.value;
@@ -1174,7 +1174,7 @@ export function RoomsManagementContent({initialView = "floor-map", query = "", a
                                 key={item.value}
                                 type="button"
                                 onClick={() => setView(item.value)}
-                                className={`inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold transition sm:flex-none ${isActive
+                                className={`inline-flex min-h-10 min-w-0 flex-1 basis-36 items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-bold transition sm:flex-none sm:px-4 ${isActive
                                     ? "bg-[#091426] text-white shadow-sm"
                                     : "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]"
                                 }`}

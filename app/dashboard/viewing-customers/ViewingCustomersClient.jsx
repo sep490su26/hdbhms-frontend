@@ -44,6 +44,79 @@ const emptyForm = {
 };
 
 
+const MOCK_VIEWING_PROPERTIES = [
+    {id: 1, name: "HDB Home Nguyen Trai"},
+    {id: 2, name: "HDB Residence Cau Giay"},
+    {id: 3, name: "HDB Living Thu Duc"},
+];
+
+const MOCK_VIEWING_CUSTOMERS = [
+    {
+        id: 2001,
+        fullName: "Nguyen Hoang Lan",
+        phone: "0908111222",
+        email: "hoang.lan@example.com",
+        propertyId: 1,
+        propertyName: "HDB Home Nguyen Trai",
+        interestedRoomId: 101,
+        interestedRoomName: "Phong A101",
+        appointmentAt: "2026-06-06T09:30:00",
+        appointmentLabel: "09:30 06/06/2026",
+        status: "NOT_VIEWED",
+        note: "Khach muon xem phong co ban cong va cho de xe may.",
+        createdAt: "2026-06-03T08:15:00",
+        createdLabel: "08:15 03/06/2026",
+    },
+    {
+        id: 2002,
+        fullName: "Tran Duc Khang",
+        phone: "0919222333",
+        email: "duc.khang@example.com",
+        propertyId: 2,
+        propertyName: "HDB Residence Cau Giay",
+        interestedRoomId: 205,
+        interestedRoomName: "Phong B205",
+        appointmentAt: "2026-06-06T14:00:00",
+        appointmentLabel: "14:00 06/06/2026",
+        status: "VIEWED",
+        note: "Da xem phong, dang can nhac hop dong 12 thang.",
+        createdAt: "2026-06-02T10:30:00",
+        createdLabel: "10:30 02/06/2026",
+    },
+    {
+        id: 2003,
+        fullName: "Le Ngoc Mai",
+        phone: "0930333444",
+        email: "ngoc.mai@example.com",
+        propertyId: 3,
+        propertyName: "HDB Living Thu Duc",
+        interestedRoomId: 402,
+        interestedRoomName: "Phong D402",
+        appointmentAt: "2026-06-08T18:30:00",
+        appointmentLabel: "18:30 08/06/2026",
+        status: "NOT_VIEWED",
+        note: "Uu tien phong yen tinh, co the chuyen vao dau thang sau.",
+        createdAt: "2026-06-05T16:20:00",
+        createdLabel: "16:20 05/06/2026",
+    },
+    {
+        id: 2004,
+        fullName: "Pham Tuan Kiet",
+        phone: "0941444555",
+        email: "",
+        propertyId: 1,
+        propertyName: "HDB Home Nguyen Trai",
+        interestedRoomId: null,
+        interestedRoomName: "",
+        appointmentAt: "2026-06-10T10:00:00",
+        appointmentLabel: "10:00 10/06/2026",
+        status: "DISMISSED",
+        note: "",
+        createdAt: "2026-06-04T11:45:00",
+        createdLabel: "11:45 04/06/2026",
+    },
+];
+
 function MetricCard({icon: Icon, label, value, tone}) {
     const tones = {
         blue: "bg-blue-100 text-blue-700",
@@ -241,8 +314,8 @@ function TrashModal({rows, pagination, onClose, onRestore, onForceDelete, onPage
                     </button>
                 </div>
 
-                <div className="max-h-[70vh] overflow-auto">
-                    <table className="w-full min-w-[1080px] text-left">
+                <div className="dashboard-table max-h-[70vh] overflow-y-auto">
+                    <table className="w-full text-left">
                         <thead
                             className="bg-[#f1f3f5] text-[11px] font-bold uppercase tracking-[0.04em] text-[#4b5563]">
                         <tr>
@@ -259,15 +332,15 @@ function TrashModal({rows, pagination, onClose, onRestore, onForceDelete, onPage
                         <tbody>
                         {rows.map((customer) => (
                             <tr key={customer.id} className="border-t border-[#d9dde5] text-sm">
-                                <td className="px-5 py-4 font-bold text-[#111827]">{customer.fullName}</td>
-                                <td className="px-5 py-4 text-[#374151]">{customer.phone}</td>
-                                <td className="px-5 py-4 text-[#374151]">{customer.propertyName}</td>
-                                <td className="px-5 py-4 text-[#374151]">{customer.interestedRoomName || "Chưa chọn phòng"}</td>
-                                <td className="px-5 py-4 font-bold text-[#111827]">{customer.appointmentLabel || "—"}</td>
-                                <td className="px-5 py-4 text-[#374151]">{VIEWING_STATUSES[customer.status] || customer.status}</td>
-                                <td className="px-5 py-4 text-[#374151]">{customer.deletedLabel || "—"}</td>
-                                <td className="px-5 py-4">
-                                    <div className="flex items-center gap-2">
+                                <td data-label="Tên khách" className="px-5 py-4 font-bold text-[#111827]">{customer.fullName}</td>
+                                <td data-label="Số điện thoại" className="px-5 py-4 text-[#374151]">{customer.phone}</td>
+                                <td data-label="Cơ sở" className="px-5 py-4 text-[#374151]">{customer.propertyName}</td>
+                                <td data-label="Phòng quan tâm" className="px-5 py-4 text-[#374151]">{customer.interestedRoomName || "Chưa chọn phòng"}</td>
+                                <td data-label="Ngày giờ xem" className="px-5 py-4 font-bold text-[#111827]">{customer.appointmentLabel || "—"}</td>
+                                <td data-label="Trạng thái" className="px-5 py-4 text-[#374151]">{VIEWING_STATUSES[customer.status] || customer.status}</td>
+                                <td data-label="Ngày xóa" className="px-5 py-4 text-[#374151]">{customer.deletedLabel || "—"}</td>
+                                <td data-label="Thao tác" className="px-5 py-4">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <button type="button" onClick={() => onRestore(customer)}
                                                 className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
                                             Khôi phục
@@ -294,7 +367,7 @@ function TrashModal({rows, pagination, onClose, onRestore, onForceDelete, onPage
                 <div
                     className="flex flex-col gap-3 border-t border-[#d9dde5] px-4 py-4 text-xs text-[#4b5563] sm:flex-row sm:items-center sm:justify-between">
                     <span>{pagination.total === 0 ? "Không có khách xem phòng nào trong thùng rác" : `Đang hiển thị ${from} đến ${to} của ${pagination.total} khách`}</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {pages.map((page) => (
                             <button
                                 key={page}
@@ -351,8 +424,8 @@ function NoteModal({customer, onClose}) {
 
 export default function ViewingCustomersClient() {
     const pageSize = 10;
-    const [customers, setCustomers] = useState([]);
-    const [properties, setProperties] = useState([]);
+    const [customers, setCustomers] = useState(MOCK_VIEWING_CUSTOMERS);
+    const [properties, setProperties] = useState(MOCK_VIEWING_PROPERTIES);
     const [filterRooms, setFilterRooms] = useState([]);
     const [formRooms, setFormRooms] = useState([]);
     const [filters, setFilters] = useState({
@@ -363,8 +436,8 @@ export default function ViewingCustomersClient() {
         fromDate: "",
         toDate: ""
     });
-    const [stats, setStats] = useState({todayCount: 0, pendingCount: 0, viewedCount: 0});
-    const [pagination, setPagination] = useState({page: 1, size: pageSize, total: 0, totalPages: 0});
+    const [stats, setStats] = useState({todayCount: 2, pendingCount: 2, viewedCount: 1});
+    const [pagination, setPagination] = useState({page: 1, size: pageSize, total: MOCK_VIEWING_CUSTOMERS.length, totalPages: 1});
     const [trashRows, setTrashRows] = useState([]);
     const [trashPagination, setTrashPagination] = useState({page: 1, size: pageSize, total: 0, totalPages: 0});
     const [trashOpen, setTrashOpen] = useState(false);
@@ -603,7 +676,7 @@ export default function ViewingCustomersClient() {
                             <select
                                 value={filters.propertyId}
                                 onChange={(event) => updateFilter("propertyId", event.target.value)}
-                                className="h-11 min-w-[170px] rounded-md border border-[#cfd5de] bg-white px-3 text-sm font-bold text-[#091426] shadow-sm outline-none focus:border-[#091426]"
+                                className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] bg-white px-3 text-sm font-bold text-[#091426] shadow-sm outline-none focus:border-[#091426] sm:w-auto"
                             >
                                 <option value="all">Tất cả cơ sở</option>
                                 {properties.map((property) => (
@@ -678,8 +751,8 @@ export default function ViewingCustomersClient() {
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[1180px] text-left">
+                        <div className="dashboard-table">
+                            <table className="w-full text-left">
                                 <thead
                                     className="bg-[#f1f3f5] text-[11px] font-bold uppercase tracking-[0.04em] text-[#4b5563]">
                                 <tr>
@@ -697,7 +770,7 @@ export default function ViewingCustomersClient() {
                                 {customers.map((customer, idx) => (
                                     <tr key={customer.id != null ? customer.id : `fallback-${idx}`}
                                         className="border-t border-[#d9dde5] text-sm">
-                                        <td className="px-5 py-4">
+                                        <td data-label="Tên khách" className="px-5 py-4">
                                             <div className="flex items-center gap-3">
                                                 <CustomerAvatar name={customer.fullName}/>
                                                 <div className="min-w-0">
@@ -706,9 +779,9 @@ export default function ViewingCustomersClient() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-[#374151]">{customer.phone}</td>
-                                        <td className="px-5 py-4 text-[#374151]">{customer.propertyName}</td>
-                                        <td className="px-5 py-4">
+                                        <td data-label="Số điện thoại" className="px-5 py-4 text-[#374151]">{customer.phone}</td>
+                                        <td data-label="Cơ sở" className="px-5 py-4 text-[#374151]">{customer.propertyName}</td>
+                                        <td data-label="Phòng quan tâm" className="px-5 py-4">
                         <span
                             className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase ${
                                 customer.interestedRoomId
@@ -719,7 +792,7 @@ export default function ViewingCustomersClient() {
                           {customer.interestedRoomName || "Chưa chọn phòng"}
                         </span>
                                         </td>
-                                        <td className="px-5 py-4">
+                                        <td data-label="Ghi chú" className="px-5 py-4">
                                             <button
                                                 type="button"
                                                 onClick={() => customer.note && setNoteCustomer(customer)}
@@ -734,15 +807,15 @@ export default function ViewingCustomersClient() {
                                                 {customer.note || "—"}
                                             </button>
                                         </td>
-                                        <td className="px-5 py-4">
+                                        <td data-label="Ngày giờ xem" className="px-5 py-4">
                                             <span
                                                 className="block font-bold text-[#111827]">{customer.appointmentLabel || "—"}</span>
                                         </td>
-                                        <td className="px-5 py-4">
+                                        <td data-label="Trạng thái" className="px-5 py-4">
                                             <StatusSelect status={customer.status} onChange={(status) => changeStatus(customer, status)} />
                                         </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-2">
+                                        <td data-label="Thao tác" className="px-5 py-4">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <button type="button" onClick={() => openEdit(customer)}
                                                         aria-label="Sửa"
                                                         className="rounded p-1.5 text-[#374151] hover:bg-[#f1f3f5]">

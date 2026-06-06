@@ -90,7 +90,7 @@ function SelectFilter({ label, value, options, onChange }) {
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full min-w-[170px] appearance-none rounded-[4px] border border-[#cbd3df] bg-[#f4f7fb] px-3 pr-9 text-xs font-medium text-[#172235] outline-none transition focus:border-[#0f1d33] focus:ring-2 focus:ring-[#0f1d33]/10"
+        className="h-10 w-full min-w-0 appearance-none rounded-[4px] border border-[#cbd3df] bg-[#f4f7fb] px-3 pr-9 text-xs font-medium text-[#172235] outline-none transition focus:border-[#0f1d33] focus:ring-2 focus:ring-[#0f1d33]/10"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -157,30 +157,30 @@ function PriorityBadge({ priority }) {
 function StatusBadge({ status }) {
   if (status === "Chờ tiếp nhận") {
     return (
-      <span className="inline-flex min-w-[82px] justify-center rounded-[8px] border border-[#fee682] bg-[#fff6bf] px-3 py-2 text-center text-xs font-medium leading-tight text-[#815b00]">
-        Chờ<br />tiếp nhận
+      <span className="inline-flex justify-center rounded-[8px] border border-[#fee682] bg-[#fff6bf] px-3 py-2 text-center text-xs font-medium leading-tight text-[#815b00]">
+        Chờ tiếp nhận
       </span>
     );
   }
 
   if (status === "Đang xử lý") {
     return (
-      <span className="inline-flex min-w-[82px] justify-center rounded-[8px] bg-[#2563eb] px-3 py-2 text-center text-xs font-medium leading-tight text-white">
-        Đang<br />xử lý
+      <span className="inline-flex justify-center rounded-[8px] bg-[#2563eb] px-3 py-2 text-center text-xs font-medium leading-tight text-white">
+        Đang xử lý
       </span>
     );
   }
 
   if (status === "Từ chối") {
     return (
-      <span className="inline-flex min-w-[82px] items-center justify-center rounded-[8px] bg-[#ffd9d9] px-3 py-2 text-xs font-medium text-[#c5161d]">
+      <span className="inline-flex items-center justify-center rounded-[8px] bg-[#ffd9d9] px-3 py-2 text-xs font-medium text-[#c5161d]">
         Từ chối
       </span>
     );
   }
 
   return (
-    <span className="inline-flex min-w-[82px] items-center justify-center gap-1 rounded-[8px] bg-[#d9f8e7] px-3 py-2 text-xs font-medium text-[#138444]">
+    <span className="inline-flex items-center justify-center gap-1 rounded-[8px] bg-[#d9f8e7] px-3 py-2 text-xs font-medium text-[#138444]">
       <Check className="h-3 w-3" />
       Hoàn tất
     </span>
@@ -272,7 +272,7 @@ function RejectTicketModal({ ticket, reason, onReasonChange, onClose, onConfirm 
           <button
             type="button"
             onClick={onClose}
-            className="h-11 min-w-[78px] rounded-md border border-[#bfc7d5] bg-[#f7f9fe] px-5 text-sm font-bold text-[#4b5563] transition hover:bg-white"
+            className="min-h-11 rounded-md border border-[#bfc7d5] bg-[#f7f9fe] px-5 py-2 text-sm font-bold text-[#4b5563] transition hover:bg-white"
           >
             Hủy
           </button>
@@ -334,7 +334,9 @@ function BeforeRepairMedia() {
       </div>
       <div className="flex min-h-[168px] flex-col items-center justify-center rounded-[4px] border border-dashed border-[#aeb8c8] bg-[#f7f9fe] text-center">
         <Video className="h-8 w-8 text-[#697386]" />
-        <p className="mt-3 max-w-[150px] break-all text-xs font-medium text-[#172235]">Video_Minh_Chung.mp4</p>
+        <p className="mt-3 max-w-[150px] truncate text-xs font-medium text-[#172235]" title="Video_Minh_Chung.mp4">
+          Video_Minh_Chung.mp4
+        </p>
       </div>
     </div>
   );
@@ -647,8 +649,8 @@ export default function MaintenancePage() {
       </section>
 
       <section className="overflow-hidden rounded-[6px] border border-[#bfc9d8] bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
+        <div className="dashboard-table">
+          <table className="w-full text-left text-sm">
             <thead className="bg-[#dfeaff] text-[11px] font-bold uppercase tracking-[0.05em] text-[#3e4b60]">
               <tr>
                 <th className="px-5 py-4">Mã ticket</th>
@@ -672,24 +674,24 @@ export default function MaintenancePage() {
                     onClick={() => setSelectedTicket(ticket)}
                     className={`cursor-pointer bg-white align-middle transition hover:bg-[#f7f9fe] ${isPending ? "border-l-2 border-l-[#ffd21f]" : ""}`}
                   >
-                    <td className="px-5 py-5 text-xs font-bold text-black">{ticket.id}</td>
-                    <td className="px-5 py-5">
+                    <td data-label="Mã ticket" className="px-5 py-5 text-xs font-bold text-black">{ticket.id}</td>
+                    <td data-label="Loại sự cố" className="px-5 py-5">
                       <span className="inline-flex items-center gap-2 text-xs font-medium text-[#0f1d33]">
                         <Icon className="h-4 w-4 text-[#3156b6]" />
                         <span className="max-w-[80px] leading-5">{ticket.type}</span>
                       </span>
                     </td>
-                    <td className="px-5 py-5 text-xs font-medium leading-5 text-[#0f1d33]">
+                    <td data-label="Vị trí" className="px-5 py-5 text-xs font-medium leading-5 text-[#0f1d33]">
                       {ticket.position}
                     </td>
-                    <td className="px-5 py-5 text-xs font-medium text-[#495365]">{ticket.createdAt}</td>
-                    <td className="px-5 py-5">
+                    <td data-label="Ngày tạo" className="px-5 py-5 text-xs font-medium text-[#495365]">{ticket.createdAt}</td>
+                    <td data-label="Mức độ" className="px-5 py-5">
                       <PriorityBadge priority={ticket.priority} />
                     </td>
-                    <td className="px-5 py-5 text-center">
+                    <td data-label="Trạng thái" className="px-5 py-5 text-center">
                       <StatusBadge status={ticket.status} />
                     </td>
-                    <td className="px-5 py-5">
+                    <td data-label="Người tạo" className="px-5 py-5">
                       {ticket.creator ? (
                         <div className="flex items-center gap-2">
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#dfeaff] text-[10px] font-bold text-[#3156b6]">
@@ -701,7 +703,7 @@ export default function MaintenancePage() {
                         <span className="text-xs font-bold text-[#7b8495]">--</span>
                       )}
                     </td>
-                    <td className="px-5 py-5">
+                    <td data-label="Hành động" className="px-5 py-5">
                       <div className="flex justify-center">
                         <TicketActions ticket={ticket} onAccept={acceptTicket} onReject={openRejectModal} />
                       </div>

@@ -83,6 +83,188 @@ const ROLE_LABELS = {
   CO_OCCUPANT: "Người ở cùng",
 };
 
+const MOCK_LEASE_CONTRACTS = [
+  {
+    sourceType: "CONTRACT",
+    contractId: 5001,
+    leaseContractId: 5001,
+    displayCode: "HD-2026-001",
+    contractCode: "HD-2026-001",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    propertyAddress: "12 Nguyen Trai, Thanh Xuan, Ha Noi",
+    roomId: 101,
+    roomCode: "A101",
+    primaryTenantProfileId: 1001,
+    primaryTenantName: "Nguyen Minh Anh",
+    phone: "0901234567",
+    email: "minh.anh@example.com",
+    startDate: "2026-01-05",
+    endDate: "2026-12-31",
+    rentStartDate: "2026-01-05",
+    monthlyRent: 4500000,
+    paymentCycleMonths: 1,
+    depositAmount: 4500000,
+    status: "ACTIVE",
+    contractStatus: "ACTIVE",
+    occupantsCount: 2,
+    contractFileId: 7001,
+    contractFileName: "HD-2026-001-signed.pdf",
+    contractFileUploadedAt: "2026-01-04T15:30:00",
+    signedAt: "2026-01-03T09:30:00",
+    accountProvisioned: true,
+    emailAvailable: true,
+    occupants: [
+      {
+        tenantProfileId: 1001,
+        fullName: "Nguyen Minh Anh",
+        occupantRole: "PRIMARY",
+        phone: "0901234567",
+        citizenId: "001298012345",
+      },
+      {
+        tenantProfileId: 1002,
+        fullName: "Tran Thu Ha",
+        occupantRole: "CO_OCCUPANT",
+        phone: "0987654321",
+        citizenId: "048300123456",
+      },
+    ],
+  },
+  {
+    sourceType: "CONTRACT",
+    contractId: 5002,
+    leaseContractId: 5002,
+    displayCode: "HD-2025-118",
+    contractCode: "HD-2025-118",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    propertyAddress: "88 Tran Thai Tong, Cau Giay, Ha Noi",
+    roomId: 205,
+    roomCode: "B205",
+    primaryTenantProfileId: 1003,
+    primaryTenantName: "Le Quang Huy",
+    phone: "0978123456",
+    email: "quang.huy@example.com",
+    startDate: "2025-08-15",
+    endDate: "2026-07-31",
+    rentStartDate: "2025-09-01",
+    monthlyRent: 6200000,
+    paymentCycleMonths: 3,
+    depositAmount: 6200000,
+    status: "EXPIRING_SOON",
+    contractStatus: "EXPIRING_SOON",
+    occupantsCount: 1,
+    contractFileId: 7002,
+    contractFileName: "HD-2025-118-signed.pdf",
+    contractFileUploadedAt: "2025-08-14T11:00:00",
+    signedAt: "2025-08-12T16:15:00",
+    accountProvisioned: true,
+    emailAvailable: true,
+    occupants: [
+      {
+        tenantProfileId: 1003,
+        fullName: "Le Quang Huy",
+        occupantRole: "PRIMARY",
+        phone: "0978123456",
+        citizenId: "092196123456",
+      },
+    ],
+  },
+  {
+    sourceType: "CONTRACT",
+    contractId: 5003,
+    leaseContractId: 5003,
+    displayCode: "HD-2026-020",
+    contractCode: "HD-2026-020",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    roomId: 301,
+    roomCode: "C301",
+    primaryTenantProfileId: 1004,
+    primaryTenantName: "Pham Gia Bao",
+    phone: "0966123456",
+    email: "",
+    startDate: "2026-06-10",
+    endDate: "2027-06-09",
+    rentStartDate: "2026-06-10",
+    monthlyRent: 5500000,
+    paymentCycleMonths: 1,
+    depositAmount: 5500000,
+    status: "PENDING_SIGNATURE",
+    contractStatus: "PENDING_SIGNATURE",
+    workflowStatus: "MISSING_FILE",
+    occupantsCount: 1,
+    contractFileId: null,
+    contractFileName: null,
+    contractFileUploadedAt: null,
+    accountProvisioned: false,
+    emailAvailable: false,
+    occupants: [
+      {
+        tenantProfileId: 1004,
+        fullName: "Pham Gia Bao",
+        occupantRole: "PRIMARY",
+        phone: "0966123456",
+        citizenId: "079199123456",
+      },
+    ],
+  },
+  {
+    sourceType: "CONTRACT",
+    contractId: 5004,
+    leaseContractId: 5004,
+    displayCode: "HD-2026-021",
+    contractCode: "HD-2026-021",
+    propertyId: 3,
+    propertyName: "HDB Living Thu Duc",
+    roomId: 402,
+    roomCode: "D402",
+    primaryTenantProfileId: 1005,
+    primaryTenantName: "Vo Thanh Truc",
+    phone: "0933123456",
+    email: "thanh.truc@example.com",
+    startDate: "2026-06-15",
+    endDate: "2027-06-14",
+    rentStartDate: "2026-07-01",
+    monthlyRent: 7800000,
+    paymentCycleMonths: 3,
+    depositAmount: 7800000,
+    status: "PENDING_SIGNATURE",
+    contractStatus: "PENDING_SIGNATURE",
+    workflowStatus: "PENDING_ACTIVATION",
+    occupantsCount: 3,
+    contractFileId: 7004,
+    contractFileName: "HD-2026-021-signed.pdf",
+    contractFileUploadedAt: "2026-06-05T10:45:00",
+    accountProvisioned: false,
+    emailAvailable: true,
+    occupants: [
+      {
+        tenantProfileId: 1005,
+        fullName: "Vo Thanh Truc",
+        occupantRole: "PRIMARY",
+        phone: "0933123456",
+        citizenId: "079202123456",
+      },
+      {
+        tenantProfileId: 1006,
+        fullName: "Do My Linh",
+        occupantRole: "CO_OCCUPANT",
+        phone: "0944123456",
+        citizenId: "001203123456",
+      },
+      {
+        tenantProfileId: 1007,
+        fullName: "Bui Duc Long",
+        occupantRole: "CO_OCCUPANT",
+        phone: "0955123456",
+        citizenId: "001201123456",
+      },
+    ],
+  },
+];
+
 function formatDate(value) {
   if (!value) return "Chưa có";
   const date = new Date(value);
@@ -230,7 +412,7 @@ function FileBadge({ item }) {
   const Icon = uploaded ? FileCheck2 : FileWarning;
   return (
     <span
-      className={`inline-flex min-w-[86px] items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:min-w-[104px] xl:px-3 xl:py-2 xl:text-xs ${
+      className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
         uploaded
           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
           : "border-red-200 bg-red-50 text-red-700"
@@ -261,7 +443,7 @@ function StatusBadge({ item }) {
 
   return (
     <span
-      className={`inline-flex min-w-[96px] items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:min-w-[128px] xl:px-3 xl:py-2 xl:text-xs ${
+      className={`inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
         classes[workflow] || "border-slate-200 bg-slate-50 text-slate-600"
       }`}
     >
@@ -316,7 +498,7 @@ function InfoValue({ label, value }) {
 
 export default function ContractTemplatePage() {
   const fileInputRef = useRef(null);
-  const [contracts, setContracts] = useState([]);
+  const [contracts, setContracts] = useState(MOCK_LEASE_CONTRACTS);
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -803,7 +985,7 @@ export default function ContractTemplatePage() {
         </p>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-5 xl:gap-4">
+      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3 xl:gap-4">
         <StatCard label="Tổng" value={summary.total} tone="dark" />
         <StatCard label="Chờ ký" value={summary.pendingSignature} tone="amber" />
         <StatCard label="Chờ kích hoạt" value={summary.pendingActivation} tone="blue" />
@@ -874,19 +1056,19 @@ export default function ContractTemplatePage() {
           </p>
         </header>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed text-left text-[12px] xl:min-w-0 xl:text-sm [&_td]:break-words [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
+        <div className="dashboard-table">
+          <table className="w-full table-auto text-left text-[12px] xl:text-sm [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
             <thead className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase tracking-[0.03em] text-[#6b7280] xl:text-xs">
               <tr>
-                <th className="w-[15%]">Mã HĐ</th>
-                <th className="w-[8%]">Phòng</th>
-                <th className="w-[16%]">Người ký chính</th>
-                <th className="w-[8%]">Số người</th>
-                <th className="w-[14%]">Thời hạn</th>
-                <th className="w-[12%]">Giá thuê</th>
-                <th className="w-[11%]">File</th>
-                <th className="w-[12%]">Trạng thái</th>
-                <th className="w-[4%] text-center">Xem</th>
+                <th className="min-w-32">Mã HĐ</th>
+                <th className="min-w-20">Phòng</th>
+                <th className="min-w-40">Người ký chính</th>
+                <th className="min-w-24">Số người</th>
+                <th className="min-w-36">Thời hạn</th>
+                <th className="min-w-32">Giá thuê</th>
+                <th className="min-w-28">File</th>
+                <th className="min-w-32">Trạng thái</th>
+                <th className="min-w-20 text-center">Xem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
@@ -907,39 +1089,39 @@ export default function ContractTemplatePage() {
                     key={getContractRowKey(item, index)}
                     className="bg-white transition hover:bg-[#f8fbff]"
                   >
-                    <td className="align-middle">
+                    <td data-label="Mã HĐ" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{item.displayCode || item.contractCode || item.depositCode || "Chưa có"}</p>
                       <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">{item.propertyName || "Chưa có cơ sở"}</p>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Phòng" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
                         <Home className="h-3.5 w-3.5 shrink-0 text-[#9aa3b2] xl:h-4 xl:w-4" />
                         {item.roomCode || "-"}
                       </span>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Người ký chính" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{item.primaryTenantName || item.customerName || "Chưa có"}</p>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Số người" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
                         <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500 xl:h-4 xl:w-4" />
                         {getOccupantsCount(item)} người
                       </span>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Thời hạn" className="align-middle">
                       <p className="font-semibold leading-5 text-[#091426]">{formatDate(item.startDate || item.expectedLeaseSignDate)}</p>
                       <p className="text-[11px] leading-5 text-[#7b8495] xl:text-xs">đến {formatDate(item.endDate || item.expectedMoveInDate)}</p>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Giá thuê" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{formatMoney(item.monthlyRent)}</p>
                     </td>
-                    <td className="align-middle">
+                    <td data-label="File" className="align-middle">
                       <FileBadge item={item} />
                     </td>
-                    <td className="align-middle">
+                    <td data-label="Trạng thái" className="align-middle">
                       <StatusBadge item={item} />
                     </td>
-                    <td className="text-center align-middle">
+                    <td data-label="Xem" className="text-center align-middle">
                       <button
                         type="button"
                         onClick={(event) => {
@@ -1218,14 +1400,14 @@ export default function ContractTemplatePage() {
               </DetailCard>
 
               <DetailCard title="Người ở trong hợp đồng" icon={Users} className="lg:col-span-2">
-                <div className="mt-5 overflow-x-auto rounded-lg border border-[#dfe5ef] bg-white">
-                  <table className="w-full min-w-[720px] table-fixed text-left">
+                <div className="dashboard-table mt-5 rounded-lg border border-[#dfe5ef] bg-white">
+                  <table className="w-full table-auto text-left">
                     <thead className="bg-[#f7f9fe] text-[11px] font-bold uppercase tracking-[0.04em] text-[#6b7280] xl:text-xs">
                       <tr>
-                        <th className="w-[34%] px-4 py-3">Họ tên</th>
-                        <th className="w-[22%] px-4 py-3">Vai trò</th>
-                        <th className="w-[22%] px-4 py-3">SĐT</th>
-                        <th className="w-[22%] px-4 py-3">CCCD</th>
+                        <th className="min-w-44 px-4 py-3">Họ tên</th>
+                        <th className="min-w-32 px-4 py-3">Vai trò</th>
+                        <th className="min-w-32 px-4 py-3">SĐT</th>
+                        <th className="min-w-36 px-4 py-3">CCCD</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#edf1f6] text-xs xl:text-sm">
@@ -1242,22 +1424,22 @@ export default function ContractTemplatePage() {
                       <tr
                         key={occupant.tenantProfileId || occupant.id || `${occupant.occupantRole}-${occupant.fullName}-${index}`}
                       >
-                        <td className="px-4 py-3">
+                        <td data-label="Họ tên" className="px-4 py-3">
                           <p className="truncate font-bold text-[#091426]" title={occupant.fullName || "Chưa cập nhật"}>
                             {occupant.fullName || "Chưa cập nhật"}
                           </p>
                         </td>
-                        <td className="px-4 py-3">
+                        <td data-label="Vai trò" className="px-4 py-3">
                           <span className="inline-flex max-w-full rounded-full border border-[#d8e1f2] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs">
                             <span className="truncate">
                               {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
                             </span>
                           </span>
                         </td>
-                        <td className="truncate px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
+                        <td data-label="SĐT" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
                           {occupant.phone || "Chưa có"}
                         </td>
-                        <td className="truncate px-4 py-3 text-[#4b5563]" title={occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}>
+                        <td data-label="CCCD" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}>
                           {occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}
                         </td>
                       </tr>

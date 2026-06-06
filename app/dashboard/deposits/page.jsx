@@ -629,8 +629,8 @@ export default function DepositsPage() {
         </section>
 
         <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-left">
+          <div className="dashboard-table">
+            <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-xs font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
                   <th className="px-5 py-4">Phòng</th>
@@ -652,10 +652,10 @@ export default function DepositsPage() {
                 ) : (
                   filteredAgreements.map((agreement) => (
                     <tr key={agreement.id} className="border-b border-[#edf0f5] last:border-0">
-                      <td className="px-5 py-4 text-base font-extrabold text-[#111827]">
+                      <td data-label="Phòng" className="px-5 py-4 text-base font-extrabold text-[#111827]">
                         {agreement.roomCode ? `P.${agreement.roomCode}` : "Chưa rõ"}
                       </td>
-                      <td className="px-5 py-4">
+                      <td data-label="Tên khách hàng" className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8f0ff] text-[#4160ad]">
                             <UserRound className="h-4 w-4" />
@@ -666,10 +666,10 @@ export default function DepositsPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
-                      <td className="px-5 py-4">
+                      <td data-label="Số tiền cọc" className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
+                      <td data-label="Ngày tạo" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
+                      <td data-label="Ngày hẹn ký HĐ" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
+                      <td data-label="Trạng thái" className="px-5 py-4">
                         <select
                           value={STATUS_OPTIONS.some((status) => status.value === agreement.status) ? agreement.status : ""}
                           onChange={(event) => handleStatusChange(agreement, event.target.value)}
@@ -684,7 +684,7 @@ export default function DepositsPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="px-5 py-4">
+                      <td data-label="Hành động" className="px-5 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"

@@ -75,9 +75,9 @@ function SummaryCard({ icon: Icon, label, value, suffix, helper, tone = "blue", 
 function RevenueChart() {
   return (
     <section className="rounded-[8px] border border-[#dce2ec] bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-[#0f1d33]">Biểu đồ doanh thu</h2>
-        <div className="flex rounded-[4px] bg-[#e8eefb] p-1">
+        <div className="flex flex-wrap rounded-[4px] bg-[#e8eefb] p-1">
           {["Tháng", "Quý", "Năm"].map((item, index) => (
             <button
               key={item}
@@ -113,10 +113,10 @@ function OccupancyCard() {
       <h2 className="text-xl font-bold text-[#0f1d33]">Tỷ lệ lấp đầy</h2>
       <div className="mt-9 flex justify-center">
         <div
-          className="grid h-52 w-52 place-items-center rounded-full"
+          className="grid aspect-square w-full max-w-52 place-items-center rounded-full"
           style={{ background: "conic-gradient(#435eac 0deg 331deg, #edf1f8 331deg 360deg)" }}
         >
-          <div className="grid h-40 w-40 place-items-center rounded-full bg-white text-center">
+          <div className="grid h-[77%] w-[77%] place-items-center rounded-full bg-white text-center">
             <div>
               <p className="text-4xl font-bold text-[#0f1d33]">92%</p>
               <p className="mt-1 text-sm font-medium text-[#4b5563]">Tháng hiện tại</p>
@@ -162,7 +162,7 @@ function ActivityIcon({ tone, icon: Icon }) {
 function RecentActivities() {
   return (
     <section className="rounded-[8px] border border-[#dce2ec] bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-[#0f1d33]">Hoạt động gần đây</h2>
         <button type="button" className="text-xs font-bold text-[#3156b6]">
           Xem tất cả
@@ -201,8 +201,8 @@ function UtilityCard({ type, value, delta, icon: Icon }) {
 function ContractExpiryCard() {
   return (
     <section className="rounded-[8px] border border-[#dce2ec] bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Sắp hết hạn hợp đồng</p>
           <p className="mt-2 text-xl font-bold text-[#0f1d33]">12 Người thuê</p>
           <button type="button" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[#3156b6]">
@@ -238,7 +238,7 @@ export default function DashboardPage() {
         <p className="mt-2 text-sm text-[#4b5563]">Thống kê hoạt động của Nhà trọ Hải Đăng</p>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-5">
         <SummaryCard
           icon={Banknote}
           label="Doanh thu tháng"

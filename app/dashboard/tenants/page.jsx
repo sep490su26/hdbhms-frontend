@@ -26,6 +26,149 @@ import {
   fetchTenantProfiles,
 } from "@/services/tenantProfilesService";
 
+const MOCK_TENANT_PROFILES = [
+  {
+    id: 1001,
+    fullName: "Nguyen Minh Anh",
+    dob: "1998-04-12",
+    gender: "FEMALE",
+    phone: "0901234567",
+    email: "minh.anh@example.com",
+    permanentAddress: "12 Nguyen Trai, Thanh Xuan, Ha Noi",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    roomRole: "PRIMARY",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    residenceStatus: "RENTING",
+    moveInDate: "2026-01-05",
+    profileStatus: "COMPLETED",
+    appStatus: "ACTIVE",
+    portraitFileId: 8101,
+    portraitUrl: "",
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    contractStartDate: "2026-01-05",
+    contractEndDate: "2026-12-31",
+    monthlyRent: 4500000,
+    identityDocument: {
+      docNumber: "001298012345",
+      issuedDate: "2021-08-20",
+      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
+      frontFileId: 7101,
+      backFileId: 7102,
+      frontFileUrl: "",
+      backFileUrl: "",
+    },
+    vehicles: [{ id: 6101, vehicleType: "MOTORBIKE", licensePlate: "29X1-123.45" }],
+    emergencyContacts: [
+      { id: 6201, fullName: "Nguyen Van Nam", relationship: "Bo", phone: "0912345678" },
+    ],
+    roommates: [
+      {
+        id: 1002,
+        fullName: "Tran Thu Ha",
+        dob: "2000-09-18",
+        phone: "0987654321",
+        roomRole: "CO_OCCUPANT",
+      },
+    ],
+  },
+  {
+    id: 1002,
+    fullName: "Tran Thu Ha",
+    dob: "2000-09-18",
+    gender: "FEMALE",
+    phone: "0987654321",
+    email: "thu.ha@example.com",
+    permanentAddress: "Hai Chau, Da Nang",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    roomRole: "CO_OCCUPANT",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    residenceStatus: "RENTING",
+    moveInDate: "2026-02-01",
+    profileStatus: "MISSING_PORTRAIT",
+    appStatus: "PENDING",
+    portraitFileId: null,
+    portraitUrl: "",
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    contractStartDate: "2026-01-05",
+    contractEndDate: "2026-12-31",
+    monthlyRent: 4500000,
+    identityDocument: {
+      docNumber: "048300123456",
+      issuedDate: "2022-03-14",
+      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
+      frontFileId: 7103,
+      backFileId: 7104,
+      frontFileUrl: "",
+      backFileUrl: "",
+    },
+    vehicles: [],
+    emergencyContacts: [
+      { id: 6202, fullName: "Tran Van Hai", relationship: "Anh trai", phone: "0934567890" },
+    ],
+    roommates: [
+      {
+        id: 1001,
+        fullName: "Nguyen Minh Anh",
+        dob: "1998-04-12",
+        phone: "0901234567",
+        roomRole: "PRIMARY",
+      },
+    ],
+  },
+  {
+    id: 1003,
+    fullName: "Le Quang Huy",
+    dob: "1996-11-03",
+    gender: "MALE",
+    phone: "0978123456",
+    email: "quang.huy@example.com",
+    permanentAddress: "Ninh Kieu, Can Tho",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    roomId: 205,
+    roomCode: "B205",
+    roomRole: "PRIMARY",
+    roomOccupantCount: 1,
+    roomMaxOccupants: 2,
+    residenceStatus: "RENTING",
+    moveInDate: "2025-08-15",
+    profileStatus: "MISSING_CCCD",
+    appStatus: "INACTIVE",
+    portraitFileId: 8103,
+    portraitUrl: "",
+    contractId: 5002,
+    contractCode: "HD-2025-118",
+    contractStatus: "EXPIRING_SOON",
+    contractStartDate: "2025-08-15",
+    contractEndDate: "2026-07-31",
+    monthlyRent: 6200000,
+    identityDocument: {
+      docNumber: "",
+      issuedDate: "",
+      issuedPlace: "",
+      frontFileId: null,
+      backFileId: null,
+      frontFileUrl: "",
+      backFileUrl: "",
+    },
+    vehicles: [{ id: 6103, vehicleType: "CAR", licensePlate: "30K-678.90" }],
+    emergencyContacts: [],
+    roommates: [],
+  },
+];
+
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
   month: "2-digit",
@@ -352,7 +495,7 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
 
             <DetailSection icon={Users} title="Danh sách người cùng phòng">
               {roommates.length ? (
-                <div className="overflow-hidden rounded-xl border border-[#e2e8f0]">
+                <div className="dashboard-table rounded-xl border border-[#e2e8f0]">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
                       <tr>
@@ -366,11 +509,11 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
                     <tbody className="divide-y divide-[#e2e8f0]">
                       {roommates.map((roommate, index) => (
                         <tr key={valueOf(roommate, "id") || `${valueOf(roommate, "roomRole", "room_role")}-${valueOf(roommate, "phone")}-${index}`}>
-                          <td className="px-4 py-3 font-bold text-[#091426]">{valueOf(roommate, "fullName", "full_name")}</td>
-                          <td className="px-4 py-3">{formatYear(valueOf(roommate, "dob"))}</td>
-                          <td className="px-4 py-3">{valueOf(roommate, "phone") || "Chưa cập nhật"}</td>
-                          <td className="px-4 py-3">{roleLabel(valueOf(roommate, "roomRole", "room_role"))}</td>
-                          <td className="px-4 py-3 text-right">
+                          <td data-label="Họ tên" className="px-4 py-3 font-bold text-[#091426]">{valueOf(roommate, "fullName", "full_name")}</td>
+                          <td data-label="Năm sinh" className="px-4 py-3">{formatYear(valueOf(roommate, "dob"))}</td>
+                          <td data-label="Số điện thoại" className="px-4 py-3">{valueOf(roommate, "phone") || "Chưa cập nhật"}</td>
+                          <td data-label="Vai trò" className="px-4 py-3">{roleLabel(valueOf(roommate, "roomRole", "room_role"))}</td>
+                          <td data-label="Thao tác" className="px-4 py-3 text-right">
                             <button
                               type="button"
                               onClick={() => openRoommateProfile(valueOf(roommate, "id"))}
@@ -523,7 +666,7 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
 }
 
 export default function TenantsPage() {
-  const [profiles, setProfiles] = useState([]);
+  const [profiles, setProfiles] = useState(MOCK_TENANT_PROFILES);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -714,8 +857,8 @@ export default function TenantsPage() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1120px] text-left">
+                <div className="dashboard-table">
+                  <table className="w-full text-left">
                     <thead className="bg-white text-xs font-black uppercase tracking-[0.05em] text-[#64748b]">
                       <tr>
                         <th className="px-6 py-4">Họ tên</th>
@@ -732,7 +875,7 @@ export default function TenantsPage() {
                     <tbody className="divide-y divide-[#e2e8f0]">
                       {roomProfiles.map((profile, index) => (
                         <tr key={profileRowKey(profile, index)} className="hover:bg-[#f8fafc]">
-                          <td className="px-6 py-5">
+                          <td data-label="Họ tên" className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-black text-[#1d4ed8]">
                                 {initialsOf(valueOf(profile, "fullName", "full_name"))}
@@ -743,14 +886,14 @@ export default function TenantsPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "phone") || "Chưa cập nhật"}</td>
-                          <td className="px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "email") || "Chưa cập nhật"}</td>
-                          <td className="px-6 py-5 text-sm font-black text-[#091426]">Phòng {valueOf(profile, "roomCode", "room_code")}</td>
-                          <td className="px-6 py-5 text-sm font-black text-[#091426]">{roomOccupancyText(profile)}</td>
-                          <td className="px-6 py-5"><Badge className={roleClass(valueOf(profile, "roomRole", "room_role"))}>{roleLabel(valueOf(profile, "roomRole", "room_role"))}</Badge></td>
-                          <td className="px-6 py-5"><Badge className={profileStatusClass(valueOf(profile, "profileStatus", "profile_status"))}>{profileStatusLabel(valueOf(profile, "profileStatus", "profile_status"), valueOf(profile, "profileStatusLabel", "profile_status_label"))}</Badge></td>
-                          <td className="px-6 py-5"><Badge className={accountStatusClass(valueOf(profile, "appStatus", "app_status"))}>{accountStatusLabel(valueOf(profile, "appStatus", "app_status"))}</Badge></td>
-                          <td className="px-6 py-5 text-right">
+                          <td data-label="SĐT" className="px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "phone") || "Chưa cập nhật"}</td>
+                          <td data-label="Email" className="break-words px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "email") || "Chưa cập nhật"}</td>
+                          <td data-label="Số phòng" className="px-6 py-5 text-sm font-black text-[#091426]">Phòng {valueOf(profile, "roomCode", "room_code")}</td>
+                          <td data-label="Số người" className="px-6 py-5 text-sm font-black text-[#091426]">{roomOccupancyText(profile)}</td>
+                          <td data-label="Vai trò" className="px-6 py-5"><Badge className={roleClass(valueOf(profile, "roomRole", "room_role"))}>{roleLabel(valueOf(profile, "roomRole", "room_role"))}</Badge></td>
+                          <td data-label="Hồ sơ" className="px-6 py-5"><Badge className={profileStatusClass(valueOf(profile, "profileStatus", "profile_status"))}>{profileStatusLabel(valueOf(profile, "profileStatus", "profile_status"), valueOf(profile, "profileStatusLabel", "profile_status_label"))}</Badge></td>
+                          <td data-label="Tài khoản app" className="px-6 py-5"><Badge className={accountStatusClass(valueOf(profile, "appStatus", "app_status"))}>{accountStatusLabel(valueOf(profile, "appStatus", "app_status"))}</Badge></td>
+                          <td data-label="Thao tác" className="px-6 py-5 text-right">
                             <button
                               type="button"
                               onClick={() => setSelectedProfile(profile)}

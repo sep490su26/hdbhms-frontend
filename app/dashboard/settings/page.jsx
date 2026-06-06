@@ -173,8 +173,8 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left text-sm">
+        <div className="dashboard-table">
+          <table className="w-full text-left text-sm">
             <thead className="bg-[#eaf0fb] text-sm font-medium text-[#4b5563]">
               <tr>
                 <th className="px-7 py-4">Ngày áp dụng</th>
@@ -187,11 +187,11 @@ export default function SettingsPage() {
             <tbody className="divide-y divide-[#d7deea]">
               {historyRows.map((row) => (
                 <tr key={row.effectiveDate} className="bg-white">
-                  <td className="px-7 py-5 text-base font-bold text-[#0f1d33]">{row.effectiveDate}</td>
-                  <td className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.electric}</td>
-                  <td className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.water}</td>
-                  <td className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.service}</td>
-                  <td className="px-7 py-5">
+                  <td data-label="Ngày áp dụng" className="px-7 py-5 text-base font-bold text-[#0f1d33]">{row.effectiveDate}</td>
+                  <td data-label="Điện (đ/kWh)" className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.electric}</td>
+                  <td data-label="Nước (đ/m³)" className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.water}</td>
+                  <td data-label="Dịch vụ" className="px-7 py-5 text-base font-medium text-[#0f1d33]">{row.service}</td>
+                  <td data-label="Người cập nhật" className="px-7 py-5">
                     <div className="flex items-center gap-3">
                       <UserBadge initials={row.initials} tone={row.tone} />
                       <span className="text-base font-medium text-[#0f1d33]">{row.updater}</span>

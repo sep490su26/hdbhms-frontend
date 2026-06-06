@@ -259,8 +259,8 @@ export function AccountManagement() {
           <h2 className="font-bold text-[#091426]">Danh sách tài khoản</h2>
           <span className="rounded-full bg-[#091426] px-3 py-1 text-xs font-bold text-white">{filteredAccounts.length}</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1060px] text-left text-sm">
+        <div className="dashboard-table">
+          <table className="w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
               <tr>
                 <th className="px-5 py-4">Họ tên</th>
@@ -277,7 +277,7 @@ export function AccountManagement() {
             <tbody>
               {filteredAccounts.map((account) => (
                 <tr key={account.id} className="border-t border-[#e2e8f0] align-top">
-                  <td className="px-5 py-4">
+                  <td data-label="Họ tên" className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d3e4fe] text-xs font-bold text-[#091426]">
                         {account.fullName.slice(0, 1)}
@@ -288,19 +288,19 @@ export function AccountManagement() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 font-semibold text-[#191c1e]">{accountTypeLabels[account.accountType]}</td>
-                  <td className="px-5 py-4 text-[#45474c]">{account.phone}</td>
-                  <td className="px-5 py-4 text-[#45474c]">{account.email}</td>
-                  <td className="px-5 py-4"><StatusBadge status={account.status} /></td>
-                  <td className="px-5 py-4 text-[#45474c]">{account.createdAt}</td>
-                  <td className="px-5 py-4 text-[#45474c]">{account.lastLoginAt}</td>
-                  <td className="px-5 py-4">
+                  <td data-label="Loại tài khoản" className="px-5 py-4 font-semibold text-[#191c1e]">{accountTypeLabels[account.accountType]}</td>
+                  <td data-label="SĐT" className="px-5 py-4 text-[#45474c]">{account.phone}</td>
+                  <td data-label="Email" className="break-words px-5 py-4 text-[#45474c]">{account.email}</td>
+                  <td data-label="Trạng thái" className="px-5 py-4"><StatusBadge status={account.status} /></td>
+                  <td data-label="Ngày tạo" className="px-5 py-4 text-[#45474c]">{account.createdAt}</td>
+                  <td data-label="Đăng nhập gần nhất" className="px-5 py-4 text-[#45474c]">{account.lastLoginAt}</td>
+                  <td data-label="Cơ sở phụ trách" className="px-5 py-4">
                     <span className="inline-flex items-center gap-2 text-[#45474c]">
                       <Building2 className="h-4 w-4 text-[#6b7280]" />
                       {resolveFacilityName(account.assignedFacility)}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td data-label="Thao tác" className="px-5 py-4">
                     <div className="flex justify-end gap-2">
                       {account.accountType === "manager" && account.status === "pending" && (
                         <button

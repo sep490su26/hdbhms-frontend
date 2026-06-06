@@ -117,7 +117,7 @@ function mergeAgreement(base, details) {
 function StatusBadge({ status }) {
   const config = STATUS_LABELS[status] || STATUS_OPTIONS[0];
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold ${config.pill}`}>
+    <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-bold ${config.pill}`}>
       <span className={`h-2 w-2 rounded-full ${config.dot}`} />
       {config.label}
     </span>
@@ -132,17 +132,17 @@ function KpiCard({ title, value, note, icon: Icon, tone = "blue" }) {
   };
 
   return (
-    <article className="min-h-[150px] rounded-lg border border-[#d7dde8] bg-white p-7 shadow-[0_14px_30px_rgba(9,20,38,0.08)]">
+    <article className="min-h-[118px] rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">{title}</p>
-          <p className="mt-7 text-4xl font-extrabold tracking-[-0.02em] text-[#102033]">{value}</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">{title}</p>
+          <p className="mt-4 text-2xl font-extrabold tracking-[-0.02em] text-[#102033]">{value}</p>
         </div>
-        <span className={`flex h-11 w-11 items-center justify-center rounded-md ${tones[tone]}`}>
-          <Icon className="h-6 w-6" />
+        <span className={`flex h-9 w-9 items-center justify-center rounded-md ${tones[tone]}`}>
+          <Icon className="h-5 w-5" />
         </span>
       </div>
-      {note && <p className="mt-6 text-base font-semibold text-[#4160ad]">{note}</p>}
+      {note && <p className="mt-3 text-sm font-semibold text-[#4160ad]">{note}</p>}
     </article>
   );
 }
@@ -249,25 +249,25 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-[#d7dde8] px-6 py-4">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <header className="flex items-center justify-between border-b border-[#d7dde8] px-5 py-4">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#4160ad]">Chi tiết hợp đồng cọc</p>
-            <h2 className="mt-1 text-2xl font-extrabold text-[#102033]">{agreement.depositCode}</h2>
+            <h2 className="mt-1 text-xl font-extrabold text-[#102033]">{agreement.depositCode}</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-[#5a6678] hover:bg-[#eef3fb]" aria-label="Đóng">
             <X className="h-5 w-5" />
           </button>
         </header>
 
-        <div className="overflow-y-auto p-6 custom-scrollbar">
+        <div className="overflow-y-auto p-5 custom-scrollbar">
           {loading ? (
             <div className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-10 text-center font-bold text-[#5a6678]">
               Đang tải chi tiết hợp đồng cọc...
             </div>
           ) : (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <section className="grid gap-6">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <section className="grid gap-5">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <DetailField label="Khách hàng" value={agreement.depositorFullName} />
                   {isEditing ? (
@@ -337,18 +337,18 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
                   </div>
                 )}
 
-                <section className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-5">
+                <section className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#8b909a]">Ảnh giấy tờ</p>
-                      <h3 className="mt-1 text-xl font-extrabold text-[#102033]">CCCD và ảnh chân dung</h3>
+                      <h3 className="mt-1 text-lg font-extrabold text-[#102033]">CCCD và ảnh chân dung</h3>
                     </div>
                     <LockKeyhole className="h-5 w-5 text-[#4160ad]" />
                   </div>
                   <p className="mt-2 text-sm font-medium text-[#5a6678]">
                     Dữ liệu này nhạy cảm, chỉ tài khoản có quyền quản lý mới nên xem.
                   </p>
-                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <SensitiveImage title="Mặt trước CCCD" url={details.idFrontFileUrl} />
                     <SensitiveImage title="Mặt sau CCCD" url={details.idBackFileUrl} />
                     <SensitiveImage title="Ảnh chân dung" url={details.portraitFileUrl} />
@@ -356,7 +356,7 @@ function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadCo
                 </section>
               </section>
 
-              <aside className="h-fit rounded-xl border border-[#d7dde8] bg-white p-5 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
+              <aside className="h-fit rounded-xl border border-[#d7dde8] bg-white p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
                 <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">Trạng thái hiện tại</p>
                 <div className="mt-4">
                   <StatusBadge status={agreement.status} />
@@ -560,10 +560,10 @@ export default function DepositsPage() {
 
   return (
     <>
-      <section className="grid gap-8">
+      <section className="grid gap-6">
         <header>
-          <h1 className="text-5xl font-extrabold tracking-[-0.03em] text-[#102033]">Danh sách hợp đồng đặt cọc</h1>
-          <p className="mt-3 text-xl font-semibold text-[#6b7280]">
+          <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sách hợp đồng đặt cọc</h1>
+          <p className="mt-2 text-sm font-semibold text-[#6b7280]">
             Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng.
           </p>
         </header>
@@ -579,32 +579,32 @@ export default function DepositsPage() {
           </div>
         )}
 
-        <section className="grid gap-6 xl:grid-cols-3">
+        <section className="grid gap-5 xl:grid-cols-3">
           <KpiCard icon={WalletCards} title="Tổng số tiền cọc" value={formatMoney(totalAmount)} note="Tổng tiền cọc đã ghi nhận" />
           <KpiCard icon={LockKeyhole} title="Đang giữ cọc" value={paidAgreements.length} note="Khoản thu khả dụng" tone="amber" />
           <KpiCard icon={ClipboardCheck} title="Đã nhận phòng" value={convertedAgreements.length} note="Đã chính thức nhận phòng" tone="emerald" />
         </section>
 
-        <section className="rounded-lg border border-[#d7dde8] bg-white p-8 shadow-[0_14px_30px_rgba(9,20,38,0.08)]">
-          <div className="grid gap-5 xl:grid-cols-3 xl:items-end">
+        <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
+          <div className="grid gap-4 xl:grid-cols-3 xl:items-end">
             <label className="grid gap-2">
-              <span className="text-base font-bold text-[#4b5563]">Tên khách hàng</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tên khách hàng</span>
               <span className="relative">
-                <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b909a]" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b909a]" />
                 <input
                   value={customerFilter}
                   onChange={(event) => setCustomerFilter(event.target.value)}
                   placeholder="Nhập tên khách, SĐT, mã cọc..."
-                  className="h-14 w-full rounded-lg border border-[#c4cad6] pl-12 pr-4 text-base font-semibold text-[#102033] outline-none placeholder:text-[#8b909a] focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                  className="h-11 w-full rounded-lg border border-[#c4cad6] pl-10 pr-3 text-sm font-semibold text-[#102033] outline-none placeholder:text-[#8b909a] focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
                 />
               </span>
             </label>
             <label className="grid gap-2">
-              <span className="text-base font-bold text-[#4b5563]">Trạng thái</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Trạng thái</span>
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-14 rounded-lg border border-[#c4cad6] px-4 text-base font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Tất cả trạng thái</option>
                 {STATUS_OPTIONS.map((status) => (
@@ -613,11 +613,11 @@ export default function DepositsPage() {
               </select>
             </label>
             <label className="grid gap-2">
-              <span className="text-base font-bold text-[#4b5563]">Tầng</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tầng</span>
               <select
                 value={floorFilter}
                 onChange={(event) => setFloorFilter(event.target.value)}
-                className="h-14 rounded-lg border border-[#c4cad6] px-4 text-base font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Tất cả tầng</option>
                 {floorOptions.map((floor) => (
@@ -628,53 +628,53 @@ export default function DepositsPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_14px_30px_rgba(9,20,38,0.08)]">
+        <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1250px] border-collapse text-left">
+            <table className="w-full min-w-[980px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-base font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
-                  <th className="px-8 py-6">Phòng</th>
-                  <th className="px-8 py-6">Tên khách hàng</th>
-                  <th className="px-8 py-6">Số tiền cọc</th>
-                  <th className="px-8 py-6">Ngày tạo</th>
-                  <th className="px-8 py-6">Ngày hẹn ký HĐ</th>
-                  <th className="px-8 py-6">Trạng thái</th>
-                  <th className="px-8 py-6 text-center">Hành động</th>
+                <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-xs font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
+                  <th className="px-5 py-4">Phòng</th>
+                  <th className="px-5 py-4">Tên khách hàng</th>
+                  <th className="px-5 py-4">Số tiền cọc</th>
+                  <th className="px-5 py-4">Ngày tạo</th>
+                  <th className="px-5 py-4">Ngày hẹn ký HĐ</th>
+                  <th className="px-5 py-4">Trạng thái</th>
+                  <th className="px-5 py-4 text-center">Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAgreements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-8 py-12 text-center text-base font-bold text-[#6b7280]">
+                    <td colSpan={7} className="px-5 py-10 text-center text-sm font-bold text-[#6b7280]">
                       Không có hợp đồng đặt cọc phù hợp.
                     </td>
                   </tr>
                 ) : (
                   filteredAgreements.map((agreement) => (
                     <tr key={agreement.id} className="border-b border-[#edf0f5] last:border-0">
-                      <td className="px-8 py-7 text-xl font-extrabold text-[#111827]">
+                      <td className="px-5 py-4 text-base font-extrabold text-[#111827]">
                         {agreement.roomCode ? `P.${agreement.roomCode}` : "Chưa rõ"}
                       </td>
-                      <td className="px-8 py-7">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8f0ff] text-[#4160ad]">
-                            <UserRound className="h-5 w-5" />
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8f0ff] text-[#4160ad]">
+                            <UserRound className="h-4 w-4" />
                           </span>
                           <span>
-                            <span className="block text-lg font-extrabold text-[#102033]">{agreement.depositorFullName}</span>
-                            <span className="block text-base font-semibold text-[#5a6678]">{agreement.depositorPhone}</span>
+                            <span className="block text-sm font-extrabold text-[#102033]">{agreement.depositorFullName}</span>
+                            <span className="block text-xs font-semibold text-[#5a6678]">{agreement.depositorPhone}</span>
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-7 text-lg font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
-                      <td className="px-8 py-7 text-lg font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
-                      <td className="px-8 py-7 text-lg font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
-                      <td className="px-8 py-7">
+                      <td className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
+                      <td className="px-5 py-4">
                         <select
                           value={STATUS_OPTIONS.some((status) => status.value === agreement.status) ? agreement.status : ""}
                           onChange={(event) => handleStatusChange(agreement, event.target.value)}
                           disabled={updatingId === agreement.id}
-                          className="h-10 rounded-full border border-[#c4cad6] bg-white px-4 text-sm font-extrabold text-[#102033] outline-none focus:border-[#4160ad] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="h-9 rounded-full border border-[#c4cad6] bg-white px-3 text-xs font-extrabold text-[#102033] outline-none focus:border-[#4160ad] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {!STATUS_OPTIONS.some((status) => status.value === agreement.status) && (
                             <option value="">{STATUS_LABELS[agreement.status]?.label || "Chưa cập nhật"}</option>
@@ -684,15 +684,15 @@ export default function DepositsPage() {
                           ))}
                         </select>
                       </td>
-                      <td className="px-8 py-7">
-                        <div className="flex items-center justify-center gap-3">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
                             onClick={() => openDetails(agreement)}
                             className="rounded-full p-2 text-[#4160ad] hover:bg-[#eef4ff]"
                             aria-label={`Xem chi tiết ${agreement.depositCode}`}
                           >
-                            <Eye className="h-7 w-7" />
+                            <Eye className="h-5 w-5" />
                           </button>
                           <button
                             type="button"
@@ -700,7 +700,7 @@ export default function DepositsPage() {
                             className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
                             aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
                           >
-                            <FileText className="h-6 w-6" />
+                            <FileText className="h-5 w-5" />
                           </button>
                           <button
                             type="button"
@@ -708,7 +708,7 @@ export default function DepositsPage() {
                             className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
                             aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
                           >
-                            <Download className="h-6 w-6" />
+                            <Download className="h-5 w-5" />
                           </button>
                         </div>
                       </td>
@@ -718,7 +718,7 @@ export default function DepositsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex flex-col gap-3 border-t border-[#d7dde8] bg-[#eef4ff] px-8 py-6 text-base font-semibold text-[#5a6678] sm:flex-row sm:items-center sm:justify-between">
+          <footer className="flex flex-col gap-3 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-[#5a6678] sm:flex-row sm:items-center sm:justify-between">
             <span>Hiển thị {filteredAgreements.length} trong tổng số {agreements.length} hợp đồng</span>
             <span className="rounded-md bg-[#4160ad] px-4 py-2 font-extrabold text-white">1</span>
           </footer>

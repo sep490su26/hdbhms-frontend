@@ -5,890 +5,1620 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
-  Clock,
   Download,
   Eye,
-  FileText,
+  FileCheck2,
+  FileWarning,
+  Filter,
   Home,
   KeyRound,
+  Loader2,
   Mail,
+  Pencil,
   RefreshCw,
+  Save,
   Search,
   Upload,
   Users,
+  X,
 } from "lucide-react";
+
 import {
   activateLeaseContract,
   createDraftLeaseContractFromDeposit,
   downloadLeaseContractFile,
   fetchLeaseContractManagementList,
   fetchManagementLeaseContractDetails,
-  liquidateLeaseContract,
   openLeaseContractFile,
   uploadSignedLeaseContractFile,
+  liquidateLeaseContract,
+  recordLeaseContractTenantIntention,
+  renewLeaseContract,
+  updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
 import { sendTenantAccountCredentials } from "@/services/identityAccessService";
-import { useAuth } from "../_contexts/AuthContext";
-import { ROLES } from "../_lib/rbac";
 
-const TABS = [
-  ["ALL", "Tất cả"],
-  ["WAITING_SIGN", "Chờ ký"],
-  ["NO_FILE", "Chưa upload file"],
-  ["WAITING_ACTIVATE", "Chờ kích hoạt"],
-  ["ACTIVE", "Đang hiệu lực"],
-  ["ENDED", "Đã kết thúc"],
+const STATUS_FILTERS = [
+  { id: "all", label: "Tất cả" },
+  { id: "PENDING_SIGNATURE", label: "Chờ ký" },
+  { id: "MISSING_FILE", label: "Chưa upload file" },
+  { id: "PENDING_ACTIVATION", label: "Chờ kích hoạt" },
+  { id: "ACTIVE", label: "Đang hiệu lực" },
+  { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
+  { id: "EXPIRED", label: "Hết hạn" },
+  { id: "RENEWED", label: "Đã gia hạn" },
+  { id: "ENDED", label: "Đã kết thúc" },
 ];
 
-const OCCUPANT_ROLE_LABELS = {
+const WORKFLOW_LABELS = {
+  PENDING_SIGNATURE: "Chờ ký",
+  MISSING_FILE: "Chưa upload",
+  PENDING_ACTIVATION: "Chờ kích hoạt",
+  ACTIVE: "Đang hiệu lực",
+  EXPIRING_SOON: "Sắp hết hạn",
+  LIQUIDATED: "Đã thanh lý",
+  EXPIRED: "Hết hạn",
+  RENEWED: "Đã gia hạn",
+  CANCELLED: "Đã hủy",
+  TERMINATION_PENDING: "Chờ thanh lý",
+  ENDED: "Đã kết thúc",
+  DRAFT: "Bản nháp",
+};
+
+const STATUS_LABELS = {
+  ACTIVE: "Đang hiệu lực",
+  PENDING_SIGNATURE: "Chờ ký",
+  DRAFT: "Bản nháp",
+  LIQUIDATED: "Đã thanh lý",
+  EXPIRED: "Hết hạn",
+  TERMINATED: "Đã thanh lý",
+  RENEWED: "Đã gia hạn",
+  EXPIRING_SOON: "Sắp hết hạn",
+  CANCELLED: "Đã hủy",
+  TERMINATION_PENDING: "Chờ thanh lý",
+};
+
+const ROLE_LABELS = {
   PRIMARY: "Người ký chính",
   CO_OCCUPANT: "Người ở cùng",
 };
 
-const EVENT_LABELS = {
-  CREATED: "Tạo hợp đồng",
-  SIGNED: "Ký hợp đồng",
-  LIQUIDATED: "Thanh lý hợp đồng",
-  FILE_UPLOADED: "Upload file",
-};
-
-function formatMoney(value) {
-  if (value === null || value === undefined || value === "") return "Chưa có";
-  return `${new Intl.NumberFormat("vi-VN").format(Number(value) || 0)} đ`;
-}
-
 function formatDate(value) {
   if (!value) return "Chưa có";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
-  return date.toLocaleDateString("vi-VN");
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN").format(date);
 }
 
-function formatDateTime(value) {
-  if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+function formatMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "Chưa có";
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(number);
 }
 
 function formatCycle(value) {
-  const cycle = Number(value);
-  if (cycle === 1) return "1 tháng/lần";
-  if (cycle === 3) return "3 tháng/lần";
-  return "Chưa có";
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "Chưa có";
+  return `${number} tháng/lần`;
 }
 
-function normalizeText(value) {
-  return String(value || "").toLowerCase().trim();
+function toDateInputValue(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
 }
 
-function getWorkflow(item) {
-  if (!item) return "WAITING_SIGN";
-  const status = item.contractStatus || item.status;
-  if (status === "ACTIVE") return "ACTIVE";
-  if (["LIQUIDATED", "EXPIRED", "CANCELLED", "RENEWED"].includes(status)) return "ENDED";
-  if (item.leaseContractId && item.contractFileId) return "WAITING_ACTIVATE";
-  return item.workflowStatus || "WAITING_SIGN";
+function buildTermsForm(item = {}) {
+  return {
+    startDate: toDateInputValue(item.startDate),
+    endDate: toDateInputValue(item.endDate),
+    paymentCycleMonths: String(item.paymentCycleMonths || 1),
+    monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
+    depositAmount: item.depositAmount == null ? "0" : String(item.depositAmount),
+  };
 }
 
-function workflowLabel(status) {
-  switch (status) {
-    case "WAITING_ACTIVATE":
-      return "Chờ kích hoạt";
-    case "ACTIVE":
-      return "Đang hiệu lực";
-    case "ENDED":
-      return "Đã kết thúc";
-    case "WAITING_SIGN":
-    default:
-      return "Chờ ký";
-  }
+function addDays(value, days) {
+  if (!value) return "";
+  const date = new Date(`${toDateInputValue(value)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function workflowClass(status) {
-  switch (status) {
-    case "WAITING_ACTIVATE":
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "ENDED":
-      return "border-slate-200 bg-slate-50 text-slate-600";
-    case "WAITING_SIGN":
-    default:
-      return "border-amber-200 bg-amber-50 text-amber-700";
-  }
+function addYearsMinusOneDay(value, years) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setFullYear(date.getFullYear() + years);
+  date.setDate(date.getDate() - 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function workflowIcon(status) {
-  if (status === "ACTIVE") return <CheckCircle2 className="h-4 w-4" />;
-  if (status === "WAITING_ACTIVATE") return <Clock className="h-4 w-4" />;
-  return <AlertTriangle className="h-4 w-4" />;
+function buildRenewForm(item = {}) {
+  const newStartDate = addDays(item.endDate, 1);
+  const year = newStartDate ? newStartDate.slice(0, 4) : new Date().getFullYear();
+  return {
+    newContractCode: item.contractCode ? `${item.contractCode}-R${year}` : "",
+    newStartDate,
+    newEndDate: addYearsMinusOneDay(newStartDate, 1),
+    monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
+    paymentCycleMonths: String(item.paymentCycleMonths || 1),
+    depositAmount: item.depositAmount == null ? "0" : String(item.depositAmount),
+    note: "",
+  };
 }
 
-function getContractRowKey(item, index = 0) {
-  if (item?.sourceType === "CONTRACT" && item?.contractId) return `contract-${item.contractId}`;
-  if (item?.sourceType === "DEPOSIT" && item?.depositAgreementId) return `deposit-${item.depositAgreementId}`;
-  if (item?.leaseContractId) return `contract-${item.leaseContractId}`;
-  if (item?.contractId) return `contract-${item.contractId}`;
-  if (item?.depositAgreementId) return `deposit-${item.depositAgreementId}`;
-  if (item?.id) return `item-${item.id}`;
-  if (item?.displayCode) return `code-${item.displayCode}`;
-  if (item?.code) return `code-${item.code}`;
+function calculateRentStartDate(startDate) {
+  if (!startDate) return "";
+  const date = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  if (date.getDate() <= 10) return startDate;
+  const nextMonth = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function isContractShorterThanCycle(startDate, endDate, cycleMonths) {
+  if (!startDate || !endDate || Number(cycleMonths) !== 3) return false;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  const minimumEnd = new Date(start);
+  minimumEnd.setMonth(minimumEnd.getMonth() + 3);
+  return end < minimumEnd;
+}
+
+function normalizeKeyword(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getContractRowKey(item, index) {
+  if (item.sourceType === "CONTRACT" && item.contractId) return `contract-${item.contractId}`;
+  if (item.sourceType === "DEPOSIT" && item.depositAgreementId) return `deposit-${item.depositAgreementId}`;
+  if (item.contractId) return `contract-${item.contractId}`;
+  if (item.depositAgreementId) return `deposit-${item.depositAgreementId}`;
+  if (item.leaseContractId) return `lease-${item.leaseContractId}`;
+  if (item.id) return `item-${item.id}`;
+  if (item.displayCode) return `code-${item.displayCode}`;
   return `row-${index}`;
 }
 
-function Badge({ status }) {
+function getOccupantsCount(item, details) {
+  const raw =
+    item?.occupantsCount ??
+    item?.occupantCount ??
+    item?.peopleCount ??
+    item?.roomOccupantCount ??
+    details?.occupantsCount ??
+    details?.occupants?.length ??
+    item?.occupants?.length ??
+    null;
+  const count = Number(raw);
+  return Number.isFinite(count) && count > 0 ? count : 1;
+}
+
+function getWorkflow(item) {
+  const contractStatus = item?.status || item?.contractStatus;
+  if ([
+    "ACTIVE",
+    "EXPIRING_SOON",
+    "EXPIRED",
+    "TERMINATION_PENDING",
+    "LIQUIDATED",
+    "RENEWED",
+    "CANCELLED",
+  ].includes(contractStatus)) {
+    return contractStatus;
+  }
+  const status = item?.workflowStatus || item?.depositStatus;
+  if (status === "ACTIVE") return "ACTIVE";
+  if (item?.leaseContractId && item?.contractFileId) return "PENDING_ACTIVATION";
+  if (item?.leaseContractId && !item?.contractFileId) return "MISSING_FILE";
+  return "PENDING_SIGNATURE";
+}
+
+function getStatusLabel(item) {
+  const workflow = getWorkflow(item);
+  return WORKFLOW_LABELS[workflow] || STATUS_LABELS[item?.status] || "Chờ xử lý";
+}
+
+function FileBadge({ item }) {
+  const uploaded = Boolean(item?.contractFileId);
+  const Icon = uploaded ? FileCheck2 : FileWarning;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${workflowClass(status)}`}>
-      {workflowIcon(status)}
-      {workflowLabel(status)}
+    <span
+      className={`inline-flex min-w-[86px] items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:min-w-[104px] xl:px-3 xl:py-2 xl:text-xs ${
+        uploaded
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-red-200 bg-red-50 text-red-700"
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {uploaded ? "Đã upload" : "Chưa upload"}
     </span>
   );
 }
 
-function StatCard({ label, value, tone = "slate" }) {
-  const color = {
-    slate: "text-[#091426]",
-    amber: "text-amber-600",
-    blue: "text-blue-600",
-    emerald: "text-emerald-600",
-    red: "text-red-600",
-  }[tone];
+function StatusBadge({ item }) {
+  const workflow = getWorkflow(item);
+  const label = getStatusLabel(item);
+  const classes = {
+    ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    EXPIRING_SOON: "border-amber-200 bg-amber-50 text-amber-700",
+    PENDING_ACTIVATION: "border-blue-200 bg-blue-50 text-blue-700",
+    MISSING_FILE: "border-red-200 bg-red-50 text-red-700",
+    PENDING_SIGNATURE: "border-amber-200 bg-amber-50 text-amber-700",
+    LIQUIDATED: "border-slate-200 bg-slate-50 text-slate-600",
+    EXPIRED: "border-slate-200 bg-slate-50 text-slate-600",
+    RENEWED: "border-blue-200 bg-blue-50 text-blue-700",
+    CANCELLED: "border-slate-200 bg-slate-50 text-slate-500",
+    TERMINATION_PENDING: "border-orange-200 bg-orange-50 text-orange-700",
+  };
+  const Icon = workflow === "ACTIVE" ? CheckCircle2 : workflow === "PENDING_ACTIVATION" ? RefreshCw : AlertTriangle;
 
   return (
-    <section className="rounded-xl border border-[#dbe3ef] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.08)]">
-      <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#6b7280]">{label}</p>
-      <p className={`mt-3 text-3xl font-extrabold ${color}`}>{value}</p>
-    </section>
+    <span
+      className={`inline-flex min-w-[96px] items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:min-w-[128px] xl:px-3 xl:py-2 xl:text-xs ${
+        classes[workflow] || "border-slate-200 bg-slate-50 text-slate-600"
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {label}
+    </span>
   );
 }
 
-function Section({ icon: Icon, title, children }) {
+function StatCard({ label, value, tone }) {
+  const toneClass = {
+    dark: "text-[#091426] bg-[#eef3fb]",
+    green: "text-emerald-700 bg-emerald-50",
+    amber: "text-amber-700 bg-amber-50",
+    red: "text-red-700 bg-red-50",
+    blue: "text-blue-700 bg-blue-50",
+  };
+  const [textClass, bgClass] = (toneClass[tone] || toneClass.dark).split(" ");
+
   return (
-    <section className="rounded-xl border border-[#dbe3ef] bg-[#f8fafc] p-4">
-      <div className="mb-3 flex items-center gap-2 font-extrabold text-[#091426]">
-        <Icon className="h-4 w-4" />
-        {title}
+    <article className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#6b7280] xl:text-xs">{label}</p>
+      <p className={`mt-2 text-2xl font-extrabold xl:text-3xl ${textClass}`}>{value}</p>
+      <div className={`mt-4 h-1.5 rounded-full ${bgClass}`} />
+    </article>
+  );
+}
+
+function DetailCard({ title, icon: Icon, action, className = "", children }) {
+  return (
+    <section className={`rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 xl:p-5 ${className}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#091426] xl:text-xl">
+          <Icon className="h-4 w-4 xl:h-5 xl:w-5" />
+          {title}
+        </h3>
+        {action}
       </div>
       {children}
     </section>
   );
 }
 
-function InfoItem({ label, value, strong = false }) {
+function InfoValue({ label, value }) {
   return (
     <div>
-      <p className="text-sm text-[#607089]">{label}</p>
-      <p className={`mt-1 ${strong ? "font-extrabold text-indigo-700" : "font-bold text-[#091426]"}`}>{value || "Chưa có"}</p>
+      <p className="text-xs font-semibold text-[#6b7280] xl:text-sm">{label}</p>
+      <p className="mt-1 break-words text-sm font-bold text-[#091426] xl:text-base">{value || "Chưa có"}</p>
     </div>
   );
 }
 
-export default function LeaseContractManagementPage() {
-  const { user } = useAuth();
-  const canManageLeaseContracts = user?.role === ROLES.OWNER;
+export default function ContractTemplatePage() {
   const fileInputRef = useRef(null);
-  const uploadTargetRef = useRef(null);
   const [contracts, setContracts] = useState([]);
-  const [selectedKey, setSelectedKey] = useState("");
-  const [selectedDetails, setSelectedDetails] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [keyword, setKeyword] = useState("");
-  const [tab, setTab] = useState("ALL");
+  const [selected, setSelected] = useState(null);
+  const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [liquidationModalOpen, setLiquidationModalOpen] = useState(false);
-  const [liquidationDate, setLiquidationDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [liquidationReason, setLiquidationReason] = useState("Khách không tiếp tục thuê phòng.");
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fileFilter, setFileFilter] = useState("all");
+  const [isEditingTerms, setIsEditingTerms] = useState(false);
+  const [termsForm, setTermsForm] = useState(buildTermsForm());
+  const [termsError, setTermsError] = useState("");
+  const [termsFieldErrors, setTermsFieldErrors] = useState({});
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [renewForm, setRenewForm] = useState(buildRenewForm());
+  const [renewError, setRenewError] = useState("");
+  const [renewFieldErrors, setRenewFieldErrors] = useState({});
+  const [intentionModalOpen, setIntentionModalOpen] = useState(false);
+  const [intentionForm, setIntentionForm] = useState({
+    intention: "UNDECIDED",
+    expectedMoveOutDate: "",
+    note: "",
+  });
+  const [intentionError, setIntentionError] = useState("");
 
-  const selected = useMemo(() => {
-    if (!contracts.length) return null;
-    return contracts.find((item, index) => getContractRowKey(item, index) === selectedKey) || contracts[0];
-  }, [contracts, selectedKey]);
-
-  const mergedSelected = useMemo(() => {
-    if (!selected) return null;
-    if (!selectedDetails) return selected;
-    return {
-      ...selected,
-      ...selectedDetails,
-      roomCode: selectedDetails.room?.roomCode ?? selected.roomCode,
-      propertyName: selectedDetails.property?.name ?? selected.propertyName,
-      customerName: selectedDetails.primaryTenant?.fullName ?? selected.customerName,
-      phone: selectedDetails.primaryTenant?.phone ?? selected.phone,
-      contractFileId: selectedDetails.contractFile?.fileId ?? selected.contractFileId,
-      contractFileName: selectedDetails.contractFile?.fileName ?? selected.contractFileName,
-    };
-  }, [selected, selectedDetails]);
-
-  const summary = useMemo(() => ({
-    total: contracts.length,
-    waitingSign: contracts.filter((item) => getWorkflow(item) === "WAITING_SIGN").length,
-    waitingActivate: contracts.filter((item) => getWorkflow(item) === "WAITING_ACTIVATE").length,
-    active: contracts.filter((item) => getWorkflow(item) === "ACTIVE").length,
-    missingFile: contracts.filter((item) => !item.contractFileId).length,
-  }), [contracts]);
-
-  const filteredContracts = useMemo(() => {
-    const search = normalizeText(keyword);
-    return contracts.filter((item) => {
-      const workflow = getWorkflow(item);
-      const matchesKeyword =
-        !search ||
-        normalizeText(item.code).includes(search) ||
-        normalizeText(item.contractCode).includes(search) ||
-        normalizeText(item.depositCode).includes(search) ||
-        normalizeText(item.roomCode).includes(search) ||
-        normalizeText(item.propertyName).includes(search) ||
-        normalizeText(item.customerName).includes(search) ||
-        normalizeText(item.phone).includes(search);
-
-      const matchesTab =
-        tab === "ALL" ||
-        (tab === "NO_FILE" && !item.contractFileId) ||
-        (tab === "ENDED" && workflow === "ENDED") ||
-        workflow === tab;
-
-      return matchesKeyword && matchesTab;
-    });
-  }, [contracts, keyword, tab]);
-
-  async function loadContracts({ silent = false } = {}) {
-    if (!silent) {
-      setLoading(true);
-      setError("");
-    }
+  async function loadContracts() {
+    setLoading(true);
+    setError("");
     try {
       const data = await fetchLeaseContractManagementList();
-      const nextContracts = Array.isArray(data) ? data : [];
-      setContracts(nextContracts);
-      if (!selectedKey && nextContracts.length) {
-        setSelectedKey(getContractRowKey(nextContracts[0], 0));
-      }
-    } catch (loadError) {
-      setError(loadError.message || "Không tải được danh sách hợp đồng thuê.");
+      setContracts(data);
+    } catch (err) {
+      setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       loadContracts();
     }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     let ignore = false;
-
     async function loadDetails() {
       if (!selected?.leaseContractId) {
-        setSelectedDetails(null);
+        setDetails(null);
         return;
       }
       setDetailLoading(true);
       try {
-        const details = await fetchManagementLeaseContractDetails(selected.leaseContractId);
-        if (!ignore) setSelectedDetails(details);
+        const data = await fetchManagementLeaseContractDetails(selected.leaseContractId);
+        if (!ignore) {
+          setDetails(data);
+          setTermsForm(buildTermsForm(data));
+        }
       } catch {
-        if (!ignore) setSelectedDetails(null);
+        if (!ignore) setDetails(null);
       } finally {
         if (!ignore) setDetailLoading(false);
       }
     }
-
     loadDetails();
     return () => {
       ignore = true;
     };
   }, [selected?.leaseContractId]);
 
-  function selectRow(item, index) {
-    setSelectedKey(getContractRowKey(item, index));
-    setNotice("");
-    setError("");
-  }
+  const summary = useMemo(() => {
+    return contracts.reduce(
+      (acc, item) => {
+        acc.total += 1;
+        const workflow = getWorkflow(item);
+        if (workflow === "ACTIVE") acc.active += 1;
+        if (workflow === "PENDING_SIGNATURE") acc.pendingSignature += 1;
+        if (workflow === "PENDING_ACTIVATION") acc.pendingActivation += 1;
+        if (!item.contractFileId) acc.missingFile += 1;
+        return acc;
+      },
+      { total: 0, pendingSignature: 0, pendingActivation: 0, active: 0, missingFile: 0 },
+    );
+  }, [contracts]);
 
-  function openUploadDialog(target = selected) {
-    if (!canManageLeaseContracts) {
-      setError("Chỉ chủ trọ được upload hoặc thay thế hợp đồng thuê.");
-      return;
-    }
-    if (!target) return;
-    uploadTargetRef.current = target;
-    fileInputRef.current?.click();
-  }
+  const filteredContracts = useMemo(() => {
+    const search = normalizeKeyword(keyword);
+    return contracts.filter((item) => {
+      const searchable = [
+        item.displayCode,
+        item.contractCode,
+        item.depositCode,
+        item.roomCode,
+        item.propertyName,
+        item.primaryTenantName,
+        item.customerName,
+        item.phone,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-  async function handleCreateDraftContract(target = selected) {
-    if (!canManageLeaseContracts) {
-      setError("Chỉ chủ trọ được tạo hợp đồng thuê.");
-      return;
-    }
-    if (!target?.depositAgreementId) {
-      setError("Không xác định được hợp đồng đặt cọc để tạo hợp đồng thuê.");
-      return;
-    }
-    setActionLoading("create");
-    setError("");
-    setNotice("");
-    try {
-      const updated = await createDraftLeaseContractFromDeposit(target.depositAgreementId);
-      await loadContracts({ silent: true });
-      setSelectedKey(getContractRowKey(updated, 0));
-      setNotice(`Đã tạo hợp đồng thuê cho phòng ${updated.roomCode}.`);
-    } catch (createError) {
-      setError(createError.message || "Không thể tạo hợp đồng thuê.");
-    } finally {
-      setActionLoading("");
-    }
-  }
+      const matchesSearch = !search || searchable.includes(search);
+      const workflow = getWorkflow(item);
+      const matchesStatus =
+        statusFilter === "all" ||
+        workflow === statusFilter ||
+        item.status === statusFilter ||
+        item.contractStatus === statusFilter;
+      const matchesFile =
+        fileFilter === "all" ||
+        (fileFilter === "uploaded" && item.contractFileId) ||
+        (fileFilter === "missing" && !item.contractFileId);
 
-  async function handleUploadFile(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    const target = uploadTargetRef.current || selected;
-    uploadTargetRef.current = null;
-    if (!canManageLeaseContracts) {
-      setError("Chỉ chủ trọ được upload hoặc thay thế hợp đồng thuê.");
-      return;
-    }
-    if (!file || !target) return;
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Chỉ cho phép upload PDF, JPG hoặc PNG.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File hợp đồng không được vượt quá 10MB.");
-      return;
-    }
-    setActionLoading("upload");
-    setError("");
-    setNotice("");
-    try {
-      const updated = await uploadSignedLeaseContractFile(target, file);
-      await loadContracts({ silent: true });
-      setSelectedKey(getContractRowKey(updated, 0));
-      setNotice(`Đã upload file hợp đồng cho phòng ${updated.roomCode}.`);
-    } catch (uploadError) {
-      setError(uploadError.message || "Không thể upload hợp đồng đã ký.");
-    } finally {
-      setActionLoading("");
-    }
-  }
+      return matchesSearch && matchesStatus && matchesFile;
+    });
+  }, [contracts, fileFilter, keyword, statusFilter]);
 
-  async function handleActivate() {
-    if (!canManageLeaseContracts) {
-      setError("Chỉ chủ trọ được kích hoạt hợp đồng thuê.");
-      return;
-    }
-    if (!selected?.leaseContractId) {
-      setError("Vui lòng tạo hợp đồng thuê và upload file hợp đồng trước khi kích hoạt.");
-      return;
-    }
-    if (!selected.contractFileId) {
-      setError("Cần upload file hợp đồng đã ký trước khi kích hoạt.");
-      return;
-    }
-    setActionLoading("activate");
-    setError("");
-    setNotice("");
-    try {
-      const updated = await activateLeaseContract(selected.leaseContractId);
-      await loadContracts({ silent: true });
-      setSelectedKey(getContractRowKey(updated, 0));
-      setNotice(`Đã kích hoạt hợp đồng phòng ${updated.roomCode}. Phòng chuyển sang đang thuê.`);
-    } catch (activateError) {
-      setError(activateError.message || "Không thể kích hoạt hợp đồng thuê.");
-    } finally {
-      setActionLoading("");
-    }
-  }
+  const mergedSelected = useMemo(() => {
+    if (!selected) return null;
+    if (!details) return selected;
+    return {
+      ...selected,
+      ...details,
+      displayCode: details.contractCode || selected.displayCode,
+      contractFileId: details.contractFile?.id || selected.contractFileId,
+      contractFileName: details.contractFile?.fileName || selected.contractFileName,
+      contractFileUploadedAt: details.contractFile?.uploadedAt || selected.contractFileUploadedAt,
+      propertyName: details.property?.name || selected.propertyName,
+      roomCode: details.room?.roomCode || selected.roomCode,
+      monthlyRent: details.monthlyRent ?? selected.monthlyRent,
+      depositAmount: details.depositAmount ?? selected.depositAmount,
+      paymentCycleMonths: details.paymentCycleMonths ?? selected.paymentCycleMonths,
+      startDate: details.startDate ?? selected.startDate,
+      endDate: details.endDate ?? selected.endDate,
+      rentStartDate: details.rentStartDate ?? selected.rentStartDate,
+      status: details.status ?? selected.status,
+    };
+  }, [details, selected]);
 
-  async function handleSendAccount() {
-    if (!selected?.leaseContractId) {
-      setError("Hợp đồng thuê chưa được tạo.");
-      return;
-    }
-    if (getWorkflow(selected) !== "ACTIVE") {
-      setError("Chỉ gửi tài khoản sau khi hợp đồng đang hiệu lực.");
-      return;
-    }
-    if (!selected.emailAvailable) {
-      setError("Khách chưa có email, không thể gửi tài khoản.");
-      return;
-    }
-    setActionLoading("account");
-    setError("");
-    setNotice("");
-    try {
-      await sendTenantAccountCredentials(selected.leaseContractId);
-      await loadContracts({ silent: true });
-      setNotice(`Đã gửi tài khoản đăng nhập cho ${selected.customerName || "khách thuê"}.`);
-    } catch (accountError) {
-      setError(accountError.message || "Không thể gửi tài khoản cho khách.");
-    } finally {
-      setActionLoading("");
-    }
-  }
+  const selectedOccupants = useMemo(() => {
+    if (Array.isArray(details?.occupants) && details.occupants.length > 0) return details.occupants;
+    if (Array.isArray(selected?.occupants) && selected.occupants.length > 0) return selected.occupants;
+    return [];
+  }, [details, selected]);
 
-  async function handleViewFile() {
-    const fileId = mergedSelected?.contractFileId;
-    if (!fileId) {
-      setError("Hợp đồng chưa có file để xem.");
-      return;
-    }
-    setError("");
-    try {
-      await openLeaseContractFile(fileId);
-    } catch (viewError) {
-      setError(viewError.message || "Không thể mở file hợp đồng.");
-    }
-  }
+  const amountPerPeriod = useMemo(() => {
+    const monthlyRent = Number(termsForm.monthlyRent);
+    const cycleMonths = Number(termsForm.paymentCycleMonths);
+    if (!Number.isFinite(monthlyRent) || !Number.isFinite(cycleMonths)) return 0;
+    return monthlyRent * cycleMonths;
+  }, [termsForm.monthlyRent, termsForm.paymentCycleMonths]);
 
-  async function handleDownloadFile() {
-    const fileId = mergedSelected?.contractFileId;
-    if (!fileId) {
-      setError("Hợp đồng chưa có file để tải.");
-      return;
-    }
-    setError("");
-    try {
-      await downloadLeaseContractFile(fileId, mergedSelected.contractFileName || `hop-dong-${mergedSelected.roomCode}.pdf`);
-    } catch (downloadError) {
-      setError(downloadError.message || "Không thể tải file hợp đồng.");
-    }
-  }
-
-  const selectedWorkflow = getWorkflow(selected);
-  const canCreateDraft = Boolean(selected?.depositAgreementId && !selected?.leaseContractId);
-  const canLiquidate = Boolean(
-    selected?.leaseContractId &&
-      ["ACTIVE", "EXPIRING_SOON", "TERMINATION_PENDING"].includes(selected.contractStatus || selectedWorkflow),
+  const previewRentStartDate = useMemo(
+    () => calculateRentStartDate(termsForm.startDate),
+    [termsForm.startDate],
   );
 
-  async function handleLiquidateContract() {
-    if (!canManageLeaseContracts) {
-      setError("Chỉ chủ trọ được thanh lý hợp đồng thuê.");
-      return;
-    }
-    if (!selected?.leaseContractId) {
-      setError("Hợp đồng chưa được tạo, không thể thanh lý.");
-      return;
-    }
-    setActionLoading("liquidate");
+  const shortThreeMonthCycle = useMemo(
+    () =>
+      isContractShorterThanCycle(
+        termsForm.startDate,
+        termsForm.endDate,
+        termsForm.paymentCycleMonths,
+      ),
+    [termsForm.endDate, termsForm.paymentCycleMonths, termsForm.startDate],
+  );
+
+  function selectContract(item) {
+    setSelected(item);
+    setTermsForm(buildTermsForm(item));
+    setIsEditingTerms(false);
+    setTermsFieldErrors({});
+    setTermsError("");
+    setRenewModalOpen(false);
+    setIntentionModalOpen(false);
+  }
+
+  function openUploadDialog(item) {
+    setSelected(item);
+    window.setTimeout(() => fileInputRef.current?.click(), 0);
+  }
+
+  async function handleFileSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selected) return;
+
+    setActionLoading("upload");
     setError("");
-    setNotice("");
     try {
-      const updated = await liquidateLeaseContract(selected.leaseContractId, {
-        liquidationDate,
-        reason: liquidationReason,
-      });
-      await loadContracts({ silent: true });
-      setSelectedKey(getContractRowKey(updated, 0));
-      setNotice(`Đã thanh lý hợp đồng phòng ${updated.roomCode}. Phòng đã chuyển về trạng thái trống.`);
-      setLiquidationModalOpen(false);
-    } catch (liquidateError) {
-      setError(liquidateError.message || "Không thể thanh lý hợp đồng.");
+      const updated = await uploadSignedLeaseContractFile(selected, file);
+      setContracts((current) =>
+        current.map((item) => (getContractRowKey(item, 0) === getContractRowKey(selected, 0) ? { ...item, ...updated } : item)),
+      );
+      setSelected((current) => ({ ...current, ...updated }));
+      await loadContracts();
+    } catch (err) {
+      setError(err?.message || "Không upload được file hợp đồng.");
     } finally {
       setActionLoading("");
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleUploadFile} />
+  async function handleCreateDraft(item) {
+    if (!item?.depositAgreementId) return;
+    setActionLoading(`draft-${item.depositAgreementId}`);
+    setError("");
+    try {
+      await createDraftLeaseContractFromDeposit(item.depositAgreementId);
+      await loadContracts();
+    } catch (err) {
+      setError(err?.message || "Không tạo được hợp đồng thuê từ cọc.");
+    } finally {
+      setActionLoading("");
+    }
+  }
 
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-[#091426]">Quản lý hợp đồng thuê</h1>
-          <p className="mt-2 text-sm leading-6 text-[#505f76]">
-            Theo dõi lịch ký, upload hợp đồng đã ký, kích hoạt hợp đồng thuê và quản lý người ở trong phòng.
-          </p>
-        </div>
-        {canManageLeaseContracts && (
-          <button
-            type="button"
-            onClick={() => handleCreateDraftContract()}
-            disabled={!canCreateDraft || actionLoading === "create"}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:bg-slate-500 disabled:opacity-70"
-            title={canCreateDraft ? "Tạo hợp đồng thuê từ hợp đồng đặt cọc đã chọn." : "Chọn một hợp đồng cọc chưa tạo hợp đồng thuê."}
-          >
-            <FileText className="h-4 w-4" />
-            {actionLoading === "create" ? "Đang tạo..." : "Tạo hợp đồng từ cọc"}
-          </button>
-        )}
+  async function handleActivate(item) {
+    if (!item?.leaseContractId) return;
+    setActionLoading(`activate-${item.leaseContractId}`);
+    setError("");
+    try {
+      await activateLeaseContract(item.leaseContractId);
+      await loadContracts();
+    } catch (err) {
+      setError(err?.message || "Không kích hoạt được hợp đồng.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  function updateTermsField(field, value) {
+    setTermsForm((current) => ({ ...current, [field]: value }));
+    setTermsFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setTermsError("");
+  }
+
+  function cancelTermsEditing() {
+    setTermsForm(buildTermsForm(mergedSelected));
+    setTermsFieldErrors({});
+    setTermsError("");
+    setIsEditingTerms(false);
+  }
+
+  async function handleSaveTerms() {
+    if (!mergedSelected?.leaseContractId) return;
+
+    const monthlyRent = Number(termsForm.monthlyRent);
+    const depositAmount = Number(termsForm.depositAmount);
+    const paymentCycleMonths = Number(termsForm.paymentCycleMonths);
+    const validationErrors = {};
+
+    if (!termsForm.startDate) {
+      validationErrors.startDate = "Vui lòng chọn ngày bắt đầu hợp đồng.";
+    }
+    if (!termsForm.endDate) {
+      validationErrors.endDate = "Vui lòng chọn ngày kết thúc hợp đồng.";
+    } else if (termsForm.startDate && termsForm.endDate <= termsForm.startDate) {
+      validationErrors.endDate = "Ngày kết thúc phải sau ngày bắt đầu hợp đồng.";
+    }
+    if (![1, 3].includes(paymentCycleMonths)) {
+      validationErrors.paymentCycleMonths = "Chu kỳ thanh toán chỉ được là 1 hoặc 3 tháng.";
+    }
+    if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) {
+      validationErrors.monthlyRent = "Giá thuê mỗi tháng phải lớn hơn 0.";
+    }
+    if (!Number.isFinite(depositAmount) || depositAmount < 0) {
+      validationErrors.depositAmount = "Tiền cọc phải lớn hơn hoặc bằng 0.";
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setTermsFieldErrors(validationErrors);
+      setTermsError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
+      return;
+    }
+
+    setActionLoading(`terms-${mergedSelected.leaseContractId}`);
+    setTermsFieldErrors({});
+    setTermsError("");
+    setError("");
+    try {
+      const updated = await updateLeaseContractTerms(mergedSelected.leaseContractId, {
+        startDate: termsForm.startDate,
+        endDate: termsForm.endDate,
+        paymentCycleMonths,
+        monthlyRent,
+        depositAmount,
+      });
+      setContracts((current) =>
+        current.map((item) =>
+          item.leaseContractId === mergedSelected.leaseContractId
+            ? { ...item, ...updated }
+            : item,
+        ),
+      );
+      setSelected((current) => (current ? { ...current, ...updated } : current));
+      const refreshedDetails = await fetchManagementLeaseContractDetails(
+        mergedSelected.leaseContractId,
+      );
+      setDetails(refreshedDetails);
+      setTermsForm(buildTermsForm(refreshedDetails));
+      setTermsFieldErrors({});
+      setIsEditingTerms(false);
+    } catch (err) {
+      const serverErrors =
+        err?.payload?.data?.fieldErrors ||
+        err?.payload?.data?.field_errors ||
+        {};
+      setTermsFieldErrors({
+        startDate: serverErrors.startDate || serverErrors.start_date,
+        endDate: serverErrors.endDate || serverErrors.end_date,
+        paymentCycleMonths:
+          serverErrors.paymentCycleMonths || serverErrors.payment_cycle_months,
+        monthlyRent: serverErrors.monthlyRent || serverErrors.monthly_rent,
+        depositAmount: serverErrors.depositAmount || serverErrors.deposit_amount,
+      });
+      setTermsError(
+        Object.keys(serverErrors).length > 0
+          ? "Vui lòng kiểm tra các trường được đánh dấu đỏ."
+          : err?.details || err?.message || "Không cập nhật được thông tin hợp đồng.",
+      );
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function handleLiquidate(item) {
+    if (!item?.leaseContractId) return;
+    const confirmed = window.confirm("Bạn chắc chắn muốn thanh lý hợp đồng này?");
+    if (!confirmed) return;
+    setActionLoading(`liquidate-${item.leaseContractId}`);
+    setError("");
+    try {
+      const updated = await liquidateLeaseContract(item.leaseContractId, { reason: "Thanh lý từ màn quản lý hợp đồng" });
+      await loadContracts();
+      const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+      setDetails(refreshedDetails);
+      setSelected((current) => current ? { ...current, ...updated } : current);
+    } catch (err) {
+      setError(err?.message || "Không thanh lý được hợp đồng.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function handleSendAccount(item) {
+    if (!item?.leaseContractId) return;
+    setActionLoading(`send-${item.leaseContractId}`);
+    setError("");
+    try {
+      await sendTenantAccountCredentials(item.leaseContractId);
+      await loadContracts();
+    } catch (err) {
+      setError(err?.message || "Không gửi được tài khoản cho khách thuê.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  function openRenewModal() {
+    setRenewForm(buildRenewForm(mergedSelected));
+    setRenewFieldErrors({});
+    setRenewError("");
+    setRenewModalOpen(true);
+  }
+
+  function updateRenewField(field, value) {
+    setRenewForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === "newStartDate") {
+        next.newEndDate = addYearsMinusOneDay(value, 1);
+      }
+      return next;
+    });
+    setRenewFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setRenewError("");
+  }
+
+  async function handleRenewContract() {
+    if (!mergedSelected?.leaseContractId) return;
+    const monthlyRent = Number(renewForm.monthlyRent);
+    const paymentCycleMonths = Number(renewForm.paymentCycleMonths);
+    const depositAmount = Number(renewForm.depositAmount);
+    const validationErrors = {};
+
+    if (!renewForm.newContractCode.trim()) {
+      validationErrors.newContractCode = "Vui lòng nhập mã hợp đồng mới.";
+    }
+    if (!renewForm.newStartDate) {
+      validationErrors.newStartDate = "Vui lòng chọn ngày bắt đầu mới.";
+    }
+    if (!renewForm.newEndDate) {
+      validationErrors.newEndDate = "Vui lòng chọn ngày kết thúc mới.";
+    } else if (renewForm.newStartDate && renewForm.newEndDate <= renewForm.newStartDate) {
+      validationErrors.newEndDate = "Ngày kết thúc phải sau ngày bắt đầu.";
+    }
+    if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) {
+      validationErrors.monthlyRent = "Giá thuê phải lớn hơn 0.";
+    }
+    if (![1, 3].includes(paymentCycleMonths)) {
+      validationErrors.paymentCycleMonths = "Chu kỳ thanh toán chỉ được là 1 hoặc 3 tháng.";
+    }
+    if (!Number.isFinite(depositAmount) || depositAmount < 0) {
+      validationErrors.depositAmount = "Tiền cọc phải lớn hơn hoặc bằng 0.";
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setRenewFieldErrors(validationErrors);
+      setRenewError("Vui lòng kiểm tra thông tin hợp đồng mới.");
+      return;
+    }
+
+    setActionLoading(`renew-${mergedSelected.leaseContractId}`);
+    setRenewError("");
+    setError("");
+    try {
+      await renewLeaseContract(mergedSelected.leaseContractId, {
+        ...renewForm,
+        monthlyRent,
+        paymentCycleMonths,
+        depositAmount,
+      });
+      setRenewModalOpen(false);
+      await loadContracts();
+      const refreshedDetails = await fetchManagementLeaseContractDetails(mergedSelected.leaseContractId);
+      setDetails(refreshedDetails);
+      setSelected((current) => current ? { ...current, status: "RENEWED", contractStatus: "RENEWED" } : current);
+    } catch (err) {
+      setRenewError(err?.details || err?.message || "Không thể tái ký hợp đồng.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  function openIntentionModal() {
+    setIntentionForm({
+      intention: "UNDECIDED",
+      expectedMoveOutDate: "",
+      note: "",
+    });
+    setIntentionError("");
+    setIntentionModalOpen(true);
+  }
+
+  async function handleRecordIntention() {
+    if (!mergedSelected?.leaseContractId) return;
+    setActionLoading(`intention-${mergedSelected.leaseContractId}`);
+    setIntentionError("");
+    try {
+      await recordLeaseContractTenantIntention(mergedSelected.leaseContractId, intentionForm);
+      const refreshedDetails = await fetchManagementLeaseContractDetails(mergedSelected.leaseContractId);
+      setDetails(refreshedDetails);
+      setIntentionModalOpen(false);
+    } catch (err) {
+      setIntentionError(err?.details || err?.message || "Không thể ghi nhận ý định khách.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  const isBusy = Boolean(actionLoading);
+
+  return (
+    <div className="grid gap-5 text-[#091426] text-[13px] xl:gap-6 xl:text-sm">
+      <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileSelected} />
+
+      <section className="flex flex-col gap-2">
+        <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-[#091426] xl:text-3xl">
+          Quản lý hợp đồng thuê
+        </h1>
+        <p className="max-w-3xl text-sm leading-6 text-[#505f76]">
+          Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời hợp đồng thuê.
+        </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-5">
-        <StatCard label="Tổng" value={summary.total} />
-        <StatCard label="Chờ ký" value={summary.waitingSign} tone="amber" />
-        <StatCard label="Chờ kích hoạt" value={summary.waitingActivate} tone="blue" />
-        <StatCard label="Đang hiệu lực" value={summary.active} tone="emerald" />
+      <section className="grid gap-3 md:grid-cols-5 xl:gap-4">
+        <StatCard label="Tổng" value={summary.total} tone="dark" />
+        <StatCard label="Chờ ký" value={summary.pendingSignature} tone="amber" />
+        <StatCard label="Chờ kích hoạt" value={summary.pendingActivation} tone="blue" />
+        <StatCard label="Đang hiệu lực" value={summary.active} tone="green" />
         <StatCard label="Chưa có file" value={summary.missingFile} tone="red" />
       </section>
 
-      <section className="rounded-xl border border-[#dbe3ef] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.08)]">
-        <div className="grid gap-4 md:grid-cols-[1fr_150px]">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a98af]" />
+      <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_160px_auto]">
+          <label className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Tìm mã cọc/mã HĐ, cơ sở, phòng, tên khách hoặc SĐT"
-              className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white pl-12 pr-4 text-sm font-semibold outline-none focus:border-indigo-500"
+              placeholder="Tìm mã HĐ, phòng hoặc người ký..."
+              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
             />
-          </div>
+          </label>
+          <label className="relative">
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
+            >
+              {STATUS_FILTERS.map((filter) => (
+                <option key={filter.id} value={filter.id}>
+                  {filter.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="relative">
+            <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
+            <select
+              value={fileFilter}
+              onChange={(event) => setFileFilter(event.target.value)}
+              className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
+            >
+              <option value="all">Tất cả file</option>
+              <option value="uploaded">Đã upload</option>
+              <option value="missing">Chưa upload</option>
+            </select>
+          </label>
           <button
             type="button"
-            onClick={() => loadContracts()}
-            className="rounded-lg bg-indigo-600 text-sm font-extrabold text-white hover:bg-indigo-700"
+            onClick={loadContracts}
+            disabled={loading}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
           >
-            Lọc
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Làm mới
           </button>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {TABS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setTab(value)}
-              className={`rounded-full border px-4 py-2 text-sm font-extrabold ${
-                tab === value
-                  ? "border-indigo-600 bg-indigo-600 text-white"
-                  : "border-[#cbd5e1] bg-white text-[#2b3d58] hover:bg-[#f8fafc]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
       </section>
 
-      {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">{notice}</div>}
-      {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-700">{error}</div>}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {error}
+        </div>
+      )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_460px]">
-        <section className="overflow-hidden rounded-xl border border-[#dbe3ef] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.08)]">
-          <div className="border-b border-[#dbe3ef] px-6 py-5">
-            <h2 className="text-lg font-extrabold text-[#091426]">Danh sách hợp đồng thuê</h2>
-            <p className="mt-1 text-sm text-[#607089]">Dữ liệu lấy từ hợp đồng cọc đã thanh toán và hợp đồng thuê hiện có.</p>
-          </div>
+      <section className="overflow-hidden rounded-xl border border-[#dfe5ef] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+        <header className="border-b border-[#dfe5ef] px-5 py-5 xl:px-8 xl:py-7">
+          <h2 className="text-xl font-extrabold tracking-[-0.01em] text-[#091426] xl:text-2xl">Danh sách hợp đồng</h2>
+          <p className="mt-2 text-sm text-[#6b7280] xl:text-base">
+            Quản lý hợp đồng thuê, file scan/PDF và trạng thái vòng đời hợp đồng.
+          </p>
+        </header>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1500px] text-left">
-              <thead className="bg-[#f3f6fb] text-xs font-extrabold uppercase tracking-wide text-[#607089]">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] table-fixed text-left text-[12px] xl:min-w-0 xl:text-sm [&_td]:break-words [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
+            <thead className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase tracking-[0.03em] text-[#6b7280] xl:text-xs">
+              <tr>
+                <th className="w-[15%]">Mã HĐ</th>
+                <th className="w-[8%]">Phòng</th>
+                <th className="w-[16%]">Người ký chính</th>
+                <th className="w-[8%]">Số người</th>
+                <th className="w-[14%]">Thời hạn</th>
+                <th className="w-[12%]">Giá thuê</th>
+                <th className="w-[11%]">File</th>
+                <th className="w-[12%]">Trạng thái</th>
+                <th className="w-[4%] text-center">Xem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#edf1f6]">
+              {loading && (
                 <tr>
-                  <th className="px-5 py-4">Mã HĐ</th>
-                  <th className="px-5 py-4">Cơ sở</th>
-                  <th className="px-5 py-4">Phòng</th>
-                  <th className="px-5 py-4">Người thuê chính</th>
-                  <th className="px-5 py-4">Số người ở</th>
-                  <th className="px-5 py-4">Ngày bắt đầu</th>
-                  <th className="px-5 py-4">Ngày kết thúc</th>
-                  <th className="px-5 py-4">Ngày tính tiền</th>
-                  <th className="px-5 py-4">Giá HĐ</th>
-                  <th className="px-5 py-4">Chu kỳ</th>
-                  <th className="px-5 py-4">File</th>
-                  <th className="px-5 py-4">Trạng thái</th>
-                  <th className="px-5 py-4 text-right">Thao tác</th>
+                  <td colSpan={9} className="py-12 text-center text-sm font-bold text-[#607089]">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang tải dữ liệu hợp đồng...
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[#e7edf5]">
-                {loading && (
-                  <tr>
-                    <td colSpan={13} className="px-6 py-16 text-center text-sm font-bold text-[#607089]">
-                      Đang tải danh sách hợp đồng thuê...
+              )}
+
+              {!loading &&
+                filteredContracts.map((item, index) => (
+                  <tr
+                    key={getContractRowKey(item, index)}
+                    className="bg-white transition hover:bg-[#f8fbff]"
+                  >
+                    <td className="align-middle">
+                      <p className="font-extrabold leading-5 text-[#091426]">{item.displayCode || item.contractCode || item.depositCode || "Chưa có"}</p>
+                      <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">{item.propertyName || "Chưa có cơ sở"}</p>
+                    </td>
+                    <td className="align-middle">
+                      <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
+                        <Home className="h-3.5 w-3.5 shrink-0 text-[#9aa3b2] xl:h-4 xl:w-4" />
+                        {item.roomCode || "-"}
+                      </span>
+                    </td>
+                    <td className="align-middle">
+                      <p className="font-extrabold leading-5 text-[#091426]">{item.primaryTenantName || item.customerName || "Chưa có"}</p>
+                    </td>
+                    <td className="align-middle">
+                      <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
+                        <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500 xl:h-4 xl:w-4" />
+                        {getOccupantsCount(item)} người
+                      </span>
+                    </td>
+                    <td className="align-middle">
+                      <p className="font-semibold leading-5 text-[#091426]">{formatDate(item.startDate || item.expectedLeaseSignDate)}</p>
+                      <p className="text-[11px] leading-5 text-[#7b8495] xl:text-xs">đến {formatDate(item.endDate || item.expectedMoveInDate)}</p>
+                    </td>
+                    <td className="align-middle">
+                      <p className="font-extrabold leading-5 text-[#091426]">{formatMoney(item.monthlyRent)}</p>
+                    </td>
+                    <td className="align-middle">
+                      <FileBadge item={item} />
+                    </td>
+                    <td className="align-middle">
+                      <StatusBadge item={item} />
+                    </td>
+                    <td className="text-center align-middle">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          selectContract(item);
+                        }}
+                        className="h-9 rounded-lg border border-[#d1d7e0] bg-white px-2 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:px-3 xl:text-sm"
+                      >
+                        Xem
+                      </button>
                     </td>
                   </tr>
-                )}
+                ))}
 
-                {!loading && filteredContracts.map((item, index) => {
-                  const workflow = getWorkflow(item);
-                  const itemKey = getContractRowKey(item, index);
-                  return (
-                    <tr
-                      key={itemKey}
-                      onClick={() => selectRow(item, index)}
-                      className={`cursor-pointer hover:bg-[#f8fafc] ${selectedKey === itemKey ? "bg-indigo-50/70" : ""}`}
-                    >
-                      <td className="px-5 py-5 align-middle">
-                        <div className="font-extrabold text-[#091426]">{item.contractCode || item.depositCode || item.code || "Chưa có"}</div>
-                        <div className="mt-1 text-xs text-[#607089]">{item.contractCode ? "Hợp đồng thuê" : "Từ đặt cọc"}</div>
-                      </td>
-                      <td className="px-5 py-5 align-middle text-sm font-semibold text-[#091426]">{item.propertyName || "Chưa có"}</td>
-                      <td className="px-5 py-5 align-middle">
-                        <div className="inline-flex items-center gap-2 rounded-lg bg-[#091426] px-3 py-2 font-extrabold text-white">
-                          <Home className="h-4 w-4" />
-                          {item.roomCode || "Chưa có"}
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 align-middle font-bold text-[#091426]">{item.customerName || item.primaryTenantName || "Chưa có"}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-black text-[#091426]">{item.occupantsCount || 1}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-semibold text-[#091426]">{formatDate(item.startDate || item.expectedMoveInDate)}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-semibold text-[#091426]">{formatDate(item.endDate)}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-semibold text-[#091426]">{formatDate(item.rentStartDate)}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-black text-indigo-700">{formatMoney(item.monthlyRent)}</td>
-                      <td className="px-5 py-5 align-middle text-sm font-semibold text-[#091426]">{formatCycle(item.paymentCycleMonths)}</td>
-                      <td className="px-5 py-5 align-middle">
-                        {item.contractFileId ? (
-                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">
-                            Đã upload
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-extrabold text-red-700">
-                            Chưa upload
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-5 align-middle"><Badge status={workflow} /></td>
-                      <td className="px-5 py-5 text-right align-middle">
-                        <div className="inline-flex flex-col gap-2 sm:flex-row">
-                          {canManageLeaseContracts && !item.leaseContractId && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                selectRow(item, index);
-                                handleCreateDraftContract(item);
-                              }}
-                              disabled={actionLoading === "create"}
-                              className="rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Tạo HĐ
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectRow(item, index);
-                              if (canManageLeaseContracts && !item.contractFileId) openUploadDialog(item);
-                            }}
-                            className="rounded-lg bg-[#091426] px-4 py-2 text-sm font-extrabold text-white hover:bg-[#16253a]"
-                          >
-                            {canManageLeaseContracts && !item.contractFileId ? "Upload PDF" : "Chi tiết"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+              {!loading && filteredContracts.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
+                    Không có hợp đồng phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-                {!loading && filteredContracts.length === 0 && (
-                  <tr>
-                    <td colSpan={13} className="px-6 py-16 text-center text-sm font-bold text-[#607089]">
-                      Không có hợp đồng thuê phù hợp.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <aside className="overflow-hidden rounded-xl border border-[#dbe3ef] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.08)]">
-          {mergedSelected ? (
-            <>
-              <div className="border-b border-[#dbe3ef] bg-[#050b1d] px-6 py-6 text-white">
-                <div className="text-xs font-extrabold uppercase tracking-[0.18em] text-slate-300">Chi tiết hợp đồng thuê</div>
-                <h2 className="mt-3 text-2xl font-extrabold">Phòng {mergedSelected.roomCode || "Chưa có"} - {mergedSelected.customerName || "Khách thuê"}</h2>
-                <div className="mt-3"><Badge status={selectedWorkflow} /></div>
+      {mergedSelected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4">
+          <section className="max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl">
+            <header className="relative bg-[#05091d] px-5 py-7 text-white xl:px-7 xl:py-8">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(null);
+                  setIsEditingTerms(false);
+                  setTermsFieldErrors({});
+                  setTermsError("");
+                }}
+                aria-label="Đóng chi tiết hợp đồng"
+                className="absolute right-4 top-4 rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">Chi tiết hợp đồng</p>
+              <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
+                {mergedSelected.displayCode || mergedSelected.contractCode || mergedSelected.depositCode || "Chưa có mã"}
+              </h2>
+              <div className="mt-4">
+                <StatusBadge item={mergedSelected} />
               </div>
+            </header>
 
-              <div className="space-y-5 p-6">
-                <Section icon={Home} title="Thông tin phòng">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <InfoItem label="Cơ sở" value={mergedSelected.propertyName} />
-                    <InfoItem label="Phòng" value={mergedSelected.roomCode} strong />
-                    <InfoItem label="Trạng thái phòng" value={mergedSelected.roomStatus} />
-                    <InfoItem label="Mã" value={mergedSelected.contractCode || mergedSelected.depositCode || mergedSelected.code} />
-                  </div>
-                </Section>
+            <div className="grid gap-4 p-5 xl:gap-5 xl:p-7 lg:grid-cols-2">
+              {getWorkflow(mergedSelected) === "EXPIRED" && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 lg:col-span-2">
+                  Hợp đồng đã hết hạn. Vui lòng tái ký hoặc thanh lý.
+                </div>
+              )}
 
-                <Section icon={Users} title="Người ở trong hợp đồng">
-                  {detailLoading ? (
-                    <div className="h-16 animate-pulse rounded-lg bg-white" />
-                  ) : selectedDetails?.occupants?.length ? (
-                    <div className="space-y-2">
-                      {selectedDetails.occupants.map((occupant, index) => (
-                        <div
-                          key={occupant.tenantProfileId || `${occupant.occupantRole}-${occupant.fullName}-${index}`}
-                          className="rounded-lg bg-white p-3 text-sm"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-extrabold text-[#091426]">{occupant.fullName || "Chưa có tên"}</p>
-                              <p className="mt-1 text-[#607089]">{occupant.phone || "Chưa có SĐT"}</p>
-                            </div>
-                            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-                              {OCCUPANT_ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
-                            </span>
-                          </div>
-                          <div className="mt-3 grid grid-cols-2 gap-3 text-xs font-semibold text-[#607089]">
-                            <span>Vào: {formatDate(occupant.moveInDate)}</span>
-                            <span>Rời: {occupant.moveOutDate ? formatDate(occupant.moveOutDate) : "Đang ở"}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg bg-white p-3 text-sm">
-                      <InfoItem label="Người ký chính" value={mergedSelected.customerName} />
-                      <p className="mt-2 text-[#607089]">Chưa có dữ liệu danh sách người ở chi tiết.</p>
-                    </div>
-                  )}
-                </Section>
+              <DetailCard title="Thông tin phòng" icon={Home}>
+                <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                  <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
+                  <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
+                </div>
+              </DetailCard>
 
-                <Section icon={CalendarDays} title="Thời hạn và tiền thuê">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <InfoItem label="Ngày bắt đầu ở" value={formatDate(mergedSelected.startDate || mergedSelected.expectedMoveInDate)} />
-                    <InfoItem label="Ngày kết thúc" value={formatDate(mergedSelected.endDate)} />
-                    <InfoItem label="Ngày bắt đầu tính tiền" value={formatDate(mergedSelected.rentStartDate)} />
-                    <InfoItem label="Chu kỳ thanh toán" value={formatCycle(mergedSelected.paymentCycleMonths)} />
-                    <InfoItem label="Giá thuê theo HĐ" value={formatMoney(mergedSelected.monthlyRent)} />
-                    <InfoItem label="Tiền cọc" value={formatMoney(mergedSelected.depositAmount)} />
-                    <InfoItem label="Số người ở" value={`${mergedSelected.occupantsCount || selectedDetails?.occupants?.length || 1} người`} />
-                    <InfoItem label="Ngày ký" value={formatDate(mergedSelected.signedAt)} />
-                  </div>
-                </Section>
-
-                <Section icon={FileText} title="File hợp đồng đã ký">
-                  {mergedSelected.contractFileId ? (
-                    <div className="rounded-lg bg-white p-4">
-                      <p className="font-extrabold text-[#091426]">{mergedSelected.contractFileName || `hop-dong-${mergedSelected.roomCode}`}</p>
-                      <p className="mt-1 text-sm text-[#607089]">Upload: {formatDate(mergedSelected.contractFileUploadedAt)}</p>
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        <button type="button" onClick={handleViewFile} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 py-3 text-sm font-extrabold hover:bg-[#f8fafc]">
-                          <Eye className="h-4 w-4" /> Xem
-                        </button>
-                        <button type="button" onClick={handleDownloadFile} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 py-3 text-sm font-extrabold hover:bg-[#f8fafc]">
-                          <Download className="h-4 w-4" /> Tải
-                        </button>
-                        {canManageLeaseContracts && (
-                          <button type="button" onClick={() => openUploadDialog(selected)} disabled={selectedWorkflow === "ACTIVE" || actionLoading === "upload"} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 py-3 text-sm font-extrabold hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50">
-                            <Upload className="h-4 w-4" /> Thay
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-red-300 bg-white p-5 text-center">
-                      <Upload className="mx-auto h-8 w-8 text-red-500" />
-                      <p className="mt-2 font-extrabold text-[#091426]">Chưa có file hợp đồng cho phòng {mergedSelected.roomCode}</p>
-                      <p className="mt-1 text-sm text-[#607089]">Khách: {mergedSelected.customerName || "Chưa có"} - SĐT: {mergedSelected.phone || "Chưa có"}</p>
-                      {canManageLeaseContracts && (
-                        <button type="button" onClick={() => openUploadDialog(selected)} disabled={actionLoading === "upload"} className="mt-4 rounded-lg bg-[#091426] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-60">
-                          {actionLoading === "upload" ? "Đang upload..." : "Upload hợp đồng đã ký"}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </Section>
-
-                {selectedDetails?.events?.length > 0 && (
-                  <Section icon={Clock} title="Lịch sử sự kiện">
-                    <div className="space-y-2">
-                      {selectedDetails.events.map((event, index) => (
-                        <div key={event.id || `${event.eventType}-${event.createdAt}-${index}`} className="rounded-lg bg-white p-3 text-sm">
-                          <p className="font-extrabold text-[#091426]">{EVENT_LABELS[event.eventType] || event.eventType}</p>
-                          <p className="mt-1 text-[#607089]">{formatDateTime(event.createdAt)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                )}
-
-                <div className="grid gap-3">
-                  {canManageLeaseContracts && canCreateDraft && (
-                    <button type="button" onClick={() => handleCreateDraftContract()} disabled={actionLoading === "create"} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-60">
-                      <FileText className="h-4 w-4" />
-                      {actionLoading === "create" ? "Đang tạo hợp đồng..." : "Tạo hợp đồng thuê từ cọc"}
-                    </button>
-                  )}
-                  {canManageLeaseContracts && selectedWorkflow === "WAITING_ACTIVATE" && (
-                    <button type="button" onClick={handleActivate} disabled={actionLoading === "activate"} className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-                      <CheckCircle2 className="h-4 w-4" />
-                      {actionLoading === "activate" ? "Đang kích hoạt..." : "Kích hoạt hợp đồng"}
-                    </button>
-                  )}
-                  {selectedWorkflow === "ACTIVE" && (
-                    <button type="button" onClick={handleSendAccount} disabled={actionLoading === "account" || selected.accountProvisioned} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">
-                      <KeyRound className="h-4 w-4" />
-                      {selected.accountProvisioned ? "Tài khoản đã được cấp" : actionLoading === "account" ? "Đang gửi tài khoản..." : "Gửi tài khoản cho khách"}
-                    </button>
-                  )}
-                  {canManageLeaseContracts && (
+              <DetailCard
+                title="Thông tin hợp đồng thực tế"
+                icon={CalendarDays}
+                action={
+                  mergedSelected.leaseContractId &&
+                  !["LIQUIDATED", "EXPIRED", "CANCELLED", "RENEWED"].includes(getWorkflow(mergedSelected)) ? (
                     <button
                       type="button"
                       onClick={() => {
-                        if (!canLiquidate) return;
-                        setLiquidationDate(new Date().toISOString().slice(0, 10));
-                        setLiquidationReason("Khách không tiếp tục thuê phòng.");
-                        setLiquidationModalOpen(true);
+                        if (isEditingTerms) {
+                          cancelTermsEditing();
+                        } else {
+                          setTermsForm(buildTermsForm(mergedSelected));
+                          setTermsFieldErrors({});
+                          setTermsError("");
+                          setIsEditingTerms(true);
+                        }
                       }}
-                      disabled={!canLiquidate || actionLoading === "liquidate"}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+                      disabled={isBusy}
+                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
                     >
-                      <AlertTriangle className="h-4 w-4" /> Thanh lý hợp đồng
+                      {isEditingTerms ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                      {isEditingTerms ? "Hủy" : "Cập nhật"}
                     </button>
+                  ) : null
+                }
+              >
+                {isEditingTerms ? (
+                  <div className="mt-5">
+                    <div className="grid grid-cols-2 gap-3 xl:gap-4">
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Ngày bắt đầu *</span>
+                        <input
+                          type="date"
+                          value={termsForm.startDate}
+                          onChange={(event) => updateTermsField("startDate", event.target.value)}
+                          aria-invalid={Boolean(termsFieldErrors.startDate)}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                            termsFieldErrors.startDate
+                              ? "border-red-500 text-red-700 focus:border-red-600"
+                              : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
+                        />
+                        {termsFieldErrors.startDate && (
+                          <span className="text-xs font-semibold leading-4 text-red-600">
+                            {termsFieldErrors.startDate}
+                          </span>
+                        )}
+                      </label>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Ngày kết thúc *</span>
+                        <input
+                          type="date"
+                          value={termsForm.endDate}
+                          min={termsForm.startDate || undefined}
+                          onChange={(event) => updateTermsField("endDate", event.target.value)}
+                          aria-invalid={Boolean(termsFieldErrors.endDate)}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                            termsFieldErrors.endDate
+                              ? "border-red-500 text-red-700 focus:border-red-600"
+                              : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
+                        />
+                        {termsFieldErrors.endDate && (
+                          <span className="text-xs font-semibold leading-4 text-red-600">
+                            {termsFieldErrors.endDate}
+                          </span>
+                        )}
+                      </label>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Chu kỳ thanh toán *</span>
+                        <select
+                          value={termsForm.paymentCycleMonths}
+                          onChange={(event) => updateTermsField("paymentCycleMonths", event.target.value)}
+                          aria-invalid={Boolean(termsFieldErrors.paymentCycleMonths)}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                            termsFieldErrors.paymentCycleMonths
+                              ? "border-red-500 text-red-700 focus:border-red-600"
+                              : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
+                        >
+                          <option value="1">1 tháng/lần</option>
+                          <option value="3">3 tháng/lần</option>
+                        </select>
+                        {termsFieldErrors.paymentCycleMonths && (
+                          <span className="text-xs font-semibold leading-4 text-red-600">
+                            {termsFieldErrors.paymentCycleMonths}
+                          </span>
+                        )}
+                      </label>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Giá thuê/tháng *</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1000"
+                          value={termsForm.monthlyRent}
+                          onChange={(event) => updateTermsField("monthlyRent", event.target.value)}
+                          aria-invalid={Boolean(termsFieldErrors.monthlyRent)}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                            termsFieldErrors.monthlyRent
+                              ? "border-red-500 text-red-700 focus:border-red-600"
+                              : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
+                        />
+                        {termsFieldErrors.monthlyRent && (
+                          <span className="text-xs font-semibold leading-4 text-red-600">
+                            {termsFieldErrors.monthlyRent}
+                          </span>
+                        )}
+                      </label>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Tiền cọc *</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1000"
+                          value={termsForm.depositAmount}
+                          onChange={(event) => updateTermsField("depositAmount", event.target.value)}
+                          aria-invalid={Boolean(termsFieldErrors.depositAmount)}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                            termsFieldErrors.depositAmount
+                              ? "border-red-500 text-red-700 focus:border-red-600"
+                              : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
+                        />
+                        {termsFieldErrors.depositAmount && (
+                          <span className="text-xs font-semibold leading-4 text-red-600">
+                            {termsFieldErrors.depositAmount}
+                          </span>
+                        )}
+                      </label>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-bold text-[#58667c]">Số tiền cần đóng mỗi kỳ</span>
+                        <input
+                          readOnly
+                          value={formatMoney(amountPerPeriod)}
+                          className="h-10 rounded-lg border border-[#d8e1ef] bg-[#f2f6fc] px-3 text-sm font-extrabold text-[#091426]"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-blue-800">
+                      Ngày bắt đầu tính tiền thực tế: <strong>{formatDate(previewRentStartDate)}</strong>.
+                      {termsForm.startDate && new Date(`${termsForm.startDate}T00:00:00`).getDate() > 10
+                        ? " Theo quy tắc hiện tại, hợp đồng bắt đầu sau ngày 10 sẽ tính tiền từ ngày 01 tháng kế tiếp."
+                        : " Hợp đồng bắt đầu từ ngày 01 đến ngày 10 sẽ tính tiền ngay từ ngày bắt đầu."}
+                    </div>
+
+                    {shortThreeMonthCycle && (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold leading-5 text-amber-800">
+                        Thời hạn hợp đồng còn dưới 3 tháng nhưng đang chọn chu kỳ 3 tháng/lần. Hệ thống vẫn cho lưu, vui lòng kiểm tra lại lịch thu tiền.
+                      </div>
+                    )}
+
+                    {termsError && (
+                      <div
+                        role="alert"
+                        className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700"
+                      >
+                        {termsError}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSaveTerms}
+                      disabled={isBusy}
+                      className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
+                    >
+                      {actionLoading === `terms-${mergedSelected.leaseContractId}` ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Lưu thông tin hợp đồng
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                    <InfoValue label="Ngày bắt đầu" value={formatDate(mergedSelected.startDate)} />
+                    <InfoValue label="Ngày kết thúc" value={formatDate(mergedSelected.endDate)} />
+                    <InfoValue label="Ngày bắt đầu tính tiền" value={formatDate(mergedSelected.rentStartDate)} />
+                    <InfoValue label="Chu kỳ thanh toán" value={formatCycle(mergedSelected.paymentCycleMonths)} />
+                    <InfoValue label="Giá thuê/tháng" value={formatMoney(mergedSelected.monthlyRent)} />
+                    <InfoValue
+                      label="Số tiền cần đóng mỗi kỳ"
+                      value={formatMoney(
+                        Number(mergedSelected.monthlyRent || 0) *
+                          Number(mergedSelected.paymentCycleMonths || 0),
+                      )}
+                    />
+                    <InfoValue label="Tiền cọc (khoản riêng)" value={formatMoney(mergedSelected.depositAmount)} />
+                    <InfoValue
+                      label="Hợp đồng trước"
+                      value={
+                        mergedSelected.previousContractCode ||
+                        (mergedSelected.previousContractId ? `#${mergedSelected.previousContractId}` : "Không có")
+                      }
+                    />
+                    <InfoValue
+                      label="Hợp đồng tái ký"
+                      value={
+                        mergedSelected.renewedContractCode ||
+                        (mergedSelected.renewedContractId ? `#${mergedSelected.renewedContractId}` : "Chưa có")
+                      }
+                    />
+                  </div>
+                )}
+              </DetailCard>
+
+              <DetailCard title="Người ở trong hợp đồng" icon={Users} className="lg:col-span-2">
+                <div className="mt-5 overflow-x-auto rounded-lg border border-[#dfe5ef] bg-white">
+                  <table className="w-full min-w-[720px] table-fixed text-left">
+                    <thead className="bg-[#f7f9fe] text-[11px] font-bold uppercase tracking-[0.04em] text-[#6b7280] xl:text-xs">
+                      <tr>
+                        <th className="w-[34%] px-4 py-3">Họ tên</th>
+                        <th className="w-[22%] px-4 py-3">Vai trò</th>
+                        <th className="w-[22%] px-4 py-3">SĐT</th>
+                        <th className="w-[22%] px-4 py-3">CCCD</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#edf1f6] text-xs xl:text-sm">
+                  {detailLoading && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-5 text-sm font-bold text-[#607089]">
+                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                        Đang tải danh sách người ở...
+                      </td>
+                    </tr>
                   )}
-                  <button type="button" disabled className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-extrabold opacity-60">
-                    <RefreshCw className="h-4 w-4" /> Tái ký / Gia hạn
+                  {!detailLoading && selectedOccupants.length > 0 ? (
+                    selectedOccupants.map((occupant, index) => (
+                      <tr
+                        key={occupant.tenantProfileId || occupant.id || `${occupant.occupantRole}-${occupant.fullName}-${index}`}
+                      >
+                        <td className="px-4 py-3">
+                          <p className="truncate font-bold text-[#091426]" title={occupant.fullName || "Chưa cập nhật"}>
+                            {occupant.fullName || "Chưa cập nhật"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex max-w-full rounded-full border border-[#d8e1f2] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs">
+                            <span className="truncate">
+                              {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="truncate px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
+                          {occupant.phone || "Chưa có"}
+                        </td>
+                        <td className="truncate px-4 py-3 text-[#4b5563]" title={occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}>
+                          {occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    !detailLoading && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-5 text-sm font-semibold text-[#607089]">
+                          Chưa có danh sách người ở trong hợp đồng.
+                        </td>
+                      </tr>
+                    )
+                  )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                  <InfoValue label="Tổng số người" value={`${getOccupantsCount(mergedSelected, details)} người`} />
+                  <InfoValue label="Giá thuê" value={formatMoney(mergedSelected.monthlyRent)} />
+                </div>
+              </DetailCard>
+
+              <DetailCard title="File hợp đồng đã ký" icon={FileCheck2} className="lg:col-span-2">
+                <div className="mt-5 rounded-lg bg-white p-4">
+                  {mergedSelected.contractFileId ? (
+                    <>
+                      <p className="break-words font-extrabold text-[#091426]">
+                        {mergedSelected.contractFileName || "hop-dong-thue.pdf"}
+                      </p>
+                      <p className="mt-1 text-sm text-[#607089]">
+                        Upload: {formatDate(mergedSelected.contractFileUploadedAt)}
+                      </p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        <button
+                          type="button"
+                          onClick={() => openLeaseContractFile(mergedSelected.contractFileId)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-sm font-extrabold hover:bg-[#f8fafc]"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Xem
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadLeaseContractFile(mergedSelected.contractFileId, mergedSelected.contractFileName)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-sm font-extrabold hover:bg-[#f8fafc]"
+                        >
+                          <Download className="h-4 w-4" />
+                          Tải
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openUploadDialog(mergedSelected)}
+                          disabled={isBusy}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-sm font-extrabold hover:bg-[#f8fafc] disabled:opacity-60"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Thay
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-red-300 bg-white p-5 text-center">
+                      <Upload className="mx-auto h-8 w-8 text-red-500" />
+                      <p className="mt-2 font-extrabold text-[#091426]">
+                        Chưa có file hợp đồng cho phòng {mergedSelected.roomCode || "chưa rõ"}
+                      </p>
+                      <p className="mt-1 text-sm text-[#607089]">
+                        Khách: {mergedSelected.primaryTenantName || mergedSelected.customerName || "Chưa có"} - SĐT: {mergedSelected.phone || "Chưa có"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => openUploadDialog(mergedSelected)}
+                        disabled={isBusy}
+                        className="mt-4 rounded-lg bg-[#091426] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
+                      >
+                        Upload hợp đồng đã ký
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </DetailCard>
+
+              <section className="grid gap-3 lg:col-span-2 sm:grid-cols-2">
+                {!mergedSelected.leaseContractId && mergedSelected.depositAgreementId && (
+                  <button
+                    type="button"
+                    onClick={() => handleCreateDraft(mergedSelected)}
+                    disabled={isBusy}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    <FileCheck2 className="h-4 w-4" />
+                    Tạo hợp đồng thuê
                   </button>
-                  <button type="button" disabled className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-extrabold opacity-60">
-                    <Mail className="h-4 w-4" /> Nhắc lịch ký hợp đồng
+                )}
+                {mergedSelected.leaseContractId && ["DRAFT", "PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(getWorkflow(mergedSelected)) && (
+                  <button
+                    type="button"
+                    onClick={() => handleActivate(mergedSelected)}
+                    disabled={isBusy || !mergedSelected.contractFileId}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Kích hoạt hợp đồng
                   </button>
+                )}
+                {(details?.canSendAccount ?? getWorkflow(mergedSelected) === "ACTIVE") && (
+                  <button
+                    type="button"
+                    onClick={() => handleSendAccount(mergedSelected)}
+                    disabled={isBusy}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    Gửi tài khoản cho khách
+                  </button>
+                )}
+                {(details?.canRenew ??
+                  ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) && (
+                  <button
+                    type="button"
+                    onClick={openRenewModal}
+                    disabled={isBusy}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Tái ký / Gia hạn
+                  </button>
+                )}
+                {getWorkflow(mergedSelected) === "EXPIRING_SOON" && (
+                  <button
+                    type="button"
+                    onClick={openIntentionModal}
+                    disabled={isBusy}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-extrabold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Ghi nhận ý định khách
+                  </button>
+                )}
+                {(details?.canLiquidate ??
+                  ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(getWorkflow(mergedSelected))) && (
+                  <button
+                    type="button"
+                    onClick={() => handleLiquidate(mergedSelected)}
+                    disabled={isBusy}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    Thanh lý hợp đồng
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-extrabold opacity-60"
+                >
+                  <Mail className="h-4 w-4" />
+                  Nhắc lịch ký hợp đồng
+                </button>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {renewModalOpen && mergedSelected && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
+          <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-start justify-between gap-4 border-b border-[#dfe5ef] px-5 py-5">
+              <div>
+                <h2 className="text-xl font-extrabold text-[#091426]">Tái ký / Gia hạn hợp đồng</h2>
+                <p className="mt-1 text-sm text-[#607089]">
+                  Tạo hợp đồng mới từ {mergedSelected.contractCode}. Hợp đồng cũ không bị sửa đè.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRenewModalOpen(false)}
+                className="rounded-lg p-2 text-[#607089] hover:bg-[#f3f6fa]"
+                aria-label="Đóng modal tái ký"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
+              {[
+                ["newContractCode", "Mã hợp đồng mới", "text"],
+                ["newStartDate", "Ngày bắt đầu mới", "date"],
+                ["newEndDate", "Ngày kết thúc mới", "date"],
+                ["monthlyRent", "Giá thuê mới", "number"],
+                ["depositAmount", "Tiền cọc", "number"],
+              ].map(([field, label, type]) => (
+                <label key={field} className="grid gap-1.5">
+                  <span className="text-sm font-bold text-[#34445c]">{label} *</span>
+                  <input
+                    type={type}
+                    min={type === "number" ? (field === "depositAmount" ? "0" : "1") : undefined}
+                    step={type === "number" ? "1000" : undefined}
+                    value={renewForm[field]}
+                    onChange={(event) => updateRenewField(field, event.target.value)}
+                    className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${
+                      renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
+                    }`}
+                  />
+                  {renewFieldErrors[field] && (
+                    <span className="text-xs font-semibold text-red-600">{renewFieldErrors[field]}</span>
+                  )}
+                </label>
+              ))}
+
+              <label className="grid gap-1.5">
+                <span className="text-sm font-bold text-[#34445c]">Chu kỳ thanh toán *</span>
+                <select
+                  value={renewForm.paymentCycleMonths}
+                  onChange={(event) => updateRenewField("paymentCycleMonths", event.target.value)}
+                  className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                    renewFieldErrors.paymentCycleMonths ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
+                  }`}
+                >
+                  <option value="1">1 tháng/lần</option>
+                  <option value="3">3 tháng/lần</option>
+                </select>
+                {renewFieldErrors.paymentCycleMonths && (
+                  <span className="text-xs font-semibold text-red-600">{renewFieldErrors.paymentCycleMonths}</span>
+                )}
+              </label>
+
+              <label className="grid gap-1.5 sm:col-span-2">
+                <span className="text-sm font-bold text-[#34445c]">Ghi chú</span>
+                <textarea
+                  rows={3}
+                  value={renewForm.note}
+                  onChange={(event) => updateRenewField("note", event.target.value)}
+                  className="rounded-lg border border-[#cbd5e1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
+                />
+              </label>
+
+              <div className="rounded-xl border border-[#dfe5ef] bg-[#f8fafc] p-4 sm:col-span-2">
+                <p className="text-sm font-extrabold text-[#091426]">Occupants giữ nguyên</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {selectedOccupants.map((occupant, index) => (
+                    <div
+                      key={occupant.tenantProfileId || `${occupant.fullName}-${index}`}
+                      className="rounded-lg border border-[#dfe5ef] bg-white px-3 py-2"
+                    >
+                      <p className="font-bold text-[#091426]">{occupant.fullName || "Chưa cập nhật"}</p>
+                      <p className="text-xs text-[#607089]">
+                        {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="p-8 text-center text-sm font-bold text-[#607089]">Chọn một dòng để xem chi tiết.</div>
-          )}
-        </aside>
-      </div>
 
-      {liquidationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4">
-          <section className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-[#dbe3ef] px-6 py-5">
-              <h2 className="text-xl font-extrabold text-[#091426]">Thanh lý hợp đồng thuê</h2>
-              <p className="mt-1 text-sm text-[#607089]">
-                Hợp đồng phòng {mergedSelected?.roomCode}. Sau khi thanh lý, phòng sẽ được trả về trạng thái trống.
-              </p>
+              {renewError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 sm:col-span-2">
+                  {renewError}
+                </div>
+              )}
             </div>
-            <div className="space-y-4 px-6 py-5">
-              <label className="block">
-                <span className="text-sm font-extrabold text-[#091426]">Ngày thanh lý</span>
-                <input type="date" value={liquidationDate} onChange={(event) => setLiquidationDate(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-[#cbd5e1] px-3 text-sm font-semibold outline-none focus:border-indigo-500" />
-              </label>
-              <label className="block">
-                <span className="text-sm font-extrabold text-[#091426]">Lý do thanh lý</span>
-                <textarea value={liquidationReason} onChange={(event) => setLiquidationReason(event.target.value)} rows={4} className="mt-2 w-full rounded-lg border border-[#cbd5e1] px-3 py-3 text-sm font-semibold outline-none focus:border-indigo-500" placeholder="Nhập lý do thanh lý hợp đồng" />
-              </label>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                Thao tác này kết thúc hợp đồng thuê hiện tại và mở lại phòng cho khách mới.
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-[#dbe3ef] px-6 py-4">
-              <button type="button" onClick={() => setLiquidationModalOpen(false)} className="rounded-lg border border-[#cbd5e1] px-5 py-2 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc]">
+
+            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setRenewModalOpen(false)}
+                className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold"
+              >
                 Hủy
               </button>
-              <button type="button" onClick={handleLiquidateContract} disabled={actionLoading === "liquidate"} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-extrabold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
-                {actionLoading === "liquidate" ? "Đang thanh lý..." : "Xác nhận thanh lý"}
+              <button
+                type="button"
+                onClick={handleRenewContract}
+                disabled={isBusy}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white disabled:opacity-60"
+              >
+                {actionLoading === `renew-${mergedSelected.leaseContractId}` && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Tạo hợp đồng mới
               </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {intentionModalOpen && mergedSelected && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
+          <section className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-start justify-between border-b border-[#dfe5ef] px-5 py-5">
+              <div>
+                <h2 className="text-xl font-extrabold text-[#091426]">Ghi nhận ý định khách</h2>
+                <p className="mt-1 text-sm text-[#607089]">{mergedSelected.contractCode}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIntentionModalOpen(false)}
+                className="rounded-lg p-2 text-[#607089] hover:bg-[#f3f6fa]"
+                aria-label="Đóng modal ý định khách"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="grid gap-4 px-5 py-5">
+              <label className="grid gap-1.5">
+                <span className="text-sm font-bold text-[#34445c]">Ý định</span>
+                <select
+                  value={intentionForm.intention}
+                  onChange={(event) => setIntentionForm((current) => ({ ...current, intention: event.target.value }))}
+                  className="h-11 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold"
+                >
+                  <option value="RENEW">Tái ký / Gia hạn</option>
+                  <option value="MOVE_OUT">Chuyển đi</option>
+                  <option value="TRANSFER_ROOM">Chuyển phòng</option>
+                  <option value="UNDECIDED">Chưa quyết định</option>
+                </select>
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-sm font-bold text-[#34445c]">Ngày dự kiến chuyển đi</span>
+                <input
+                  type="date"
+                  value={intentionForm.expectedMoveOutDate}
+                  onChange={(event) => setIntentionForm((current) => ({ ...current, expectedMoveOutDate: event.target.value }))}
+                  className="h-11 rounded-lg border border-[#cbd5e1] px-3 text-sm font-semibold"
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-sm font-bold text-[#34445c]">Ghi chú</span>
+                <textarea
+                  rows={3}
+                  value={intentionForm.note}
+                  onChange={(event) => setIntentionForm((current) => ({ ...current, note: event.target.value }))}
+                  className="rounded-lg border border-[#cbd5e1] px-3 py-2 text-sm font-semibold"
+                />
+              </label>
+              {intentionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+                  {intentionError}
+                </div>
+              )}
             </div>
+            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setIntentionModalOpen(false)}
+                className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleRecordIntention}
+                disabled={isBusy}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-5 text-sm font-extrabold text-white disabled:opacity-60"
+              >
+                {actionLoading === `intention-${mergedSelected.leaseContractId}` && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Lưu ý định
+              </button>
+            </footer>
           </section>
         </div>
       )}

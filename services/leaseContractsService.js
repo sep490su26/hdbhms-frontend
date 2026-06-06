@@ -85,14 +85,48 @@ export function normalizeLeaseContractItem(item = {}) {
     status: item.status ?? item.contractStatus ?? item.contract_status ?? null,
     depositStatus: item.depositStatus ?? item.deposit_status ?? null,
     workflowStatus: item.workflowStatus ?? item.workflow_status ?? null,
-    occupantsCount: item.occupantsCount ?? item.occupants_count ?? null,
-    contractFileId: item.contractFileId ?? item.contract_file_id ?? null,
-    contractFileName: item.contractFileName ?? item.contract_file_name ?? null,
-    contractFileUploadedAt: item.contractFileUploadedAt ?? item.contract_file_uploaded_at ?? null,
+    occupantsCount:
+      item.occupantsCount ??
+      item.occupants_count ??
+      item.occupantCount ??
+      item.occupant_count ??
+      item.peopleCount ??
+      item.people_count ??
+      item.roomOccupantCount ??
+      item.room_occupant_count ??
+      (Array.isArray(item.occupants) ? item.occupants.length : null),
+    contractFileId:
+      item.contractFileId ??
+      item.contract_file_id ??
+      item.fileId ??
+      item.file_id ??
+      item.contractFile?.id ??
+      item.contract_file?.id ??
+      item.contractFile?.fileId ??
+      item.contract_file?.file_id ??
+      null,
+    contractFileName:
+      item.contractFileName ??
+      item.contract_file_name ??
+      item.fileName ??
+      item.file_name ??
+      item.contractFile?.fileName ??
+      item.contract_file?.file_name ??
+      null,
+    contractFileUploadedAt:
+      item.contractFileUploadedAt ??
+      item.contract_file_uploaded_at ??
+      item.uploadedAt ??
+      item.uploaded_at ??
+      item.contractFile?.uploadedAt ??
+      item.contract_file?.uploaded_at ??
+      null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
     accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
     emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+    previousContractId: item.previousContractId ?? item.previous_contract_id ?? null,
+    renewedContractId: item.renewedContractId ?? item.renewed_contract_id ?? item.nextContractId ?? item.next_contract_id ?? null,
   };
 }
 
@@ -156,6 +190,27 @@ export async function activateLeaseContract(leaseContractId) {
   return normalizeLeaseContractItem(data);
 }
 
+export async function updateLeaseContractTerms(leaseContractId, payload) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng cần cập nhật.");
+  }
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/terms`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        start_date: payload.startDate,
+        end_date: payload.endDate,
+        payment_cycle_months: payload.paymentCycleMonths,
+        monthly_rent: payload.monthlyRent,
+        deposit_amount: payload.depositAmount,
+      }),
+    },
+  );
+  return normalizeLeaseContractItem(data);
+}
+
 export async function liquidateLeaseContract(leaseContractId, payload = {}) {
   if (!leaseContractId) {
     throw new Error("Hợp đồng chưa được tạo, không thể thanh lý.");
@@ -165,6 +220,47 @@ export async function liquidateLeaseContract(leaseContractId, payload = {}) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  return normalizeLeaseContractItem(data);
+}
+
+export async function renewLeaseContract(leaseContractId, payload) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng cần tái ký.");
+  }
+  return authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/renew`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        new_contract_code: payload.newContractCode,
+        new_start_date: payload.newStartDate,
+        new_end_date: payload.newEndDate,
+        monthly_rent: payload.monthlyRent,
+        payment_cycle_months: payload.paymentCycleMonths,
+        deposit_amount: payload.depositAmount,
+        note: payload.note,
+      }),
+    },
+  );
+}
+
+export async function recordLeaseContractTenantIntention(leaseContractId, payload) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng cần ghi nhận ý định.");
+  }
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/tenant-intention`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        intention: payload.intention,
+        expected_move_out_date: payload.expectedMoveOutDate || null,
+        note: payload.note,
+      }),
+    },
+  );
   return normalizeLeaseContractItem(data);
 }
 
@@ -217,6 +313,23 @@ export async function downloadLeaseContractFile(fileId, filename = "hop-dong-thu
 
 function normalizeLeaseContractDetails(details = {}) {
   if (!details || typeof details !== "object") return null;
+  const rawContractFile = details.contractFile ?? details.contract_file ?? null;
+  const rawOccupants =
+    details.occupants ??
+    details.contractOccupants ??
+    details.contract_occupants ??
+    details.occupantInfos ??
+    details.occupant_infos ??
+    details.residents ??
+    [];
+  const contractFile = rawContractFile
+    ? {
+        ...rawContractFile,
+        id: rawContractFile.id ?? rawContractFile.fileId ?? rawContractFile.file_id ?? null,
+        fileName: rawContractFile.fileName ?? rawContractFile.file_name ?? rawContractFile.name ?? null,
+        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
+      }
+    : null;
   return {
     ...details,
     contractId: details.contractId ?? details.contract_id ?? null,
@@ -227,18 +340,51 @@ function normalizeLeaseContractDetails(details = {}) {
     monthlyRent: details.monthlyRent ?? details.monthly_rent ?? null,
     paymentCycleMonths: details.paymentCycleMonths ?? details.payment_cycle_months ?? null,
     depositAmount: details.depositAmount ?? details.deposit_amount ?? null,
+    occupantsCount:
+      details.occupantsCount ??
+      details.occupants_count ??
+      details.occupantCount ??
+      details.occupant_count ??
+      (Array.isArray(rawOccupants) ? rawOccupants.length : null),
     status: details.status ?? null,
     signedAt: details.signedAt ?? details.signed_at ?? null,
+    previousContractId: details.previousContractId ?? details.previous_contract_id ?? null,
+    previousContractCode: details.previousContractCode ?? details.previous_contract_code ?? null,
+    renewedContractId:
+      details.renewedContractId ??
+      details.renewed_contract_id ??
+      details.nextContractId ??
+      details.next_contract_id ??
+      null,
+    renewedContractCode:
+      details.renewedContractCode ??
+      details.renewed_contract_code ??
+      details.nextContractCode ??
+      details.next_contract_code ??
+      null,
+    canRenew: details.canRenew ?? details.can_renew ?? false,
+    canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
+    canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
     room: details.room ?? {},
     property: details.property ?? {},
     primaryTenant: details.primaryTenant ?? details.primary_tenant ?? {},
-    contractFile: details.contractFile ?? details.contract_file ?? null,
-    occupants: Array.isArray(details.occupants)
-      ? details.occupants.map((occupant) => ({
+    contractFile,
+    occupants: Array.isArray(rawOccupants)
+      ? rawOccupants.map((occupant) => ({
           ...occupant,
           tenantProfileId: occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
           fullName: occupant.fullName ?? occupant.full_name ?? "",
           phone: occupant.phone ?? "",
+          citizenId:
+            occupant.citizenId ??
+            occupant.citizen_id ??
+            occupant.cccd ??
+            occupant.citizen_id ??
+            occupant.identityNumber ??
+            occupant.identity_number ??
+            occupant.idNumber ??
+            occupant.id_number ??
+            null,
           occupantRole: occupant.occupantRole ?? occupant.occupant_role ?? null,
           moveInDate: occupant.moveInDate ?? occupant.move_in_date ?? null,
           moveOutDate: occupant.moveOutDate ?? occupant.move_out_date ?? null,

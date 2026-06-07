@@ -666,7 +666,7 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
 }
 
 export default function TenantsPage() {
-  const [profiles, setProfiles] = useState(MOCK_TENANT_PROFILES);
+  const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);

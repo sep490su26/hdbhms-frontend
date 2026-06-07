@@ -9,7 +9,6 @@ import {
   Eye,
   FileCheck2,
   FileWarning,
-  Filter,
   Home,
   KeyRound,
   Loader2,
@@ -37,18 +36,35 @@ import {
   updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
 import { sendTenantAccountCredentials } from "@/services/identityAccessService";
+import ContractHandoverSection from "./ContractHandoverSection";
 
 const STATUS_FILTERS = [
+  { id: "current", label: "Hợp đồng hiện tại" },
   { id: "all", label: "Tất cả" },
-  { id: "PENDING_SIGNATURE", label: "Chờ ký" },
-  { id: "MISSING_FILE", label: "Chưa upload file" },
-  { id: "PENDING_ACTIVATION", label: "Chờ kích hoạt" },
+  { id: "PENDING", label: "Chờ ký / kích hoạt" },
   { id: "ACTIVE", label: "Đang hiệu lực" },
   { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
   { id: "EXPIRED", label: "Hết hạn" },
+  { id: "history", label: "Lịch sử" },
   { id: "RENEWED", label: "Đã gia hạn" },
-  { id: "ENDED", label: "Đã kết thúc" },
+  { id: "LIQUIDATED", label: "Đã thanh lý" },
 ];
+
+const CURRENT_CONTRACT_WORKFLOWS = new Set([
+  "PENDING_SIGNATURE",
+  "MISSING_FILE",
+  "PENDING_ACTIVATION",
+  "ACTIVE",
+  "EXPIRING_SOON",
+  "EXPIRED",
+]);
+
+const HISTORY_CONTRACT_WORKFLOWS = new Set([
+  "RENEWED",
+  "LIQUIDATED",
+  "CANCELLED",
+  "AUTO_TERMINATED",
+]);
 
 const WORKFLOW_LABELS = {
   PENDING_SIGNATURE: "Chờ ký",
@@ -60,6 +76,7 @@ const WORKFLOW_LABELS = {
   EXPIRED: "Hết hạn",
   RENEWED: "Đã gia hạn",
   CANCELLED: "Đã hủy",
+  AUTO_TERMINATED: "Đã tự động kết thúc",
   TERMINATION_PENDING: "Chờ thanh lý",
   ENDED: "Đã kết thúc",
   DRAFT: "Bản nháp",
@@ -75,6 +92,7 @@ const STATUS_LABELS = {
   RENEWED: "Đã gia hạn",
   EXPIRING_SOON: "Sắp hết hạn",
   CANCELLED: "Đã hủy",
+  AUTO_TERMINATED: "Đã tự động kết thúc",
   TERMINATION_PENDING: "Chờ thanh lý",
 };
 
@@ -83,193 +101,49 @@ const ROLE_LABELS = {
   CO_OCCUPANT: "Người ở cùng",
 };
 
-const MOCK_LEASE_CONTRACTS = [
-  {
-    sourceType: "CONTRACT",
-    contractId: 5001,
-    leaseContractId: 5001,
-    displayCode: "HD-2026-001",
-    contractCode: "HD-2026-001",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    propertyAddress: "12 Nguyen Trai, Thanh Xuan, Ha Noi",
-    roomId: 101,
-    roomCode: "A101",
-    primaryTenantProfileId: 1001,
-    primaryTenantName: "Nguyen Minh Anh",
-    phone: "0901234567",
-    email: "minh.anh@example.com",
-    startDate: "2026-01-05",
-    endDate: "2026-12-31",
-    rentStartDate: "2026-01-05",
-    monthlyRent: 4500000,
-    paymentCycleMonths: 1,
-    depositAmount: 4500000,
-    status: "ACTIVE",
-    contractStatus: "ACTIVE",
-    occupantsCount: 2,
-    contractFileId: 7001,
-    contractFileName: "HD-2026-001-signed.pdf",
-    contractFileUploadedAt: "2026-01-04T15:30:00",
-    signedAt: "2026-01-03T09:30:00",
-    accountProvisioned: true,
-    emailAvailable: true,
-    occupants: [
-      {
-        tenantProfileId: 1001,
-        fullName: "Nguyen Minh Anh",
-        occupantRole: "PRIMARY",
-        phone: "0901234567",
-        citizenId: "001298012345",
-      },
-      {
-        tenantProfileId: 1002,
-        fullName: "Tran Thu Ha",
-        occupantRole: "CO_OCCUPANT",
-        phone: "0987654321",
-        citizenId: "048300123456",
-      },
-    ],
+const ACCOUNT_PROVISIONING_ACTIONS = {
+  NOT_PROVISIONED: {
+    label: "Gửi tài khoản cho khách",
+    disabled: false,
+    className: "bg-indigo-600 text-white hover:bg-indigo-700",
   },
-  {
-    sourceType: "CONTRACT",
-    contractId: 5002,
-    leaseContractId: 5002,
-    displayCode: "HD-2025-118",
-    contractCode: "HD-2025-118",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    propertyAddress: "88 Tran Thai Tong, Cau Giay, Ha Noi",
-    roomId: 205,
-    roomCode: "B205",
-    primaryTenantProfileId: 1003,
-    primaryTenantName: "Le Quang Huy",
-    phone: "0978123456",
-    email: "quang.huy@example.com",
-    startDate: "2025-08-15",
-    endDate: "2026-07-31",
-    rentStartDate: "2025-09-01",
-    monthlyRent: 6200000,
-    paymentCycleMonths: 3,
-    depositAmount: 6200000,
-    status: "EXPIRING_SOON",
-    contractStatus: "EXPIRING_SOON",
-    occupantsCount: 1,
-    contractFileId: 7002,
-    contractFileName: "HD-2025-118-signed.pdf",
-    contractFileUploadedAt: "2025-08-14T11:00:00",
-    signedAt: "2025-08-12T16:15:00",
-    accountProvisioned: true,
-    emailAvailable: true,
-    occupants: [
-      {
-        tenantProfileId: 1003,
-        fullName: "Le Quang Huy",
-        occupantRole: "PRIMARY",
-        phone: "0978123456",
-        citizenId: "092196123456",
-      },
-    ],
+  PENDING: {
+    label: "Đang gửi tài khoản",
+    disabled: true,
+    className: "border border-blue-200 bg-blue-50 text-blue-700",
   },
-  {
-    sourceType: "CONTRACT",
-    contractId: 5003,
-    leaseContractId: 5003,
-    displayCode: "HD-2026-020",
-    contractCode: "HD-2026-020",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 301,
-    roomCode: "C301",
-    primaryTenantProfileId: 1004,
-    primaryTenantName: "Pham Gia Bao",
-    phone: "0966123456",
-    email: "",
-    startDate: "2026-06-10",
-    endDate: "2027-06-09",
-    rentStartDate: "2026-06-10",
-    monthlyRent: 5500000,
-    paymentCycleMonths: 1,
-    depositAmount: 5500000,
-    status: "PENDING_SIGNATURE",
-    contractStatus: "PENDING_SIGNATURE",
-    workflowStatus: "MISSING_FILE",
-    occupantsCount: 1,
-    contractFileId: null,
-    contractFileName: null,
-    contractFileUploadedAt: null,
-    accountProvisioned: false,
-    emailAvailable: false,
-    occupants: [
-      {
-        tenantProfileId: 1004,
-        fullName: "Pham Gia Bao",
-        occupantRole: "PRIMARY",
-        phone: "0966123456",
-        citizenId: "079199123456",
-      },
-    ],
+  SENT: {
+    label: "Đã gửi tài khoản",
+    disabled: true,
+    className: "border border-blue-200 bg-blue-50 text-blue-700",
   },
-  {
-    sourceType: "CONTRACT",
-    contractId: 5004,
-    leaseContractId: 5004,
-    displayCode: "HD-2026-021",
-    contractCode: "HD-2026-021",
-    propertyId: 3,
-    propertyName: "HDB Living Thu Duc",
-    roomId: 402,
-    roomCode: "D402",
-    primaryTenantProfileId: 1005,
-    primaryTenantName: "Vo Thanh Truc",
-    phone: "0933123456",
-    email: "thanh.truc@example.com",
-    startDate: "2026-06-15",
-    endDate: "2027-06-14",
-    rentStartDate: "2026-07-01",
-    monthlyRent: 7800000,
-    paymentCycleMonths: 3,
-    depositAmount: 7800000,
-    status: "PENDING_SIGNATURE",
-    contractStatus: "PENDING_SIGNATURE",
-    workflowStatus: "PENDING_ACTIVATION",
-    occupantsCount: 3,
-    contractFileId: 7004,
-    contractFileName: "HD-2026-021-signed.pdf",
-    contractFileUploadedAt: "2026-06-05T10:45:00",
-    accountProvisioned: false,
-    emailAvailable: true,
-    occupants: [
-      {
-        tenantProfileId: 1005,
-        fullName: "Vo Thanh Truc",
-        occupantRole: "PRIMARY",
-        phone: "0933123456",
-        citizenId: "079202123456",
-      },
-      {
-        tenantProfileId: 1006,
-        fullName: "Do My Linh",
-        occupantRole: "CO_OCCUPANT",
-        phone: "0944123456",
-        citizenId: "001203123456",
-      },
-      {
-        tenantProfileId: 1007,
-        fullName: "Bui Duc Long",
-        occupantRole: "CO_OCCUPANT",
-        phone: "0955123456",
-        citizenId: "001201123456",
-      },
-    ],
+  ACTIVE: {
+    label: "Đã kích hoạt tài khoản",
+    disabled: true,
+    className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
   },
-];
+  FAILED: {
+    label: "Thử gửi lại tài khoản",
+    disabled: false,
+    className: "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+  },
+  MISSING_EMAIL: {
+    label: "Thiếu email nhận tài khoản",
+    disabled: true,
+    className: "border border-amber-200 bg-amber-50 text-amber-700",
+  },
+};
 
 function formatDate(value) {
   if (!value) return "Chưa có";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("vi-VN").format(date);
+}
+
+function formatIdentityNumber(value) {
+  if (!value || String(value).startsWith("PENDING-")) return "Chưa cập nhật";
+  return value;
 }
 
 function formatMoney(value) {
@@ -280,6 +154,23 @@ function formatMoney(value) {
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(number);
+}
+
+function formatOptionalMoney(value) {
+  if (value === null || value === undefined || value === "") return "Chưa có";
+  return formatMoney(value);
+}
+
+function getAmountPerPeriod(item) {
+  if (
+    item?.monthlyRent === null ||
+    item?.monthlyRent === undefined ||
+    item?.paymentCycleMonths === null ||
+    item?.paymentCycleMonths === undefined
+  ) {
+    return null;
+  }
+  return Number(item.monthlyRent) * Number(item.paymentCycleMonths);
 }
 
 function formatCycle(value) {
@@ -392,6 +283,7 @@ function getWorkflow(item) {
     "LIQUIDATED",
     "RENEWED",
     "CANCELLED",
+    "AUTO_TERMINATED",
   ].includes(contractStatus)) {
     return contractStatus;
   }
@@ -400,6 +292,17 @@ function getWorkflow(item) {
   if (item?.leaseContractId && item?.contractFileId) return "PENDING_ACTIVATION";
   if (item?.leaseContractId && !item?.contractFileId) return "MISSING_FILE";
   return "PENDING_SIGNATURE";
+}
+
+function matchesStatusFilter(item, statusFilter) {
+  const workflow = getWorkflow(item);
+  if (statusFilter === "all") return true;
+  if (statusFilter === "current") return CURRENT_CONTRACT_WORKFLOWS.has(workflow);
+  if (statusFilter === "history") return HISTORY_CONTRACT_WORKFLOWS.has(workflow);
+  if (statusFilter === "PENDING") {
+    return ["PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(workflow);
+  }
+  return workflow === statusFilter || item.status === statusFilter || item.contractStatus === statusFilter;
 }
 
 function getStatusLabel(item) {
@@ -498,15 +401,16 @@ function InfoValue({ label, value }) {
 
 export default function ContractTemplatePage() {
   const fileInputRef = useRef(null);
-  const [contracts, setContracts] = useState(MOCK_LEASE_CONTRACTS);
+  const [contracts, setContracts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("current");
   const [fileFilter, setFileFilter] = useState("all");
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [termsForm, setTermsForm] = useState(buildTermsForm());
@@ -530,11 +434,13 @@ export default function ContractTemplatePage() {
     try {
       const data = await fetchLeaseContractManagementList();
       setContracts(data);
+      return data;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
     } finally {
       setLoading(false);
     }
+    return [];
   }
 
   useEffect(() => {
@@ -603,12 +509,7 @@ export default function ContractTemplatePage() {
         .toLowerCase();
 
       const matchesSearch = !search || searchable.includes(search);
-      const workflow = getWorkflow(item);
-      const matchesStatus =
-        statusFilter === "all" ||
-        workflow === statusFilter ||
-        item.status === statusFilter ||
-        item.contractStatus === statusFilter;
+      const matchesStatus = matchesStatusFilter(item, statusFilter);
       const matchesFile =
         fileFilter === "all" ||
         (fileFilter === "uploaded" && item.contractFileId) ||
@@ -670,6 +571,7 @@ export default function ContractTemplatePage() {
 
   function selectContract(item) {
     setSelected(item);
+    setActionMessage("");
     setTermsForm(buildTermsForm(item));
     setIsEditingTerms(false);
     setTermsFieldErrors({});
@@ -692,11 +594,18 @@ export default function ContractTemplatePage() {
     setError("");
     try {
       const updated = await uploadSignedLeaseContractFile(selected, file);
-      setContracts((current) =>
-        current.map((item) => (getContractRowKey(item, 0) === getContractRowKey(selected, 0) ? { ...item, ...updated } : item)),
+      const uploadedContractId = updated.leaseContractId;
+      const refreshedContracts = await loadContracts();
+      const refreshedItem = refreshedContracts.find(
+        (item) => String(item.leaseContractId) === String(uploadedContractId),
       );
-      setSelected((current) => ({ ...current, ...updated }));
-      await loadContracts();
+      setSelected((current) => ({ ...current, ...updated, ...refreshedItem }));
+
+      if (uploadedContractId) {
+        const refreshedDetails = await fetchManagementLeaseContractDetails(uploadedContractId);
+        setDetails(refreshedDetails);
+        setTermsForm(buildTermsForm(refreshedDetails));
+      }
     } catch (err) {
       setError(err?.message || "Không upload được file hợp đồng.");
     } finally {
@@ -723,8 +632,44 @@ export default function ContractTemplatePage() {
     setActionLoading(`activate-${item.leaseContractId}`);
     setError("");
     try {
-      await activateLeaseContract(item.leaseContractId);
-      await loadContracts();
+      const activated = await activateLeaseContract(item.leaseContractId);
+      const activatedStatus = activated.status ?? activated.contractStatus;
+
+      setSelected((current) =>
+        String(current?.leaseContractId) === String(item.leaseContractId)
+          ? { ...current, ...activated }
+          : current,
+      );
+      setDetails((current) =>
+        current
+          ? {
+              ...current,
+              status: activatedStatus,
+              canSendAccount: activatedStatus === "ACTIVE",
+              accountProvisioningStatus: "NOT_PROVISIONED",
+              canRenew: ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(activatedStatus),
+              canLiquidate: ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(
+                activatedStatus,
+              ),
+            }
+          : current,
+      );
+
+      const refreshedContracts = await loadContracts();
+      const refreshedItem = refreshedContracts.find(
+        (contract) => String(contract.leaseContractId) === String(item.leaseContractId),
+      );
+      if (refreshedItem) {
+        setSelected((current) =>
+          String(current?.leaseContractId) === String(item.leaseContractId)
+            ? { ...current, ...refreshedItem }
+            : current,
+        );
+      }
+
+      const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+      setDetails(refreshedDetails);
+      setTermsForm(buildTermsForm(refreshedDetails));
     } catch (err) {
       setError(err?.message || "Không kích hoạt được hợp đồng.");
     } finally {
@@ -853,13 +798,32 @@ export default function ContractTemplatePage() {
 
   async function handleSendAccount(item) {
     if (!item?.leaseContractId) return;
+    const provisioningStatus = details?.accountProvisioningStatus || "NOT_PROVISIONED";
+    const retry = provisioningStatus === "FAILED";
+    const confirmed = window.confirm(
+      retry
+        ? "Lần gửi trước thất bại. Bạn có chắc muốn thử gửi lại cho các người thuê chưa được cấp tài khoản?"
+        : "Hệ thống sẽ gửi tài khoản cho các người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
+    );
+    if (!confirmed) return;
+
     setActionLoading(`send-${item.leaseContractId}`);
     setError("");
+    setActionMessage("");
     try {
-      await sendTenantAccountCredentials(item.leaseContractId);
+      const result = await sendTenantAccountCredentials(item.leaseContractId, { retry });
       await loadContracts();
+      const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+      setDetails(refreshedDetails);
+      setActionMessage(result?.message || "Đã cập nhật trạng thái cấp tài khoản.");
     } catch (err) {
       setError(err?.message || "Không gửi được tài khoản cho khách thuê.");
+      try {
+        const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+        setDetails(refreshedDetails);
+      } catch {
+        // Keep the original provisioning error visible.
+      }
     } finally {
       setActionLoading("");
     }
@@ -926,17 +890,28 @@ export default function ContractTemplatePage() {
     setRenewError("");
     setError("");
     try {
-      await renewLeaseContract(mergedSelected.leaseContractId, {
+      const renewal = await renewLeaseContract(mergedSelected.leaseContractId, {
         ...renewForm,
         monthlyRent,
         paymentCycleMonths,
         depositAmount,
       });
       setRenewModalOpen(false);
-      await loadContracts();
-      const refreshedDetails = await fetchManagementLeaseContractDetails(mergedSelected.leaseContractId);
+      const refreshedContracts = await loadContracts();
+      const newContractId = renewal?.newContractId ?? renewal?.new_contract_id;
+      const newContract = refreshedContracts.find(
+        (item) => String(item.leaseContractId) === String(newContractId),
+      );
+      const refreshedDetails = await fetchManagementLeaseContractDetails(newContractId);
       setDetails(refreshedDetails);
-      setSelected((current) => current ? { ...current, status: "RENEWED", contractStatus: "RENEWED" } : current);
+      setSelected(newContract || {
+        leaseContractId: newContractId,
+        contractId: newContractId,
+        contractCode: renewal?.newContractCode ?? renewal?.new_contract_code,
+        displayCode: renewal?.newContractCode ?? renewal?.new_contract_code,
+        status: renewal?.newContractStatus ?? renewal?.new_contract_status,
+        contractStatus: renewal?.newContractStatus ?? renewal?.new_contract_status,
+      });
     } catch (err) {
       setRenewError(err?.details || err?.message || "Không thể tái ký hợp đồng.");
     } finally {
@@ -994,7 +969,7 @@ export default function ContractTemplatePage() {
       </section>
 
       <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_160px_auto]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_auto]">
           <label className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
@@ -1003,20 +978,6 @@ export default function ContractTemplatePage() {
               placeholder="Tìm mã HĐ, phòng hoặc người ký..."
               className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
             />
-          </label>
-          <label className="relative">
-            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
-            >
-              {STATUS_FILTERS.map((filter) => (
-                <option key={filter.id} value={filter.id}>
-                  {filter.label}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="relative">
             <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
@@ -1040,11 +1001,33 @@ export default function ContractTemplatePage() {
             Làm mới
           </button>
         </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => setStatusFilter(filter.id)}
+              className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
+                statusFilter === filter.id
+                  ? "border-[#091426] bg-[#091426] text-white"
+                  : "border-[#d7deea] bg-white text-[#56647a] hover:border-[#9ba8ba] hover:text-[#091426]"
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
           {error}
+        </div>
+      )}
+
+      {actionMessage && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          {actionMessage}
         </div>
       )}
 
@@ -1092,6 +1075,56 @@ export default function ContractTemplatePage() {
                     <td data-label="Mã HĐ" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{item.displayCode || item.contractCode || item.depositCode || "Chưa có"}</p>
                       <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">{item.propertyName || "Chưa có cơ sở"}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {getWorkflow(item) === "RENEWED" && (
+                          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">
+                            Hợp đồng cũ
+                          </span>
+                        )}
+                        {item.previousContractId && CURRENT_CONTRACT_WORKFLOWS.has(getWorkflow(item)) && (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">
+                            Hợp đồng hiện tại
+                          </span>
+                        )}
+                      </div>
+                      {item.renewedContractId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const renewed = contracts.find(
+                              (contract) => String(contract.leaseContractId) === String(item.renewedContractId),
+                            );
+                            selectContract(renewed || {
+                              leaseContractId: item.renewedContractId,
+                              contractId: item.renewedContractId,
+                              contractCode: item.renewedContractCode,
+                              displayCode: item.renewedContractCode,
+                            });
+                          }}
+                          className="mt-2 block text-left text-[11px] font-bold text-blue-700 hover:underline xl:text-xs"
+                        >
+                          Xem HĐ mới {item.renewedContractCode || `#${item.renewedContractId}`}
+                        </button>
+                      )}
+                      {item.previousContractId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const previous = contracts.find(
+                              (contract) => String(contract.leaseContractId) === String(item.previousContractId),
+                            );
+                            selectContract(previous || {
+                              leaseContractId: item.previousContractId,
+                              contractId: item.previousContractId,
+                              contractCode: item.previousContractCode,
+                              displayCode: item.previousContractCode,
+                            });
+                          }}
+                          className="mt-2 block text-left text-[11px] font-bold text-[#607089] hover:text-blue-700 hover:underline xl:text-xs"
+                        >
+                          Hợp đồng trước: {item.previousContractCode || `#${item.previousContractId}`}
+                        </button>
+                      )}
                     </td>
                     <td data-label="Phòng" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
@@ -1180,16 +1213,111 @@ export default function ContractTemplatePage() {
                   Hợp đồng đã hết hạn. Vui lòng tái ký hoặc thanh lý.
                 </div>
               )}
+              {getWorkflow(mergedSelected) === "RENEWED" && mergedSelected.renewedContractId && (
+                <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800 lg:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    Hợp đồng đã được gia hạn sang {mergedSelected.renewedContractCode || `#${mergedSelected.renewedContractId}`}.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const renewed = contracts.find(
+                        (item) => String(item.leaseContractId) === String(mergedSelected.renewedContractId),
+                      );
+                      setSelected(renewed || {
+                        leaseContractId: mergedSelected.renewedContractId,
+                        contractId: mergedSelected.renewedContractId,
+                        contractCode: mergedSelected.renewedContractCode,
+                        displayCode: mergedSelected.renewedContractCode,
+                      });
+                    }}
+                    className="h-9 shrink-0 rounded-lg bg-blue-700 px-4 text-xs font-extrabold text-white hover:bg-blue-800"
+                  >
+                    Xem hợp đồng mới
+                  </button>
+                </div>
+              )}
 
               <DetailCard title="Thông tin phòng" icon={Home}>
-                <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
-                  <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
-                  <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
-                </div>
+                {isEditingTerms ? (
+                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                    <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
+                    <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
+                    <label className="grid min-w-0 gap-1.5">
+                      <span className="text-xs font-bold text-[#58667c]">Giá thuê/tháng *</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1000"
+                        value={termsForm.monthlyRent}
+                        onChange={(event) => updateTermsField("monthlyRent", event.target.value)}
+                        aria-invalid={Boolean(termsFieldErrors.monthlyRent)}
+                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                          termsFieldErrors.monthlyRent
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
+                        }`}
+                      />
+                      {termsFieldErrors.monthlyRent && (
+                        <span className="text-xs font-semibold leading-4 text-red-600">
+                          {termsFieldErrors.monthlyRent}
+                        </span>
+                      )}
+                    </label>
+                    <label className="grid min-w-0 gap-1.5">
+                      <span className="text-xs font-bold text-[#58667c]">Số tiền đóng mỗi kỳ</span>
+                      <input
+                        readOnly
+                        value={formatMoney(amountPerPeriod)}
+                        className="h-10 min-w-0 rounded-lg border border-[#d8e1ef] bg-[#f2f6fc] px-3 text-sm font-extrabold text-[#091426]"
+                      />
+                    </label>
+                    <label className="grid min-w-0 gap-1.5">
+                      <span className="text-xs font-bold text-[#58667c]">Tiền cọc *</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={termsForm.depositAmount}
+                        onChange={(event) => updateTermsField("depositAmount", event.target.value)}
+                        aria-invalid={Boolean(termsFieldErrors.depositAmount)}
+                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
+                          termsFieldErrors.depositAmount
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
+                        }`}
+                      />
+                      {termsFieldErrors.depositAmount && (
+                        <span className="text-xs font-semibold leading-4 text-red-600">
+                          {termsFieldErrors.depositAmount}
+                        </span>
+                      )}
+                    </label>
+                    <InfoValue
+                      label="Số người"
+                      value={`${getOccupantsCount(mergedSelected, details)} người`}
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                    <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
+                    <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
+                    <InfoValue label="Giá thuê/tháng" value={formatOptionalMoney(mergedSelected.monthlyRent)} />
+                    <InfoValue
+                      label="Số tiền đóng mỗi kỳ"
+                      value={formatOptionalMoney(getAmountPerPeriod(mergedSelected))}
+                    />
+                    <InfoValue label="Tiền cọc" value={formatOptionalMoney(mergedSelected.depositAmount)} />
+                    <InfoValue
+                      label="Số người"
+                      value={`${getOccupantsCount(mergedSelected, details)} người`}
+                    />
+                  </div>
+                )}
               </DetailCard>
 
               <DetailCard
-                title="Thông tin hợp đồng thực tế"
+                title="Thông tin hợp đồng"
                 icon={CalendarDays}
                 action={
                   mergedSelected.leaseContractId &&
@@ -1218,7 +1346,12 @@ export default function ContractTemplatePage() {
                 {isEditingTerms ? (
                   <div className="mt-5">
                     <div className="grid grid-cols-2 gap-3 xl:gap-4">
-                      <label className="grid gap-1.5">
+                      <InfoValue
+                        label="Mã hợp đồng"
+                        value={mergedSelected.contractCode || mergedSelected.displayCode}
+                      />
+                      <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
+                      <label className="grid min-w-0 gap-1.5">
                         <span className="text-xs font-bold text-[#58667c]">Ngày bắt đầu *</span>
                         <input
                           type="date"
@@ -1237,7 +1370,7 @@ export default function ContractTemplatePage() {
                           </span>
                         )}
                       </label>
-                      <label className="grid gap-1.5">
+                      <label className="grid min-w-0 gap-1.5">
                         <span className="text-xs font-bold text-[#58667c]">Ngày kết thúc *</span>
                         <input
                           type="date"
@@ -1257,7 +1390,7 @@ export default function ContractTemplatePage() {
                           </span>
                         )}
                       </label>
-                      <label className="grid gap-1.5">
+                      <label className="grid min-w-0 gap-1.5">
                         <span className="text-xs font-bold text-[#58667c]">Chu kỳ thanh toán *</span>
                         <select
                           value={termsForm.paymentCycleMonths}
@@ -1278,56 +1411,25 @@ export default function ContractTemplatePage() {
                           </span>
                         )}
                       </label>
-                      <label className="grid gap-1.5">
-                        <span className="text-xs font-bold text-[#58667c]">Giá thuê/tháng *</span>
-                        <input
-                          type="number"
-                          min="1"
-                          step="1000"
-                          value={termsForm.monthlyRent}
-                          onChange={(event) => updateTermsField("monthlyRent", event.target.value)}
-                          aria-invalid={Boolean(termsFieldErrors.monthlyRent)}
-                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                            termsFieldErrors.monthlyRent
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
-                          }`}
-                        />
-                        {termsFieldErrors.monthlyRent && (
-                          <span className="text-xs font-semibold leading-4 text-red-600">
-                            {termsFieldErrors.monthlyRent}
-                          </span>
-                        )}
-                      </label>
-                      <label className="grid gap-1.5">
-                        <span className="text-xs font-bold text-[#58667c]">Tiền cọc *</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
-                          value={termsForm.depositAmount}
-                          onChange={(event) => updateTermsField("depositAmount", event.target.value)}
-                          aria-invalid={Boolean(termsFieldErrors.depositAmount)}
-                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                            termsFieldErrors.depositAmount
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
-                          }`}
-                        />
-                        {termsFieldErrors.depositAmount && (
-                          <span className="text-xs font-semibold leading-4 text-red-600">
-                            {termsFieldErrors.depositAmount}
-                          </span>
-                        )}
-                      </label>
-                      <label className="grid gap-1.5">
-                        <span className="text-xs font-bold text-[#58667c]">Số tiền cần đóng mỗi kỳ</span>
-                        <input
-                          readOnly
-                          value={formatMoney(amountPerPeriod)}
-                          className="h-10 rounded-lg border border-[#d8e1ef] bg-[#f2f6fc] px-3 text-sm font-extrabold text-[#091426]"
-                        />
-                      </label>
+                      <InfoValue label="Ngày bắt đầu tính tiền" value={formatDate(previewRentStartDate)} />
+                      <InfoValue
+                        label="Hợp đồng trước"
+                        value={
+                          mergedSelected.previousContractCode ||
+                          (mergedSelected.previousContractId ? `#${mergedSelected.previousContractId}` : "Chưa có")
+                        }
+                      />
+                      <InfoValue
+                        label="Hợp đồng tái ký"
+                        value={
+                          mergedSelected.renewedContractCode ||
+                          (mergedSelected.renewedContractId ? `#${mergedSelected.renewedContractId}` : "Chưa có")
+                        }
+                      />
+                      <InfoValue
+                        label="File hợp đồng"
+                        value={mergedSelected.contractFileName || "Chưa có"}
+                      />
                     </div>
 
                     <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs leading-5 text-blue-800">
@@ -1368,24 +1470,20 @@ export default function ContractTemplatePage() {
                   </div>
                 ) : (
                   <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                    <InfoValue
+                      label="Mã hợp đồng"
+                      value={mergedSelected.contractCode || mergedSelected.displayCode}
+                    />
+                    <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
                     <InfoValue label="Ngày bắt đầu" value={formatDate(mergedSelected.startDate)} />
                     <InfoValue label="Ngày kết thúc" value={formatDate(mergedSelected.endDate)} />
                     <InfoValue label="Ngày bắt đầu tính tiền" value={formatDate(mergedSelected.rentStartDate)} />
                     <InfoValue label="Chu kỳ thanh toán" value={formatCycle(mergedSelected.paymentCycleMonths)} />
-                    <InfoValue label="Giá thuê/tháng" value={formatMoney(mergedSelected.monthlyRent)} />
-                    <InfoValue
-                      label="Số tiền cần đóng mỗi kỳ"
-                      value={formatMoney(
-                        Number(mergedSelected.monthlyRent || 0) *
-                          Number(mergedSelected.paymentCycleMonths || 0),
-                      )}
-                    />
-                    <InfoValue label="Tiền cọc (khoản riêng)" value={formatMoney(mergedSelected.depositAmount)} />
                     <InfoValue
                       label="Hợp đồng trước"
                       value={
                         mergedSelected.previousContractCode ||
-                        (mergedSelected.previousContractId ? `#${mergedSelected.previousContractId}` : "Không có")
+                        (mergedSelected.previousContractId ? `#${mergedSelected.previousContractId}` : "Chưa có")
                       }
                     />
                     <InfoValue
@@ -1394,6 +1492,10 @@ export default function ContractTemplatePage() {
                         mergedSelected.renewedContractCode ||
                         (mergedSelected.renewedContractId ? `#${mergedSelected.renewedContractId}` : "Chưa có")
                       }
+                    />
+                    <InfoValue
+                      label="File hợp đồng"
+                      value={mergedSelected.contractFileName || "Chưa có"}
                     />
                   </div>
                 )}
@@ -1439,8 +1541,8 @@ export default function ContractTemplatePage() {
                         <td data-label="SĐT" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
                           {occupant.phone || "Chưa có"}
                         </td>
-                        <td data-label="CCCD" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}>
-                          {occupant.citizenId || occupant.identityNumber || "Chưa cập nhật"}
+                        <td data-label="CCCD" className="break-words px-4 py-3 text-[#4b5563]" title={formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}>
+                          {formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}
                         </td>
                       </tr>
                     ))
@@ -1461,6 +1563,17 @@ export default function ContractTemplatePage() {
                   <InfoValue label="Giá thuê" value={formatMoney(mergedSelected.monthlyRent)} />
                 </div>
               </DetailCard>
+
+              {mergedSelected.leaseContractId && (
+                <ContractHandoverSection
+                  key={mergedSelected.leaseContractId}
+                  contractId={mergedSelected.leaseContractId}
+                  roomCode={mergedSelected.roomCode || mergedSelected.room?.roomCode}
+                  readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(
+                    getWorkflow(mergedSelected),
+                  )}
+                />
+              )}
 
               <DetailCard title="File hợp đồng đã ký" icon={FileCheck2} className="lg:col-span-2">
                 <div className="mt-5 rounded-lg bg-white p-4">
@@ -1545,16 +1658,33 @@ export default function ContractTemplatePage() {
                     Kích hoạt hợp đồng
                   </button>
                 )}
-                {(details?.canSendAccount ?? getWorkflow(mergedSelected) === "ACTIVE") && (
-                  <button
-                    type="button"
-                    onClick={() => handleSendAccount(mergedSelected)}
-                    disabled={isBusy}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:opacity-60"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    Gửi tài khoản cho khách
-                  </button>
+                {getWorkflow(mergedSelected) === "ACTIVE" && (() => {
+                  const accountAction =
+                    ACCOUNT_PROVISIONING_ACTIONS[
+                      details?.accountProvisioningStatus || "NOT_PROVISIONED"
+                    ] || ACCOUNT_PROVISIONING_ACTIONS.NOT_PROVISIONED;
+                  const isSendingAccount =
+                    actionLoading === `send-${mergedSelected.leaseContractId}`;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleSendAccount(mergedSelected)}
+                      disabled={isBusy || accountAction.disabled}
+                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${accountAction.className}`}
+                    >
+                      {isSendingAccount ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <KeyRound className="h-4 w-4" />
+                      )}
+                      {isSendingAccount ? "Đang gửi tài khoản" : accountAction.label}
+                    </button>
+                  );
+                })()}
+                {getWorkflow(mergedSelected) === "RENEWED" && (
+                  <p className="flex min-h-11 items-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 sm:col-span-2">
+                    Hợp đồng đã gia hạn. Tài khoản khách thuê được sử dụng tiếp ở hợp đồng mới.
+                  </p>
                 )}
                 {(details?.canRenew ??
                   ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) && (

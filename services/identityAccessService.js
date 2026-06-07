@@ -251,6 +251,7 @@ function normalizeTenantAccountCandidate(item = {}) {
         roomId: item.roomId ?? item.room_id ?? null,
         roomCode: item.roomCode ?? item.room_code ?? "",
         roomStatus: item.roomStatus ?? item.room_status ?? null,
+        occupantId: item.occupantId ?? item.occupant_id ?? null,
         profileId: item.profileId ?? item.profile_id ?? null,
         roomRole: item.roomRole ?? item.room_role ?? null,
         roomOccupantCount: item.roomOccupantCount ?? item.room_occupant_count ?? null,
@@ -267,6 +268,20 @@ function normalizeTenantAccountCandidate(item = {}) {
         accountCreatedAt: item.accountCreatedAt ?? item.account_created_at ?? null,
         accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
         emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+        provisioningStatus:
+            item.provisioningStatus ??
+            item.provisioning_status ??
+            "NOT_PROVISIONED",
+        sentAt: item.sentAt ?? item.sent_at ?? null,
+        failedAt: item.failedAt ?? item.failed_at ?? null,
+        failureReason: item.failureReason ?? item.failure_reason ?? "",
+        attemptCount: item.attemptCount ?? item.attempt_count ?? 0,
+        lastAttemptAt: item.lastAttemptAt ?? item.last_attempt_at ?? null,
+        profileStatus: item.profileStatus ?? item.profile_status ?? null,
+        missingIdentity: item.missingIdentity ?? item.missing_identity ?? false,
+        missingPortrait: item.missingPortrait ?? item.missing_portrait ?? false,
+        missingEmergencyContact:
+            item.missingEmergencyContact ?? item.missing_emergency_contact ?? false,
         message: item.message ?? "",
     };
 }
@@ -282,8 +297,9 @@ export async function fetchTenantAccountCandidates() {
     return normalizeTenantAccountCandidates(data);
 }
 
-export async function sendTenantAccountCredentials(contractId) {
-    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send`, {
+export async function sendTenantAccountCredentials(contractId, { retry = false } = {}) {
+    const params = retry ? "?retry=true" : "";
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send${params}`, {
         method: "POST",
     });
     return normalizeTenantAccountCandidate(data);

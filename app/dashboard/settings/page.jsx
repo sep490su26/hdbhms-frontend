@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Bell,
   Building2,
@@ -53,7 +54,14 @@ function SettingsGroup({ title, children }) {
   );
 }
 
-function SettingRow({ icon: Icon, title, description, toggle = false, off = false, action }) {
+function SettingRow({ icon: Icon, title, description, toggle = false, off = false, action, href }) {
+  const actionContent = (
+    <>
+      {action || "Open"}
+      <ChevronRight className="h-4 w-4" />
+    </>
+  );
+
   return (
     <div className="flex items-center justify-between gap-4 border-b border-[#e2e8f0] p-5 last:border-b-0">
       <div className="flex items-center gap-4">
@@ -69,10 +77,17 @@ function SettingRow({ icon: Icon, title, description, toggle = false, off = fals
         <span className={`relative h-6 w-11 rounded-full ${off ? "bg-slate-300" : "bg-[#091426]"}`}>
           <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${off ? "left-1" : "left-6"}`} />
         </span>
+      ) : href ? (
+        <Link
+          href={href}
+          aria-label={`${action || "Open"} ${title}`}
+          className="inline-flex shrink-0 items-center gap-2 rounded-md px-2 py-1 text-sm font-bold text-[#505f76] transition-colors hover:bg-[#f2f4f6] hover:text-[#091426] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#091426]/20"
+        >
+          {actionContent}
+        </Link>
       ) : (
         <span className="inline-flex items-center gap-2 text-sm font-bold text-[#505f76]">
-          {action || "Open"}
-          <ChevronRight className="h-4 w-4" />
+          {actionContent}
         </span>
       )}
     </div>
@@ -98,8 +113,18 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-        <SettingRow icon={UserRoundCog} title="Personal Information" description="Update name, phone and email." />
-        <SettingRow icon={ShieldCheck} title="Security & Password" description="Manage login security and two-factor authentication." />
+        <SettingRow
+          icon={UserRoundCog}
+          title="Personal Information"
+          description="Update name, phone and email."
+          href="/dashboard/profile"
+        />
+        <SettingRow
+          icon={ShieldCheck}
+          title="Security & Password"
+          description="Manage your password and login security."
+          href="/dashboard/settings/security"
+        />
       </Card>
       <section className="grid gap-6 xl:grid-cols-2">
         <SettingsGroup title="PROPERTY SETTINGS">

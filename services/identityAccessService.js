@@ -143,6 +143,19 @@ export async function updateCurrentUserProfile({phone, email}) {
     });
 }
 
+export async function changeCurrentUserPassword({oldPassword, newPassword}) {
+    if (IS_MOCK_MODE) {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        return {message: "Password changed successfully."};
+    }
+
+    return authenticatedFetch("/users/me/change-password", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({oldPassword, newPassword}),
+    });
+}
+
 function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();

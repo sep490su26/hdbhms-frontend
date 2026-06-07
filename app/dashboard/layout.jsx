@@ -58,7 +58,7 @@ const navigation = [
     {path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2, permissionKey: "deposits"},
     {path: "/dashboard/contract-template", label: "Mẫu hợp đồng", icon: FileText, permissionKey: "contract"},
     {path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards, permissionKey: "finance"},
-    {path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings, permissionKey: "settings"},
+    {path: "/dashboard/settings", label: "Cài đặt tài khoản", icon: Settings, permissionKey: "settings"},
 ];
 
 function getAllowedRoles(item) {

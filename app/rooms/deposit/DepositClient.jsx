@@ -52,6 +52,12 @@ const readPaymentIntentId = (paymentIntent) =>
 const readPaymentContent = (paymentIntent) =>
   paymentIntent?.paymentContent ?? paymentIntent?.payment_content ?? paymentIntent?.description ?? "";
 
+const readTransferDescription = (paymentIntent) =>
+  paymentIntent?.transferDescription ??
+  paymentIntent?.transfer_description ??
+  paymentIntent?.description ??
+  "";
+
 const readCheckoutUrl = (paymentIntent) =>
   paymentIntent?.checkoutUrl ?? paymentIntent?.checkout_url ?? paymentIntent?.checkOutUrl ?? paymentIntent?.check_out_url ?? "";
 
@@ -1257,9 +1263,21 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   const checkoutUrl = readCheckoutUrl(paymentIntent);
   const qrPayload = readQrPayload(paymentIntent);
   const paymentLinkId = paymentIntent?.paymentLinkId ?? paymentIntent?.payment_link_id ?? "";
-  const receiverName = paymentIntent?.receiverName ?? paymentIntent?.receiver_name ?? "HAIDANG";
-  const bankName = paymentIntent?.bankName ?? paymentIntent?.bank_name ?? "PayOS/VietQR";
+  const accountName =
+    paymentIntent?.accountName ??
+    paymentIntent?.account_name ??
+    paymentIntent?.receiverName ??
+    paymentIntent?.receiver_name ??
+    "";
+  const bankName =
+    paymentIntent?.bankShortName ??
+    paymentIntent?.bank_short_name ??
+    paymentIntent?.bankName ??
+    paymentIntent?.bank_name ??
+    "";
   const accountNumber = paymentIntent?.accountNumber ?? paymentIntent?.account_number ?? "";
+  const transferDescription = readTransferDescription(paymentIntent);
+  const hasManualTransferDetails = Boolean(bankName && accountNumber && accountName);
   const depositAmount = paymentIntent?.amount ?? paymentIntent?.depositAmount ?? paymentIntent?.deposit_amount;
   const depositAmountLabel = Number(depositAmount) > 0
     ? `${Number(depositAmount).toLocaleString("vi-VN")} VND`
@@ -1481,15 +1499,25 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
               <h2 className="text-lg font-bold text-[#091426]">Thông tin thanh toán</h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-[#6b7280]">
-              Vui lòng chuyển đúng số tiền và mã code để hệ thống tự xác nhận giao dịch.
+              Vui lòng chuyển đúng số tiền và đúng nội dung chuyển khoản để hệ thống tự động xác nhận.
             </p>
-            <div className="mt-5 grid gap-3">
-              <CopyablePaymentField label="Tên người nhận" value={receiverName} />
-              <CopyablePaymentField label="Tên ngân hàng" value={bankName} />
-              {accountNumber && <CopyablePaymentField label="Số tài khoản" value={accountNumber} />}
-              <CopyablePaymentField label="Số tiền" value={depositAmountLabel} valueClassName="text-[#006c49]" />
-              <CopyablePaymentField label="Mã code" value={paymentCode} valueClassName="text-[#b45309]" />
-            </div>
+            {hasManualTransferDetails ? (
+              <div className="mt-5 grid gap-3">
+                <CopyablePaymentField label="Ngân hàng" value={bankName} />
+                <CopyablePaymentField label="Số tài khoản" value={accountNumber} />
+                <CopyablePaymentField label="Tên người nhận" value={accountName} />
+                <CopyablePaymentField label="Số tiền" value={depositAmountLabel} valueClassName="text-[#006c49]" />
+                <CopyablePaymentField
+                  label="Nội dung chuyển khoản"
+                  value={transferDescription}
+                  valueClassName="text-[#b45309]"
+                />
+              </div>
+            ) : (
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
+                Vui lòng quét QR hoặc mở trang thanh toán PayOS.
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-[#c5c6cd] bg-white p-5">

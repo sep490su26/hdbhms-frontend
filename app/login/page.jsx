@@ -45,7 +45,7 @@ function LoginForm() {
 
     try {
       const loginData = await loginWithPhonePassword({ phone, password });
-      const accessToken = loginData?.token || "mock-jwt-token-fake" ;
+      const accessToken = loginData?.token || "mock-jwt-token-fake";
       const userRole = loginData?.role;
 
       if (!accessToken) {
@@ -68,9 +68,9 @@ function LoginForm() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#0f172a]">
-      <section className="grid min-h-screen lg:grid-cols-[minmax(360px,0.93fr)_minmax(420px,1.07fr)]">
-        <aside className="flex min-h-[360px] flex-col bg-[#0b1220] px-8 py-10 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[#eef2f7] p-4 text-[#0f172a] sm:p-6 lg:p-8">
+      <section className="grid w-full max-w-[1080px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)] lg:grid-cols-[minmax(340px,0.92fr)_minmax(420px,1.08fr)]">
+        <aside className="flex min-h-[300px] flex-col bg-[#0b1220] px-8 py-8 text-white sm:px-10 sm:py-10 lg:min-h-[680px] lg:px-12 lg:py-12">
           <Link href="/" className="inline-flex w-fit items-center gap-4">
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-[#0b1220]">
               <Building2 className="h-6 w-6" />
@@ -78,7 +78,7 @@ function LoginForm() {
             <span className="text-base font-bold">Nhà trọ Hải Đăng</span>
           </Link>
 
-          <div className="mt-24 max-w-[520px] sm:mt-32 lg:mt-[220px]">
+          <div className="my-auto max-w-[520px] py-14 lg:py-20">
             <h1 className="max-w-[460px] text-4xl font-bold leading-[1.05] tracking-[-0.035em] text-white sm:text-5xl">
               Hệ thống quản lý nhà trọ
             </h1>
@@ -88,7 +88,7 @@ function LoginForm() {
           </div>
         </aside>
 
-        <div className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10">
+        <div className="flex min-h-[620px] items-center justify-center px-6 py-12 sm:px-10 lg:min-h-[680px] lg:px-14">
           <form onSubmit={handleSubmit} className="w-full max-w-[430px]" noValidate>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#64748b]">

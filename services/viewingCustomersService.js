@@ -308,7 +308,7 @@ export async function fetchViewingProperties() {
         }));
     } catch {
         // Fallback only if the API truly fails (network error)
-        return [{id: 1, name: 'Hải Đăng House', propertyCode: 'HDH'}];
+        return [];
     }
 }
 

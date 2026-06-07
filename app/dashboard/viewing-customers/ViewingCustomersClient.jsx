@@ -424,8 +424,8 @@ function NoteModal({customer, onClose}) {
 
 export default function ViewingCustomersClient() {
     const pageSize = 10;
-    const [customers, setCustomers] = useState(MOCK_VIEWING_CUSTOMERS);
-    const [properties, setProperties] = useState(MOCK_VIEWING_PROPERTIES);
+    const [customers, setCustomers] = useState([]);
+    const [properties, setProperties] = useState([]);
     const [filterRooms, setFilterRooms] = useState([]);
     const [formRooms, setFormRooms] = useState([]);
     const [filters, setFilters] = useState({
@@ -436,8 +436,8 @@ export default function ViewingCustomersClient() {
         fromDate: "",
         toDate: ""
     });
-    const [stats, setStats] = useState({todayCount: 2, pendingCount: 2, viewedCount: 1});
-    const [pagination, setPagination] = useState({page: 1, size: pageSize, total: MOCK_VIEWING_CUSTOMERS.length, totalPages: 1});
+    const [stats, setStats] = useState({todayCount: 0, pendingCount: 0, viewedCount: 0});
+    const [pagination, setPagination] = useState({page: 1, size: pageSize, total: 0, totalPages: 0});
     const [trashRows, setTrashRows] = useState([]);
     const [trashPagination, setTrashPagination] = useState({page: 1, size: pageSize, total: 0, totalPages: 0});
     const [trashOpen, setTrashOpen] = useState(false);

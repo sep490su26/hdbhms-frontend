@@ -157,7 +157,25 @@ function resolveAccountState(item) {
     };
   }
 
-  if (!item.accountProvisioned) {
+  if (item.provisioningStatus === "PENDING") {
+    return {
+      key: "PENDING",
+      label: "Đang gửi",
+      hint: "Hệ thống đang xử lý gửi tài khoản.",
+      className: "border-blue-200 bg-blue-50 text-blue-700",
+    };
+  }
+
+  if (item.provisioningStatus === "FAILED") {
+    return {
+      key: "FAILED",
+      label: "Gửi thất bại",
+      hint: item.failureReason || "Có thể thử gửi lại sau khi xác nhận.",
+      className: "border-rose-200 bg-rose-50 text-rose-700",
+    };
+  }
+
+  if (item.provisioningStatus === "NOT_PROVISIONED") {
     return {
       key: "NOT_SENT",
       label: "Chưa cấp",
@@ -166,7 +184,7 @@ function resolveAccountState(item) {
     };
   }
 
-  if (item.mustChangePassword) {
+  if (item.provisioningStatus === "SENT") {
     return {
       key: "SENT",
       label: "Đã gửi",
@@ -248,7 +266,7 @@ function rowKey(item, index) {
 }
 
 export default function AccountsPage() {
-  const [items, setItems] = useState(MOCK_TENANT_ACCOUNT_CANDIDATES);
+  const [items, setItems] = useState([]);
   const [query, setQuery] = useState("");
   const [propertyFilter, setPropertyFilter] = useState(ALL_VALUE);
   const [stateFilter, setStateFilter] = useState(ALL_VALUE);
@@ -335,6 +353,7 @@ export default function AccountsPage() {
           key,
           contractId: item.contractId,
           contractCode: item.contractCode,
+          contractStatus: item.contractStatus,
           propertyName: item.propertyName,
           roomCode: item.roomCode,
           recipientEmail: item.recipientEmail,
@@ -353,11 +372,19 @@ export default function AccountsPage() {
 
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
+    const contractRows = items.filter((item) => item.contractId === contractId);
+    const retry = contractRows.some((item) => item.provisioningStatus === "FAILED");
+    const confirmed = window.confirm(
+      retry
+        ? "Lần gửi trước thất bại. Bạn có chắc muốn thử gửi lại cho các người thuê chưa được cấp tài khoản?"
+        : "Hệ thống sẽ gửi tài khoản cho các người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
+    );
+    if (!confirmed) return;
     setSendingContractId(contractId);
     setMessage("");
     setError("");
     try {
-      const result = await sendTenantAccountCredentials(contractId);
+      const result = await sendTenantAccountCredentials(contractId, { retry });
       setMessage(result?.message || "Đã gửi thông tin tài khoản khách thuê.");
       await loadData();
     } catch (sendError) {
@@ -417,7 +444,15 @@ export default function AccountsPage() {
           <SelectFilter
             label="Trạng thái"
             value={stateFilter}
-            options={[ALL_VALUE, "Chưa cấp", "Đã gửi", "Đã kích hoạt", "Thiếu email"]}
+            options={[
+              ALL_VALUE,
+              "Chưa cấp",
+              "Đang gửi",
+              "Đã gửi",
+              "Đã kích hoạt",
+              "Gửi thất bại",
+              "Thiếu email",
+            ]}
             onChange={setStateFilter}
           />
           <SelectFilter
@@ -463,9 +498,14 @@ export default function AccountsPage() {
         ) : (
           <div className="divide-y divide-[#d4dbe8]">
             {groupedContracts.map((group) => {
-              const allActivated = group.rows.every((row) => resolveAccountState(row).key === "ACTIVATED");
+              const groupStates = group.rows.map((row) => resolveAccountState(row).key);
+              const canSend = groupStates.some((state) => ["NOT_SENT", "FAILED"].includes(state));
+              const hasFailed = groupStates.includes("FAILED");
+              const allActivated = groupStates.every((state) => state === "ACTIVATED");
               const isSending = sendingContractId === group.contractId;
-              const sendDisabled = !group.recipientEmail || allActivated || isSending;
+              const contractCanSend = group.contractStatus === "ACTIVE";
+              const sendDisabled =
+                !contractCanSend || !group.recipientEmail || !canSend || isSending;
 
               return (
                 <article key={group.safeKey} className="bg-white">
@@ -476,7 +516,11 @@ export default function AccountsPage() {
                           Phòng {group.roomCode || "Chưa có"}
                         </h3>
                         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                          Hợp đồng ACTIVE
+                          {group.contractStatus === "EXPIRING_SOON"
+                            ? "Hợp đồng sắp hết hạn"
+                            : group.contractStatus === "TERMINATION_PENDING"
+                              ? "Hợp đồng chờ thanh lý"
+                              : "Hợp đồng ACTIVE"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold text-[#526179]">
@@ -498,7 +542,17 @@ export default function AccountsPage() {
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2]"
                       >
                         <Send className="h-4 w-4" />
-                        {isSending ? "Đang gửi..." : allActivated ? "Đã hoàn tất" : "Gửi tài khoản"}
+                        {!contractCanSend
+                          ? "Chỉ gửi khi ACTIVE"
+                          : isSending
+                          ? "Đang gửi..."
+                          : hasFailed
+                            ? "Thử gửi lại"
+                            : allActivated
+                              ? "Đã hoàn tất"
+                              : canSend
+                                ? "Gửi tài khoản"
+                                : "Đã gửi tài khoản"}
                       </button>
                     </div>
                   </div>

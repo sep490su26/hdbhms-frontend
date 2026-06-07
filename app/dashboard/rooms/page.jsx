@@ -21,12 +21,10 @@ import {
     Wrench,
     X,
 } from "lucide-react";
-import {tenants} from "@/services/dashboardService";
 import {statusCopy} from "@/services/roomsService";
 import {useDashboardLayout} from "../_contexts/DashboardLayoutContext";
 import {authenticatedFetch} from "@/services/identityAccessService";
 import {fetchManagementRoomRentalHistory} from "@/services/leaseContractsService";
-import {floorTabs, mockFloorPlanData} from "./mockFloorPlanData";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -348,10 +346,10 @@ function getRoomDetailHref(room) {
     return `/rooms/${buildingId}/${roomCode}`;
 }
 
-function FloorTabs({activeFloor, onChange}) {
+function FloorTabs({activeFloor, floors, onChange}) {
     return (
         <div className="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-1">
-            {floorTabs.map((floor) => (
+            {floors.map((floor) => (
                 <button
                     key={floor.id}
                     type="button"
@@ -871,11 +869,14 @@ function FloorPlanPage({tenantList = [], activeRole = "owner"}) {
 
                 if (isMounted) {
                     setRooms(normalizedRooms);
+                    if (normalizedRooms.length > 0) {
+                        setActiveFloor(normalizedRooms[0].floorNumber);
+                    }
                 }
             } catch {
                 if (isMounted) {
-                    setRooms(mockFloorPlanData);
-                    setSourceWarning("Không thể tải dữ liệu từ API /rooms, đang hiển thị dữ liệu mẫu tạm thời.");
+                    setRooms([]);
+                    setSourceWarning("Không thể tải dữ liệu từ API /rooms.");
                 }
             } finally {
                 if (isMounted) setIsLoading(false);
@@ -892,6 +893,13 @@ function FloorPlanPage({tenantList = [], activeRole = "owner"}) {
     const activeFloorRooms = useMemo(
         () => rooms.filter((room) => room.floorNumber === activeFloor),
         [activeFloor, rooms],
+    );
+    const availableFloors = useMemo(
+        () => [...new Set(rooms.map((room) => room.floorNumber))]
+            .filter(Number.isFinite)
+            .sort((a, b) => a - b)
+            .map((floorNumber) => ({id: floorNumber, label: `Tầng ${floorNumber}`})),
+        [rooms],
     );
 
     function handleFloorChange(floor) {
@@ -913,7 +921,7 @@ function FloorPlanPage({tenantList = [], activeRole = "owner"}) {
                         Theo dõi nhanh trạng thái, giá thuê và sức chứa từng phòng theo tầng.
                     </p>
                 </div>
-                <FloorTabs activeFloor={activeFloor} onChange={handleFloorChange}/>
+                <FloorTabs activeFloor={activeFloor} floors={availableFloors} onChange={handleFloorChange}/>
             </div>
 
             {sourceWarning && (
@@ -1187,7 +1195,7 @@ export function RoomsManagementContent({initialView = "floor-map", query = "", a
                 </div>
             </div>
 
-            {view === "floor-map" ? <FloorPlanPage tenantList={tenants} activeRole={activeRole}/> : <RoomsListPage query={query}/>}
+            {view === "floor-map" ? <FloorPlanPage activeRole={activeRole}/> : <RoomsListPage query={query}/>}
         </section>
     );
 }

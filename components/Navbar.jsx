@@ -62,7 +62,7 @@ export function Navbar() {
       return;
     }
 
-    // router.push('/login');
+    router.push('/login');
   };
   const primaryActionLabel = staffRole ? 'Quản lý trọ' : 'Đăng nhập';
   const PrimaryActionIcon = staffRole ? LayoutDashboard : LogIn;

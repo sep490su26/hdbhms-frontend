@@ -126,7 +126,14 @@ export function normalizeLeaseContractItem(item = {}) {
     accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
     emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
     previousContractId: item.previousContractId ?? item.previous_contract_id ?? null,
+    previousContractCode: item.previousContractCode ?? item.previous_contract_code ?? null,
     renewedContractId: item.renewedContractId ?? item.renewed_contract_id ?? item.nextContractId ?? item.next_contract_id ?? null,
+    renewedContractCode:
+      item.renewedContractCode ??
+      item.renewed_contract_code ??
+      item.nextContractCode ??
+      item.next_contract_code ??
+      null,
   };
 }
 
@@ -365,6 +372,10 @@ function normalizeLeaseContractDetails(details = {}) {
     canRenew: details.canRenew ?? details.can_renew ?? false,
     canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
     canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
+    accountProvisioningStatus:
+      details.accountProvisioningStatus ??
+      details.account_provisioning_status ??
+      "NOT_PROVISIONED",
     room: details.room ?? {},
     property: details.property ?? {},
     primaryTenant: details.primaryTenant ?? details.primary_tenant ?? {},
@@ -375,6 +386,7 @@ function normalizeLeaseContractDetails(details = {}) {
           tenantProfileId: occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
           fullName: occupant.fullName ?? occupant.full_name ?? "",
           phone: occupant.phone ?? "",
+          email: occupant.email ?? "",
           citizenId:
             occupant.citizenId ??
             occupant.citizen_id ??
@@ -389,6 +401,16 @@ function normalizeLeaseContractDetails(details = {}) {
           moveInDate: occupant.moveInDate ?? occupant.move_in_date ?? null,
           moveOutDate: occupant.moveOutDate ?? occupant.move_out_date ?? null,
           status: occupant.status ?? null,
+          accountStatus:
+            occupant.accountStatus ??
+            occupant.account_status ??
+            "NOT_PROVISIONED",
+          accountSentAt: occupant.accountSentAt ?? occupant.account_sent_at ?? null,
+          lastLoginAt: occupant.lastLoginAt ?? occupant.last_login_at ?? null,
+          mustChangePassword:
+            occupant.mustChangePassword ??
+            occupant.must_change_password ??
+            null,
         }))
       : [],
     events: Array.isArray(details.events)

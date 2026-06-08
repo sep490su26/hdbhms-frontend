@@ -51,6 +51,10 @@ export function normalizeLeaseContractItem(item = {}) {
   const contractId = item.contractId ?? item.contract_id ?? item.leaseContractId ?? item.lease_contract_id ?? null;
   const depositCode = item.depositCode ?? item.deposit_code ?? null;
   const contractCode = item.contractCode ?? item.contract_code ?? null;
+  const legacyContractCode = contractId
+    ? item.displayCode ?? item.display_code ?? item.code ?? null
+    : null;
+  const displayedContractCode = contractCode ?? legacyContractCode ?? "";
 
   return {
     ...item,
@@ -58,8 +62,8 @@ export function normalizeLeaseContractItem(item = {}) {
     contractId,
     leaseContractId: item.leaseContractId ?? item.lease_contract_id ?? contractId,
     depositAgreementId: item.depositAgreementId ?? item.deposit_agreement_id ?? null,
-    code: item.code ?? item.displayCode ?? item.display_code ?? contractCode ?? depositCode ?? "",
-    displayCode: item.displayCode ?? item.display_code ?? item.code ?? contractCode ?? depositCode ?? "",
+    code: displayedContractCode,
+    displayCode: displayedContractCode,
     depositCode,
     contractCode,
     propertyId: item.propertyId ?? item.property_id ?? null,
@@ -240,7 +244,6 @@ export async function renewLeaseContract(leaseContractId, payload) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        new_contract_code: payload.newContractCode,
         new_start_date: payload.newStartDate,
         new_end_date: payload.newEndDate,
         monthly_rent: payload.monthlyRent,

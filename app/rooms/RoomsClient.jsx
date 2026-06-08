@@ -701,7 +701,7 @@ function RoomListingCard({ room, isSelected, onSelect }) {
       onClick={() => {
         onSelect(room);
       }}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`group w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <Image
@@ -956,7 +956,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   };
 
   return (
-    <div className="min-h-screen bg-[#091426] px-4 pb-12 pt-28 text-white sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#091426] px-4 pb-8 pt-8 text-white sm:px-6 sm:pb-12 sm:pt-28 lg:px-8">
       {isError && (
         <div className="mx-auto mb-6 max-w-xl rounded-[1.5rem] border border-rose-300/20 bg-rose-400/10 px-6 py-8 text-center">
           <p className="text-sm font-semibold text-rose-100">Không tải được dữ liệu phòng</p>
@@ -1074,7 +1074,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                 {viewMode === "Listing" ? (
                   <div className="mx-auto w-full max-w-6xl">
                     {filteredRooms.length > 0 ? (
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
                             key={room.id}

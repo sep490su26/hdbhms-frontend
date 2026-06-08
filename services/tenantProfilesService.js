@@ -15,6 +15,14 @@ export async function fetchTenantProfiles() {
   return toArray(data);
 }
 
+export async function fetchMyTenantProfile() {
+  const data = await authenticatedFetch(`${API_BASE_URL}/tenants/profiles/me`, {
+    method: "GET",
+  });
+
+  return data;
+}
+
 export async function fetchPrivateFileObjectUrl(fileUrlOrId) {
   if (!fileUrlOrId) return "";
 
@@ -38,4 +46,32 @@ export async function fetchPrivateFileObjectUrl(fileUrlOrId) {
 
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+}
+
+export async function fetchPrivateFile(fileUrlOrId, fileName = "image.jpg") {
+  if (!fileUrlOrId) return null;
+
+  const rawPath = String(fileUrlOrId);
+  const url = rawPath.startsWith("http")
+    ? rawPath
+    : `${API_BASE_URL}${rawPath.startsWith("/api/v1") ? rawPath.slice("/api/v1".length) : rawPath}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "X-Client-Type": "web",
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const blob = await response.blob();
+  const fileType = blob.type || 'image/jpeg';
+  const name = fileName.endsWith('.jpg') && fileType.includes('png') ? fileName.replace('.jpg', '.png') : fileName;
+  
+  return new File([blob], name, { type: fileType });
 }

@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 const geistSans = Geist({
@@ -16,14 +17,17 @@ export const metadata = {
   description: "Quản lý phòng trọ hiệu quả: theo dõi phòng, khách thuê, hợp đồng và tài chính tại một nơi duy nhất.",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const isWebView = cookieStore.get('is_webview')?.value === '1';
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome isWebView={isWebView}>{children}</SiteChrome>
       </body>
     </html>
   );

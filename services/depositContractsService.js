@@ -1,6 +1,5 @@
+import { API_BASE_URL } from "@/lib/apiConfig";
 import { refreshTokenApi } from "@/services/identityAccessService";
-
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api/v1";
 
 function getAuthToken() {
   if (typeof window === "undefined") return "";

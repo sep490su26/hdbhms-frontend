@@ -37,6 +37,8 @@ import {
   openDepositContractByPaymentPdf,
   previewDepositContract,
 } from "../../../services/depositContractsService";
+import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import { getAuthToken } from "../../../services/identityAccessService";
 
 const resolvePaymentExpiresAtMs = (paymentIntent) => {
   const expiresAt = paymentIntent?.expiresAt ?? paymentIntent?.expires_at;
@@ -576,7 +578,7 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
         onChange={handleChange}
         onBlur={handleBlur}
         aria-invalid={displayError ? "true" : "false"}
-        className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
+        className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
           ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
           : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
           }`}
@@ -746,26 +748,86 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   });
 
   useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      const draft = readDepositDraftCookie();
+    let isMounted = true;
+
+    const loadDraftAndProfile = async () => {
+      let draft = readDepositDraftCookie();
+
+      // Always try fetching profile if authenticated to ensure fields are populated
+      if (getAuthToken()) {
+        try {
+          const profile = await fetchMyTenantProfile();
+          if (profile && profile.person) {
+            draft = {
+              ...draft,
+              fullName: profile.person?.full_name || profile.person?.fullName || draft.fullName || "",
+              birthDate: profile.person?.dob || draft.birthDate || "",
+              phone: profile.person?.phone || draft.phone || "",
+              email: profile.person?.email || draft.email || "",
+              permanentAddress: profile.person?.permanent_address || profile.person?.permanentAddress || draft.permanentAddress || "",
+              citizenId: profile.identity_document?.doc_number || profile.identityDocument?.docNumber || profile.identity_document?.docNumber || draft.citizenId || "",
+              idIssueDate: profile.identity_document?.issued_date || profile.identityDocument?.issuedDate || profile.identity_document?.issuedDate || draft.idIssueDate || "",
+              idIssuePlace: profile.identity_document?.issued_place || profile.identityDocument?.issuedPlace || profile.identity_document?.issuedPlace || draft.idIssuePlace || "",
+            };
+
+            // Attempt to fetch files in background
+            const frontUrl = profile.identity_document?.front_file_url || profile.identityDocument?.frontFileUrl;
+            const backUrl = profile.identity_document?.back_file_url || profile.identityDocument?.backFileUrl;
+            const portraitUrl = profile.person?.portrait_url || profile.person?.portraitUrl;
+
+            if (frontUrl || backUrl || portraitUrl) {
+              Promise.all([
+                fetchPrivateFile(frontUrl, "cccd_front.jpg"),
+                fetchPrivateFile(backUrl, "cccd_back.jpg"),
+                fetchPrivateFile(portraitUrl, "portrait.jpg")
+              ]).then(([frontFile, backFile, portraitFile]) => {
+                if (!isMounted) return;
+                
+                if (frontFile) {
+                  setSelectedFiles(prev => ({ ...prev, citizenIdFront: frontFile }));
+                  setImagePreviews(prev => ({ ...prev, citizenIdFront: URL.createObjectURL(frontFile) }));
+                }
+                if (backFile) {
+                  setSelectedFiles(prev => ({ ...prev, citizenIdBack: backFile }));
+                  setImagePreviews(prev => ({ ...prev, citizenIdBack: URL.createObjectURL(backFile) }));
+                }
+                if (portraitFile) {
+                  setSelectedFiles(prev => ({ ...prev, portraitImage: portraitFile }));
+                  setImagePreviews(prev => ({ ...prev, portraitImage: URL.createObjectURL(portraitFile) }));
+                }
+              }).catch(console.error);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch tenant profile for autofill:", error);
+        }
+      }
+
       if (!hasDepositDraftValue(draft)) return;
 
-      setSavedDraft(draft);
-      setOccupantCount(["1", "2", "3"].includes(draft.occupantCount) ? draft.occupantCount : "1");
-      setCoOccupants({
-        1: {
-          fullName: draft.coOccupant1FullName || "",
-          phone: draft.coOccupant1Phone || "",
-        },
-        2: {
-          fullName: draft.coOccupant2FullName || "",
-          phone: draft.coOccupant2Phone || "",
-        },
-      });
-      setDraftVersion((currentVersion) => currentVersion + 1);
-    }, 0);
+      if (isMounted) {
+        setSavedDraft(draft);
+        setOccupantCount(["1", "2", "3"].includes(draft.occupantCount) ? draft.occupantCount : "1");
+        setCoOccupants({
+          1: {
+            fullName: draft.coOccupant1FullName || "",
+            phone: draft.coOccupant1Phone || "",
+          },
+          2: {
+            fullName: draft.coOccupant2FullName || "",
+            phone: draft.coOccupant2Phone || "",
+          },
+        });
+        setDraftVersion((currentVersion) => currentVersion + 1);
+      }
+    };
 
-    return () => window.clearTimeout(timerId);
+    const timerId = window.setTimeout(loadDraftAndProfile, 0);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timerId);
+    };
   }, []);
 
   useEffect(() => {
@@ -965,7 +1027,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
   return (
     <DepositFormErrorContext.Provider value={{ errors: fieldErrors, setError: setFieldError }}>
-      <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-6 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
+      <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-4 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
         <div>
           <h1 className="text-4xl font-bold tracking-[-0.02em] text-[#091426]">Thông tin đặt cọc</h1>
           <p className="mt-2 text-base leading-7 text-[#45474c]">
@@ -985,9 +1047,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.birthDate} />
           <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
           <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
-          <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" />
-          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" />
-          <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" />
+          <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
+          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.idIssueDate} />
+          <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
           <div className="grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2">
             <div className="flex items-center gap-3">

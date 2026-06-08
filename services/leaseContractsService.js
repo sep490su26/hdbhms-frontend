@@ -340,6 +340,57 @@ function normalizeLeaseContractDetails(details = {}) {
         uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
       }
     : null;
+  const rawPrimaryTenant = details.primaryTenant ?? details.primary_tenant ?? {};
+  const primaryTenant = rawPrimaryTenant
+    ? {
+        ...rawPrimaryTenant,
+        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? rawPrimaryTenant.tenant_profile_id ?? null,
+        fullName: rawPrimaryTenant.fullName ?? rawPrimaryTenant.full_name ?? "",
+        phone: rawPrimaryTenant.phone ?? "",
+        email: rawPrimaryTenant.email ?? "",
+        dob:
+          rawPrimaryTenant.dob ??
+          rawPrimaryTenant.dateOfBirth ??
+          rawPrimaryTenant.date_of_birth ??
+          rawPrimaryTenant.birthDate ??
+          rawPrimaryTenant.birth_date ??
+          null,
+        dateOfBirth:
+          rawPrimaryTenant.dateOfBirth ??
+          rawPrimaryTenant.date_of_birth ??
+          rawPrimaryTenant.dob ??
+          rawPrimaryTenant.birthDate ??
+          rawPrimaryTenant.birth_date ??
+          null,
+        permanentAddress: rawPrimaryTenant.permanentAddress ?? rawPrimaryTenant.permanent_address ?? "",
+        citizenId:
+          rawPrimaryTenant.citizenId ??
+          rawPrimaryTenant.citizen_id ??
+          rawPrimaryTenant.identityNumber ??
+          rawPrimaryTenant.identity_number ??
+          rawPrimaryTenant.idNumber ??
+          rawPrimaryTenant.id_number ??
+          rawPrimaryTenant.docNumber ??
+          rawPrimaryTenant.doc_number ??
+          null,
+        identityIssuedDate:
+          rawPrimaryTenant.identityIssuedDate ??
+          rawPrimaryTenant.identity_issued_date ??
+          rawPrimaryTenant.issuedDate ??
+          rawPrimaryTenant.issued_date ??
+          rawPrimaryTenant.issueDate ??
+          rawPrimaryTenant.issue_date ??
+          null,
+        identityIssuedPlace:
+          rawPrimaryTenant.identityIssuedPlace ??
+          rawPrimaryTenant.identity_issued_place ??
+          rawPrimaryTenant.issuedPlace ??
+          rawPrimaryTenant.issued_place ??
+          rawPrimaryTenant.issuePlace ??
+          rawPrimaryTenant.issue_place ??
+          "",
+      }
+    : {};
   return {
     ...details,
     contractId: details.contractId ?? details.contract_id ?? null,
@@ -381,7 +432,7 @@ function normalizeLeaseContractDetails(details = {}) {
       "NOT_PROVISIONED",
     room: details.room ?? {},
     property: details.property ?? {},
-    primaryTenant: details.primaryTenant ?? details.primary_tenant ?? {},
+    primaryTenant,
     contractFile,
     occupants: Array.isArray(rawOccupants)
       ? rawOccupants.map((occupant) => ({
@@ -390,6 +441,21 @@ function normalizeLeaseContractDetails(details = {}) {
           fullName: occupant.fullName ?? occupant.full_name ?? "",
           phone: occupant.phone ?? "",
           email: occupant.email ?? "",
+          dob:
+            occupant.dob ??
+            occupant.dateOfBirth ??
+            occupant.date_of_birth ??
+            occupant.birthDate ??
+            occupant.birth_date ??
+            null,
+          dateOfBirth:
+            occupant.dateOfBirth ??
+            occupant.date_of_birth ??
+            occupant.dob ??
+            occupant.birthDate ??
+            occupant.birth_date ??
+            null,
+          permanentAddress: occupant.permanentAddress ?? occupant.permanent_address ?? "",
           citizenId:
             occupant.citizenId ??
             occupant.citizen_id ??
@@ -399,7 +465,25 @@ function normalizeLeaseContractDetails(details = {}) {
             occupant.identity_number ??
             occupant.idNumber ??
             occupant.id_number ??
+            occupant.docNumber ??
+            occupant.doc_number ??
             null,
+          identityIssuedDate:
+            occupant.identityIssuedDate ??
+            occupant.identity_issued_date ??
+            occupant.issuedDate ??
+            occupant.issued_date ??
+            occupant.issueDate ??
+            occupant.issue_date ??
+            null,
+          identityIssuedPlace:
+            occupant.identityIssuedPlace ??
+            occupant.identity_issued_place ??
+            occupant.issuedPlace ??
+            occupant.issued_place ??
+            occupant.issuePlace ??
+            occupant.issue_place ??
+            "",
           occupantRole: occupant.occupantRole ?? occupant.occupant_role ?? null,
           moveInDate: occupant.moveInDate ?? occupant.move_in_date ?? null,
           moveOutDate: occupant.moveOutDate ?? occupant.move_out_date ?? null,

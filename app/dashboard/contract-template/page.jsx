@@ -14,6 +14,7 @@ import {
   Loader2,
   Mail,
   Pencil,
+  Printer,
   RefreshCw,
   Save,
   Search,
@@ -37,6 +38,7 @@ import {
 } from "@/services/leaseContractsService";
 import { sendTenantAccountCredentials } from "@/services/identityAccessService";
 import ContractHandoverSection from "./ContractHandoverSection";
+import ContractPrintWizard from "./ContractPrintWizard";
 
 const STATUS_FILTERS = [
   { id: "current", label: "Hợp đồng hiện tại" },
@@ -446,6 +448,7 @@ export default function ContractTemplatePage() {
     note: "",
   });
   const [intentionError, setIntentionError] = useState("");
+  const [printWizard, setPrintWizard] = useState(null);
 
   async function loadContracts() {
     setLoading(true);
@@ -603,6 +606,29 @@ export default function ContractTemplatePage() {
   function openUploadDialog(item) {
     setSelected(item);
     window.setTimeout(() => fileInputRef.current?.click(), 0);
+  }
+
+  async function openPrintWizard(item) {
+    if (!item?.leaseContractId) {
+      setError("Vui lòng tạo hợp đồng thuê trước khi in.");
+      return;
+    }
+    setActionLoading(`print-${item.leaseContractId}`);
+    setError("");
+    try {
+      const contractDetails =
+        details && String(details.contractId) === String(item.leaseContractId)
+          ? details
+          : await fetchManagementLeaseContractDetails(item.leaseContractId);
+      setPrintWizard({
+        contract: { ...item, ...contractDetails },
+        details: contractDetails,
+      });
+    } catch (err) {
+      setError(err?.message || "Không tải được dữ liệu để in hợp đồng.");
+    } finally {
+      setActionLoading("");
+    }
   }
 
   async function handleFileSelected(event) {
@@ -1182,16 +1208,34 @@ export default function ContractTemplatePage() {
                       <StatusBadge item={item} />
                     </td>
                     <td data-label="Xem" className="text-center align-middle">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          selectContract(item);
-                        }}
-                        className="h-9 rounded-lg border border-[#d1d7e0] bg-white px-2 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:px-3 xl:text-sm"
-                      >
-                        Xem
-                      </button>
+                      <div className="flex flex-col items-center justify-center gap-2 xl:flex-row">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            selectContract(item);
+                          }}
+                          className="h-9 rounded-lg border border-[#d1d7e0] bg-white px-2 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:px-3 xl:text-sm"
+                        >
+                          Xem
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openPrintWizard(item);
+                          }}
+                          disabled={!item.leaseContractId || actionLoading === `print-${item.leaseContractId}`}
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 text-xs font-extrabold text-red-700 shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 xl:h-10 xl:px-3 xl:text-sm"
+                        >
+                          {actionLoading === `print-${item.leaseContractId}` ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Printer className="h-3.5 w-3.5" />
+                          )}
+                          In Hợp Đồng
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1766,6 +1810,15 @@ export default function ContractTemplatePage() {
             </div>
           </section>
         </div>
+      )}
+
+      {printWizard && (
+        <ContractPrintWizard
+          contract={printWizard.contract}
+          details={printWizard.details}
+          occupants={printWizard.details?.occupants || printWizard.contract?.occupants || []}
+          onClose={() => setPrintWizard(null)}
+        />
       )}
 
       {renewModalOpen && mergedSelected && (

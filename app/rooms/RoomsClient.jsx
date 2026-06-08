@@ -10,9 +10,11 @@ import {
   CheckCircle2,
   Home,
   LayoutGrid,
+  Layers3,
   Map as MapIcon,
   Maximize2,
   Search,
+  ShoppingCart,
   Users,
   X,
   Zap,
@@ -694,12 +696,17 @@ function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor,
   );
 }
 
-function RoomListingCard({ room, isSelected, onSelect }) {
+function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatch }) {
+  const selectable = room.status === "available";
   return (
     <button
       type="button"
       onClick={() => {
-        onSelect(room);
+        if (multiSelect && selectable) {
+          onToggleBatch(room);
+        } else {
+          onSelect(room);
+        }
       }}
       className={`group w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
     >
@@ -718,6 +725,19 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         >
           {guestStatusCopy(room.status)}
         </span>
+        {multiSelect && (
+          <span
+            className={`absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-lg border text-sm font-black ${
+              isSelected
+                ? "border-emerald-300 bg-emerald-400 text-slate-950"
+                : selectable
+                  ? "border-white/50 bg-slate-950/70 text-white"
+                  : "border-white/10 bg-slate-950/60 text-slate-600"
+            }`}
+          >
+            {isSelected ? "✓" : ""}
+          </span>
+        )}
       </div>
 
       <div className="bg-slate-900 p-4">
@@ -738,7 +758,7 @@ function RoomListingCard({ room, isSelected, onSelect }) {
 
         <div className="mt-5 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
           <>
-            Xem chi tiết
+            {multiSelect ? (selectable ? "Chọn phòng" : "Không thể chọn") : "Xem chi tiết"}
             <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
           </>
         </div>
@@ -893,6 +913,8 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const [activeFloorPlan, setActiveFloorPlan] = useState(BUILDING_OVERVIEW_LABEL);
   const [searchQuery, setSearchQuery] = useState("");
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState([]);
 
   const [apiRooms, setApiRooms] = useState([]);
   const [catalogFloors, setCatalogFloors] = useState([]);
@@ -954,6 +976,26 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const openRoom = (room) => {
     router.push(getRoomDetailHref(room));
   };
+  const toggleBatchRoom = (room) => {
+    if (room.status !== "available") return;
+    setSelectedRooms((current) => (
+      current.some((item) => item.roomId === room.roomId)
+        ? current.filter((item) => item.roomId !== room.roomId)
+        : [...current, room]
+    ));
+  };
+  const startBatchDeposit = () => {
+    if (selectedRooms.length < 2) return;
+    const roomIds = selectedRooms.map((room) => room.roomId).join(",");
+    window.sessionStorage.setItem(
+      "hdbhms_batch_selected_rooms",
+      JSON.stringify(selectedRooms.map((room) => ({
+        roomId: room.roomId,
+        roomCode: room.roomCode,
+      }))),
+    );
+    router.push(`/rooms/deposit-batch?roomIds=${encodeURIComponent(roomIds)}`);
+  };
 
   return (
     <div className="min-h-screen bg-[#091426] px-4 pb-8 pt-8 text-white sm:px-6 sm:pb-12 sm:pt-28 lg:px-8">
@@ -985,6 +1027,22 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               </div>
 
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMultiSelect((current) => !current);
+                    setViewMode("Listing");
+                    setAvailableOnly(true);
+                  }}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-bold transition ${
+                    multiSelect
+                      ? "bg-emerald-400 text-slate-950"
+                      : "border border-white/10 bg-[#1e2746] text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Layers3 className="h-4 w-4" />
+                  {multiSelect ? "Đang chọn nhiều phòng" : "Chọn nhiều phòng"}
+                </button>
                 <div className="flex h-11 rounded-2xl border border-white/5 bg-[#1e2746] p-1">
                   {[
                     { key: "Listing", label: "Danh sách", icon: LayoutGrid },
@@ -1079,8 +1137,10 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                           <RoomListingCard
                             key={room.id}
                             room={room}
-                            isSelected={false}
+                            isSelected={selectedRooms.some((item) => item.roomId === room.roomId)}
                             onSelect={openRoom}
+                            multiSelect={multiSelect}
+                            onToggleBatch={toggleBatchRoom}
                           />
                         ))}
                       </div>
@@ -1108,6 +1168,41 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               </section>
             </div>
           </div>
+          {multiSelect && (
+            <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-4xl rounded-2xl border border-emerald-300/30 bg-[#111c31]/95 p-4 shadow-2xl backdrop-blur sm:bottom-6 sm:flex sm:items-center sm:justify-between sm:gap-5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm font-black text-white">
+                  <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                  {selectedRooms.length} phòng đã chọn
+                </div>
+                <p className="mt-1 truncate text-xs text-slate-300">
+                  {selectedRooms.length
+                    ? selectedRooms.map((room) => room.roomCode).join(", ")
+                    : "Chọn ít nhất 2 phòng đang trống"}
+                </p>
+                <p className="mt-1 text-xs font-bold text-emerald-300">
+                  Tổng tiền cọc: {(selectedRooms.length * 2000).toLocaleString("vi-VN")} ₫
+                </p>
+              </div>
+              <div className="mt-3 flex gap-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRooms([])}
+                  className="h-11 rounded-xl border border-white/15 px-4 text-sm font-bold text-white hover:bg-white/10"
+                >
+                  Xóa chọn
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedRooms.length < 2}
+                  onClick={startBatchDeposit}
+                  className="h-11 rounded-xl bg-emerald-400 px-5 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Đặt cọc các phòng đã chọn
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

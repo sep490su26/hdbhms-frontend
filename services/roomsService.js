@@ -325,6 +325,75 @@ export async function checkoutDeposit(formData) {
   return payload.data ?? null;
 }
 
+export async function checkoutBatchDeposit(formData) {
+  const response = await fetch(`${API_BASE_URL}/public/deposits/batch-checkout`, {
+    method: "POST",
+    headers: {
+      "X-Client-Type": "web",
+    },
+    body: formData,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || (payload.code !== undefined && payload.code !== 0)) {
+    const error = new Error(payload.message || payload.details || "Không thể khởi tạo phiên đặt cọc nhiều phòng.");
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload.data ?? payload;
+}
+
+export async function fetchBatchDepositStatus(batchId) {
+  if (!batchId) {
+    throw new Error("Thiếu mã phiên đặt cọc nhiều phòng.");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/status`,
+    {
+      cache: "no-store",
+      headers: {
+        "X-Client-Type": "web",
+      },
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || (payload.code !== undefined && payload.code !== 0)) {
+    throw new Error(payload.message || payload.details || "Không thể kiểm tra trạng thái thanh toán.");
+  }
+
+  return payload.data ?? payload;
+}
+
+export async function cancelBatchDeposit(batchId) {
+  if (!batchId) {
+    throw new Error("Thiếu mã phiên đặt cọc để hủy giữ chỗ.");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/cancel`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Type": "web",
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || (payload.code !== undefined && payload.code !== 0)) {
+    throw new Error(payload.message || payload.details || "Không thể hủy phiên giữ chỗ.");
+  }
+
+  return payload.data ?? payload;
+}
+
 export async function fetchDepositRoomHoldStatus(roomId) {
   if (!roomId) return null;
 

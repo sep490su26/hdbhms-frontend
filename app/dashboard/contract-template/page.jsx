@@ -211,11 +211,30 @@ function addYearsMinusOneDay(value, years) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function getNextRenewalContractCode(item = {}) {
+  let rootContractCode = String(item.contractCode || item.displayCode || "").trim();
+  const renewalSuffixes = [];
+
+  while (/-R(\d+)$/.test(rootContractCode)) {
+    renewalSuffixes.unshift(Number(rootContractCode.match(/-R(\d+)$/)?.[1]));
+    rootContractCode = rootContractCode.replace(/-R\d+$/, "");
+  }
+
+  const lastSuffix = renewalSuffixes.at(-1);
+  let renewalNumber = 1;
+  if (renewalSuffixes.length === 1 && lastSuffix < 1900) {
+    renewalNumber = lastSuffix + 1;
+  } else if (renewalSuffixes.length > 0) {
+    renewalNumber = renewalSuffixes.length + 1;
+  }
+
+  return rootContractCode ? `${rootContractCode}-R${renewalNumber}` : "";
+}
+
 function buildRenewForm(item = {}) {
   const newStartDate = addDays(item.endDate, 1);
-  const year = newStartDate ? newStartDate.slice(0, 4) : new Date().getFullYear();
   return {
-    newContractCode: item.contractCode ? `${item.contractCode}-R${year}` : "",
+    newContractCode: getNextRenewalContractCode(item),
     newStartDate,
     newEndDate: addYearsMinusOneDay(newStartDate, 1),
     monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
@@ -1073,7 +1092,14 @@ export default function ContractTemplatePage() {
                     className="bg-white transition hover:bg-[#f8fbff]"
                   >
                     <td data-label="Mã HĐ" className="align-middle">
-                      <p className="font-extrabold leading-5 text-[#091426]">{item.displayCode || item.contractCode || item.depositCode || "Chưa có"}</p>
+                      <p className="font-extrabold leading-5 text-[#091426]">
+                        {item.contractCode || item.displayCode || "Chưa tạo HĐ"}
+                      </p>
+                      {!item.leaseContractId && item.depositCode && (
+                        <p className="mt-1 text-[11px] font-semibold text-[#607089] xl:text-xs">
+                          Mã cọc: {item.depositCode}
+                        </p>
+                      )}
                       <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">{item.propertyName || "Chưa có cơ sở"}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {getWorkflow(item) === "RENEWED" && (
@@ -1182,8 +1208,8 @@ export default function ContractTemplatePage() {
       </section>
 
       {mergedSelected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4">
-          <section className="max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4" onClick={() => { setSelected(null); setIsEditingTerms(false); setTermsFieldErrors({}); setTermsError(""); }}>
+          <section className="max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="relative bg-[#05091d] px-5 py-7 text-white xl:px-7 xl:py-8">
               <button
                 type="button"
@@ -1200,8 +1226,13 @@ export default function ContractTemplatePage() {
               </button>
               <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">Chi tiết hợp đồng</p>
               <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
-                {mergedSelected.displayCode || mergedSelected.contractCode || mergedSelected.depositCode || "Chưa có mã"}
+                {mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
               </h2>
+              {!mergedSelected.leaseContractId && mergedSelected.depositCode && (
+                <p className="mt-2 text-sm font-semibold text-slate-300">
+                  Mã cọc: {mergedSelected.depositCode}
+                </p>
+              )}
               <div className="mt-4">
                 <StatusBadge item={mergedSelected} />
               </div>
@@ -1348,7 +1379,7 @@ export default function ContractTemplatePage() {
                     <div className="grid grid-cols-2 gap-3 xl:gap-4">
                       <InfoValue
                         label="Mã hợp đồng"
-                        value={mergedSelected.contractCode || mergedSelected.displayCode}
+                        value={mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
                       />
                       <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
                       <label className="grid min-w-0 gap-1.5">
@@ -1472,7 +1503,7 @@ export default function ContractTemplatePage() {
                   <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
                     <InfoValue
                       label="Mã hợp đồng"
-                      value={mergedSelected.contractCode || mergedSelected.displayCode}
+                      value={mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
                     />
                     <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
                     <InfoValue label="Ngày bắt đầu" value={formatDate(mergedSelected.startDate)} />
@@ -1736,8 +1767,8 @@ export default function ContractTemplatePage() {
       )}
 
       {renewModalOpen && mergedSelected && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
-          <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm" onClick={() => setRenewModalOpen(false)}>
+          <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="flex items-start justify-between gap-4 border-b border-[#dfe5ef] px-5 py-5">
               <div>
                 <h2 className="text-xl font-extrabold text-[#091426]">Tái ký / Gia hạn hợp đồng</h2>
@@ -1770,8 +1801,11 @@ export default function ContractTemplatePage() {
                     min={type === "number" ? (field === "depositAmount" ? "0" : "1") : undefined}
                     step={type === "number" ? "1000" : undefined}
                     value={renewForm[field]}
+                    readOnly={field === "newContractCode"}
                     onChange={(event) => updateRenewField(field, event.target.value)}
                     className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${
+                      field === "newContractCode" ? "bg-slate-100 text-slate-600 " : ""
+                    }${
                       renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
                     }`}
                   />
@@ -1857,8 +1891,8 @@ export default function ContractTemplatePage() {
       )}
 
       {intentionModalOpen && mergedSelected && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
-          <section className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm" onClick={() => setIntentionModalOpen(false)}>
+          <section className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="flex items-start justify-between border-b border-[#dfe5ef] px-5 py-5">
               <div>
                 <h2 className="text-xl font-extrabold text-[#091426]">Ghi nhận ý định khách</h2>

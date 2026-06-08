@@ -10,7 +10,9 @@ export function SiteChrome({children, isWebView}) {
         pathname?.startsWith("/management")
         || pathname?.startsWith("/viewing-customers")
         || pathname?.startsWith("/dashboard");
-    const isAuthRoute = pathname?.startsWith("/login");
+    const isAuthRoute =
+        pathname?.startsWith("/login")
+        || pathname?.startsWith("/forgot-password");
 
   if (isWebView || isManagementRoute || isAuthRoute) {
         return <>{children}</>;

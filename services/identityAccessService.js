@@ -1,7 +1,9 @@
-export const API_BASE_URL = "http://localhost:8080/api/v1";
+import { API_BASE_URL } from "@/lib/apiConfig";
+
+export { API_BASE_URL };
 
 export class ApiError extends Error {
-    constructor(message, {code, details, status, payload} = {}) {
+    constructor(message, { code, details, status, payload } = {}) {
         super(message || details || "Khong the xu ly yeu cau.");
         this.name = "ApiError";
         this.code = code;
@@ -17,22 +19,17 @@ export function getAuthToken() {
     return window.localStorage.getItem("token") || "";
 }
 
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-function subscribeTokenRefresh(cb) {
-    refreshSubscribers.push(cb);
-}
-
-function onTokenRefreshed(newToken) {
-    refreshSubscribers.forEach((cb) => cb(newToken));
-    refreshSubscribers = [];
+export function clearAuthSession() {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("token");
+    window.localStorage.removeItem("userRole");
 }
 
 function getAuthHeaders(extraHeaders = {}) {
+    const token = getAuthToken();
     return {
-        "Authorization": `Bearer ${getAuthToken()}`,
         "X-Client-Type": "web",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...extraHeaders,
     };
 }
@@ -54,45 +51,49 @@ export async function parseEnvelope(response) {
 
 export async function authenticatedFetch(url, options = {}) {
     const fullUrl = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
-
-    const res = await fetch(fullUrl, {
+    const requestOptions = {
         ...options,
         credentials: "include",
         headers: getAuthHeaders(options.headers),
-    });
+    };
 
-    if (res.status === 401) {
-        if (!isRefreshing) {
-            isRefreshing = true;
-            refreshTokenApi()
-                .then((newToken) => {
-                    isRefreshing = false;
-                    onTokenRefreshed(newToken);
-                })
-                .catch(() => {
-                    isRefreshing = false;
-                    window.localStorage.removeItem("token");
-                    window.localStorage.removeItem("userRole");
-                    window.location.href = "/login?reason=expired";
-                });
+    const res = await fetch(fullUrl, requestOptions);
+
+    if (res.status !== 401) {
+        return parseEnvelope(res);
+    }
+
+    let newToken;
+    try {
+        newToken = await refreshTokenApi();
+    } catch (error) {
+        clearAuthSession();
+        if (error?.isApiError) {
+            throw error;
         }
-
-        return new Promise((resolve) => {
-            subscribeTokenRefresh(async (newToken) => {
-                const retryRes = await fetch(fullUrl, {
-                    ...options,
-                    credentials: "include",
-                    headers: {
-                        ...getAuthHeaders(options.headers),
-                        Authorization: `Bearer ${newToken}`,
-                    },
-                });
-                resolve(parseEnvelope(retryRes));
-            });
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", {
+            status: 401,
+            details: error?.message,
         });
     }
 
-    return parseEnvelope(res);
+    const retryRes = await fetch(fullUrl, {
+        ...options,
+        credentials: "include",
+        headers: {
+            ...getAuthHeaders(options.headers),
+            Authorization: `Bearer ${newToken}`,
+        },
+    });
+
+    if (retryRes.status === 401) {
+        clearAuthSession();
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", {
+            status: 401,
+        });
+    }
+
+    return parseEnvelope(retryRes);
 }
 
 export async function getCurrentUserProfile() {
@@ -122,7 +123,7 @@ export async function getCurrentUserProfile() {
     }
 }
 
-export async function loginWithPhonePassword({phone, password}) {
+export async function loginWithPhonePassword({ phone, password }) {
     const IS_MOCK_MODE = false;
 
     if (IS_MOCK_MODE) {
@@ -146,7 +147,7 @@ export async function loginWithPhonePassword({phone, password}) {
                 "Content-Type": "application/json",
                 "X-Client-Type": "web",
             },
-            body: JSON.stringify({phone, password}),
+            body: JSON.stringify({ phone, password }),
         });
         return parseEnvelope(response);
     }
@@ -157,7 +158,7 @@ export async function logout() {
     try {
         return authenticatedFetch(`${API_BASE_URL}/auth/logout`, {
             method: "POST",
-            body: JSON.stringify({token}),
+            body: JSON.stringify({ token }),
         });
     } catch {
         return null;
@@ -165,7 +166,6 @@ export async function logout() {
 }
 
 export async function refreshTokenApi() {
-    const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: "POST",
         credentials: "include",
@@ -173,7 +173,7 @@ export async function refreshTokenApi() {
             "Content-Type": "application/json",
             "X-Client-Type": "web"
         },
-        body: JSON.stringify({token}),
+        body: JSON.stringify({}),
     });
 
     const data = await parseEnvelope(response);
@@ -184,10 +184,10 @@ export async function refreshTokenApi() {
     throw new Error("Không thể làm mới phiên đăng nhập");
 }
 
-export async function createStaffAccount({phone, email, fullName, role}) {
+export async function createStaffAccount({ phone, email, fullName, role }) {
     return authenticatedFetch(`${API_BASE_URL}/users/staff`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             phone,
             email,
@@ -197,7 +197,7 @@ export async function createStaffAccount({phone, email, fullName, role}) {
     });
 }
 
-export async function fetchUsers({page, size, status, role, search}) {
+export async function fetchUsers({ page, size, status, role, search }) {
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
@@ -209,19 +209,19 @@ export async function fetchUsers({page, size, status, role, search}) {
     return authenticatedFetch(`${API_BASE_URL}/users?${params.toString()}`);
 }
 
-export async function updateUserStatus(userId, {status}) {
+export async function updateUserStatus(userId, { status }) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/status`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({status}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
     });
 }
 
 export async function updateUserRole(userId, role) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/role`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({role}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
     });
 }
 
@@ -235,4 +235,72 @@ export async function restoreUser(userId) {
     return authenticatedFetch(`${API_BASE_URL}/users/${userId}/restore`, {
         method: "POST",
     });
+}
+
+function normalizeTenantAccountCandidate(item = {}) {
+    return {
+        ...item,
+        contractId: item.contractId ?? item.contract_id ?? null,
+        contractCode: item.contractCode ?? item.contract_code ?? "",
+        contractStatus: item.contractStatus ?? item.contract_status ?? null,
+        startDate: item.startDate ?? item.start_date ?? null,
+        endDate: item.endDate ?? item.end_date ?? null,
+        signedAt: item.signedAt ?? item.signed_at ?? null,
+        propertyId: item.propertyId ?? item.property_id ?? null,
+        propertyName: item.propertyName ?? item.property_name ?? "",
+        roomId: item.roomId ?? item.room_id ?? null,
+        roomCode: item.roomCode ?? item.room_code ?? "",
+        roomStatus: item.roomStatus ?? item.room_status ?? null,
+        occupantId: item.occupantId ?? item.occupant_id ?? null,
+        profileId: item.profileId ?? item.profile_id ?? null,
+        roomRole: item.roomRole ?? item.room_role ?? null,
+        roomOccupantCount: item.roomOccupantCount ?? item.room_occupant_count ?? null,
+        roomMaxOccupants: item.roomMaxOccupants ?? item.room_max_occupants ?? null,
+        userId: item.userId ?? item.user_id ?? null,
+        fullName: item.fullName ?? item.full_name ?? "",
+        phone: item.phone ?? "",
+        email: item.email ?? "",
+        recipientEmail: item.recipientEmail ?? item.recipient_email ?? "",
+        role: item.role ?? null,
+        accountStatus: item.accountStatus ?? item.account_status ?? null,
+        mustChangePassword: item.mustChangePassword ?? item.must_change_password ?? null,
+        lastLoginAt: item.lastLoginAt ?? item.last_login_at ?? null,
+        accountCreatedAt: item.accountCreatedAt ?? item.account_created_at ?? null,
+        accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
+        emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+        provisioningStatus:
+            item.provisioningStatus ??
+            item.provisioning_status ??
+            "NOT_PROVISIONED",
+        sentAt: item.sentAt ?? item.sent_at ?? null,
+        failedAt: item.failedAt ?? item.failed_at ?? null,
+        failureReason: item.failureReason ?? item.failure_reason ?? "",
+        attemptCount: item.attemptCount ?? item.attempt_count ?? 0,
+        lastAttemptAt: item.lastAttemptAt ?? item.last_attempt_at ?? null,
+        profileStatus: item.profileStatus ?? item.profile_status ?? null,
+        missingIdentity: item.missingIdentity ?? item.missing_identity ?? false,
+        missingPortrait: item.missingPortrait ?? item.missing_portrait ?? false,
+        missingEmergencyContact:
+            item.missingEmergencyContact ?? item.missing_emergency_contact ?? false,
+        message: item.message ?? "",
+    };
+}
+
+function normalizeTenantAccountCandidates(data) {
+    return Array.isArray(data) ? data.map(normalizeTenantAccountCandidate) : [];
+}
+
+export async function fetchTenantAccountCandidates() {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
+        method: "GET",
+    });
+    return normalizeTenantAccountCandidates(data);
+}
+
+export async function sendTenantAccountCredentials(contractId, { retry = false } = {}) {
+    const params = retry ? "?retry=true" : "";
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send${params}`, {
+        method: "POST",
+    });
+    return normalizeTenantAccountCandidate(data);
 }

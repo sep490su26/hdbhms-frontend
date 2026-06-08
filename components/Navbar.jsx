@@ -52,7 +52,17 @@ export function Navbar() {
   const toggleDropdown = () => setIsDropdownOpen((current) => !current);
   const goToPrimaryAction = () => {
     setIsMobileMenuOpen(false);
-    router.push(staffRole === 'MANAGER' || staffRole === 'manager' ? '/dashboard/rooms' : staffRole ? '/dashboard' : '/login');
+    if (staffRole === 'MANAGER' || staffRole === 'manager') {
+      router.push('/dashboard/rooms');
+      return;
+    }
+
+    if (staffRole) {
+      router.push('/dashboard');
+      return;
+    }
+
+    router.push('/login');
   };
   const primaryActionLabel = staffRole ? 'Quản lý trọ' : 'Đăng nhập';
   const PrimaryActionIcon = staffRole ? LayoutDashboard : LogIn;

@@ -8,18 +8,20 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
-  DoorOpen,
   Home,
   LayoutGrid,
+  Layers3,
   Map as MapIcon,
   Maximize2,
   Search,
+  ShoppingCart,
   Users,
-  Wallet,
   X,
   Zap,
 } from "lucide-react";
 import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
+
+const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
 
 function guestStatusCopy(status) {
   const copy = {
@@ -392,19 +394,20 @@ function FloorBlueprint({ rooms, onSelect }) {
 
 function FloorPlanTabs({ floors, selectedFloor, onSelect }) {
   return (
-    <div className="flex gap-3 overflow-x-auto rounded-[1.7rem] bg-[#19243a] p-2 shadow-inner">
+    <div className="grid grid-cols-2 gap-2 rounded-[1.4rem] bg-[#19243a] p-1.5 shadow-inner sm:grid-cols-3 lg:grid-cols-6">
       {floors.map((floor) => {
         const active = floor === selectedFloor;
+        const isOverview = floor === BUILDING_OVERVIEW_LABEL;
         return (
           <button
             key={floor}
             type="button"
             onClick={() => onSelect(floor)}
-            className={`h-12 min-w-[120px] rounded-2xl px-6 text-sm font-black uppercase tracking-wide transition ${
+            className={`h-10 min-w-0 rounded-[1rem] px-3 text-xs font-black uppercase tracking-wide transition ${
               active ? "bg-white text-[#172033] shadow" : "text-slate-200 hover:bg-white/10 hover:text-white"
             }`}
           >
-            {floor}
+            <span className="block truncate">{isOverview ? "Sơ đồ nhà trọ" : floor}</span>
           </button>
         );
       })}
@@ -425,72 +428,287 @@ function FloorPlanLegend() {
   );
 }
 
-function FloorPlanSummaryCards({ rooms }) {
-  const stats = useMemo(() => {
-    return rooms.reduce(
-      (result, room) => {
-        const status = getFloorPlanStatus(room);
-        result.total += 1;
-        if (status === "VACANT") result.vacant += 1;
-        if (status === "HOLDING") result.holding += 1;
-        if (status === "RESERVED") result.reserved += 1;
-        if (status === "OCCUPIED") result.occupied += 1;
-        return result;
-      },
-      { total: 0, vacant: 0, holding: 0, reserved: 0, occupied: 0 },
-    );
-  }, [rooms]);
+function getMiniRoomLabel(room) {
+  const roomCode = getRoomCode(room);
+  return roomCode.toUpperCase().startsWith("P") ? roomCode : `P${roomCode}`;
+}
 
-  const items = [
-    { label: "Tổng phòng", value: stats.total, icon: Building2, color: "text-slate-950" },
-    { label: "Còn trống", value: stats.vacant, icon: DoorOpen, color: "text-emerald-600" },
-    { label: "Đang đặt cọc", value: stats.holding, icon: Wallet, color: "text-amber-600" },
-    { label: "Đặt cọc", value: stats.reserved, icon: Wallet, color: "text-orange-600" },
-    { label: "Đã thuê", value: stats.occupied, icon: Home, color: "text-blue-600" },
-  ];
+function MiniDoor({ x, y, side = "left", radius = 13 }) {
+  const sweep = side === "right" ? 0 : 1;
+  const arcEndX = side === "right" ? x - radius : x + radius;
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-      {items.map((item) => {
-        const Icon = item.icon;
+    <g>
+      <line x1={x} y1={y} x2={x} y2={y + radius} stroke="#cbd5e1" strokeWidth="1.5" />
+      <path d={`M ${x} ${y + radius} A ${radius} ${radius} 0 0 ${sweep} ${arcEndX} ${y}`} fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+    </g>
+  );
+}
+
+function MiniWindowLine({ x, y, width = 32 }) {
+  return <line x1={x} y1={y} x2={x + width} y2={y} stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" />;
+}
+
+function MiniVerticalWindowLine({ x, y, height = 28 }) {
+  return <line x1={x} y1={y} x2={x} y2={y + height} stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" />;
+}
+
+function MiniStair({ x, y }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {[0, 1, 2, 3, 4, 5].map((step) => {
+        const sx = step * 8;
+        const sy = 48 - step * 7;
         return (
-          <div key={item.label} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <Icon className="mb-3 text-blue-500" size={22} />
-            <p className="truncate text-xs font-black uppercase tracking-widest text-slate-400">{item.label}</p>
-            <p className={`mt-1 text-2xl font-black ${item.color}`}>{item.value}</p>
-          </div>
+          <path
+            key={step}
+            d={`M ${sx} ${sy} H ${sx + 8} V ${sy - 7}`}
+            fill="none"
+            stroke="#111827"
+            strokeWidth="3.2"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+          />
         );
       })}
+    </g>
+  );
+}
+
+function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+  const statusKey = getFloorPlanStatus(room);
+  const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
+  const isVertical = orientation === "vertical";
+  const suffix = getRoomSuffix(room);
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(room);
+    }
+  };
+
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem phòng ${getRoomCode(room)}`}
+      onClick={() => onSelect(room)}
+      onKeyDown={handleKeyDown}
+      className="cursor-pointer transition hover:drop-shadow-md focus:outline-none"
+    >
+      <rect x={x} y={y} width={w} height={h} fill={meta.fill} stroke="#111827" strokeWidth="2" />
+      <rect
+        x={x + 5}
+        y={y + 5}
+        width={w - 10}
+        height={h - 10}
+        fill="none"
+        stroke={meta.stroke}
+        strokeWidth="1"
+        strokeDasharray="3 5"
+        opacity="0.3"
+      />
+
+      {isVertical ? (
+        <>
+          <MiniDoor x={x + w} y={y + h - 28} side="right" radius={14} />
+          {suffix === 2 && <MiniWindowLine x={x + 12} y={y + 3} width={w - 24} />}
+          {suffix === 1 && <MiniVerticalWindowLine x={x + 3} y={y + h - 38} height={30} />}
+        </>
+      ) : (
+        <>
+          <MiniDoor x={x} y={y + h * 0.42} side="left" radius={13} />
+          <MiniVerticalWindowLine x={x + w - 3} y={y + h / 2 - 14} height={28} />
+          {suffix === 3 && <MiniWindowLine x={x + w / 2 - 17} y={y + 3} width={34} />}
+          {isLastRightRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + h - 3} width={34} />}
+        </>
+      )}
+
+      <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#111827">
+        {getMiniRoomLabel(room)}
+      </text>
+      <circle cx={x + w - 8} cy={y + 8} r="4.5" fill={meta.stroke} />
+    </g>
+  );
+}
+
+function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
+  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
+  const RIGHT_ROOM_H = 58;
+  const RIGHT_GAP = 5;
+  const LEFT_GAP = 5;
+  const LEFT_ROOM_W = 58;
+  const LEFT_ROOM_H = (RIGHT_ROOM_H * 3 + RIGHT_GAP * 2 - LEFT_GAP) / 2;
+  const TOTAL_LEFT_HEIGHT = LEFT_ROOM_H * Math.max(leftRooms.length, 2) + LEFT_GAP * Math.max(leftRooms.length - 1, 1);
+  const RIGHT_ROOM_W = 86;
+  const START_Y = 44;
+  const LEFT_X = 8;
+  const HALL_X = 78;
+  const RIGHT_X = 118;
+  const rightColumnHeight = rightRooms.length > 0
+    ? RIGHT_ROOM_H * rightRooms.length + RIGHT_GAP * Math.max(0, rightRooms.length - 1)
+    : 0;
+  const contentHeight = Math.max(TOTAL_LEFT_HEIGHT, rightColumnHeight);
+  const svgHeight = Math.max(242, START_Y + contentHeight + 84);
+  const hallTop = START_Y;
+  const hallBottom = START_Y + contentHeight;
+  const hallHeight = hallBottom - hallTop;
+  const safeFloorId = String(floor).replace(/[^a-zA-Z0-9_-]/g, "") || "floor";
+  const hallGradientId = `miniHallGradient-${safeFloorId}`;
+  const hallShadowId = `miniHallShadow-${safeFloorId}`;
+
+  return (
+    <article className="w-[200px] min-w-[200px]">
+      <button
+        type="button"
+        onClick={() => onSelectFloor(floor)}
+        className="mb-4 block w-full rounded-xl text-center transition hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <span className="text-2xl font-black tracking-tight text-black md:text-3xl">{floor}</span>
+      </button>
+
+      {rooms.length === 0 ? (
+        <div className="flex min-h-[242px] items-center justify-center rounded-2xl bg-slate-100 px-3 text-center text-xs font-bold text-slate-400">
+          Chưa có dữ liệu phòng
+        </div>
+      ) : (
+        <svg viewBox={`0 0 210 ${svgHeight}`} className="mx-auto block h-auto w-full">
+          <defs>
+            <linearGradient id={hallGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f7fbff" />
+              <stop offset="100%" stopColor="#e8f0f9" />
+            </linearGradient>
+            <filter id={hallShadowId} x="-35%" y="-12%" width="170%" height="124%">
+              <feDropShadow dx="0" dy="8" stdDeviation="7" floodColor="#94a3b8" floodOpacity="0.22" />
+            </filter>
+          </defs>
+
+          <rect x={HALL_X} y={hallTop} width="28" height={hallHeight} rx="12" fill={`url(#${hallGradientId})`} stroke="#cbd5e1" strokeWidth="1.3" filter={`url(#${hallShadowId})`} />
+          <line x1={HALL_X + 14} y1={hallTop + 8} x2={HALL_X + 14} y2={hallTop + hallHeight / 2 - 34} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
+          <line x1={HALL_X + 14} y1={hallTop + hallHeight / 2 + 34} x2={HALL_X + 14} y2={hallBottom - 8} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
+          <text
+            x={HALL_X + 14}
+            y={hallTop + hallHeight / 2}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="8"
+            fontWeight="900"
+            fill="#64748b"
+            letterSpacing="2"
+            transform={`rotate(-90 ${HALL_X + 14} ${hallTop + hallHeight / 2})`}
+          >
+            HÀNH LANG
+          </text>
+
+          {leftRooms.map((room, index) => (
+            <MiniBlueprintRoomShape
+              key={getRoomCode(room)}
+              room={room}
+              x={LEFT_X}
+              y={START_Y + index * (LEFT_ROOM_H + LEFT_GAP)}
+              w={LEFT_ROOM_W}
+              h={LEFT_ROOM_H}
+              orientation="vertical"
+              onSelect={onSelectRoom}
+            />
+          ))}
+
+          <MiniStair x={LEFT_X - 2} y={START_Y + TOTAL_LEFT_HEIGHT + 16} />
+
+          {rightRooms.map((room, index) => (
+            <MiniBlueprintRoomShape
+              key={getRoomCode(room)}
+              room={room}
+              x={RIGHT_X}
+              y={START_Y + index * (RIGHT_ROOM_H + RIGHT_GAP)}
+              w={RIGHT_ROOM_W}
+              h={RIGHT_ROOM_H}
+              orientation="horizontal"
+              onSelect={onSelectRoom}
+              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+            />
+          ))}
+        </svg>
+      )}
+    </article>
+  );
+}
+
+function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
+  const roomsByFloor = useMemo(() => {
+    const grouped = new Map();
+    for (const floor of floors) grouped.set(floor, []);
+    for (const room of allRooms) {
+      const key = room.floor;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(room);
+    }
+    return grouped;
+  }, [allRooms, floors]);
+
+  if (floors.length === 0) {
+    return (
+      <div className="rounded-[2rem] bg-[#e9e9e9] px-6 py-16 text-center text-sm font-semibold text-slate-500 ring-1 ring-slate-200">
+        Chưa có dữ liệu tầng.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-[2rem] bg-[#e9e9e9] px-4 py-6 ring-1 ring-slate-200 xl:overflow-x-visible">
+      <div className="mx-auto grid min-w-[1048px] max-w-[1048px] grid-cols-5 items-start gap-3">
+        {floors.map((floor) => (
+          <MiniFloorOverview
+            key={floor}
+            floor={floor}
+            rooms={[...(roomsByFloor.get(floor) || [])].sort(sortRoomsByCode)}
+            onSelectRoom={onSelectRoom}
+            onSelectFloor={onSelectFloor}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function FloorPlanPanel({ floors, selectedFloor, rooms, onSelectFloor, onSelectRoom }) {
+function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor, onSelectRoom }) {
+  const isOverview = selectedFloor === BUILDING_OVERVIEW_LABEL;
+  const tabItems = [BUILDING_OVERVIEW_LABEL, ...floors];
+
   return (
     <div className="space-y-6 rounded-[2rem] bg-[#f3f5f8] p-5 text-slate-950 shadow-sm md:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Sơ đồ tầng</p>
-          <h2 className="mt-1 text-3xl font-black text-slate-950">{selectedFloor || "Chưa có tầng"}</h2>
+          <h2 className="mt-1 text-3xl font-black text-slate-950">{selectedFloor || BUILDING_OVERVIEW_LABEL}</h2>
         </div>
         <FloorPlanLegend />
       </div>
 
-      <FloorPlanSummaryCards rooms={rooms} />
-      {floors.length > 0 && <FloorPlanTabs floors={floors} selectedFloor={selectedFloor} onSelect={onSelectFloor} />}
-      <FloorBlueprint rooms={rooms} onSelect={onSelectRoom} />
+      {tabItems.length > 1 && <FloorPlanTabs floors={tabItems} selectedFloor={selectedFloor} onSelect={onSelectFloor} />}
+      {isOverview ? (
+        <BuildingOverview floors={floors} allRooms={allRooms} onSelectFloor={onSelectFloor} onSelectRoom={onSelectRoom} />
+      ) : (
+        <FloorBlueprint rooms={rooms} onSelect={onSelectRoom} />
+      )}
     </div>
   );
 }
 
-function RoomListingCard({ room, isSelected, onSelect }) {
+function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatch }) {
+  const selectable = room.status === "available";
   return (
     <button
       type="button"
       onClick={() => {
-        onSelect(room);
+        if (multiSelect && selectable) {
+          onToggleBatch(room);
+        } else {
+          onSelect(room);
+        }
       }}
-      className={`group w-full max-w-[350px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
+      className={`group w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-900 text-left shadow-lg shadow-black/15 transition hover:-translate-y-1 hover:border-white/20 ${isSelected ? "ring-2 ring-white" : ""}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-950">
         <Image
@@ -507,6 +725,19 @@ function RoomListingCard({ room, isSelected, onSelect }) {
         >
           {guestStatusCopy(room.status)}
         </span>
+        {multiSelect && (
+          <span
+            className={`absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-lg border text-sm font-black ${
+              isSelected
+                ? "border-emerald-300 bg-emerald-400 text-slate-950"
+                : selectable
+                  ? "border-white/50 bg-slate-950/70 text-white"
+                  : "border-white/10 bg-slate-950/60 text-slate-600"
+            }`}
+          >
+            {isSelected ? "✓" : ""}
+          </span>
+        )}
       </div>
 
       <div className="bg-slate-900 p-4">
@@ -527,7 +758,7 @@ function RoomListingCard({ room, isSelected, onSelect }) {
 
         <div className="mt-5 flex items-center justify-between text-xs font-bold uppercase tracking-widest text-slate-400">
           <>
-            Xem chi tiết
+            {multiSelect ? (selectable ? "Chọn phòng" : "Không thể chọn") : "Xem chi tiết"}
             <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
           </>
         </div>
@@ -679,9 +910,11 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const router = useRouter();
   const [viewMode, setViewMode] = useState("Listing");
   const [activeFloorFilter, setActiveFloorFilter] = useState(allFloorsLabel);
-  const [activeFloorPlan, setActiveFloorPlan] = useState("Tầng 1");
+  const [activeFloorPlan, setActiveFloorPlan] = useState(BUILDING_OVERVIEW_LABEL);
   const [searchQuery, setSearchQuery] = useState("");
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState([]);
 
   const [apiRooms, setApiRooms] = useState([]);
   const [catalogFloors, setCatalogFloors] = useState([]);
@@ -698,9 +931,9 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
       setCatalogFloors(catalog.floors);
       setApiRooms(catalog.rooms);
       setActiveFloorPlan((current) => (
-        catalog.floors.some((floor) => floor.name === current)
+        current === BUILDING_OVERVIEW_LABEL || catalog.floors.some((floor) => floor.name === current)
           ? current
-          : catalog.floors[0]?.name || ""
+          : BUILDING_OVERVIEW_LABEL
       ));
       setIsSuccess(true);
     } catch {
@@ -743,9 +976,29 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const openRoom = (room) => {
     router.push(getRoomDetailHref(room));
   };
+  const toggleBatchRoom = (room) => {
+    if (room.status !== "available") return;
+    setSelectedRooms((current) => (
+      current.some((item) => item.roomId === room.roomId)
+        ? current.filter((item) => item.roomId !== room.roomId)
+        : [...current, room]
+    ));
+  };
+  const startBatchDeposit = () => {
+    if (selectedRooms.length < 2) return;
+    const roomIds = selectedRooms.map((room) => room.roomId).join(",");
+    window.sessionStorage.setItem(
+      "hdbhms_batch_selected_rooms",
+      JSON.stringify(selectedRooms.map((room) => ({
+        roomId: room.roomId,
+        roomCode: room.roomCode,
+      }))),
+    );
+    router.push(`/rooms/deposit-batch?roomIds=${encodeURIComponent(roomIds)}`);
+  };
 
   return (
-    <div className="min-h-screen bg-[#091426] px-4 pb-12 pt-28 text-white sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#091426] px-4 pb-8 pt-8 text-white sm:px-6 sm:pb-12 sm:pt-28 lg:px-8">
       {isError && (
         <div className="mx-auto mb-6 max-w-xl rounded-[1.5rem] border border-rose-300/20 bg-rose-400/10 px-6 py-8 text-center">
           <p className="text-sm font-semibold text-rose-100">Không tải được dữ liệu phòng</p>
@@ -774,6 +1027,22 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               </div>
 
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMultiSelect((current) => !current);
+                    setViewMode("Listing");
+                    setAvailableOnly(true);
+                  }}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-bold transition ${
+                    multiSelect
+                      ? "bg-emerald-400 text-slate-950"
+                      : "border border-white/10 bg-[#1e2746] text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Layers3 className="h-4 w-4" />
+                  {multiSelect ? "Đang chọn nhiều phòng" : "Chọn nhiều phòng"}
+                </button>
                 <div className="flex h-11 rounded-2xl border border-white/5 bg-[#1e2746] p-1">
                   {[
                     { key: "Listing", label: "Danh sách", icon: LayoutGrid },
@@ -863,13 +1132,15 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                 {viewMode === "Listing" ? (
                   <div className="mx-auto w-full max-w-6xl">
                     {filteredRooms.length > 0 ? (
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] justify-items-start gap-5">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
                         {filteredRooms.map((room) => (
                           <RoomListingCard
                             key={room.id}
                             room={room}
-                            isSelected={false}
+                            isSelected={selectedRooms.some((item) => item.roomId === room.roomId)}
                             onSelect={openRoom}
+                            multiSelect={multiSelect}
+                            onToggleBatch={toggleBatchRoom}
                           />
                         ))}
                       </div>
@@ -889,6 +1160,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     floors={floorsForPlan}
                     selectedFloor={activeFloorPlan}
                     rooms={currentFloorRooms}
+                    allRooms={visibleRooms}
                     onSelectFloor={setActiveFloorPlan}
                     onSelectRoom={openRoom}
                   />
@@ -896,6 +1168,41 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
               </section>
             </div>
           </div>
+          {multiSelect && (
+            <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-4xl rounded-2xl border border-emerald-300/30 bg-[#111c31]/95 p-4 shadow-2xl backdrop-blur sm:bottom-6 sm:flex sm:items-center sm:justify-between sm:gap-5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm font-black text-white">
+                  <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                  {selectedRooms.length} phòng đã chọn
+                </div>
+                <p className="mt-1 truncate text-xs text-slate-300">
+                  {selectedRooms.length
+                    ? selectedRooms.map((room) => room.roomCode).join(", ")
+                    : "Chọn ít nhất 2 phòng đang trống"}
+                </p>
+                <p className="mt-1 text-xs font-bold text-emerald-300">
+                  Tổng tiền cọc: {(selectedRooms.length * 2000).toLocaleString("vi-VN")} ₫
+                </p>
+              </div>
+              <div className="mt-3 flex gap-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRooms([])}
+                  className="h-11 rounded-xl border border-white/15 px-4 text-sm font-bold text-white hover:bg-white/10"
+                >
+                  Xóa chọn
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedRooms.length < 2}
+                  onClick={startBatchDeposit}
+                  className="h-11 rounded-xl bg-emerald-400 px-5 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Đặt cọc các phòng đã chọn
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

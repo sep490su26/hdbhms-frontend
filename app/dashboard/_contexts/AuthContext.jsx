@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
+import { clearAuthSession, getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
 
 const AuthContext = createContext(null);
@@ -64,14 +64,22 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
       return normalizedProfile;
     } catch (error) {
       setUserState(null);
-      if (isBrowser) {
-        window.localStorage.removeItem("token");
-        window.localStorage.removeItem("userRole");
-      }
+      clearAuthSession();
       throw error;
     } finally {
       setIsLoadingUser(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const token = window.localStorage.getItem("token");
+      if (!token) {
+        setUserState(null);
+      }
+    };
+    window.addEventListener("auth-changed", handleAuthChanged);
+    return () => window.removeEventListener("auth-changed", handleAuthChanged);
   }, []);
 
   const setUser = useCallback((profile) => {
@@ -86,13 +94,10 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
       // Ignore API errors for logout to ensure frontend always clears
     }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("token");
-      window.localStorage.removeItem("userRole");
-    }
+    clearAuthSession();
 
     setUserState(null);
-    router.push("/login");
+    // router.push("/login");
   }, [router]);
 
   const value = useMemo(

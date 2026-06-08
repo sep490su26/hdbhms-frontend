@@ -4,15 +4,17 @@ import {usePathname} from "next/navigation";
 import {Navbar} from "@/components/Navbar";
 import {Footer} from "@/components/Footer";
 
-export function SiteChrome({children}) {
+export function SiteChrome({children, isWebView}) {
     const pathname = usePathname();
     const isManagementRoute =
         pathname?.startsWith("/management")
         || pathname?.startsWith("/viewing-customers")
         || pathname?.startsWith("/dashboard");
-    const isAuthRoute = pathname?.startsWith("/login");
+    const isAuthRoute =
+        pathname?.startsWith("/login")
+        || pathname?.startsWith("/forgot-password");
 
-  if (isManagementRoute || isAuthRoute) {
+  if (isWebView || isManagementRoute || isAuthRoute) {
         return <>{children}</>;
     }
 

@@ -1,811 +1,927 @@
 "use client";
 
-import {useState} from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger
-} from "@/components/ui/dialog";
+  AlertCircle,
+  Bike,
+  BriefcaseBusiness,
+  CheckCircle2,
+  Contact,
+  Eye,
+  FileText,
+  FolderOpen,
+  IdCard,
+  ImageOff,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCcw,
+  Search,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
-} from "@/components/ui/pagination";
+  fetchPrivateFileObjectUrl,
+  fetchTenantProfiles,
+} from "@/services/tenantProfilesService";
 
-const TENANTS = [
-    {
-        id: 1,
-        initials: "NH",
-        color: "bg-indigo-100 text-indigo-700",
-        name: "Nguyễn Văn Hưng",
-        phone: "0901 234 567",
-        email: "vinhung@gmail.com",
-        rooms: 102,
-        people: 2,
-        detail: {
-            fullName: "Nguyễn Văn Hoàng",
-            dob: "15/05/1992",
-            gender: "Nam",
-            idNumber: "0123456789001",
-            idDate: "24/10/2021",
-            idPlace: "Cục CS QLHC",
-            address: "123 Đường Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh",
-            branch: "Hải Đăng 1",
-            roomNumber: "P.102",
-            coTenant: "Trần Thị B",
-            coTenantYear: "1995",
-            coTenantPhone: "0987 654 321",
-            vehicle: "Honda Airblade",
-            plate: "59-X1123.45",
-            vehicleCount: "01",
-            contract: "HD-2024-H102",
-            contractDuration: "12 tháng",
-            contractStart: "01/01/2024",
-            contractEnd: "31/12/2024",
-            cccdFront: true,
-            cccdBack: false,
-            hasCCCD: true,
-            hasPhoto: true,
-            phone: "090 123 4567",
-            email: "hoang.nguyen@email.com",
-        },
+const MOCK_TENANT_PROFILES = [
+  {
+    id: 1001,
+    fullName: "Nguyen Minh Anh",
+    dob: "1998-04-12",
+    gender: "FEMALE",
+    phone: "0901234567",
+    email: "minh.anh@example.com",
+    permanentAddress: "12 Nguyen Trai, Thanh Xuan, Ha Noi",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    roomRole: "PRIMARY",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    residenceStatus: "RENTING",
+    moveInDate: "2026-01-05",
+    profileStatus: "COMPLETED",
+    appStatus: "ACTIVE",
+    portraitFileId: 8101,
+    portraitUrl: "",
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    contractStartDate: "2026-01-05",
+    contractEndDate: "2026-12-31",
+    monthlyRent: 4500000,
+    identityDocument: {
+      docNumber: "001298012345",
+      issuedDate: "2021-08-20",
+      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
+      frontFileId: 7101,
+      backFileId: 7102,
+      frontFileUrl: "",
+      backFileUrl: "",
     },
-    {
-        id: 2,
-        initials: "LT",
-        color: "bg-teal-100 text-teal-700",
-        name: "Lê Thị Thu",
-        phone: "0912 333 444",
-        email: "thithu@gmail.com",
-        rooms: 105,
-        people: 1,
-        detail: {
-            fullName: "Lê Thị Thu",
-            dob: "22/08/1995",
-            gender: "Nữ",
-            idNumber: "0987654321001",
-            idDate: "10/06/2020",
-            idPlace: "Cục CS QLHC",
-            address: "45 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh",
-            branch: "Hải Đăng 1",
-            roomNumber: "P.105",
-            coTenant: null,
-            coTenantYear: null,
-            coTenantPhone: null,
-            vehicle: "Yamaha Exciter",
-            plate: "51-B99876",
-            vehicleCount: "01",
-            contract: "HD-2024-H105",
-            contractDuration: "6 tháng",
-            contractStart: "01/03/2024",
-            contractEnd: "31/08/2024",
-            cccdFront: true,
-            cccdBack: true,
-            hasCCCD: true,
-            hasPhoto: true,
-            phone: "0912 333 444",
-            email: "thithu@gmail.com",
-        },
+    vehicles: [{ id: 6101, vehicleType: "MOTORBIKE", licensePlate: "29X1-123.45" }],
+    emergencyContacts: [
+      { id: 6201, fullName: "Nguyen Van Nam", relationship: "Bo", phone: "0912345678" },
+    ],
+    roommates: [
+      {
+        id: 1002,
+        fullName: "Tran Thu Ha",
+        dob: "2000-09-18",
+        phone: "0987654321",
+        roomRole: "CO_OCCUPANT",
+      },
+    ],
+  },
+  {
+    id: 1002,
+    fullName: "Tran Thu Ha",
+    dob: "2000-09-18",
+    gender: "FEMALE",
+    phone: "0987654321",
+    email: "thu.ha@example.com",
+    permanentAddress: "Hai Chau, Da Nang",
+    propertyId: 1,
+    propertyName: "HDB Home Nguyen Trai",
+    roomId: 101,
+    roomCode: "A101",
+    roomRole: "CO_OCCUPANT",
+    roomOccupantCount: 2,
+    roomMaxOccupants: 3,
+    residenceStatus: "RENTING",
+    moveInDate: "2026-02-01",
+    profileStatus: "MISSING_PORTRAIT",
+    appStatus: "PENDING",
+    portraitFileId: null,
+    portraitUrl: "",
+    contractId: 5001,
+    contractCode: "HD-2026-001",
+    contractStatus: "ACTIVE",
+    contractStartDate: "2026-01-05",
+    contractEndDate: "2026-12-31",
+    monthlyRent: 4500000,
+    identityDocument: {
+      docNumber: "048300123456",
+      issuedDate: "2022-03-14",
+      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
+      frontFileId: 7103,
+      backFileId: 7104,
+      frontFileUrl: "",
+      backFileUrl: "",
     },
-    {
-        id: 3,
-        initials: "PM",
-        color: "bg-orange-100 text-orange-700",
-        name: "Phạm Minh Tuấn",
-        phone: "0933 111 222",
-        email: "minhtuanpham@gmail.com",
-        rooms: 201,
-        people: 3,
-        detail: {
-            fullName: "Phạm Minh Tuấn",
-            dob: "05/03/1990",
-            gender: "Nam",
-            idNumber: "0112233445566",
-            idDate: "01/01/2019",
-            idPlace: "Cục CS QLHC",
-            address: "88 Trần Hưng Đạo, Quận 5, TP. Hồ Chí Minh",
-            branch: "Hải Đăng 2",
-            roomNumber: "P.201",
-            coTenant: "Nguyễn Thị C",
-            coTenantYear: "1992",
-            coTenantPhone: "0966 778 899",
-            vehicle: "Honda Winner",
-            plate: "59-AA5678",
-            vehicleCount: "01",
-            contract: "HD-2024-H201",
-            contractDuration: "12 tháng",
-            contractStart: "15/02/2024",
-            contractEnd: "14/02/2025",
-            cccdFront: true,
-            cccdBack: true,
-            hasCCCD: true,
-            hasPhoto: false,
-            phone: "0933 111 222",
-            email: "minhtuanpham@gmail.com",
-        },
+    vehicles: [],
+    emergencyContacts: [
+      { id: 6202, fullName: "Tran Van Hai", relationship: "Anh trai", phone: "0934567890" },
+    ],
+    roommates: [
+      {
+        id: 1001,
+        fullName: "Nguyen Minh Anh",
+        dob: "1998-04-12",
+        phone: "0901234567",
+        roomRole: "PRIMARY",
+      },
+    ],
+  },
+  {
+    id: 1003,
+    fullName: "Le Quang Huy",
+    dob: "1996-11-03",
+    gender: "MALE",
+    phone: "0978123456",
+    email: "quang.huy@example.com",
+    permanentAddress: "Ninh Kieu, Can Tho",
+    propertyId: 2,
+    propertyName: "HDB Residence Cau Giay",
+    roomId: 205,
+    roomCode: "B205",
+    roomRole: "PRIMARY",
+    roomOccupantCount: 1,
+    roomMaxOccupants: 2,
+    residenceStatus: "RENTING",
+    moveInDate: "2025-08-15",
+    profileStatus: "MISSING_CCCD",
+    appStatus: "INACTIVE",
+    portraitFileId: 8103,
+    portraitUrl: "",
+    contractId: 5002,
+    contractCode: "HD-2025-118",
+    contractStatus: "EXPIRING_SOON",
+    contractStartDate: "2025-08-15",
+    contractEndDate: "2026-07-31",
+    monthlyRent: 6200000,
+    identityDocument: {
+      docNumber: "",
+      issuedDate: "",
+      issuedPlace: "",
+      frontFileId: null,
+      backFileId: null,
+      frontFileUrl: "",
+      backFileUrl: "",
     },
+    vehicles: [{ id: 6103, vehicleType: "CAR", licensePlate: "30K-678.90" }],
+    emergencyContacts: [],
+    roommates: [],
+  },
 ];
 
-const FLOORS = [
-    {label: "Tầng 2", rooms: ["101", "102", "103", "104"]},
-    {label: "Tầng 3", rooms: ["201", "202", "203", "204"]},
-    {label: "Tầng 4", rooms: ["301", "302", "303", "304"]},
-];
+const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
 
-function getPageNumbers(currentPage, totalPages, maxVisible = 5) {
-    const pages = [];
-    if (totalPages <= maxVisible) {
-        for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-        const start = Math.max(2, currentPage - 1);
-        const end = Math.min(totalPages - 1, currentPage + 1);
-        pages.push(1);
-        if (start > 2) pages.push("...");
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (end < totalPages - 1) pages.push("...");
-        pages.push(totalPages);
+const moneyFormatter = new Intl.NumberFormat("vi-VN");
+
+const valueOf = (item, ...keys) => {
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && item[key] !== "") {
+      return item[key];
     }
-    return pages;
+  }
+  return "";
+};
+
+const normalizeText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const formatDate = (value) => {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Chưa cập nhật" : dateFormatter.format(date);
+};
+
+const formatYear = (value) => {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Chưa cập nhật" : String(date.getFullYear());
+};
+
+const formatMoney = (value) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0
+    ? `${moneyFormatter.format(amount)} đ`
+    : "Chưa cập nhật";
+};
+
+const initialsOf = (name) => {
+  const words = String(name || "KH").trim().split(/\s+/).filter(Boolean);
+  return words
+    .slice(-2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase() || "KH";
+};
+
+const roleLabel = (role) =>
+  String(role).toUpperCase() === "PRIMARY" ? "Người ký chính" : "Người ở cùng";
+
+const roleClass = (role) =>
+  String(role).toUpperCase() === "PRIMARY"
+    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+    : "border-slate-200 bg-slate-50 text-slate-700";
+
+const profileStatusLabel = (status, fallback) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "COMPLETED") return "Hồ sơ đủ";
+  if (value === "MISSING_CCCD") return "Thiếu CCCD";
+  if (value === "MISSING_PORTRAIT") return "Thiếu ảnh chân dung";
+  if (value === "MISSING_EMERGENCY_CONTACT") return "Thiếu liên hệ khẩn cấp";
+  return fallback || "Chưa rõ";
+};
+
+const profileStatusClass = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "COMPLETED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (
+    value === "MISSING_CCCD" ||
+    value === "MISSING_PORTRAIT" ||
+    value === "MISSING_EMERGENCY_CONTACT"
+  ) {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-700";
+};
+
+const accountStatusLabel = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "ACTIVE") return "Đã kích hoạt";
+  if (value === "INACTIVE" || value === "DISABLED" || value === "CLOSED" || value === "ARCHIVED") {
+    return "Bị vô hiệu hóa";
+  }
+  return "Chưa kích hoạt";
+};
+
+const accountStatusClass = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "ACTIVE") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (value === "INACTIVE" || value === "DISABLED" || value === "CLOSED" || value === "ARCHIVED") {
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-700";
+};
+
+const residenceStatusLabel = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "RENTING") return "Đang thuê";
+  if (value === "MOVED_OUT") return "Đã rời đi";
+  return "Chờ duyệt";
+};
+
+const contractStatusLabel = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "ACTIVE") return "Đang hiệu lực";
+  if (value === "EXPIRING_SOON") return "Sắp hết hạn";
+  if (value === "PENDING_SIGNATURE") return "Chờ ký";
+  if (value === "DRAFT") return "Bản nháp";
+  return value || "Chưa cập nhật";
+};
+
+const genderLabel = (gender) => {
+  const value = String(gender || "").toUpperCase();
+  if (value === "MALE") return "Nam";
+  if (value === "FEMALE") return "Nữ";
+  if (value === "OTHER") return "Khác";
+  return gender || "Chưa cập nhật";
+};
+
+const vehicleTypeLabel = (type) => {
+  const value = String(type || "").toUpperCase();
+  if (value === "MOTORBIKE") return "Xe máy";
+  if (value === "BICYCLE") return "Xe đạp";
+  if (value === "CAR") return "Ô tô";
+  if (value === "E_BIKE") return "Xe điện";
+  return type || "Khác";
+};
+
+const roomOccupancyText = (profile) => {
+  const current = Number(valueOf(profile, "roomOccupantCount", "room_occupant_count")) || 0;
+  const max = Number(valueOf(profile, "roomMaxOccupants", "room_max_occupants")) || 3;
+  return `${current}/${max}`;
+};
+
+const profileRowKey = (profile, index) => {
+  const profileId = valueOf(profile, "id", "profileId", "profile_id");
+  if (profileId) return `profile-${profileId}`;
+  return [
+    "profile-row",
+    valueOf(profile, "contractId", "contract_id") || "contract",
+    valueOf(profile, "roomRole", "room_role") || "role",
+    valueOf(profile, "phone") || "phone",
+    valueOf(profile, "fullName", "full_name") || "name",
+    index,
+  ].join("-");
+};
+
+function Badge({ children, className = "" }) {
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${className}`}>
+      {children}
+    </span>
+  );
 }
 
-function PaginationFooter({
-                              startIndex,
-                              pageSize,
-                              totalItems,
-                              currentPage,
-                              totalPages,
-                              onPageChange,
-                              onPageSizeChange,
-                          }) {
-    const pages = getPageNumbers(currentPage, totalPages);
+function InfoItem({ label, value, strong = false }) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-[#7b8494]">{label}</p>
+      <p className={`mt-1 text-sm ${strong ? "font-black text-[#091426]" : "font-semibold text-[#243247]"}`}>
+        {value || "Chưa cập nhật"}
+      </p>
+    </div>
+  );
+}
 
+function DetailSection({ icon: Icon, title, children, className = "" }) {
+  return (
+    <section className={`rounded-xl border border-[#d8dee8] bg-white p-5 ${className}`}>
+      <div className="mb-5 flex items-center gap-3">
+        <Icon className="h-5 w-5 text-[#091426]" />
+        <h3 className="text-sm font-black uppercase tracking-[0.06em] text-[#45474c]">{title}</h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ProtectedImage({ fileUrl, alt, placeholder }) {
+  const [objectUrl, setObjectUrl] = useState("");
+  const [state, setState] = useState(fileUrl ? "loading" : "empty");
+
+  useEffect(() => {
+    let isActive = true;
+    let createdUrl = "";
+
+    if (!fileUrl) {
+      return undefined;
+    }
+
+    fetchPrivateFileObjectUrl(fileUrl)
+      .then((url) => {
+        if (!isActive) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        createdUrl = url;
+        setObjectUrl(url);
+        setState("ready");
+      })
+      .catch(() => {
+        if (isActive) setState("error");
+      });
+
+    return () => {
+      isActive = false;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [fileUrl]);
+
+  const displayState = fileUrl ? state : "empty";
+
+  if (displayState !== "ready") {
     return (
-        <div
-            className="border-t border-gray-100 px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-      <span className="text-xs text-gray-500 whitespace-nowrap">
-        Hiển thị {startIndex + 1}–{Math.min(startIndex + pageSize, totalItems)} trong {totalItems} kết quả
+      <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f1f5f9] p-4 text-center text-sm font-bold text-[#64748b]">
+        <div>
+          <ImageOff className="mx-auto mb-3 h-8 w-8 text-[#94a3b8]" />
+          {displayState === "loading" ? "Đang tải ảnh..." : placeholder}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={objectUrl}
+      alt={alt}
+      className="h-[220px] w-full rounded-xl border border-[#d8dee8] bg-[#f8fafc] object-contain"
+      onError={() => setState("error")}
+    />
+  );
+}
+
+function ChecklistRow({ label, done, doneText, missingText }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-[#f1f5ff] px-4 py-3">
+      <div className="flex items-center gap-3">
+        <FileText className="h-5 w-5 text-[#4166b2]" />
+        <span className="font-bold text-[#243247]">{label}</span>
+      </div>
+      <span className={`flex items-center gap-1 text-xs font-black uppercase ${done ? "text-emerald-600" : "text-amber-700"}`}>
+        {done ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+        {done ? doneText : missingText}
       </span>
-            <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(e.target.value)}
-                className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-100"
-            >
-                {[5, 10, 20, 50].map((size) => (
-                    <option key={size} value={size}>
-                        {size} / trang
-                    </option>
-                ))}
-            </select>
-            <Pagination>
-                <PaginationContent>
-                    <PaginationItem>
-                        <PaginationPrevious
-                            onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                    </PaginationItem>
-                    {pages.map((page, idx) =>
-                        page === "..." ? (
-                            <PaginationItem key={`ellipsis-${idx}`}>
-                                <span className="px-2 text-gray-400 text-sm">…</span>
-                            </PaginationItem>
-                        ) : (
-                            <PaginationItem key={page}>
-                                <PaginationLink
-                                    isActive={currentPage === page}
-                                    onClick={() => onPageChange(page)}
-                                >
-                                    {page}
-                                </PaginationLink>
-                            </PaginationItem>
-                        )
-                    )}
-                    <PaginationItem>
-                        <PaginationNext
-                            onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                    </PaginationItem>
-                </PaginationContent>
-            </Pagination>
-        </div>
-    );
+    </div>
+  );
 }
 
-function SectionTitle({icon, title}) {
-    return (
-        <div className="flex items-center gap-2 mb-3">
-            <div className="text-gray-500">{icon}</div>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</span>
-        </div>
-    );
+function ContactLine({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-4">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#4166b2]">
+        <Icon className="h-5 w-5" />
+      </span>
+      <span>
+        <span className="block text-xs font-bold text-[#7b8494]">{label}</span>
+        <span className="block text-sm font-black text-[#091426]">{value || "Chưa cập nhật"}</span>
+      </span>
+    </div>
+  );
 }
 
-function InfoRow({label, value}) {
-    return (
-        <div className="flex flex-col gap-0.5">
-            <span className="text-[11px] text-gray-400">{label}</span>
-            <span className="text-sm text-gray-800 font-medium">{value || "—"}</span>
-        </div>
-    );
-}
+function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
+  const identity = valueOf(profile, "identityDocument", "identity_document") || {};
+  const vehicles = valueOf(profile, "vehicles") || [];
+  const emergencyContacts = valueOf(profile, "emergencyContacts", "emergency_contacts") || [];
+  const roommates = valueOf(profile, "roommates") || [];
+  const maxOccupants = Number(valueOf(profile, "roomMaxOccupants", "room_max_occupants")) || 3;
+  const occupantCount = Number(valueOf(profile, "roomOccupantCount", "room_occupant_count")) || 1;
+  const firstEmergency = emergencyContacts[0];
+  const contractId = valueOf(profile, "contractId", "contract_id");
 
+  const openRoommateProfile = (roommateId) => {
+    const nextProfile = profiles.find((item) => Number(valueOf(item, "id")) === Number(roommateId));
+    if (nextProfile) onSelectProfile(nextProfile);
+  };
 
-function DetailModal({tenant, open, onOpenChange}) {
-    if (!tenant) return null;
-    const d = tenant.detail;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <header className="flex items-center justify-between border-b border-[#d8dee8] px-6 py-5">
+          <div className="flex items-center gap-4">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+              <UserRound className="h-6 w-6" />
+            </span>
+            <h2 className="text-2xl font-black text-[#091426]">Chi tiết hồ sơ khách thuê</h2>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-[#45474c] hover:bg-[#f2f4f6]" aria-label="Đóng">
+            <X className="h-6 w-6" />
+          </button>
+        </header>
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogTrigger>
-            </DialogTrigger>
-            <DialogContent
-                className="max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden flex flex-col [&>button.absolute]:hidden">
-                {/* Modal header */}
-                <DialogHeader className="px-5 py-4 bg-white border-b border-gray-200 rounded-t-2xl sticky top-0 z-10">
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
-                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor"
-                                     viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                </svg>
-                            </div>
-                            <DialogTitle className="text-lg font-semibold text-gray-800">Chi tiết hồ sơ khách
-                                thuê</DialogTitle>
-                        </div>
-                        <button
-                            onClick={() => onOpenChange(false)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-                </DialogHeader>
-                <DialogDescription className="sr-only">
-                    Thông tin chi tiết về khách thuê {d.fullName}, bao gồm hồ sơ cá nhân, hợp đồng thuê, và thông tin
-                    liên lạc.
-                </DialogDescription>
-                {/* Body – responsive grid: 1 col on mobile, 3 cols on lg+ */}
-                <div
-                    className="flex-1 overflow-y-auto px-2 py-2
-            [&::-webkit-scrollbar]:w-1.5
-            [&::-webkit-scrollbar-thumb]:rounded-full
-            [&::-webkit-scrollbar-thumb]:bg-gray-300
-            [&::-webkit-scrollbar-track]:bg-gray-100"
-                >
-                    <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        {/* LEFT: full width on mobile, 2/3 on desktop */}
-                        <div className="lg:col-span-2 space-y-4">
-                            {/* Thông tin cá nhân */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <SectionTitle
-                                    icon={
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                    }
-                                    title="Thông tin cá nhân"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                                    <InfoRow label="Họ và tên" value={d.fullName}/>
-                                    <InfoRow label="Ngày sinh" value={d.dob}/>
-                                    <InfoRow label="Giới tính" value={d.gender}/>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                                    <InfoRow label="Số CCCD/CMND" value={d.idNumber}/>
-                                    <InfoRow label="Ngày cấp" value={d.idDate}/>
-                                    <InfoRow label="Nơi cấp" value={d.idPlace}/>
-                                </div>
-                                <InfoRow label="Địa chỉ thường trú" value={d.address}/>
-                            </div>
-
-                            {/* Nơi cư trú */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <SectionTitle
-                                    icon={
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                                        </svg>
-                                    }
-                                    title="Nơi cư trú"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <InfoRow label="Tên cơ sở" value={d.branch}/>
-                                    <InfoRow label="Số phòng" value={d.roomNumber}/>
-                                </div>
-                            </div>
-
-                            {/* Thông tin bạn cùng phòng */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <SectionTitle
-                                    icon={
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        </svg>
-                                    }
-                                    title="Thông tin bạn cùng phòng"
-                                />
-                                {d.coTenant ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        <InfoRow label="Họ và tên" value={d.coTenant}/>
-                                        <InfoRow label="Năm sinh" value={d.coTenantYear}/>
-                                        <InfoRow label="Số điện thoại" value={d.coTenantPhone}/>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-gray-400 italic">Không có bạn cùng phòng.</p>
-                                )}
-                            </div>
-
-                            {/* Thông tin xe */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <SectionTitle
-                                    icon={
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                  d="M8 16l-1.447-.724A1 1 0 016 14.382V11a5 5 0 0110 0v3.382a1 1 0 01-.553.894L14 16m-6 0h6m-6 0l-1 3h8l-1-3"/>
-                                        </svg>
-                                    }
-                                    title="Thông tin xe"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <InfoRow label="Hãng xe" value={d.vehicle}/>
-                                    <InfoRow label="Biển số" value={d.plate}/>
-                                    <InfoRow label="Số lượng xe" value={d.vehicleCount}/>
-                                </div>
-                            </div>
-
-                            {/* Ảnh căn cước công dân */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <SectionTitle
-                                    icon={
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                  d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
-                                        </svg>
-                                    }
-                                    title="Ảnh căn cước công dân"
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {/* Front CCCD */}
-                                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-blue-50 p-3">
-                                        <div className="text-center mb-2">
-                                            <p className="text-xs font-bold text-blue-800">Nhà Trọ HẢI ĐĂNG 1</p>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 justify-center text-[9px] text-gray-500">
-                                            {FLOORS.map((f) => (
-                                                <div key={f.label} className="flex flex-col items-center gap-0.5">
-                                                    <span className="font-semibold text-gray-600">{f.label}</span>
-                                                    {f.rooms.map((r) => (
-                                                        <div
-                                                            key={r}
-                                                            className="w-6 h-4 bg-blue-200 border border-blue-300 rounded-sm flex items-center justify-center text-[8px] text-blue-700"
-                                                        >
-                                                            {r}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {/* Back CCCD */}
-                                    {d.cccdBack ? (
-                                        <div
-                                            className="border border-gray-200 rounded-xl bg-gray-100 flex items-center justify-center h-28">
-                                            <div className="text-center">
-                                                <svg className="w-8 h-8 text-gray-300 mx-auto mb-1" fill="none"
-                                                     stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                                                          d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5"/>
-                                                </svg>
-                                                <p className="text-xs text-gray-400">Mặt sau</p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="border-2 border-dashed border-red-200 rounded-xl bg-red-50 flex flex-col items-center justify-center h-28 gap-1">
-                                            <svg className="w-7 h-7 text-red-300" fill="none" stroke="currentColor"
-                                                 viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01"/>
-                                            </svg>
-                                            <p className="text-xs text-red-400">Không tải được ảnh, thử lại sau</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* RIGHT: full width on mobile, 1/3 on desktop */}
-                        <div className="space-y-4">
-                            {/* Hợp đồng thuê */}
-                            <div className="bg-gray-900 rounded-xl p-4 text-white">
-                                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Hợp đồng thuê</p>
-                                <p className="text-xl font-bold mb-1">{d.contract}</p>
-                                <p className="text-xs text-gray-400 mb-0.5">Thời hạn: {d.contractDuration}</p>
-                                <p className="text-xs text-gray-400 mb-3">{d.contractStart} – {d.contractEnd}</p>
-                                <button
-                                    className="w-full flex items-center justify-center gap-2 border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white text-xs font-medium py-2 rounded-lg transition-colors">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                    </svg>
-                                    Xem chi tiết
-                                </button>
-                            </div>
-
-                            {/* Danh mục hồ sơ */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Danh mục
-                                    hồ
-                                    sơ</p>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
-                                                 viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                            </svg>
-                                            CCCD
-                                        </div>
-                                        {d.hasCCCD ? (
-                                            <span
-                                                className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                          strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
-                      Hoàn tất
-                    </span>
-                                        ) : (
-                                            <span
-                                                className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Thiếu</span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
-                                                 viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                            </svg>
-                                            Ảnh chân dung
-                                        </div>
-                                        {d.hasPhoto ? (
-                                            <span
-                                                className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                          strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
-                      Hoàn tất
-                    </span>
-                                        ) : (
-                                            <span
-                                                className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Thiếu</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Liên lạc */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Liên
-                                    lạc</p>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div
-                                            className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
-                                            <svg className="w-3.5 h-3.5 text-green-500" fill="none"
-                                                 stroke="currentColor"
-                                                 viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-400">Điện thoại</p>
-                                            <p className="text-sm font-semibold text-gray-800">{d.phone}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center">
-                                            <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor"
-                                                 viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-gray-400">Email</p>
-                                            <p className="text-sm font-semibold text-gray-800 break-all">{d.email}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Footer */}
-                    {/*<div className=" px-5 pb-5 flex justify-end">*/}
-                    {/*    <button*/}
-                    {/*        onClick={() => onOpenChange(false)}*/}
-                    {/*        className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-xl transition-colors"*/}
-                    {/*    >*/}
-                    {/*        Đóng*/}
-                    {/*    </button>*/}
-                    {/*</div>*/}
+        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid content-start gap-5">
+            <DetailSection icon={IdCard} title="Thông tin cá nhân">
+              <div className="grid gap-5 md:grid-cols-3">
+                <InfoItem label="Họ và tên" value={valueOf(profile, "fullName", "full_name")} strong />
+                <InfoItem label="Ngày sinh" value={formatDate(valueOf(profile, "dob"))} />
+                <InfoItem label="Giới tính" value={genderLabel(valueOf(profile, "gender"))} />
+                <InfoItem label="Số CCCD" value={valueOf(identity, "docNumber", "doc_number")} />
+                <InfoItem label="Ngày cấp" value={formatDate(valueOf(identity, "issuedDate", "issued_date"))} />
+                <InfoItem label="Nơi cấp" value={valueOf(identity, "issuedPlace", "issued_place")} />
+                <div className="md:col-span-3">
+                  <InfoItem label="Hộ khẩu thường trú" value={valueOf(profile, "permanentAddress", "permanent_address")} />
                 </div>
-            </DialogContent>
-        </Dialog>
-    );
+              </div>
+            </DetailSection>
+
+            <DetailSection icon={MapPin} title="Nơi cư trú">
+              <div className="grid gap-5 md:grid-cols-3">
+                <InfoItem label="Tên cơ sở trọ" value={valueOf(profile, "propertyName", "property_name")} />
+                <InfoItem label="Số phòng" value={`Phòng ${valueOf(profile, "roomCode", "room_code")}`} strong />
+                <InfoItem label="Vai trò trong phòng" value={roleLabel(valueOf(profile, "roomRole", "room_role"))} />
+                <InfoItem label="Số người trong phòng" value={`${occupantCount}/${maxOccupants}`} />
+                <InfoItem label="Ngày vào ở" value={formatDate(valueOf(profile, "moveInDate", "move_in_date"))} />
+                <InfoItem label="Trạng thái cư trú" value={residenceStatusLabel(valueOf(profile, "residenceStatus", "residence_status"))} />
+              </div>
+            </DetailSection>
+
+            <DetailSection icon={Users} title="Danh sách người cùng phòng">
+              {roommates.length ? (
+                <div className="dashboard-table rounded-xl border border-[#e2e8f0]">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
+                      <tr>
+                        <th className="px-4 py-3">Họ tên</th>
+                        <th className="px-4 py-3">Năm sinh</th>
+                        <th className="px-4 py-3">Số điện thoại</th>
+                        <th className="px-4 py-3">Vai trò</th>
+                        <th className="px-4 py-3 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e2e8f0]">
+                      {roommates.map((roommate, index) => (
+                        <tr key={valueOf(roommate, "id") || `${valueOf(roommate, "roomRole", "room_role")}-${valueOf(roommate, "phone")}-${index}`}>
+                          <td data-label="Họ tên" className="px-4 py-3 font-bold text-[#091426]">{valueOf(roommate, "fullName", "full_name")}</td>
+                          <td data-label="Năm sinh" className="px-4 py-3">{formatYear(valueOf(roommate, "dob"))}</td>
+                          <td data-label="Số điện thoại" className="px-4 py-3">{valueOf(roommate, "phone") || "Chưa cập nhật"}</td>
+                          <td data-label="Vai trò" className="px-4 py-3">{roleLabel(valueOf(roommate, "roomRole", "room_role"))}</td>
+                          <td data-label="Thao tác" className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openRoommateProfile(valueOf(roommate, "id"))}
+                              className="rounded-lg border border-[#d8dee8] px-3 py-2 text-xs font-bold text-[#091426] hover:bg-[#f2f4f6]"
+                            >
+                              Xem hồ sơ
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+                  Phòng hiện chỉ có 1 người ở.
+                </p>
+              )}
+            </DetailSection>
+
+            <DetailSection icon={Bike} title="Thông tin xe">
+              {vehicles.length ? (
+                <div className="grid gap-4">
+                  {vehicles.map((vehicle, index) => (
+                    <div key={valueOf(vehicle, "id") || index} className="grid gap-5 rounded-xl bg-[#f8fafc] p-4 md:grid-cols-3">
+                      <InfoItem label="Hãng xe" value={vehicleTypeLabel(valueOf(vehicle, "vehicleType", "vehicle_type"))} />
+                      <InfoItem label="Biển số" value={valueOf(vehicle, "licensePlate", "license_plate")} strong />
+                      <InfoItem label="Số lượng xe" value={vehicles.length} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">Chưa đăng ký xe</p>
+              )}
+            </DetailSection>
+
+            <DetailSection icon={Contact} title="Ảnh căn cước công dân">
+              <div className="grid gap-5 md:grid-cols-2">
+                <ProtectedImage
+                  fileUrl={valueOf(identity, "frontFileUrl", "front_file_url")}
+                  alt="Ảnh mặt trước CCCD"
+                  placeholder="Chưa có ảnh mặt trước CCCD, thêm sau"
+                />
+                <ProtectedImage
+                  fileUrl={valueOf(identity, "backFileUrl", "back_file_url")}
+                  alt="Ảnh mặt sau CCCD"
+                  placeholder="Chưa có ảnh mặt sau CCCD, thêm sau"
+                />
+              </div>
+            </DetailSection>
+
+            <DetailSection icon={UserRound} title="Ảnh chân dung">
+              <ProtectedImage
+                fileUrl={valueOf(profile, "portraitUrl", "portrait_url")}
+                alt="Ảnh chân dung khách thuê"
+                placeholder="Chưa có ảnh chân dung"
+              />
+            </DetailSection>
+          </div>
+
+          <aside className="grid content-start gap-5">
+            <section className="rounded-xl bg-[#050505] p-6 text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+              <div className="flex items-center gap-3">
+                <BriefcaseBusiness className="h-5 w-5" />
+                <h3 className="text-sm font-black uppercase tracking-[0.08em]">Hợp đồng thuê</h3>
+              </div>
+              <p className="mt-7 text-2xl font-black">{valueOf(profile, "contractCode", "contract_code") || "Chưa có mã"}</p>
+              <p className="mt-3 text-sm font-semibold text-white/70">
+                Tiền thuê: {formatMoney(valueOf(profile, "monthlyRent", "monthly_rent"))}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white/70">
+                Thời hạn: {formatDate(valueOf(profile, "contractStartDate", "contract_start_date"))} - {formatDate(valueOf(profile, "contractEndDate", "contract_end_date"))}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-white/70">
+                Trạng thái: {contractStatusLabel(valueOf(profile, "contractStatus", "contract_status"))}
+              </p>
+              <button
+                type="button"
+                onClick={() => alert(contractId ? "Chức năng xem chi tiết hợp đồng đang phát triển." : "Chưa có hợp đồng để xem.")}
+                className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 text-sm font-black hover:bg-white/15"
+              >
+                <Eye className="h-4 w-4" />
+                Xem chi tiết
+              </button>
+            </section>
+
+            <DetailSection icon={FolderOpen} title="Danh mục hồ sơ">
+              <div className="grid gap-3">
+                <ChecklistRow
+                  label="CCCD"
+                  done={Boolean(
+                    valueOf(identity, "docNumber", "doc_number") &&
+                    valueOf(identity, "frontFileId", "front_file_id") &&
+                    valueOf(identity, "backFileId", "back_file_id")
+                  )}
+                  doneText="Hoàn tất"
+                  missingText="Thiếu"
+                />
+                <ChecklistRow
+                  label="Ảnh chân dung"
+                  done={Boolean(valueOf(profile, "portraitFileId", "portrait_file_id"))}
+                  doneText="Hoàn tất"
+                  missingText="Thiếu"
+                />
+                <ChecklistRow
+                  label="Liên hệ khẩn cấp"
+                  done={emergencyContacts.length > 0}
+                  doneText="Hoàn tất"
+                  missingText="Thiếu"
+                />
+                <ChecklistRow label="Xe" done={vehicles.length > 0} doneText="Có" missingText="Không có" />
+                <ChecklistRow
+                  label="Tài khoản app"
+                  done={String(valueOf(profile, "appStatus", "app_status")).toUpperCase() === "ACTIVE"}
+                  doneText="Đã kích hoạt"
+                  missingText="Chưa kích hoạt"
+                />
+              </div>
+            </DetailSection>
+
+            <DetailSection icon={Phone} title="Liên hệ">
+              <div className="grid gap-4">
+                <ContactLine icon={Phone} label="Số điện thoại" value={valueOf(profile, "phone")} />
+                <ContactLine icon={Mail} label="Email" value={valueOf(profile, "email")} />
+                <div className="rounded-xl bg-[#f8fafc] p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.06em] text-[#64748b]">Liên hệ khẩn cấp</p>
+                  {firstEmergency ? (
+                    <div className="mt-3 grid gap-2 text-sm font-semibold text-[#243247]">
+                      <p>{valueOf(firstEmergency, "fullName", "full_name")}</p>
+                      <p>Quan hệ: {valueOf(firstEmergency, "relationship")}</p>
+                      <p>SĐT: {valueOf(firstEmergency, "phone")}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm font-semibold text-[#64748b]">Chưa cập nhật liên hệ khẩn cấp</p>
+                  )}
+                </div>
+              </div>
+            </DetailSection>
+          </aside>
+        </div>
+
+        <footer className="flex justify-end border-t border-[#d8dee8] bg-white px-6 py-4">
+          <button type="button" onClick={onClose} className="h-11 rounded-lg border border-[#c5c6cd] px-8 text-sm font-bold text-[#45474c] hover:bg-[#f2f4f6]">
+            Đóng
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }
 
-export default function TenantProfiles() {
-    const [search, setSearch] = useState("");
-    const [selected, setSelected] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
-    const filtered = TENANTS.filter(
-        (t) =>
-            t.name.toLowerCase().includes(search.toLowerCase()) ||
-            t.phone.includes(search)
-    );
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
+export default function TenantsPage() {
+  const [profiles, setProfiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [keyword, setKeyword] = useState("");
+  const [roomFilter, setRoomFilter] = useState("all");
+  const [propertyFilter, setPropertyFilter] = useState("all");
+  const [profileStatusFilter, setProfileStatusFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+
+  const loadProfiles = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      const data = await fetchTenantProfiles();
+      setProfiles(data);
+    } catch (loadError) {
+      setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetchTenantProfiles()
+      .then((data) => {
+        if (!isActive) return;
+        setProfiles(data);
+        setError("");
+      })
+      .catch((loadError) => {
+        if (!isActive) return;
+        setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
     };
-    const handlePageSizeChange = (newSize) => {
-        setPageSize(Number(newSize));
-        setCurrentPage(1);
-    };
-    const totalItems = filtered.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (currentPage - 1) * pageSize;
-    const paginatedData = filtered.slice(startIndex, startIndex + pageSize);
-    return (
-        <div className="min-h-screen bg-gray-50 font-sans">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Hồ sơ khách thuê</h1>
+  }, []);
 
-            {/* Filters – wrap on mobile */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
-                {/* Search */}
-                <div className="relative w-full sm:flex-1 sm:max-w-sm">
-                    <svg
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"
-                        />
-                    </svg>
-                    <input
-                        className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
-                        placeholder="Tìm kiếm theo tên hoặc SĐT"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
+  const roomOptions = useMemo(() => {
+    const rooms = [...new Set(profiles.map((profile) => valueOf(profile, "roomCode", "room_code")).filter(Boolean))];
+    return rooms.sort((a, b) => String(a).localeCompare(String(b), "vi", { numeric: true }));
+  }, [profiles]);
 
-                {/* Dropdowns */}
-                <select
-                    className="w-full sm:w-auto text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700">
-                    <option>Phòng (Tất cả)</option>
-                    <option>P.102</option>
-                    <option>P.105</option>
-                    <option>P.201</option>
-                </select>
+  const propertyOptions = useMemo(() => {
+    const properties = [...new Set(profiles.map((profile) => valueOf(profile, "propertyName", "property_name")).filter(Boolean))];
+    return properties.sort((a, b) => String(a).localeCompare(String(b), "vi"));
+  }, [profiles]);
 
-                <select
-                    className="w-full sm:w-auto text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700">
-                    <option>Cơ sở (Tất cả)</option>
-                    <option>Hải Đăng 1</option>
-                    <option>Hải Đăng 2</option>
-                </select>
+  const filteredProfiles = useMemo(() => {
+    const normalizedKeyword = normalizeText(keyword);
+    return profiles.filter((profile) => {
+      const searchable = normalizeText(
+        [
+          valueOf(profile, "fullName", "full_name"),
+          valueOf(profile, "phone"),
+          valueOf(profile, "email"),
+          valueOf(profile, "roomCode", "room_code"),
+        ].join(" ")
+      );
+      const matchKeyword = !normalizedKeyword || searchable.includes(normalizedKeyword);
+      const matchRoom = roomFilter === "all" || valueOf(profile, "roomCode", "room_code") === roomFilter;
+      const matchProperty = propertyFilter === "all" || valueOf(profile, "propertyName", "property_name") === propertyFilter;
+      const matchStatus = profileStatusFilter === "all" || valueOf(profile, "profileStatus", "profile_status") === profileStatusFilter;
+      const matchRole = roleFilter === "all" || valueOf(profile, "roomRole", "room_role") === roleFilter;
+      return matchKeyword && matchRoom && matchProperty && matchStatus && matchRole;
+    });
+  }, [keyword, profiles, profileStatusFilter, propertyFilter, roleFilter, roomFilter]);
 
-                <button
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium px-4 py-2 rounded-xl border border-indigo-200 transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
-                        />
-                    </svg>
-                    Lọc
-                </button>
-            </div>
+  const groupedByRoom = useMemo(() => {
+    const groups = new Map();
+    filteredProfiles.forEach((profile) => {
+      const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(profile);
+    });
+    return [...groups.values()];
+  }, [filteredProfiles]);
 
-            {/* ======================= */}
-            {/* DESKTOP TABLE (hidden on mobile) */}
-            {/* ======================= */}
-            <div className="hidden sm:block rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="bg-gray-50 hover:bg-gray-50">
-                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
-                                Họ Tên
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
-                                Số Điện Thoại
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
-                                Email
-                            </TableHead>
-                            <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4">
-                                Phòng
-                            </TableHead>
-                            <TableHead
-                                className="text-xs font-semibold uppercase tracking-wider text-gray-500 py-4 text-right">
-                                Người Ở
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {paginatedData.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center py-12 text-gray-400">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor"
-                                             viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                                  d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-                                        </svg>
-                                        <span>Không tìm thấy khách thuê</span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            paginatedData.map((t) => (
-                                <TableRow
-                                    key={t.id}
-                                    className="cursor-pointer hover:bg-blue-50/40 transition-colors border-gray-100 last:border-0"
-                                    onClick={() => setSelected(t)}
-                                >
-                                    {/* Name + Avatar */}
-                                    <TableCell className="py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div
-                                                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${t.color}`}
-                                            >
-                                                {t.initials}
-                                            </div>
-                                            <span className="font-medium text-gray-900">{t.name}</span>
-                                        </div>
-                                    </TableCell>
+  return (
+    <>
+      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h1 className="text-3xl font-black tracking-[-0.02em] text-[#091426]">Hồ sơ khách thuê</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#45474c]">
+            Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và người ở cùng.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadProfiles}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-4 text-sm font-bold text-[#091426] hover:bg-[#f2f4f6]"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          Làm mới
+        </button>
+      </section>
 
-                                    {/* Phone */}
-                                    <TableCell className="text-sm text-gray-600 py-4">{t.phone}</TableCell>
-
-                                    {/* Email */}
-                                    <TableCell className="text-sm text-gray-600 py-4 truncate max-w-[180px]">
-                                        {t.email}
-                                    </TableCell>
-
-                                    {/* Room – with a subtle badge */}
-                                    <TableCell className="py-4">
-                    <span
-                        className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                      P.{t.rooms}
-                    </span>
-                                    </TableCell>
-
-                                    {/* People – aligned right with icon hint */}
-                                    <TableCell className="text-sm text-gray-600 py-4 text-right">
-                    <span className="inline-flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                      </svg>
-                        {t.people} người
-                    </span>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-                {totalItems > pageSize && (
-                    <PaginationFooter
-                        startIndex={startIndex}
-                        pageSize={pageSize}
-                        totalItems={totalItems}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={handlePageChange}
-                        onPageSizeChange={handlePageSizeChange}
-                    />
-                )}
-            </div>
-            {/* ======================= */}
-            {/* MOBILE CARDS (visible only on small screens) */}
-            {/* ======================= */}
-            <div className="sm:hidden space-y-4">
-                {paginatedData.length === 0 ? (
-                    <p className="text-center py-10 text-gray-400">Không tìm thấy khách thuê.</p>
-                ) : (
-                    paginatedData.map((t) => (
-                        <div
-                            key={t.id}
-                            className="bg-white border border-gray-200 rounded-2xl p-4 active:bg-gray-50 cursor-pointer transition-colors"
-                            onClick={() => setSelected(t)}
-                        >
-                            <div className="flex items-center gap-3 mb-3">
-                                <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${t.color}`}
-                                >
-                                    {t.initials}
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-gray-900">{t.name}</p>
-                                    <p className="text-sm text-gray-500">{t.phone}</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-3 text-sm border-t pt-3 mt-2">
-                                <div>
-                                    <span className="text-xs text-gray-400">Email</span>
-                                    <p className="font-medium text-gray-700 truncate">{t.email}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-gray-400">Phòng</span>
-                                    <p className="font-medium text-gray-700">{t.rooms}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-gray-400">Người ở</span>
-                                    <p className="font-medium text-gray-700">{t.people}</p>
-                                </div>
-                            </div>
-                        </div>
-                    ))
-                )}
-                {totalItems > pageSize && (
-                    <PaginationFooter
-                        startIndex={startIndex}
-                        pageSize={pageSize}
-                        totalItems={totalItems}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={handlePageChange}
-                        onPageSizeChange={handlePageSizeChange}
-                    />
-                )}
-            </div>
-
-            {/* Detail Modal */}
-            <DetailModal
-                tenant={selected}
-                open={!!selected}
-                onOpenChange={(open) => {
-                    if (!open) setSelected(null);
-                }}
+      <section className="rounded-xl border border-[#d8dee8] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_180px_200px_210px_190px]">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b97aa]" />
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="Tìm theo tên, SĐT, email hoặc số phòng"
+              className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white pl-12 pr-4 text-sm outline-none focus:border-[#4166b2]"
             />
+          </div>
+          <select value={roomFilter} onChange={(event) => setRoomFilter(event.target.value)} className="h-12 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]">
+            <option value="all">Tất cả phòng</option>
+            {roomOptions.map((room) => (
+              <option key={room} value={room}>Phòng {room}</option>
+            ))}
+          </select>
+          <select value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className="h-12 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]">
+            <option value="all">Tất cả cơ sở</option>
+            {propertyOptions.map((property) => (
+              <option key={property} value={property}>{property}</option>
+            ))}
+          </select>
+          <select value={profileStatusFilter} onChange={(event) => setProfileStatusFilter(event.target.value)} className="h-12 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="COMPLETED">Hồ sơ đủ</option>
+            <option value="MISSING_CCCD">Thiếu CCCD</option>
+            <option value="MISSING_PORTRAIT">Thiếu ảnh chân dung</option>
+            <option value="MISSING_EMERGENCY_CONTACT">Thiếu liên hệ khẩn cấp</option>
+          </select>
+          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-12 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]">
+            <option value="all">Tất cả vai trò</option>
+            <option value="PRIMARY">Người ký chính</option>
+            <option value="CO_OCCUPANT">Người ở cùng</option>
+          </select>
         </div>
-    );
+      </section>
+
+      {isLoading && (
+        <section className="rounded-xl border border-[#d8dee8] bg-white p-10 text-center shadow-sm">
+          <p className="text-sm font-bold text-[#64748b]">Đang tải hồ sơ khách thuê...</p>
+        </section>
+      )}
+
+      {!isLoading && error && (
+        <section className="rounded-xl border border-rose-200 bg-rose-50 p-10 text-center">
+          <AlertCircle className="mx-auto h-10 w-10 text-rose-600" />
+          <p className="mt-3 text-sm font-bold text-rose-700">{error}</p>
+          <button type="button" onClick={loadProfiles} className="mt-5 h-10 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white">
+            Thử lại
+          </button>
+        </section>
+      )}
+
+      {!isLoading && !error && groupedByRoom.length === 0 && (
+        <section className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-16 text-center">
+          <UserRound className="mx-auto h-10 w-10 text-[#94a3b8]" />
+          <p className="mt-3 text-sm font-bold text-[#64748b]">Không tìm thấy hồ sơ khách thuê phù hợp.</p>
+        </section>
+      )}
+
+      {!isLoading && !error && groupedByRoom.length > 0 && (
+        <section className="grid gap-5">
+          {groupedByRoom.map((roomProfiles) => {
+            const roomProfile = roomProfiles[0];
+            const maxOccupants = Number(valueOf(roomProfile, "roomMaxOccupants", "room_max_occupants")) || 3;
+            const currentOccupants = Number(valueOf(roomProfile, "roomOccupantCount", "room_occupant_count")) || roomProfiles.length;
+
+            return (
+              <div key={`${valueOf(roomProfile, "propertyId", "property_id")}-${valueOf(roomProfile, "roomCode", "room_code")}`} className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] bg-[#f8fafc] px-6 py-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="text-lg font-black text-[#091426]">Phòng {valueOf(roomProfile, "roomCode", "room_code")}</h2>
+                      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">{residenceStatusLabel(valueOf(roomProfile, "residenceStatus", "residence_status"))}</Badge>
+                      {currentOccupants >= maxOccupants && <Badge className="border-amber-200 bg-amber-50 text-amber-700">Đã đủ người</Badge>}
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                      {valueOf(roomProfile, "propertyName", "property_name") || "Chưa có cơ sở"} · Hợp đồng {valueOf(roomProfile, "contractCode", "contract_code") || "chưa cập nhật"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#091426] ring-1 ring-[#d8dee8]">
+                    <Users className="h-4 w-4 text-[#4166b2]" />
+                    {roomOccupancyText(roomProfile)} người
+                  </div>
+                </div>
+
+                <div className="dashboard-table">
+                  <table className="w-full text-left">
+                    <thead className="bg-white text-xs font-black uppercase tracking-[0.05em] text-[#64748b]">
+                      <tr>
+                        <th className="px-6 py-4">Họ tên</th>
+                        <th className="px-6 py-4">SĐT</th>
+                        <th className="px-6 py-4">Email</th>
+                        <th className="px-6 py-4">Số phòng</th>
+                        <th className="px-6 py-4">Số người</th>
+                        <th className="px-6 py-4">Vai trò</th>
+                        <th className="px-6 py-4">Hồ sơ</th>
+                        <th className="px-6 py-4">Tài khoản app</th>
+                        <th className="px-6 py-4 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e2e8f0]">
+                      {roomProfiles.map((profile, index) => (
+                        <tr key={profileRowKey(profile, index)} className="hover:bg-[#f8fafc]">
+                          <td data-label="Họ tên" className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-black text-[#1d4ed8]">
+                                {initialsOf(valueOf(profile, "fullName", "full_name"))}
+                              </span>
+                              <span>
+                                <span className="block font-black text-[#091426]">{valueOf(profile, "fullName", "full_name")}</span>
+                                <span className="mt-1 block text-xs font-semibold text-[#64748b]">ID hồ sơ: #{valueOf(profile, "id")}</span>
+                              </span>
+                            </div>
+                          </td>
+                          <td data-label="SĐT" className="px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "phone") || "Chưa cập nhật"}</td>
+                          <td data-label="Email" className="break-words px-6 py-5 text-sm font-semibold text-[#243247]">{valueOf(profile, "email") || "Chưa cập nhật"}</td>
+                          <td data-label="Số phòng" className="px-6 py-5 text-sm font-black text-[#091426]">Phòng {valueOf(profile, "roomCode", "room_code")}</td>
+                          <td data-label="Số người" className="px-6 py-5 text-sm font-black text-[#091426]">{roomOccupancyText(profile)}</td>
+                          <td data-label="Vai trò" className="px-6 py-5"><Badge className={roleClass(valueOf(profile, "roomRole", "room_role"))}>{roleLabel(valueOf(profile, "roomRole", "room_role"))}</Badge></td>
+                          <td data-label="Hồ sơ" className="px-6 py-5"><Badge className={profileStatusClass(valueOf(profile, "profileStatus", "profile_status"))}>{profileStatusLabel(valueOf(profile, "profileStatus", "profile_status"), valueOf(profile, "profileStatusLabel", "profile_status_label"))}</Badge></td>
+                          <td data-label="Tài khoản app" className="px-6 py-5"><Badge className={accountStatusClass(valueOf(profile, "appStatus", "app_status"))}>{accountStatusLabel(valueOf(profile, "appStatus", "app_status"))}</Badge></td>
+                          <td data-label="Thao tác" className="px-6 py-5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProfile(profile)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6]"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Xem hồ sơ
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {selectedProfile && (
+        <TenantProfileModal
+          profile={selectedProfile}
+          profiles={profiles}
+          onClose={() => setSelectedProfile(null)}
+          onSelectProfile={setSelectedProfile}
+        />
+      )}
+    </>
+  );
 }

@@ -12,16 +12,16 @@ import {
 } from "lucide-react";
 
 export const navigation = [
-    {path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard},
-    {path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2},
-    {path: "/dashboard/tenants", label: "Quản lý khách thuê", icon: UsersRound},
-    {path: "/dashboard/accounts", label: "Quản lý nhân sự", icon: UserRoundCog},
-    {path: "/dashboard/meter-readings", label: "Nhập số điện nước", icon: Gauge},
-    {path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench},
-    {path: "/dashboard/lease-contracts", label: "Danh sách cọc", icon: FileCheck2},
-    {path: "/dashboard/contract-template", label: "Mẫu hợp đồng", icon: FileText},
-    {path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards},
-    {path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings},
+    { path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+    { path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2 },
+    { path: "/dashboard/tenants", label: "Quản lý khách thuê", icon: UsersRound },
+    { path: "/dashboard/accounts", label: "Quản lý nhân sự", icon: UserRoundCog },
+    { path: "/dashboard/meter-readings", label: "Nhập số điện nước", icon: Gauge },
+    { path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench },
+    { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2 },
+    { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText },
+    { path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards },
+    { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings },
 ];
 
 export const navigationPermissionKeys = {

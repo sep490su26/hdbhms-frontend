@@ -1,725 +1,738 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
-  CalendarClock,
-  Check,
+  ClipboardCheck,
+  Download,
   Eye,
-  FileCheck2,
-  ListFilter,
-  RotateCcw,
-  UserRoundCog,
+  FileText,
+  ImageIcon,
+  LockKeyhole,
+  Search,
+  UserRound,
+  WalletCards,
   X,
 } from "lucide-react";
-import { allRooms, depositContracts, tenants } from "@/services/dashboardService";
 import {
-  ROOM_HOLD_DURATION_MS,
-  formatHoldCountdown,
-  getActiveRoomHolds,
-  getHoldRemainingMs,
-} from "@/lib/roomHoldStorage";
-import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
+  downloadDepositContractPdf,
+  fetchDepositAgreementDetails,
+  fetchDepositAgreements,
+  openDepositContractPdf,
+  toApiAssetUrl,
+  updateDepositAgreementManagementInfo,
+  updateDepositAgreementStatus,
+} from "@/services/depositContractsService";
 
 const money = new Intl.NumberFormat("vi-VN");
 
-const depositStatus = {
-  pending: ["Chờ duyệt", "bg-amber-50 text-amber-700 ring-amber-100"],
-  approved: ["Đã nhận phòng", "bg-emerald-50 text-emerald-700 ring-emerald-100"],
-  cancelled: ["Đã hủy", "bg-rose-50 text-rose-700 ring-rose-100"],
-  overdue: ["Quá hạn", "bg-slate-100 text-slate-600 ring-slate-200"],
-  refunded: ["Đã hoàn cọc", "bg-blue-50 text-blue-700 ring-blue-100"],
-  forfeited: ["Mất cọc", "bg-red-50 text-red-700 ring-red-100"],
-};
-
-const initialAccountApprovals = [
-  {
-    id: "APP-2401",
-    name: "Đặng Minh Khang",
-    phone: "0977001122",
-    email: "khang.dang@example.com",
-    roomId: "P203",
-    requestedAt: "19/05/2026 08:15",
-    status: "pending",
-  },
+const STATUS_OPTIONS = [
+  { value: "PAID", label: "Đã đặt cọc", pill: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
+  { value: "CONVERTED_TO_LEASE", label: "Đã nhận phòng", pill: "bg-blue-100 text-blue-800", dot: "bg-blue-600" },
+  { value: "REFUNDED", label: "Đã hoàn cọc", pill: "bg-emerald-100 text-emerald-800", dot: "bg-emerald-600" },
+  { value: "FORFEITED", label: "Mất cọc", pill: "bg-rose-100 text-rose-800", dot: "bg-rose-600" },
 ];
 
+const MANAGED_DEPOSIT_STATUSES = new Set(STATUS_OPTIONS.map((status) => status.value));
+const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set(["PENDING_PAYMENT", "PAID", "CONFIRMED", "EXTENDED"]);
+
+const STATUS_LABELS = {
+  PAID: STATUS_OPTIONS[0],
+  CONFIRMED: STATUS_OPTIONS[0],
+  CONVERTED_TO_LEASE: STATUS_OPTIONS[1],
+  REFUNDED: STATUS_OPTIONS[2],
+  FORFEITED: STATUS_OPTIONS[3],
+  CANCELLED: { label: "Đã hủy", pill: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
+};
+
 function formatMoney(value) {
-  return `${money.format(value)} đ`;
+  return `${money.format(Number(value || 0))} đ`;
 }
 
-function parseVNDate(value) {
-  if (!value) return null;
-  const [day, month, year] = value.split("/").map(Number);
-  if (!day || !month || !year) return null;
-  return new Date(year, month - 1, day);
+function formatDate(value) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
+  return date.toLocaleDateString("vi-VN");
 }
 
-function parseVNDateTime(value) {
-  if (!value) return 0;
-  const [datePart, timePart = "00:00"] = value.split(" ");
-  const [day, month, year] = datePart.split("/").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-
-  if (!day || !month || !year) return 0;
-  return new Date(year, month - 1, day, hour || 0, minute || 0).getTime();
+function toInputDate(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
-function downloadTextFile(filename, content, type = "text/csv;charset=utf-8") {
-  if (typeof window === "undefined") return;
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+function formatDateTime(value) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function Modal({ title, children, onClose, footer }) {
+function getAgreementItems(response) {
+  return response?.data || response?.content || response?.items || [];
+}
+
+function normalizeAgreement(item) {
+  const rawStatus = String(item.status || "").toUpperCase();
+  const status = rawStatus === "CONFIRMED" ? "PAID" : rawStatus;
+  const roomCode = item.roomCode || item.room_code || "";
+  return {
+    id: item.id ?? item.depositAgreementId ?? item.deposit_agreement_id,
+    depositCode: item.depositCode || item.deposit_code || `DC-${item.id}`,
+    roomCode,
+    floorLabel: roomCode ? `Tầng ${String(roomCode).charAt(0)}` : "Chưa rõ tầng",
+    propertyName: item.propertyName || item.property_name || "Nhà trọ Hải Đăng",
+    depositorFullName: item.depositorFullName || item.depositor_full_name || "Khách đặt cọc",
+    depositorPhone: item.depositorPhone || item.depositor_phone || "Chưa có SĐT",
+    depositorEmail: item.depositorEmail || item.depositor_email || "",
+    depositorPermanentAddress: item.depositorPermanentAddress || item.depositor_permanent_address || item.permanentAddress || item.permanent_address || "",
+    amount: Number(item.amount || 0),
+    createdAt: item.createdAt || item.created_at || null,
+    status,
+    confirmedAt: item.confirmedAt || item.confirmed_at || null,
+    expectedLeaseSignDate: item.expectedLeaseSignDate || item.expected_lease_sign_date || null,
+    expectedMoveInDate: item.expectedMoveInDate || item.expected_move_in_date || null,
+    contractFileId: item.contractFileId || item.contract_file_id || null,
+    contractDownloadUrl: item.contractDownloadUrl || item.contract_download_url || null,
+  };
+}
+
+function mergeAgreement(base, details) {
+  if (!details) return base;
+  return {
+    ...base,
+    ...normalizeAgreement({ ...base, ...details }),
+    details,
+  };
+}
+
+function StatusBadge({ status }) {
+  const config = STATUS_LABELS[status] || STATUS_OPTIONS[0];
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-          <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng"
-            className="rounded-md p-2 text-[#505f76] hover:bg-[#f2f4f6]"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="max-h-[68vh] overflow-y-auto p-6 custom-scrollbar">{children}</div>
-        {footer && <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>}
-      </div>
-    </div>
-  );
-}
-
-function ExportConfirm({ title, filename, description, onClose, onConfirm }) {
-  return (
-    <Modal
-      title={title}
-      onClose={onClose}
-      footer={
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#6b7280]">
-            File sẽ được tải về máy: <span className="font-bold text-[#091426]">{filename}</span>
-          </p>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]">
-              Hủy
-            </button>
-            <button type="button" onClick={onConfirm} className="h-10 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white">
-              Xuất file
-            </button>
-          </div>
-        </div>
-      }
-    >
-      <div className="grid gap-4">
-        <p className="text-sm leading-6 text-[#45474c]">{description}</p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {["CSV", "Dữ liệu đang lọc", "Tải về máy"].map((item) => (
-            <div key={item} className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 text-sm font-bold text-[#091426]">
-              {item}
-            </div>
-          ))}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function StatusBadge({ value, map }) {
-  const [label, className] = map[value] || ["Không rõ", "bg-slate-100 text-slate-700"];
-  return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
-      {label}
+    <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-bold ${config.pill}`}>
+      <span className={`h-2 w-2 rounded-full ${config.dot}`} />
+      {config.label}
     </span>
   );
 }
 
-function IconButton({ label, icon: Icon, onClick, tone = "neutral" }) {
+function KpiCard({ title, value, note, icon: Icon, tone = "blue" }) {
   const tones = {
-    neutral: "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]",
-    good: "text-emerald-600 hover:bg-emerald-50",
-    warn: "text-blue-600 hover:bg-blue-50",
-    bad: "text-rose-600 hover:bg-rose-50",
+    blue: "text-blue-700 bg-blue-50",
+    amber: "text-amber-700 bg-amber-50",
+    emerald: "text-emerald-700 bg-emerald-50",
   };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className={`rounded-md p-2 transition ${tones[tone]}`}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-}
-
-function PageHeader({ title, description, actionLabel, actionIcon: ActionIcon = Check, onAction }) {
-  return (
-    <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">{description}</p>
+    <article className="min-h-[118px] rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">{title}</p>
+          <p className="mt-4 text-2xl font-extrabold tracking-[-0.02em] text-[#102033]">{value}</p>
+        </div>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-md ${tones[tone]}`}>
+          <Icon className="h-5 w-5" />
+        </span>
       </div>
-      {actionLabel && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a]"
-        >
-          <ActionIcon className="h-4 w-4" />
-          {actionLabel}
-        </button>
-      )}
-    </section>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, subtext, tone = "blue" }) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
-  };
-
-  return (
-    <article className="flex min-h-[104px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-6 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-        <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#191c1e]">{value}</p>
-        {subtext && <p className="mt-1 truncate text-xs text-[#6b7280]">{subtext}</p>}
-      </div>
+      {note && <p className="mt-3 text-sm font-semibold text-[#4160ad]">{note}</p>}
     </article>
   );
 }
 
-function Card({ children, className = "" }) {
+function DetailField({ label, value }) {
   return (
-    <section className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}>
-      {children}
-    </section>
-  );
-}
-
-function InfoBlock({ label, value }) {
-  return (
-    <div>
-      <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">{label}</p>
-      <p className="mt-1 text-sm font-bold text-[#091426]">{value}</p>
+    <div className="rounded-lg bg-[#f7f9fc] p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">{label}</p>
+      <p className="mt-2 break-words text-sm font-bold text-[#102033]">{value || "Chưa cập nhật"}</p>
     </div>
   );
 }
 
-function SectionTitle({ children }) {
-  return <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#45474c]">{children}</h3>;
-}
-
-function Row({ label, value }) {
+function SensitiveImage({ title, url }) {
+  const src = toApiAssetUrl(url);
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[#45474c]">{label}</span>
-      <span className="font-bold text-[#091426]">{value}</span>
+    <div className="rounded-xl border border-[#d7dde8] bg-white p-3">
+      <p className="mb-3 text-sm font-bold text-[#102033]">{title}</p>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={title}
+          className="h-48 w-full rounded-lg border border-[#e5e9f2] object-contain"
+        />
+      ) : (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-[#c7cfdd] bg-[#f7f9fc] text-sm font-semibold text-[#8b909a]">
+          <ImageIcon className="mr-2 h-5 w-5" />
+          Chưa có ảnh
+        </div>
+      )}
     </div>
   );
 }
 
-function DepositTable({
-  deposits,
-  statusFilter,
-  onStatusFilter,
-  dateFrom,
-  dateTo,
-  onDateFromChange,
-  onDateToChange,
-  onAction,
-  selectedDeposit,
-  onSelectDeposit,
-}) {
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-[#e2e8f0] bg-[#f7f9fb] p-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-2 text-sm font-bold text-[#45474c]">
-          <ListFilter className="h-4 w-4" />
-          Lọc:
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ["all", "Tất cả"],
-            ["pending", "Chờ duyệt"],
-            ["approved", "Đã nhận phòng"],
-            ["overdue", "Quá hạn"],
-            ["refunded", "Đã hoàn"],
-            ["forfeited", "Mất cọc"],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => onStatusFilter(value)}
-              className={`inline-flex h-9 items-center rounded-lg border px-3 text-sm transition ${
-                statusFilter === value
-                  ? "border-[#091426] bg-[#091426] text-white"
-                  : "border-[#c5c6cd] bg-white text-[#191c1e] hover:border-[#091426]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-3 border-b border-[#e2e8f0] bg-white px-4 py-3">
-        <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">Khoảng thời gian nhận cọc</span>
-        <label className="grid gap-1 text-xs font-semibold text-[#45474c]">
-          Từ ngày
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(event) => onDateFromChange(event.target.value)}
-            className="h-9 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
-          />
-        </label>
-        <label className="grid gap-1 text-xs font-semibold text-[#45474c]">
-          Đến ngày
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(event) => onDateToChange(event.target.value)}
-            className="h-9 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426]"
-          />
-        </label>
-        {(dateFrom || dateTo) && (
-          <button
-            type="button"
-            onClick={() => {
-              onDateFromChange("");
-              onDateToChange("");
-            }}
-            className="mt-5 h-9 rounded-lg border border-[#c5c6cd] px-3 text-sm font-bold text-[#091426]"
-          >
-            Xóa lọc
-          </button>
-        )}
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] border-collapse text-left">
-          <thead>
-            <tr className="border-b border-[#e2e8f0] text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">
-              <th className="px-6 py-3">Mã phòng</th>
-              <th className="px-6 py-3">Tên khách hàng</th>
-              <th className="px-6 py-3 text-right">Số tiền cọc</th>
-              <th className="px-6 py-3">Ngày nhận</th>
-              <th className="px-6 py-3">Trạng thái</th>
-              <th className="px-6 py-3 text-center">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deposits.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-sm font-semibold text-[#6b7280]">
-                  Không có hợp đồng cọc phù hợp với bộ lọc hiện tại.
-                </td>
-              </tr>
-            ) : (
-              deposits.map((deposit) => (
-                <tr key={deposit.id} className={`border-b border-[#e2e8f0] last:border-0 ${selectedDeposit?.id === deposit.id ? "bg-blue-50/45" : "bg-white"}`}>
-                  <td className="px-6 py-4 text-sm font-bold text-[#091426]">{deposit.roomId}</td>
-                  <td className="px-6 py-4">
-                    <button type="button" onClick={() => onSelectDeposit(deposit)} className="text-left">
-                      <span className="block text-sm font-semibold text-[#191c1e]">{deposit.tenantName}</span>
-                      <span className="block text-xs text-[#45474c]">{deposit.phone}</span>
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 text-right text-sm font-semibold text-[#191c1e]">{formatMoney(deposit.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-[#191c1e]">{deposit.paidAt}</td>
-                  <td className="px-6 py-4">
-                    <StatusBadge value={deposit.status} map={depositStatus} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <IconButton label={`Xem ${deposit.id}`} icon={Eye} onClick={() => onSelectDeposit(deposit)} />
-                      <IconButton label={`Duyệt ${deposit.id}`} icon={Check} onClick={() => onAction(deposit.id, "approved")} tone="good" />
-                      <IconButton label={`Hoàn cọc ${deposit.id}`} icon={RotateCcw} onClick={() => onAction(deposit.id, "refunded")} tone="warn" />
-                      <IconButton label={`Mất cọc ${deposit.id}`} icon={X} onClick={() => onAction(deposit.id, "forfeited")} tone="bad" />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
+function valueOf(object, camelKey, snakeKey) {
+  return object?.[camelKey] ?? object?.[snakeKey] ?? null;
 }
 
-function DepositDetail({ deposit }) {
-  if (!deposit) {
-    return (
-      <Card className="p-6">
-        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <FileCheck2 className="h-8 w-8 text-[#c8d0dc]" />
-          <p className="text-sm font-semibold text-[#6b7280]">Chưa chọn hợp đồng cọc để xem chi tiết.</p>
-        </div>
-      </Card>
-    );
-  }
+function DetailModal({ agreement, loading, onClose, onOpenContract, onDownloadContract, onSaveManagementInfo }) {
+  const safeAgreement = agreement || {};
+  const details = safeAgreement.details || safeAgreement;
+  const room = details.room || {};
+  const expectedLeaseSignDate = valueOf(details, "expectedLeaseSignDate", "expected_lease_sign_date")
+    || safeAgreement.expectedLeaseSignDate;
+  const expectedMoveInDate = valueOf(details, "expectedMoveInDate", "expected_move_in_date")
+    || safeAgreement.expectedMoveInDate;
+  const depositorPermanentAddress = valueOf(details, "depositorPermanentAddress", "depositor_permanent_address")
+    || safeAgreement.depositorPermanentAddress
+    || "";
+  const canEditManagementInfo = MANAGEMENT_INFO_EDITABLE_STATUSES.has(safeAgreement.status);
+  const formDefaults = useMemo(() => ({
+    depositorPhone: safeAgreement.depositorPhone || "",
+    permanentAddress: depositorPermanentAddress || "",
+    expectedLeaseSignDate: toInputDate(expectedLeaseSignDate),
+    expectedMoveInDate: toInputDate(expectedMoveInDate),
+  }), [safeAgreement.depositorPhone, depositorPermanentAddress, expectedLeaseSignDate, expectedMoveInDate]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState(null);
+  const activeForm = form || formDefaults;
 
-  const room = allRooms.find((item) => item.id === deposit.roomId);
-  const tenant = tenants.find((item) => item.roomId === deposit.roomId);
-  const handoverItems = ["Giường", "Tủ quần áo", "Máy lạnh", "Bàn học", "Khóa cửa"];
+  if (!agreement) return null;
 
-  return (
-    <Card className="p-6">
-      <h2 className="flex items-center gap-2 text-base font-bold text-[#191c1e]">
-        <UserRoundCog className="h-5 w-5 text-[#091426]" />
-        Hồ sơ đang xử lý
-      </h2>
-      <div className="mt-5 grid gap-5">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">{deposit.id}</p>
-          <h3 className="mt-1 text-xl font-bold text-[#091426]">{deposit.tenantName}</h3>
-          <p className="mt-1 text-sm text-[#45474c]">{deposit.phone}</p>
-        </div>
-        <div className="grid gap-3 rounded-lg bg-[#f7f9fb] p-4 text-sm">
-          <Row label="Phòng" value={deposit.roomId} />
-          <Row label="Tiền cọc" value={formatMoney(deposit.amount)} />
-          <Row label="Hẹn nhận phòng" value={deposit.moveInDate} />
-          <Row label="Giá thuê" value={room ? formatMoney(room.price) : "N/A"} />
-        </div>
-        {["approved", "pending"].includes(deposit.status) && (
-          <div className="grid gap-4 rounded-lg border border-[#e2e8f0] p-4">
-            <SectionTitle>Chi tiết nhận phòng / đặt phòng</SectionTitle>
-            <div className="grid gap-3 text-sm">
-              <Row label="Bên cho thuê" value="Hải Đăng Boarding House" />
-              <Row label="Bên thuê" value={tenant?.name || deposit.tenantName} />
-              <Row label="Ngày bắt đầu" value={deposit.moveInDate} />
-              <Row label="Ngày kết thúc" value="20/10/2024" />
-              <Row label="Chu kỳ thanh toán" value="Hàng tháng" />
-              <Row label="Điện ban đầu" value="128 kWh" />
-              <Row label="Nước ban đầu" value="34 m3" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">Bảng bàn giao thiết bị</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {handoverItems.map((item) => (
-                  <span key={item} className="rounded-full bg-[#f2f4f6] px-3 py-1 text-xs font-bold text-[#505f76]">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.06em] text-amber-700">Ghi chú kế toán</p>
-          <p className="mt-2 text-sm leading-6 text-amber-800">{deposit.accountantNote}</p>
-        </div>
-        <Link href={`/rooms/deposit?roomId=${deposit.roomId}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a]">
-          Mở luồng đặt cọc khách
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    </Card>
-  );
-}
-
-function DepositExportBar({ deposits }) {
-  const [exportPrompt, setExportPrompt] = useState(false);
-  const exportDeposits = () => {
-    const rows = ["Ma coc,Phong,Khach hang,So dien thoai,So tien,Ngay nhan,Trang thai"];
-    deposits.forEach((deposit) => {
-      const [statusLabel] = depositStatus[deposit.status] || ["Không rõ"];
-      rows.push([deposit.id, deposit.roomId, deposit.tenantName, deposit.phone, deposit.amount, deposit.paidAt, statusLabel].join(","));
-    });
-    downloadTextFile("danh-sach-coc.csv", rows.join("\n"));
+  const today = new Date().toISOString().slice(0, 10);
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...(current || formDefaults), [field]: value }));
+  };
+  const validateForm = () => {
+    const phone = activeForm.depositorPhone.replace(/[\s.-]/g, "");
+    if (!/^0\d{9}$/.test(phone)) return "Số điện thoại phải bắt đầu bằng 0 và có đúng 10 chữ số.";
+    if (!activeForm.permanentAddress.trim()) return "Địa chỉ không được để trống.";
+    if (!activeForm.expectedLeaseSignDate) return "Vui lòng chọn ngày ký hợp đồng dự kiến.";
+    if (activeForm.expectedLeaseSignDate < today) return "Ngày ký hợp đồng dự kiến không được là ngày quá khứ.";
+    if (!activeForm.expectedMoveInDate) return "Vui lòng chọn ngày vào ở dự kiến.";
+    if (activeForm.expectedMoveInDate < today) return "Ngày vào ở dự kiến không được là ngày quá khứ.";
+    if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate) return "Ngày vào ở dự kiến không được trước ngày ký hợp đồng dự kiến.";
+    return "";
+  };
+  const handleSave = async () => {
+    const error = validateForm();
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setIsSaving(true);
+    setFormError("");
+    try {
+      await onSaveManagementInfo(agreement, {
+        depositorPhone: activeForm.depositorPhone.replace(/[\s.-]/g, ""),
+        permanentAddress: activeForm.permanentAddress.trim(),
+        expectedLeaseSignDate: activeForm.expectedLeaseSignDate,
+        expectedMoveInDate: activeForm.expectedMoveInDate,
+      });
+      setForm(null);
+      setIsEditing(false);
+    } catch (error) {
+      setFormError(error.message || "Không thể cập nhật thông tin hợp đồng cọc.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setExportPrompt(true)}
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426] hover:border-[#091426]"
-        >
-          Xuất danh sách cọc
-        </button>
-      </div>
-      {exportPrompt && (
-        <ExportConfirm
-          title="Xuất danh sách hợp đồng cọc"
-          filename="danh-sach-coc.csv"
-          description="Xuất toàn bộ hợp đồng cọc đang lọc ra file CSV, gồm mã cọc, phòng, khách hàng, số tiền và trạng thái."
-          onClose={() => setExportPrompt(false)}
-          onConfirm={() => {
-            exportDeposits();
-            setExportPrompt(false);
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-function RejectAccountModal({ approval, onClose, onReject }) {
-  const [reason, setReason] = useState("Thông tin đặt cọc chưa khớp với phòng đăng ký.");
-
-  return (
-    <Modal
-      title={`Từ chối tài khoản ${approval.name}`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]">
-            Hủy
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <header className="flex items-center justify-between border-b border-[#d7dde8] px-5 py-4">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#4160ad]">Chi tiết hợp đồng cọc</p>
+            <h2 className="mt-1 text-xl font-extrabold text-[#102033]">{agreement.depositCode}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-[#5a6678] hover:bg-[#eef3fb]" aria-label="Đóng">
+            <X className="h-5 w-5" />
           </button>
-          <button type="button" onClick={() => onReject(reason)} className="h-10 rounded-lg bg-rose-600 px-4 text-sm font-bold text-white">
-            Gửi lý do từ chối
-          </button>
+        </header>
+
+        <div className="overflow-y-auto p-5 custom-scrollbar">
+          {loading ? (
+            <div className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-10 text-center font-bold text-[#5a6678]">
+              Đang tải chi tiết hợp đồng cọc...
+            </div>
+          ) : (
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <section className="grid gap-5">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <DetailField label="Khách hàng" value={agreement.depositorFullName} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Số điện thoại</span>
+                      <input
+                        value={activeForm.depositorPhone}
+                        onChange={(event) => updateField("depositorPhone", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Số điện thoại" value={agreement.depositorPhone} />
+                  )}
+                  <DetailField label="Email" value={agreement.depositorEmail || "Không có"} />
+                  <DetailField label="Phòng" value={agreement.roomCode || room.roomCode} />
+                  <DetailField label="Cơ sở" value={agreement.propertyName} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Địa chỉ</span>
+                      <input
+                        value={activeForm.permanentAddress}
+                        onChange={(event) => updateField("permanentAddress", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Địa chỉ" value={depositorPermanentAddress} />
+                  )}
+                  <DetailField label="Tiền cọc" value={formatMoney(agreement.amount)} />
+                  <DetailField label="Ngày tạo" value={formatDateTime(agreement.createdAt)} />
+                  <DetailField label="Ngày xác nhận" value={formatDateTime(agreement.confirmedAt)} />
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày ký HĐ dự kiến</span>
+                      <input
+                        type="date"
+                        min={today}
+                        value={activeForm.expectedLeaseSignDate}
+                        onChange={(event) => updateField("expectedLeaseSignDate", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Ngày ký HĐ dự kiến" value={formatDate(expectedLeaseSignDate)} />
+                  )}
+                  {isEditing ? (
+                    <label className="rounded-lg bg-[#f7f9fc] p-4">
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày vào ở dự kiến</span>
+                      <input
+                        type="date"
+                        min={today}
+                        value={activeForm.expectedMoveInDate}
+                        onChange={(event) => updateField("expectedMoveInDate", event.target.value)}
+                        className="mt-2 h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad]"
+                      />
+                    </label>
+                  ) : (
+                    <DetailField label="Ngày vào ở dự kiến" value={formatDate(expectedMoveInDate)} />
+                  )}
+                  <DetailField label="Ghi chú" value={details.note || "Không có ghi chú"} />
+                </div>
+
+                {formError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+                    {formError}
+                  </div>
+                )}
+
+                <section className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#8b909a]">Ảnh giấy tờ</p>
+                      <h3 className="mt-1 text-lg font-extrabold text-[#102033]">CCCD và ảnh chân dung</h3>
+                    </div>
+                    <LockKeyhole className="h-5 w-5 text-[#4160ad]" />
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-[#5a6678]">
+                    Dữ liệu này nhạy cảm, chỉ tài khoản có quyền quản lý mới nên xem.
+                  </p>
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <SensitiveImage title="Mặt trước CCCD" url={details.idFrontFileUrl} />
+                    <SensitiveImage title="Mặt sau CCCD" url={details.idBackFileUrl} />
+                    <SensitiveImage title="Ảnh chân dung" url={details.portraitFileUrl} />
+                  </div>
+                </section>
+              </section>
+
+              <aside className="h-fit rounded-xl border border-[#d7dde8] bg-white p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
+                <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">Trạng thái hiện tại</p>
+                <div className="mt-4">
+                  <StatusBadge status={agreement.status} />
+                </div>
+                <div className="mt-6 grid gap-3">
+                  {canEditManagementInfo && (
+                    isEditing ? (
+                      <div className="grid gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="inline-flex h-12 items-center justify-center rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setFormError("");
+                            setForm(null);
+                          }}
+                          disabled={isSaving}
+                          className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Hủy chỉnh sửa
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm(formDefaults);
+                          setFormError("");
+                          setIsEditing(true);
+                        }}
+                        className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
+                      >
+                        Chỉnh sửa thông tin
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onOpenContract(agreement)}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a]"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Xem hợp đồng cọc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDownloadContract(agreement)}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
+                  >
+                    <Download className="h-4 w-4" />
+                    Tải PDF
+                  </button>
+                  {!canEditManagementInfo && (
+                    <p className="rounded-lg bg-[#f7f9fc] p-3 text-sm font-semibold text-[#5a6678]">
+                      Thông tin cọc đã khóa vì trạng thái hiện tại không còn trong giai đoạn chờ ký.
+                    </p>
+                  )}
+                </div>
+              </aside>
+            </div>
+          )}
         </div>
-      }
-    >
-      <label className="grid gap-2">
-        <span className="text-sm font-bold text-[#45474c]">Lý do gửi cho khách</span>
-        <textarea
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          className="min-h-28 rounded-lg border border-[#c5c6cd] p-3 text-sm text-[#091426]"
-        />
-      </label>
-    </Modal>
+      </div>
+    </div>
   );
 }
 
 export default function DepositsPage() {
-  const { query } = useDashboardLayout();
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [depositDateFrom, setDepositDateFrom] = useState("");
-  const [depositDateTo, setDepositDateTo] = useState("");
-  const [deposits, setDeposits] = useState(depositContracts);
-  const [selectedDepositId, setSelectedDepositId] = useState(depositContracts[0]?.id ?? null);
-  const [approvals, setApprovals] = useState(initialAccountApprovals);
-  const [rejecting, setRejecting] = useState(null);
+  const [agreements, setAgreements] = useState([]);
+  const [selectedAgreement, setSelectedAgreement] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
-  const [roomHolds, setRoomHolds] = useState(() => getActiveRoomHolds());
-  const [holdClock, setHoldClock] = useState(0);
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [floorFilter, setFloorFilter] = useState("all");
+  const [updatingId, setUpdatingId] = useState(null);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setHoldClock(Date.now());
-      setRoomHolds(getActiveRoomHolds());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
+  const loadAgreements = useCallback(async () => {
+    try {
+      setLoadError("");
+      const response = await fetchDepositAgreements({ size: 200 });
+      const nextAgreements = getAgreementItems(response)
+        .map(normalizeAgreement)
+        .filter((agreement) => MANAGED_DEPOSIT_STATUSES.has(agreement.status));
+      setAgreements(nextAgreements);
+    } catch (error) {
+      setLoadError(error.message || "Không tải được danh sách hợp đồng cọc từ backend.");
+    }
   }, []);
 
-  const filteredDeposits = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadAgreements();
+    }, 0);
 
-    return deposits.filter((deposit) => {
-      const matchStatus = statusFilter === "all" || deposit.status === statusFilter;
-      const paidAt = parseVNDate(deposit.paidAt);
-      const from = depositDateFrom ? new Date(`${depositDateFrom}T00:00:00`) : null;
-      const to = depositDateTo ? new Date(`${depositDateTo}T23:59:59`) : null;
-      const matchDate = (!from || (paidAt && paidAt >= from)) && (!to || (paidAt && paidAt <= to));
-      const matchQuery =
-        !normalizedQuery ||
-        deposit.roomId.toLowerCase().includes(normalizedQuery) ||
-        deposit.tenantName.toLowerCase().includes(normalizedQuery) ||
-        deposit.phone.includes(normalizedQuery) ||
-        deposit.id.toLowerCase().includes(normalizedQuery);
+    return () => window.clearTimeout(timer);
+  }, [loadAgreements]);
 
-      return matchStatus && matchDate && matchQuery;
+  const floorOptions = useMemo(() => {
+    const floors = new Set(agreements.map((item) => item.floorLabel).filter(Boolean));
+    return Array.from(floors).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [agreements]);
+
+  const filteredAgreements = useMemo(() => {
+    const normalizedName = customerFilter.trim().toLowerCase();
+    return agreements.filter((item) => {
+      const matchCustomer =
+        !normalizedName ||
+        item.depositorFullName.toLowerCase().includes(normalizedName) ||
+        item.depositorPhone.includes(normalizedName) ||
+        item.depositCode.toLowerCase().includes(normalizedName);
+      const matchStatus = statusFilter === "all" || item.status === statusFilter;
+      const matchFloor = floorFilter === "all" || item.floorLabel === floorFilter;
+      return matchCustomer && matchStatus && matchFloor;
     });
-  }, [depositDateFrom, depositDateTo, deposits, query, statusFilter]);
+  }, [agreements, customerFilter, floorFilter, statusFilter]);
 
-  const selectedDeposit =
-    (selectedDepositId ? deposits.find((deposit) => deposit.id === selectedDepositId) : null) ??
-    deposits[0] ??
-    null;
+  const paidAgreements = agreements.filter((item) => item.status === "PAID");
+  const convertedAgreements = agreements.filter((item) => item.status === "CONVERTED_TO_LEASE");
+  const totalAmount = paidAgreements.reduce((sum, item) => sum + item.amount, 0);
 
-  const effectiveSelectedDeposit =
-    selectedDeposit && filteredDeposits.find((deposit) => deposit.id === selectedDeposit.id) || null;
-
-  const holdApprovals = useMemo(() => {
-    return Object.values(roomHolds).map((hold) => ({
-      id: hold.id,
-      name: hold.customerName || "Khách vãng lai",
-      phone: hold.phone || "Chưa cung cấp",
-      email: hold.email || "Chưa cung cấp",
-      roomId: hold.roomId,
-      requestedAt: new Date(hold.createdAt).toLocaleString("vi-VN"),
-      status: "pending",
-      holdExpiresAt: hold.expiresAt,
-    }));
-  }, [roomHolds]);
-
-  const approvalRows = useMemo(() => {
-    const holdRoomIds = new Set(holdApprovals.map((approval) => approval.roomId));
-    return [
-      ...holdApprovals,
-      ...approvals
-        .filter((approval) => !holdRoomIds.has(approval.roomId))
-        .map((approval) => ({
-          ...approval,
-          holdExpiresAt: parseVNDateTime(approval.requestedAt) + ROOM_HOLD_DURATION_MS,
-        })),
-    ];
-  }, [approvals, holdApprovals]);
-
-  const handleDepositAction = (depositId, nextStatus) => {
-    setDeposits((current) =>
-      current.map((deposit) =>
-        deposit.id === depositId
-          ? {
-              ...deposit,
-              status: nextStatus,
-              accountantNote:
-                nextStatus === "approved"
-                  ? "Đã duyệt cọc và chuyển sang lịch nhận phòng."
-                  : nextStatus === "refunded"
-                    ? "Đã đánh dấu hoàn cọc, chờ đối soát ngân hàng."
-                    : nextStatus === "forfeited"
-                      ? "Đã ghi nhận mất cọc do quá hạn hoặc hủy lịch."
-                      : deposit.accountantNote,
-            }
-          : deposit,
-      ),
-    );
-    setSelectedDepositId(depositId);
+  const openDetails = async (agreement) => {
+    if (!agreement?.id) return;
+    setSelectedAgreement(agreement);
+    setDetailLoading(true);
+    try {
+      const details = await fetchDepositAgreementDetails(agreement.id);
+      const merged = mergeAgreement(agreement, details);
+      setSelectedAgreement(merged);
+      setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
+    } catch (error) {
+      setNotice(error.message || "Không tải được chi tiết hợp đồng cọc.");
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
-  const approveAccount = (approvalId) => {
-    setApprovals((current) =>
-      current.map((item) => (item.id === approvalId ? { ...item, status: "approved" } : item)),
-    );
-    const account = approvalRows.find((item) => item.id === approvalId);
-    setNotice(`Đã kích hoạt tài khoản ${account?.name || ""} và gửi thông báo cho khách.`);
+  const handleStatusChange = async (agreement, nextStatus) => {
+    if (!agreement?.id || !nextStatus || nextStatus === agreement.status) return;
+    setUpdatingId(agreement.id);
+    setNotice("");
+    try {
+      const details = await updateDepositAgreementStatus(agreement.id, nextStatus);
+      const merged = mergeAgreement(agreement, details);
+      setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
+      if (selectedAgreement?.id === agreement.id) {
+        setSelectedAgreement(merged);
+      }
+      setNotice("Đã cập nhật trạng thái cọc và trạng thái phòng.");
+    } catch (error) {
+      setNotice(error.message || "Không cập nhật được trạng thái cọc.");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
-  const rejectAccount = (reason) => {
-    if (!rejecting) return;
+  const handleSaveManagementInfo = async (agreement, payload) => {
+    if (!agreement?.id) {
+      throw new Error("Chưa có mã hợp đồng đặt cọc để cập nhật.");
+    }
+    setNotice("");
+    const details = await updateDepositAgreementManagementInfo(agreement.id, payload);
+    const merged = mergeAgreement(agreement, details);
+    setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
+    setSelectedAgreement(merged);
+    setNotice("Đã cập nhật thông tin hợp đồng cọc và tạo lại file PDF.");
+    return merged;
+  };
 
-    setApprovals((current) =>
-      current.map((item) =>
-        item?.id === rejecting.id
-          ? { ...item, status: "rejected", rejectReason: reason }
-          : item,
-      ),
-    );
-    setNotice(`Đã từ chối tài khoản ${rejecting.name}. Lý do đã được gửi cho khách.`);
-    setRejecting(null);
+  const handleOpenContract = async (agreement) => {
+    if (!agreement?.id) {
+      setNotice("Chưa có mã hợp đồng đặt cọc để mở.");
+      return;
+    }
+    try {
+      await openDepositContractPdf(agreement.id);
+    } catch (error) {
+      setNotice(error.message || "Không thể mở hợp đồng đặt cọc.");
+    }
+  };
+
+  const handleDownloadContract = async (agreement) => {
+    if (!agreement?.id) {
+      setNotice("Chưa có mã hợp đồng đặt cọc để tải.");
+      return;
+    }
+    try {
+      await downloadDepositContractPdf(agreement.id, `hop-dong-dat-coc-${agreement.roomCode || agreement.depositCode}.pdf`);
+    } catch (error) {
+      setNotice(error.message || "Không thể tải hợp đồng đặt cọc.");
+    }
   };
 
   return (
     <>
-      <PageHeader
-        title="Danh sách Hợp đồng Cọc"
-        description="Quản lý và theo dõi trạng thái các khoản tiền cọc phòng."
-        actionLabel="Tạo hợp đồng mới"
-        actionIcon={FileCheck2}
-      />
-      <DepositExportBar deposits={filteredDeposits} />
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between gap-4 border-b border-[#e2e8f0] bg-[#f7f9fb] px-6 py-4">
-          <div>
-            <h2 className="font-bold text-[#091426]">Yêu cầu đặt cọc cần duyệt</h2>
-            <p className="mt-1 text-sm text-[#6b7280]">
-              Sau khi đọc thông tin xét duyệt đặt cọc, quản lý kiểm tra thông tin rồi đồng ý hoặc từ chối kèm lý do.
-            </p>
-          </div>
-          <span className="rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white">
-            {approvalRows.filter((item) => item.status === "pending").length}
-          </span>
-        </div>
-        <div className="grid gap-3 p-4">
-          {approvalRows.map((approval) => {
-            const countdownClock = holdClock || Math.max(0, Number(approval.holdExpiresAt) - ROOM_HOLD_DURATION_MS);
-            const remainingMs = getHoldRemainingMs({ expiresAt: approval.holdExpiresAt }, countdownClock);
+      <section className="grid gap-6">
+        <header>
+          <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sách hợp đồng đặt cọc</h1>
+          <p className="mt-2 text-sm font-semibold text-[#6b7280]">
+            Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng.
+          </p>
+        </header>
 
-            return (
-              <div key={approval.id} className="grid gap-4 rounded-lg border border-[#e2e8f0] p-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div className="grid gap-3">
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    <InfoBlock label="Họ tên" value={approval.name} />
-                    <InfoBlock label="SĐT" value={approval.phone} />
-                    <InfoBlock label="Email" value={approval.email} />
-                    <InfoBlock label="Phòng đăng ký" value={approval.roomId} />
-                  </div>
-                  <p className={`text-sm font-bold ${remainingMs > 0 ? "text-amber-700" : "text-rose-700"}`}>
-                    {remainingMs > 0
-                      ? `Thời gian giữ phòng còn lại: ${formatHoldCountdown(remainingMs)}`
-                      : "Thời gian giữ phòng đã hết hạn"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge
-                    value={approval.status === "pending" ? "pending" : approval.status === "approved" ? "approved" : "cancelled"}
-                    map={depositStatus}
-                  />
-                  {approval.status === "pending" && (
-                    <>
-                      <IconButton label={`Duyệt ${approval.name}`} icon={Check} onClick={() => approveAccount(approval.id)} tone="good" />
-                      <IconButton label={`Từ chối ${approval.name}`} icon={X} onClick={() => setRejecting(approval)} tone="bad" />
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {notice && <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{notice}</div>}
-        </div>
-      </Card>
-      <section className="grid gap-4 md:grid-cols-3">
-        <KpiCard icon={FileCheck2} label="Tổng hợp đồng" value={depositContracts.length} />
-        <KpiCard
-          icon={CalendarClock}
-          label="Sắp hết hạn nhận phòng"
-          value={depositContracts.filter((item) => item.status === "overdue").length}
-          tone="amber"
-        />
-        <KpiCard
-          icon={X}
-          label="Đã hủy / mất cọc"
-          value={depositContracts.filter((item) => ["cancelled", "forfeited"].includes(item.status)).length}
-          tone="rose"
-        />
+        {loadError && (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+            {loadError}
+          </div>
+        )}
+        {notice && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">
+            {notice}
+          </div>
+        )}
+
+        <section className="grid gap-5 xl:grid-cols-3">
+          <KpiCard icon={WalletCards} title="Tổng số tiền cọc" value={formatMoney(totalAmount)} note="Tổng tiền cọc đã ghi nhận" />
+          <KpiCard icon={LockKeyhole} title="Đang giữ cọc" value={paidAgreements.length} note="Khoản thu khả dụng" tone="amber" />
+          <KpiCard icon={ClipboardCheck} title="Đã nhận phòng" value={convertedAgreements.length} note="Đã chính thức nhận phòng" tone="emerald" />
+        </section>
+
+        <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
+          <div className="grid gap-4 xl:grid-cols-3 xl:items-end">
+            <label className="grid gap-2">
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tên khách hàng</span>
+              <span className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b909a]" />
+                <input
+                  value={customerFilter}
+                  onChange={(event) => setCustomerFilter(event.target.value)}
+                  placeholder="Nhập tên khách, SĐT, mã cọc..."
+                  className="h-11 w-full rounded-lg border border-[#c4cad6] pl-10 pr-3 text-sm font-semibold text-[#102033] outline-none placeholder:text-[#8b909a] focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                />
+              </span>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Trạng thái</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                {STATUS_OPTIONS.map((status) => (
+                  <option key={status.value} value={status.value}>{status.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tầng</span>
+              <select
+                value={floorFilter}
+                onChange={(event) => setFloorFilter(event.target.value)}
+                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+              >
+                <option value="all">Tất cả tầng</option>
+                {floorOptions.map((floor) => (
+                  <option key={floor} value={floor}>{floor}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
+          <div className="dashboard-table">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-xs font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
+                  <th className="px-5 py-4">Phòng</th>
+                  <th className="px-5 py-4">Tên khách hàng</th>
+                  <th className="px-5 py-4">Số tiền cọc</th>
+                  <th className="px-5 py-4">Ngày tạo</th>
+                  <th className="px-5 py-4">Ngày hẹn ký HĐ</th>
+                  <th className="px-5 py-4">Trạng thái</th>
+                  <th className="px-5 py-4 text-center">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAgreements.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-sm font-bold text-[#6b7280]">
+                      Không có hợp đồng đặt cọc phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAgreements.map((agreement) => (
+                    <tr key={agreement.id} className="border-b border-[#edf0f5] last:border-0">
+                      <td data-label="Phòng" className="px-5 py-4 text-base font-extrabold text-[#111827]">
+                        {agreement.roomCode ? `P.${agreement.roomCode}` : "Chưa rõ"}
+                      </td>
+                      <td data-label="Tên khách hàng" className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8f0ff] text-[#4160ad]">
+                            <UserRound className="h-4 w-4" />
+                          </span>
+                          <span>
+                            <span className="block text-sm font-extrabold text-[#102033]">{agreement.depositorFullName}</span>
+                            <span className="block text-xs font-semibold text-[#5a6678]">{agreement.depositorPhone}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td data-label="Số tiền cọc" className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
+                      <td data-label="Ngày tạo" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
+                      <td data-label="Ngày hẹn ký HĐ" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
+                      <td data-label="Trạng thái" className="px-5 py-4">
+                        <select
+                          value={STATUS_OPTIONS.some((status) => status.value === agreement.status) ? agreement.status : ""}
+                          onChange={(event) => handleStatusChange(agreement, event.target.value)}
+                          disabled={updatingId === agreement.id}
+                          className="h-9 rounded-full border border-[#c4cad6] bg-white px-3 text-xs font-extrabold text-[#102033] outline-none focus:border-[#4160ad] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {!STATUS_OPTIONS.some((status) => status.value === agreement.status) && (
+                            <option value="">{STATUS_LABELS[agreement.status]?.label || "Chưa cập nhật"}</option>
+                          )}
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status.value} value={status.value}>{status.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td data-label="Hành động" className="px-5 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openDetails(agreement)}
+                            className="rounded-full p-2 text-[#4160ad] hover:bg-[#eef4ff]"
+                            aria-label={`Xem chi tiết ${agreement.depositCode}`}
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenContract(agreement)}
+                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
+                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
+                          >
+                            <FileText className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadContract(agreement)}
+                            className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
+                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
+                          >
+                            <Download className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <footer className="flex flex-col gap-3 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-[#5a6678] sm:flex-row sm:items-center sm:justify-between">
+            <span>Hiển thị {filteredAgreements.length} trong tổng số {agreements.length} hợp đồng</span>
+            <span className="rounded-md bg-[#4160ad] px-4 py-2 font-extrabold text-white">1</span>
+          </footer>
+        </section>
       </section>
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <DepositTable
-          deposits={filteredDeposits}
-          statusFilter={statusFilter}
-          onStatusFilter={setStatusFilter}
-          dateFrom={depositDateFrom}
-          dateTo={depositDateTo}
-          onDateFromChange={setDepositDateFrom}
-          onDateToChange={setDepositDateTo}
-          onAction={handleDepositAction}
-          selectedDeposit={effectiveSelectedDeposit}
-          onSelectDeposit={(deposit) => deposit && setSelectedDepositId(deposit.id)}
-        />
-        <DepositDetail deposit={effectiveSelectedDeposit} />
-      </section>
-      {rejecting && (
-        <RejectAccountModal approval={rejecting} onClose={() => setRejecting(null)} onReject={rejectAccount} />
-      )}
+
+      <DetailModal
+        agreement={selectedAgreement}
+        loading={detailLoading}
+        onClose={() => setSelectedAgreement(null)}
+        onOpenContract={handleOpenContract}
+        onDownloadContract={handleDownloadContract}
+        onSaveManagementInfo={handleSaveManagementInfo}
+      />
     </>
   );
 }

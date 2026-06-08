@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearAuthSession, getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
@@ -69,6 +69,17 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
     } finally {
       setIsLoadingUser(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const token = window.localStorage.getItem("token");
+      if (!token) {
+        setUserState(null);
+      }
+    };
+    window.addEventListener("auth-changed", handleAuthChanged);
+    return () => window.removeEventListener("auth-changed", handleAuthChanged);
   }, []);
 
   const setUser = useCallback((profile) => {

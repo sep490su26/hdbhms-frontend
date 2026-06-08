@@ -799,7 +799,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             }
           }
         } catch (error) {
-          console.error("Failed to fetch tenant profile for autofill:", error);
+          // Ignore profile fetch failures (e.g. unauthenticated or guest users)
         }
       }
 

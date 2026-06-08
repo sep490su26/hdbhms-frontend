@@ -1,143 +1,383 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Gauge, Save } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Gauge, Loader2, RefreshCw, Save } from "lucide-react";
 import Image from "next/image";
+import {
+  ASSET_CONDITION_VALUES,
+  createRoomAsset,
+  fetchRoomAssets,
+  normalizeAsset,
+  updateRoomAsset,
+} from "@/services/roomAssetsService";
+import {
+  confirmHandover,
+  createHandoverReadings,
+  fetchLatestReadings,
+  uploadFile,
+} from "@/services/contractHandoverService";
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                           */
+/* ------------------------------------------------------------------ */
 
 const HANDOVER_ASSET_TEMPLATE = [
-  ["Điều hòa + Remote", "Bộ", "Hoạt động bình thường", ""],
-  ["Thiết bị vệ sinh + phòng tắm", "Bộ", "Hoạt động bình thường", "Xí, vòi xịt, vòi sen, lavabo, gương, phụ kiện"],
-  ["Bình nóng lạnh", "Bộ", "Hoạt động bình thường", ""],
-  ["Tủ quần áo 3 buồng", "Bộ", "Còn nguyên vẹn", ""],
-  ["Bàn học", "Bộ", "Còn nguyên vẹn", ""],
-  ["Giường đôi/tầng + Dát giường", "Bộ", "Còn nguyên vẹn", ""],
-  ["Cửa đi + cửa sổ", "Bộ", "Hoạt động bình thường", ""],
-  ["Modem Internet", "Bộ", "Hoạt động bình thường", ""],
-  ["Hệ thống điện: công tắc, ổ cắm, bóng điện", "Bộ", "Hoạt động bình thường", ""],
-].map(([name, unit, condition, note]) => ({
-  name,
-  unit,
+  ["Điều hòa + Remote", "Thiết bị điện tử", "GOOD", ""],
+  ["Thiết bị vệ sinh + phòng tắm", "Thiết bị vệ sinh", "GOOD", "Xí, vòi xịt, vòi sen, lavabo, gương, phụ kiện"],
+  ["Bình nóng lạnh", "Thiết bị điện tử", "GOOD", ""],
+  ["Tủ quần áo 3 buồng", "Nội thất", "GOOD", ""],
+  ["Bàn học", "Nội thất", "GOOD", ""],
+  ["Giường đôi/tầng + Dát giường", "Nội thất", "GOOD", ""],
+  ["Cửa đi + cửa sổ", "Cơ sở hạ tầng", "GOOD", ""],
+  ["Modem Internet", "Thiết bị điện tử", "GOOD", ""],
+  ["Hệ thống điện: công tắc, ổ cắm, bóng điện", "Cơ sở hạ tầng", "GOOD", ""],
+].map(([assetName, assetCategory, currentCondition, description]) => ({
+  id: null,
+  assetName,
+  assetCategory,
   quantity: 1,
-  condition,
-  note,
+  currentCondition,
+  description,
   imageFile: null,
   imageUrl: "",
 }));
 
 const CONDITION_OPTIONS = [
-  "Hoạt động bình thường",
-  "Còn nguyên vẹn",
-  "Có trầy xước nhẹ",
-  "Hỏng cần sửa",
-  "Thiếu thiết bị",
+  { value: "GOOD",      label: "Hoạt động bình thường" },
+  { value: "ATTENTION", label: "Có trầy xước nhẹ" },
+  { value: "BROKEN",    label: "Hỏng cần sửa" },
+  { value: "MISSING",   label: "Thiếu thiết bị" },
 ];
 
-export default function ContractHandoverSection({ contractId, roomCode, readonly = false }) {
-  const [handoverDate, setHandoverDate] = useState("");
-  const [electricReading, setElectricReading] = useState("");
-  const [waterReading, setWaterReading] = useState("");
-  const [assets, setAssets] = useState(HANDOVER_ASSET_TEMPLATE);
-  const [note, setNote] = useState("");
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function apiAssetToRow(raw) {
+  const a = normalizeAsset(raw);
+  return {
+    id: a.id,
+    assetName: a.assetName,
+    assetCategory: a.assetCategory,
+    quantity: a.quantity,
+    currentCondition: a.currentCondition,   // keep as enum value
+    description: a.description,
+    imageFile: null,
+    imageUrl: "",
+  };
+}
+
+function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] px-3 text-xs font-bold ${
+          disabled
+            ? "cursor-not-allowed bg-slate-100 text-slate-400"
+            : "cursor-pointer text-[#607089] hover:border-[#091426] hover:bg-[#f8fafc]"
+        }`}
+      >
+        <Camera className="h-3.5 w-3.5 shrink-0" />
+        {imageUrl ? "Đổi ảnh" : label}
+        <input
+          type="file"
+          accept="image/*"
+          disabled={disabled}
+          className="hidden"
+          onChange={onChange}
+        />
+      </label>
+      {imageUrl && (
+        <Image
+          src={imageUrl}
+          alt="Ảnh chỉ số"
+          width={100}
+          height={70}
+          unoptimized
+          className="h-16 w-full rounded-lg border border-[#dfe5ef] object-cover"
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                           */
+/* ------------------------------------------------------------------ */
+
+export default function ContractHandoverSection({
+  contractId,
+  roomId,
+  roomCode,
+  readonly = false,
+}) {
+  /* meter readings -------------------------------------------------- */
+  const [handoverDate, setHandoverDate]         = useState("");
+  const [electricReading, setElectricReading]   = useState("");
+  const [waterReading, setWaterReading]         = useState("");
+  const [electricReadingDate, setElectricReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [waterReadingDate, setWaterReadingDate]       = useState(() => new Date().toISOString().split("T")[0]);
+  const [electricImageFile, setElectricImageFile] = useState(null);
+  const [electricImageUrl,  setElectricImageUrl]  = useState("");
+  const [waterImageFile, setWaterImageFile]     = useState(null);
+  const [waterImageUrl,  setWaterImageUrl]      = useState("");
+
+  /* assets ---------------------------------------------------------- */
+  const [assets, setAssets]         = useState(HANDOVER_ASSET_TEMPLATE);
+  const [fromApi, setFromApi]       = useState(false);   // true once loaded from backend
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [loadError, setLoadError]   = useState(null);
+
+  /* save ------------------------------------------------------------ */
+  const [note, setNote]             = useState("");
+  const [saving, setSaving]         = useState(false);
+  const [saveError, setSaveError]   = useState(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   const previewUrlsRef = useRef(new Set());
 
+  /* Fetch assets from API ------------------------------------------- */
+  const loadAssets = useCallback((signal) => {
+    if (!roomId) {
+      console.warn("[ContractHandoverSection] roomId is null — skipping fetch");
+      return;
+    }
+    setLoadingAssets(true);
+    setLoadError(null);
+    setSaveSuccess(false);
+
+    console.log("[ContractHandoverSection] fetching assets for roomId:", roomId);
+
+    fetchRoomAssets(roomId)
+      .then((data) => {
+        if (signal?.aborted) return;
+        console.log("[ContractHandoverSection] API response:", data);
+        if (Array.isArray(data) && data.length > 0) {
+          setAssets(data.map(apiAssetToRow));
+          setFromApi(true);
+        } else {
+          // Room exists but no assets saved yet — keep template
+          setAssets(HANDOVER_ASSET_TEMPLATE);
+          setFromApi(false);
+        }
+      })
+      .catch((err) => {
+        if (signal?.aborted) return;
+        console.error("[ContractHandoverSection] fetch error:", err);
+        setLoadError(err?.message ?? "Không tải được danh sách thiết bị.");
+      })
+      .finally(() => {
+        if (!signal?.aborted) setLoadingAssets(false);
+      });
+  }, [roomId]);
+
   useEffect(() => {
+    const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAssets(controller.signal);
+    return () => controller.abort();
+  }, [loadAssets]);
+
+  /* Fetch latest meter readings ------------------------------------- */
+  const loadReadings = useCallback((signal) => {
+    if (!roomId) return;
+    fetchLatestReadings(roomId)
+      .then((data) => {
+        if (signal?.aborted) return;
+        
+        const elec = data?.electricity || {};
+        const elecValue = elec.suggested_value ?? elec.suggestedValue;
+        const elecDate = elec.last_reading_date ?? elec.lastReadingDate;
+        
+        if (elecValue != null) {
+          setElectricReading(String(elecValue));
+          if (elecDate) setElectricReadingDate(elecDate);
+        }
+
+        const wat = data?.water || {};
+        const watValue = wat.suggested_value ?? wat.suggestedValue;
+        const watDate = wat.last_reading_date ?? wat.lastReadingDate;
+
+        if (watValue != null) {
+          setWaterReading(String(watValue));
+          if (watDate) setWaterReadingDate(watDate);
+        }
+      })
+      .catch((err) => {
+        if (signal?.aborted) return;
+        console.error("Failed to fetch latest readings:", err);
+      });
+  }, [roomId]);
+
+  useEffect(() => {
+    if (readonly) return;
+    if (electricReading === "" && waterReading === "") {
+      const controller = new AbortController();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadReadings(controller.signal);
+      return () => controller.abort();
+    }
+  }, [loadReadings, readonly, electricReading, waterReading]);
+
+  /* Cleanup blob URLs ----------------------------------------------- */
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
     return () => {
-      const previewUrls = previewUrlsRef.current;
-      if (previewUrls instanceof Set) {
-        previewUrls.forEach((url) => URL.revokeObjectURL(url));
-        previewUrls.clear();
-      } else if (Array.isArray(previewUrls)) {
-        previewUrls.forEach((url) => URL.revokeObjectURL(url));
-      }
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls.clear();
     };
   }, []);
 
-  const isValid = useMemo(() => {
-    const electric = Number(electricReading);
-    const water = Number(waterReading);
-    return (
-      Boolean(contractId && handoverDate) &&
-      electricReading !== "" &&
-      waterReading !== "" &&
-      Number.isFinite(electric) &&
-      electric >= 0 &&
-      Number.isFinite(water) &&
-      water >= 0 &&
-      assets.every((asset) => asset.name.trim() && asset.unit.trim() && Number(asset.quantity) > 0)
-    );
-  }, [assets, contractId, electricReading, handoverDate, waterReading]);
-
-  function updateAsset(index, field, value) {
-    setAssets((current) =>
-      current.map((asset, assetIndex) =>
-        assetIndex === index ? { ...asset, [field]: value } : asset,
-      ),
-    );
-  }
-
-  function handleImageChange(index, file) {
-    if (!file) return;
+  /* Helpers --------------------------------------------------------- */
+  const makeBlobUrl = useCallback((file) => {
     if (!(previewUrlsRef.current instanceof Set)) {
-      previewUrlsRef.current = new Set(
-        Array.isArray(previewUrlsRef.current)
-          ? previewUrlsRef.current.filter(Boolean)
-          : [],
-      );
+      previewUrlsRef.current = new Set();
     }
-    const previewUrls = previewUrlsRef.current;
-    const nextImageUrl = URL.createObjectURL(file);
-    previewUrls.add(nextImageUrl);
-    setAssets((current) =>
-      current.map((asset, assetIndex) => {
-        if (assetIndex !== index) return asset;
-        if (asset.imageUrl) {
-          URL.revokeObjectURL(asset.imageUrl);
-          previewUrls.delete(asset.imageUrl);
+    const url = URL.createObjectURL(file);
+    previewUrlsRef.current.add(url);
+    return url;
+  }, []);
+
+  const handleMeterImage = useCallback((type, file) => {
+    if (!file) return;
+    const url = makeBlobUrl(file);
+    if (type === "electric") {
+      if (electricImageUrl) URL.revokeObjectURL(electricImageUrl);
+      setElectricImageFile(file);
+      setElectricImageUrl(url);
+    } else {
+      if (waterImageUrl) URL.revokeObjectURL(waterImageUrl);
+      setWaterImageFile(file);
+      setWaterImageUrl(url);
+    }
+  }, [electricImageUrl, waterImageUrl, makeBlobUrl]);
+
+  const updateAsset = useCallback((index, field, value) => {
+    setSaveSuccess(false);
+    setAssets((prev) =>
+      prev.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+    );
+  }, []);
+
+  function handleAssetImageChange(index, file) {
+    if (!file) return;
+    const url = makeBlobUrl(file);
+    setAssets((prev) =>
+      prev.map((a, i) => {
+        if (i !== index) return a;
+        if (a.imageUrl) {
+          URL.revokeObjectURL(a.imageUrl);
+          previewUrlsRef.current?.delete(a.imageUrl);
         }
-        return { ...asset, imageFile: file, imageUrl: nextImageUrl };
+        return { ...a, imageFile: file, imageUrl: url };
       }),
     );
   }
 
-  function handleSave() {
+  const isValid =
+    Boolean(contractId && handoverDate) &&
+    electricReading !== "" &&
+    waterReading !== "" &&
+    Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
+    Number.isFinite(Number(waterReading))    && Number(waterReading) >= 0 &&
+    assets.every((a) => a.assetName.trim() && a.assetCategory.trim() && Number(a.quantity) > 0);
+
+  /* Save ------------------------------------------------------------ */
+  async function handleSave() {
     if (!isValid) {
       window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
       return;
     }
+    if (!roomId) {
+      window.alert("Không xác định được phòng để lưu thiết bị.");
+      return;
+    }
 
-    const payload = {
-      contractId,
-      roomCode: roomCode || null,
-      handoverDate,
-      meterReadings: [
-        { type: "ELECTRIC", source: "HANDOVER", value: Number(electricReading) },
-        { type: "WATER", source: "HANDOVER", value: Number(waterReading) },
-      ],
-      assets: assets.map((asset) => ({
-        name: asset.name.trim(),
-        unit: asset.unit.trim(),
-        quantity: Number(asset.quantity),
-        condition: asset.condition,
-        note: asset.note.trim(),
-        hasImage: Boolean(asset.imageFile),
-        image: asset.imageFile
-          ? {
-              name: asset.imageFile.name,
-              type: asset.imageFile.type,
-              size: asset.imageFile.size,
-            }
-          : null,
-      })),
-      note: note.trim(),
-    };
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
 
-    // TODO: Replace this preview with the handover API when the backend endpoint is available.
-    console.log("Contract handover payload:", payload);
-    window.alert("Đã tạo payload bàn giao. Dữ liệu hiện được ghi ra console.");
+    try {
+      // 1. Upload ảnh đồng hồ
+      let electricPhotoId = null;
+      let waterPhotoId = null;
+      if (electricImageFile) {
+        const res = await uploadFile(electricImageFile, "METER_PHOTO");
+        electricPhotoId = res?.id;
+      }
+      if (waterImageFile) {
+        const res = await uploadFile(waterImageFile, "METER_PHOTO");
+        waterPhotoId = res?.id;
+      }
+
+      // 2. Lưu chỉ số điện/nước
+      await createHandoverReadings(contractId, {
+        electricity: {
+          currentValue: Number(electricReading),
+          photoFileId: electricPhotoId,
+          readingDate: electricReadingDate || undefined,
+        },
+        water: {
+          currentValue: Number(waterReading),
+          photoFileId: waterPhotoId,
+          readingDate: waterReadingDate || undefined,
+        },
+      });
+
+      // 3. Lưu hiện trạng thiết bị
+      const savedAssets = await Promise.all(
+        assets.map(async (asset) => {
+          let assetImageId = null;
+          // Nếu có file ảnh mới, upload trước
+          if (asset.imageFile) {
+             const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
+             assetImageId = res?.id;
+          } else if (asset.imageUrl && asset.fileImageId) {
+             // Giữ nguyên ID ảnh cũ nếu không đổi
+             assetImageId = asset.fileImageId;
+          }
+          const body = {
+            asset_name: asset.assetName.trim(),
+            asset_category: asset.assetCategory.trim(),
+            quantity: Number(asset.quantity),
+            current_condition:
+              ASSET_CONDITION_VALUES[asset.currentCondition] ?? asset.currentCondition ?? "GOOD",
+            description: asset.description?.trim() ?? "",
+            file_image_id: assetImageId,
+          };
+          return asset.id
+            ? updateRoomAsset(roomId, asset.id, body)
+            : createRoomAsset(roomId, body);
+        }),
+      );
+
+      setAssets((prev) =>
+        prev.map((a, i) =>
+          a.id ? a : { ...a, id: savedAssets[i]?.id ?? null },
+        ),
+      );
+      setFromApi(true);
+
+      // 4. Xác nhận bàn giao
+      await confirmHandover(contractId, {
+        handoverType: "CHECK_IN", // Hoặc dựa vào ngữ cảnh
+        note: note.trim(),
+      });
+
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err?.message ?? "Lưu thông tin thất bại.");
+    } finally {
+      setSaving(false);
+    }
   }
 
+  /* ----------------------------------------------------------------- */
+  /*  Render                                                            */
+  /* ----------------------------------------------------------------- */
   return (
     <section className="rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 lg:col-span-2 xl:p-5">
+      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#091426] xl:text-xl">
@@ -145,143 +385,251 @@ export default function ContractHandoverSection({ contractId, roomCode, readonly
             Bàn giao phòng
           </h3>
           <p className="mt-1 text-xs leading-5 text-[#607089] xl:text-sm">
-            Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng {roomCode || "chưa cập nhật"}.
+            Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng{" "}
+            {roomCode || "chưa cập nhật"}.
           </p>
         </div>
-        {readonly && (
-          <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-            Chỉ xem
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {!roomId && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+              Chưa xác định phòng
+            </span>
+          )}
+          {readonly && (
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+              Chỉ xem
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="mt-5 grid gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4 md:grid-cols-3">
-        <label className="grid min-w-0 gap-1.5">
+      {/* Handover Date */}
+      <div className="mt-5 rounded-xl border border-[#dfe5ef] bg-white p-4">
+        <label className="grid gap-1.5 max-w-xs">
           <span className="text-xs font-bold text-[#58667c]">Ngày bàn giao *</span>
           <input
             type="date"
             value={handoverDate}
             disabled={readonly}
-            onChange={(event) => setHandoverDate(event.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
-          />
-        </label>
-        <label className="grid min-w-0 gap-1.5">
-          <span className="text-xs font-bold text-[#58667c]">Chỉ số điện ban đầu *</span>
-          <input
-            type="number"
-            min="0"
-            value={electricReading}
-            disabled={readonly}
-            onChange={(event) => setElectricReading(event.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
-          />
-        </label>
-        <label className="grid min-w-0 gap-1.5">
-          <span className="text-xs font-bold text-[#58667c]">Chỉ số nước ban đầu *</span>
-          <input
-            type="number"
-            min="0"
-            value={waterReading}
-            disabled={readonly}
-            onChange={(event) => setWaterReading(event.target.value)}
-            className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            onChange={(e) => setHandoverDate(e.target.value)}
+            className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
           />
         </label>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] bg-white">
-        <div className="border-b border-[#dfe5ef] px-4 py-3">
-          <h4 className="font-extrabold text-[#091426]">Hiện trạng thiết bị</h4>
+      {/* Meter Readings */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {/* Electric Card */}
+        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
+          <h4 className="font-extrabold text-[#091426]">Đồng hồ điện</h4>
+          
+          <div className="grid gap-1.5">
+            <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (kWh) *</span>
+            <input
+              type="number"
+              min="0"
+              value={electricReading}
+              disabled={readonly}
+              onChange={(e) => setElectricReading(e.target.value)}
+              placeholder="VD: 1234"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <span className="text-xs font-bold text-[#58667c]">Ngày chốt chỉ số *</span>
+            <input
+              type="date"
+              value={electricReadingDate}
+              disabled={readonly}
+              onChange={(e) => setElectricReadingDate(e.target.value)}
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="mt-1">
+            <ImageUploadButton
+              imageUrl={electricImageUrl}
+              label="Chụp ảnh đồng hồ điện"
+              disabled={readonly}
+              onChange={(e) => handleMeterImage("electric", e.target.files?.[0])}
+            />
+          </div>
         </div>
+
+        {/* Water Card */}
+        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
+          <h4 className="font-extrabold text-[#091426]">Đồng hồ nước</h4>
+          
+          <div className="grid gap-1.5">
+            <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (m³) *</span>
+            <input
+              type="number"
+              min="0"
+              value={waterReading}
+              disabled={readonly}
+              onChange={(e) => setWaterReading(e.target.value)}
+              placeholder="VD: 56"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <span className="text-xs font-bold text-[#58667c]">Ngày chốt chỉ số *</span>
+            <input
+              type="date"
+              value={waterReadingDate}
+              disabled={readonly}
+              onChange={(e) => setWaterReadingDate(e.target.value)}
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            />
+          </div>
+
+          <div className="mt-1">
+            <ImageUploadButton
+              imageUrl={waterImageUrl}
+              label="Chụp ảnh đồng hồ nước"
+              disabled={readonly}
+              onChange={(e) => handleMeterImage("water", e.target.files?.[0])}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Assets Table */}
+      <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] bg-white">
+        <div className="flex items-center justify-between border-b border-[#dfe5ef] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <h4 className="font-extrabold text-[#091426]">Hiện trạng thiết bị</h4>
+            {fromApi && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                Từ hệ thống
+              </span>
+            )}
+            {!fromApi && !loadingAssets && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                Mẫu mặc định
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {loadingAssets && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-[#607089]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Đang tải…
+              </span>
+            )}
+            {!loadingAssets && roomId && (
+              <button
+                type="button"
+                onClick={loadAssets}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#607089] hover:bg-[#f3f5f9]"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Tải lại
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loadError && (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+            {loadError}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[940px] text-left text-xs xl:text-sm">
+          <table className="w-full min-w-[980px] text-left text-xs xl:text-sm">
             <thead className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase tracking-[0.03em] text-[#6b7280] xl:text-xs">
               <tr>
-                <th className="w-12 px-3 py-3">STT</th>
-                <th className="min-w-52 px-3 py-3">Thiết bị</th>
-                <th className="w-20 px-3 py-3">Đơn vị</th>
+                <th className="w-10 px-3 py-3">STT</th>
+                <th className="min-w-52 px-3 py-3">Tên thiết bị</th>
+                <th className="min-w-36 px-3 py-3">Danh mục</th>
                 <th className="w-20 px-3 py-3">SL</th>
-                <th className="min-w-48 px-3 py-3">Hiện trạng</th>
-                <th className="min-w-48 px-3 py-3">Ghi chú</th>
-                <th className="w-36 px-3 py-3">Ảnh</th>
+                <th className="min-w-44 px-3 py-3">Tình trạng</th>
+                <th className="min-w-44 px-3 py-3">Mô tả</th>
+                <th className="w-32 px-3 py-3">Ảnh</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
               {assets.map((asset, index) => (
-                <tr key={`${asset.name}-${index}`}>
-                  <td className="px-3 py-3 font-bold text-[#607089]">{index + 1}</td>
-                  <td className="px-3 py-3">
+                <tr key={asset.id ?? `new-${index}`} className="hover:bg-[#fafbff]">
+                  <td className="px-3 py-2.5 font-bold text-[#607089]">{index + 1}</td>
+                  <td className="px-3 py-2.5">
                     <input
-                      value={asset.name}
+                      value={asset.assetName}
                       disabled={readonly}
-                      onChange={(event) => updateAsset(index, "name", event.target.value)}
+                      onChange={(e) => updateAsset(index, "assetName", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <input
-                      value={asset.unit}
+                      value={asset.assetCategory}
                       disabled={readonly}
-                      onChange={(event) => updateAsset(index, "unit", event.target.value)}
+                      onChange={(e) => updateAsset(index, "assetCategory", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <input
                       type="number"
                       min="1"
                       value={asset.quantity}
                       disabled={readonly}
-                      onChange={(event) => updateAsset(index, "quantity", event.target.value)}
+                      onChange={(e) => updateAsset(index, "quantity", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <select
-                      value={asset.condition}
+                      value={asset.currentCondition}
                       disabled={readonly}
-                      onChange={(event) => updateAsset(index, "condition", event.target.value)}
+                      onChange={(e) => updateAsset(index, "currentCondition", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] bg-white px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     >
-                      {CONDITION_OPTIONS.map((condition) => (
-                        <option key={condition} value={condition}>
-                          {condition}
+                      {CONDITION_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>
+                          {label}
                         </option>
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <input
-                      value={asset.note}
+                      value={asset.description}
                       disabled={readonly}
-                      onChange={(event) => updateAsset(index, "note", event.target.value)}
+                      onChange={(e) => updateAsset(index, "description", e.target.value)}
                       placeholder="Chưa cập nhật"
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
                   </td>
-                  <td className="px-3 py-3">
-                    <label className={`inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2.5 text-[11px] font-bold ${
-                      readonly ? "cursor-not-allowed bg-slate-100 text-slate-400" : "cursor-pointer hover:bg-[#f8fafc]"
-                    }`}>
+                  <td className="px-3 py-2.5">
+                    <label
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${
+                        readonly
+                          ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                          : "cursor-pointer hover:bg-[#f8fafc]"
+                      }`}
+                    >
                       <Camera className="h-3.5 w-3.5" />
-                      {asset.imageUrl ? "Đổi ảnh" : "Thêm ảnh"}
+                      {asset.imageUrl ? "Đổi" : "Thêm"}
                       <input
                         type="file"
                         accept="image/*"
                         disabled={readonly}
                         className="hidden"
-                        onChange={(event) => handleImageChange(index, event.target.files?.[0])}
+                        onChange={(e) => handleAssetImageChange(index, e.target.files?.[0])}
                       />
                     </label>
                     {asset.imageUrl && (
                       <Image
                         src={asset.imageUrl}
-                        alt={`Minh họa ${asset.name}`}
+                        alt={`Ảnh ${asset.assetName}`}
                         width={80}
                         height={56}
                         unoptimized
-                        className="mt-2 h-14 w-20 rounded-lg border border-[#dfe5ef] object-cover"
+                        className="mt-1.5 h-12 w-20 rounded-lg border border-[#dfe5ef] object-cover"
                       />
                     )}
                   </td>
@@ -292,27 +640,46 @@ export default function ContractHandoverSection({ contractId, roomCode, readonly
         </div>
       </div>
 
+      {/* Note */}
       <label className="mt-4 grid gap-1.5">
         <span className="text-xs font-bold text-[#58667c]">Ghi chú bàn giao</span>
         <textarea
           value={note}
           disabled={readonly}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(e) => setNote(e.target.value)}
           rows={3}
           placeholder="Chưa cập nhật"
           className="w-full rounded-lg border border-[#cbd5e1] bg-white p-3 text-sm outline-none focus:border-[#091426] disabled:bg-slate-100"
         />
       </label>
 
+      {/* Feedback */}
+      {saveError && (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700">
+          {saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
+          ✓ Đã lưu hiện trạng thiết bị thành công.
+        </div>
+      )}
+
+      {/* Save button */}
       {!readonly && (
         <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a]"
+            disabled={saving || loadingAssets}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
           >
-            <Save className="h-4 w-4" />
-            Lưu bàn giao
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {saving ? "Đang lưu…" : "Lưu bàn giao"}
           </button>
         </div>
       )}

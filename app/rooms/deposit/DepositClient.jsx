@@ -118,6 +118,13 @@ const normalizeHoldStatus = (status) => {
 const toBlockingStatus = (status) => {
   const normalizedStatus = normalizeHoldStatus(status);
   if (!normalizedStatus || normalizedStatus.canBook) return null;
+  if (
+    String(normalizedStatus.roomStatus || "").toUpperCase() === "SOON_VACANT"
+    && !normalizedStatus.holdStatus
+    && normalizedStatus.remainingSeconds <= 0
+  ) {
+    return null;
+  }
 
   return {
     ...normalizedStatus,
@@ -1780,7 +1787,7 @@ export function DepositClient({ room }) {
     );
   }
 
-  if (room.status !== "available") {
+  if (room.status !== "available" && room.status !== "soonVacant") {
     return (
       <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
         <div className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">

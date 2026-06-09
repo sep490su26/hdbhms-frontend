@@ -8,7 +8,6 @@ export const floorPlans = [
 
 const availableRoomIds = ["P101", "P103", "P202", "P203", "P208", "P303", "P308", "P401", "P403", "P408", "P503", "P507"];
 const maintenanceRoomIds = ["P204", "P306"];
-const soonVacantRoomIds = ["P105", "P301"];
 const premiumRoomIds = ["P101", "P102", "P201", "P202", "P301", "P302", "P401", "P402", "P501", "P502"];
 const quietRoomIds = ["P103", "P203", "P208", "P303", "P308", "P403", "P408", "P503", "P507"];
 
@@ -43,7 +42,6 @@ function resolveLastMeterReading(code, floorIndex, roomIndex) {
 
 function resolveStatus(code) {
   if (maintenanceRoomIds.includes(code)) return "maintenance";
-  if (soonVacantRoomIds.includes(code)) return "soonVacant";
   if (availableRoomIds.includes(code)) return "available";
   return "occupied";
 }
@@ -161,6 +159,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? "Hải Đăng House",
     name: apiRoom.name ?? roomCode,
     status,
+    expectedVacantDate: apiRoom.expected_vacant_date ?? apiRoom.expectedVacantDate ?? null,
     type: apiRoom.type ?? "standard",
     image: uniqueImages[0] ?? defaultRoomImage,
     images: uniqueImages.length > 0 ? uniqueImages : [defaultRoomImage],
@@ -394,10 +393,14 @@ export async function cancelBatchDeposit(batchId) {
   return payload.data ?? payload;
 }
 
-export async function fetchDepositRoomHoldStatus(roomId) {
+export async function fetchDepositRoomHoldStatus(roomId, dates = {}) {
   if (!roomId) return null;
 
-  const response = await fetch(`${API_BASE_URL}/deposit/rooms/${encodeURIComponent(roomId)}/hold-status`, {
+  const params = new URLSearchParams();
+  if (dates.expectedMoveInDate) params.set("expectedMoveInDate", dates.expectedMoveInDate);
+  if (dates.expectedLeaseSignDate) params.set("expectedLeaseSignDate", dates.expectedLeaseSignDate);
+  const queryString = params.toString();
+  const response = await fetch(`${API_BASE_URL}/deposit/rooms/${encodeURIComponent(roomId)}/hold-status${queryString ? `?${queryString}` : ""}`, {
     cache: "no-store",
     headers: {
       "X-Client-Type": "web",

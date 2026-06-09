@@ -1,4 +1,4 @@
-import { API_BASE_URL, authenticatedFetch, parseEnvelope } from "@/services/identityAccessService";
+import { API_BASE_URL, ApiError, authenticatedFetch } from "@/services/identityAccessService";
 
 const BASE = API_BASE_URL;
 
@@ -23,11 +23,18 @@ export async function uploadFile(file, category = "OTHER") {
 
 /**
  * Fetch latest meter readings for a room
- * GET /api/v1/rooms/{roomId}/meter-readings/latest
+ * GET /api/v1/tenants/{tenantId}/rooms/{roomId}/meter-readings/latest
  */
-export async function fetchLatestReadings(roomId) {
-  if (!roomId) throw new Error("Missing roomId");
-  return authenticatedFetch(`${BASE}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`);
+export async function fetchLatestReadings(tenantId, roomId) {
+  if (!tenantId || !roomId) return null;
+  try {
+    return await authenticatedFetch(
+      `${BASE}/tenants/${encodeURIComponent(tenantId)}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 /**

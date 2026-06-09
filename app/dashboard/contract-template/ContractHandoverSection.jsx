@@ -107,6 +107,7 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
 
 export default function ContractHandoverSection({
   contractId,
+  tenantId,
   roomId,
   roomCode,
   readonly = false,
@@ -138,17 +139,17 @@ export default function ContractHandoverSection({
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
-    if (!roomId) {
-      console.warn("[ContractHandoverSection] roomId is null — skipping fetch");
+    if (!tenantId || !roomId) {
+      console.warn("[ContractHandoverSection] tenantId/roomId is null — skipping fetch");
       return;
     }
     setLoadingAssets(true);
     setLoadError(null);
     setSaveSuccess(false);
 
-    console.log("[ContractHandoverSection] fetching assets for roomId:", roomId);
+    console.log("[ContractHandoverSection] fetching assets for tenantId/roomId:", tenantId, roomId);
 
-    fetchRoomAssets(roomId)
+    fetchRoomAssets(tenantId, roomId)
       .then((data) => {
         if (signal?.aborted) return;
         console.log("[ContractHandoverSection] API response:", data);
@@ -169,7 +170,7 @@ export default function ContractHandoverSection({
       .finally(() => {
         if (!signal?.aborted) setLoadingAssets(false);
       });
-  }, [roomId]);
+  }, [tenantId, roomId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -180,8 +181,8 @@ export default function ContractHandoverSection({
 
   /* Fetch latest meter readings ------------------------------------- */
   const loadReadings = useCallback((signal) => {
-    if (!roomId) return;
-    fetchLatestReadings(roomId)
+    if (!tenantId || !roomId) return;
+    fetchLatestReadings(tenantId, roomId)
       .then((data) => {
         if (signal?.aborted) return;
         
@@ -207,13 +208,12 @@ export default function ContractHandoverSection({
         if (signal?.aborted) return;
         console.error("Failed to fetch latest readings:", err);
       });
-  }, [roomId]);
+  }, [tenantId, roomId]);
 
   useEffect(() => {
     if (readonly) return;
     if (electricReading === "" && waterReading === "") {
       const controller = new AbortController();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadReadings(controller.signal);
       return () => controller.abort();
     }
@@ -288,8 +288,8 @@ export default function ContractHandoverSection({
       window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
       return;
     }
-    if (!roomId) {
-      window.alert("Không xác định được phòng để lưu thiết bị.");
+    if (!tenantId || !roomId) {
+      window.alert("Không xác định được tenant hoặc phòng để lưu thiết bị.");
       return;
     }
 
@@ -346,8 +346,8 @@ export default function ContractHandoverSection({
             file_image_id: assetImageId,
           };
           return asset.id
-            ? updateRoomAsset(roomId, asset.id, body)
-            : createRoomAsset(roomId, body);
+            ? updateRoomAsset(tenantId, roomId, asset.id, body)
+            : createRoomAsset(tenantId, roomId, body);
         }),
       );
 
@@ -390,9 +390,9 @@ export default function ContractHandoverSection({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!roomId && (
+          {(!tenantId || !roomId) && (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-              Chưa xác định phòng
+              Chưa xác định tenant/phòng
             </span>
           )}
           {readonly && (
@@ -519,7 +519,7 @@ export default function ContractHandoverSection({
                 Đang tải…
               </span>
             )}
-            {!loadingAssets && roomId && (
+            {!loadingAssets && tenantId && roomId && (
               <button
                 type="button"
                 onClick={loadAssets}

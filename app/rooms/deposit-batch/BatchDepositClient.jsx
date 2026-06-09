@@ -451,7 +451,10 @@ export function BatchDepositClient({ initialRooms }) {
     const refreshAvailability = async () => {
       const results = await Promise.all(rooms.map(async (room) => {
         try {
-          const status = await fetchDepositRoomHoldStatus(room.roomId);
+          const status = await fetchDepositRoomHoldStatus(room.roomId, {
+            expectedMoveInDate: form.expectedMoveInDate,
+            expectedLeaseSignDate: form.expectedLeaseSignDate,
+          });
           const canBook = Boolean(status?.canBook ?? status?.can_book);
           if (canBook) return null;
           return {
@@ -493,7 +496,7 @@ export function BatchDepositClient({ initialRooms }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [checkout, rooms]);
+  }, [checkout, form.expectedLeaseSignDate, form.expectedMoveInDate, rooms]);
 
   useEffect(() => {
     if (!conflict) return undefined;

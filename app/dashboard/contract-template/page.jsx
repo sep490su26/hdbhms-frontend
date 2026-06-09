@@ -552,6 +552,7 @@ export default function ContractTemplatePage() {
       contractFileName: details.contractFile?.fileName || selected.contractFileName,
       contractFileUploadedAt: details.contractFile?.uploadedAt || selected.contractFileUploadedAt,
       propertyName: details.property?.name || selected.propertyName,
+      tenantId: details.tenantId || selected.tenantId || null,
       roomCode: details.room?.roomCode || selected.roomCode,
       roomId: details.room?.id || selected.roomId || null,
       monthlyRent: details.monthlyRent ?? selected.monthlyRent,
@@ -1644,6 +1645,7 @@ export default function ContractTemplatePage() {
                 <ContractHandoverSection
                   key={mergedSelected.leaseContractId}
                   contractId={mergedSelected.leaseContractId}
+                  tenantId={mergedSelected.tenantId || null}
                   roomId={mergedSelected.roomId || null}
                   roomCode={mergedSelected.roomCode || mergedSelected.room?.roomCode}
                   readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(

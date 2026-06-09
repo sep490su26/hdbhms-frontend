@@ -673,25 +673,17 @@ function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
 }
 
 function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor, onSelectRoom }) {
-  const isOverview = selectedFloor === BUILDING_OVERVIEW_LABEL;
-  const tabItems = [BUILDING_OVERVIEW_LABEL, ...floors];
-
   return (
     <div className="space-y-6 rounded-[2rem] bg-[#f3f5f8] p-5 text-slate-950 shadow-sm md:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Sơ đồ tầng</p>
-          <h2 className="mt-1 text-3xl font-black text-slate-950">{selectedFloor || BUILDING_OVERVIEW_LABEL}</h2>
+          <h2 className="mt-1 text-3xl font-black text-slate-950">{BUILDING_OVERVIEW_LABEL}</h2>
         </div>
         <FloorPlanLegend />
       </div>
 
-      {tabItems.length > 1 && <FloorPlanTabs floors={tabItems} selectedFloor={selectedFloor} onSelect={onSelectFloor} />}
-      {isOverview ? (
-        <BuildingOverview floors={floors} allRooms={allRooms} onSelectFloor={onSelectFloor} onSelectRoom={onSelectRoom} />
-      ) : (
-        <FloorBlueprint rooms={rooms} onSelect={onSelectRoom} />
-      )}
+      <BuildingOverview floors={floors} allRooms={allRooms} onSelectFloor={onSelectFloor} onSelectRoom={onSelectRoom} />
     </div>
   );
 }

@@ -118,6 +118,13 @@ const normalizeHoldStatus = (status) => {
 const toBlockingStatus = (status) => {
   const normalizedStatus = normalizeHoldStatus(status);
   if (!normalizedStatus || normalizedStatus.canBook) return null;
+  if (
+    String(normalizedStatus.roomStatus || "").toUpperCase() === "SOON_VACANT"
+    && !normalizedStatus.holdStatus
+    && normalizedStatus.remainingSeconds <= 0
+  ) {
+    return null;
+  }
 
   return {
     ...normalizedStatus,
@@ -528,7 +535,7 @@ const buildDepositMetadata = (room, data) => ({
   id_issue_place: String(data.idIssuePlace || "").trim(),
   permanent_address: String(data.permanentAddress || "").trim(),
   deposit_months: 1,
-  payment_cycle_months: 1,
+  payment_cycle_months: Number(data.paymentCycleMonths || 1),
   occupant_count: Number(data.occupantCount || 1),
   co_occupants: [1, 2]
     .filter((displayOrder) => Number(data.occupantCount || 1) > displayOrder)
@@ -946,6 +953,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       "occupantCount",
       "contractDate",
       "moveInDate",
+      "paymentCycleMonths",
     ];
     const nextErrors = {};
 
@@ -1054,6 +1062,25 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.idIssueDate} />
           <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
+          <label className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+              Chu kỳ thanh toán <span className="text-rose-600">*</span>
+            </span>
+            <select
+              name="paymentCycleMonths"
+              defaultValue={savedDraft.paymentCycleMonths || "1"}
+              required
+              aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
+              className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.paymentCycleMonths
+                ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                }`}
+            >
+              <option value="1">1 tháng/lần</option>
+              <option value="3">3 tháng/lần</option>
+            </select>
+            {fieldErrors.paymentCycleMonths && <span className="text-xs font-medium text-rose-600">{fieldErrors.paymentCycleMonths}</span>}
+          </label>
           <div className="grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2">
             <div className="flex items-center gap-3">
               <Home className="h-5 w-5 text-[#4f46e5]" />
@@ -1786,7 +1813,7 @@ export function DepositClient({ room }) {
     );
   }
 
-  if (room.status !== "available") {
+  if (room.status !== "available" && room.status !== "soonVacant") {
     return (
       <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
         <div

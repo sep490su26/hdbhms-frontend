@@ -53,6 +53,13 @@ const getTomorrowDateString = () => {
   return tomorrow.toISOString().split("T")[0];
 };
 
+const formatShortDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+};
+
 const VIEWING_DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
 const REQUIRED_MESSAGES = {
   fullName: "Vui lòng nhập họ và tên.",
@@ -201,11 +208,14 @@ function withDetailDefaults(room) {
 
 function BookingCard({ room }) {
   const isAvailable = room.status === "available";
+  const isSoonVacant = room.status === "soonVacant";
+  const isBookable = isAvailable || isSoonVacant;
   const isOnHold = room.status === "onHold";
   const isDeposited = room.status === "deposited";
   const isOccupied = room.status === "occupied";
   const holdMinutesLabel = formatHoldMinutes(room.holdRemainingMs ?? 0);
   const roomLabel = room.roomCode || room.name || room.id;
+  const vacantDateLabel = formatShortDate(room.expectedVacantDate);
   const tomorrowDate = getTomorrowDateString();
   const [isViewingModalOpen, setIsViewingModalOpen] = useState(false);
   const [viewingForm, setViewingForm] = useState({
@@ -219,6 +229,7 @@ function BookingCard({ room }) {
   // Hàm helper lấy class màu sắc theo trạng thái
   const getStatusClass = () => {
     if (isAvailable) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (isSoonVacant) return "border-orange-200 bg-orange-50 text-orange-700";
     if (isOnHold) return "border-amber-200 bg-amber-50 text-amber-700";
     if (isDeposited) return "border-orange-200 bg-orange-50 text-orange-700";
     return "border-slate-200 bg-slate-50 text-slate-600";
@@ -341,15 +352,16 @@ function BookingCard({ room }) {
         <div className="mt-6">
           {/* Thanh trạng thái động */}
           <div className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}>
-            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`} />
+            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`} />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
+            {isSoonVacant && `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
             {isOnHold && `Đang giữ chỗ - còn ${holdMinutesLabel}`}
             {isOccupied && "Đã thuê - Không còn trống"}
             {isDeposited && "Đã đặt cọc - Không còn trống"}
           </div>
 
           <div className="grid gap-3">
-            {isAvailable ? (
+            {isBookable ? (
               <Link
                 href={`/rooms/deposit?roomCode=${encodeURIComponent(room.roomCode || room.id)}`}
                 className="flex min-h-14 items-center justify-center gap-2 rounded-[16px] bg-[#232946] px-4 py-3 text-center text-sm font-bold text-white shadow-lg shadow-[#232946]/20 transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
@@ -658,7 +670,8 @@ export function RoomDetailPageClient({ roomId }) {
     const isServerReserved = serverRoomStatus === "RESERVED";
     const isServerOccupied = serverRoomStatus === "OCCUPIED";
     const isServerVacant = serverRoomStatus === "VACANT";
-    const isServerBookable = serverHoldStatus?.canBook === true && isServerVacant;
+    const isServerSoonVacant = serverRoomStatus === "SOON_VACANT";
+    const isServerBookable = serverHoldStatus?.canBook === true && (isServerVacant || isServerSoonVacant);
     const isExpiredHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs <= 0;
     const localRemainingMs = localHold && nowMs ? Math.max(0, Number(localHold.expiresAt) - nowMs) : 0;
     const hasLocalHold = Boolean(localHold && localRemainingMs > 0);
@@ -670,9 +683,11 @@ export function RoomDetailPageClient({ roomId }) {
         : isServerOccupied || room.status === "occupied"
           ? "occupied"
           : isServerBookable || (isExpiredHold && isServerVacant)
-            ? "available"
-            : hasServerHold || (hasLocalHold && room.status === "available")
+            ? (isServerSoonVacant ? "soonVacant" : "available")
+            : hasServerHold || (hasLocalHold && (room.status === "available" || room.status === "soonVacant"))
               ? "onHold"
+              : isServerSoonVacant
+                ? "soonVacant"
               : room.status,
       holdExpiresAt: serverHoldStatus?.holdExpiresAt ?? localHold?.expiresAt,
       holdRemainingMs: hasServerHold ? serverHoldStatus.remainingMs : localRemainingMs,

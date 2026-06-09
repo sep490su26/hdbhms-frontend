@@ -1,0 +1,12 @@
+
+> hdbhms-web@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://172.25.48.1:3001
+✓ Ready in 670ms
+
+○ Compiling /viewing-customers ...
+ GET /viewing-customers 200 in 4.2s (next.js: 3.9s, application-code: 248ms)
+[?25h

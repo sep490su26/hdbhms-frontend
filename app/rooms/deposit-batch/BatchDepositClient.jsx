@@ -220,6 +220,7 @@ function buildContractPreviewMetadata(room, form) {
     permanent_address: String(form.permanentAddress || "").trim(),
     expected_move_in_date: form.expectedMoveInDate || null,
     expected_lease_sign_date: form.expectedLeaseSignDate || null,
+    payment_cycle_months: Number(form.paymentCycleMonths || 1),
   };
 }
 
@@ -451,7 +452,10 @@ export function BatchDepositClient({ initialRooms }) {
     const refreshAvailability = async () => {
       const results = await Promise.all(rooms.map(async (room) => {
         try {
-          const status = await fetchDepositRoomHoldStatus(room.roomId);
+          const status = await fetchDepositRoomHoldStatus(room.roomId, {
+            expectedMoveInDate: form.expectedMoveInDate,
+            expectedLeaseSignDate: form.expectedLeaseSignDate,
+          });
           const canBook = Boolean(status?.canBook ?? status?.can_book);
           if (canBook) return null;
           return {
@@ -493,7 +497,7 @@ export function BatchDepositClient({ initialRooms }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [checkout, rooms]);
+  }, [checkout, form.expectedLeaseSignDate, form.expectedMoveInDate, rooms]);
 
   useEffect(() => {
     if (!conflict) return undefined;

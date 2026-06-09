@@ -610,19 +610,43 @@ export default function ContractTemplatePage() {
   }
 
   async function openPrintWizard(item) {
-    if (!item?.leaseContractId) {
-      setError("Vui lòng tạo hợp đồng thuê trước khi in.");
-      return;
+    let targetContractId = item?.leaseContractId;
+    
+    if (!targetContractId) {
+      if (item?.depositAgreementId) {
+        setActionLoading(`draft-${item.depositAgreementId}`);
+        setError("");
+        try {
+          await createDraftLeaseContractFromDeposit(item.depositAgreementId);
+          const refreshedContracts = await loadContracts();
+          const updatedItem = refreshedContracts.find(
+            (c) => String(c.depositAgreementId) === String(item.depositAgreementId) && c.leaseContractId
+          );
+          if (updatedItem && updatedItem.leaseContractId) {
+            targetContractId = updatedItem.leaseContractId;
+          } else {
+            throw new Error("Không lấy được mã hợp đồng sau khi tạo.");
+          }
+        } catch (err) {
+          setError(err?.message || "Không tự động tạo được hợp đồng thuê từ cọc để in.");
+          setActionLoading("");
+          return;
+        }
+      } else {
+        setError("Vui lòng tạo hợp đồng thuê trước khi in.");
+        return;
+      }
     }
-    setActionLoading(`print-${item.leaseContractId}`);
+
+    setActionLoading(`print-${targetContractId}`);
     setError("");
     try {
       const contractDetails =
-        details && String(details.contractId) === String(item.leaseContractId)
+        details && String(details.contractId) === String(targetContractId)
           ? details
-          : await fetchManagementLeaseContractDetails(item.leaseContractId);
+          : await fetchManagementLeaseContractDetails(targetContractId);
       setPrintWizard({
-        contract: { ...item, ...contractDetails },
+        contract: { ...item, leaseContractId: targetContractId, ...contractDetails },
         details: contractDetails,
       });
     } catch (err) {
@@ -1226,10 +1250,10 @@ export default function ContractTemplatePage() {
                             event.stopPropagation();
                             openPrintWizard(item);
                           }}
-                          disabled={!item.leaseContractId || actionLoading === `print-${item.leaseContractId}`}
+                          disabled={actionLoading === `print-${item.leaseContractId}` || actionLoading === `draft-${item.depositAgreementId}`}
                           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 text-xs font-extrabold text-red-700 shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 xl:h-10 xl:px-3 xl:text-sm"
                         >
-                          {actionLoading === `print-${item.leaseContractId}` ? (
+                          {actionLoading === `print-${item.leaseContractId}` || actionLoading === `draft-${item.depositAgreementId}` ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Printer className="h-3.5 w-3.5" />

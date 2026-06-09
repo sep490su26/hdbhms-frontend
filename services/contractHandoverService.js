@@ -34,15 +34,24 @@ export async function fetchLatestReadings(roomId) {
  * Create handover readings
  * POST /api/v1/lease-contracts/{contractId}/handover/meter-readings
  */
-export async function createHandoverReadings(contractId, body, type = "CHECK_IN") {
-  if (!contractId) throw new Error("Missing contractId");
-  return authenticatedFetch(`${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/meter-readings?type=${type}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export async function createHandoverReadings(contractId, payload, handoverType = "MOVE_IN") {
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/meter-readings?type=${encodeURIComponent(handoverType)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  return data;
 }
 
+export async function fetchContractHandover(contractId, handoverType = "MOVE_IN") {
+  return authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover?type=${encodeURIComponent(handoverType)}`,
+    { method: "GET" }
+  );
+}
 /**
  * Confirm handover
  * PATCH /api/v1/lease-contracts/{contractId}/handover/confirm

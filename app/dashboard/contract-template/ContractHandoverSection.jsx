@@ -43,10 +43,10 @@ const HANDOVER_ASSET_TEMPLATE = [
 }));
 
 const CONDITION_OPTIONS = [
-  { value: "GOOD",      label: "Hoạt động bình thường" },
+  { value: "GOOD", label: "Hoạt động bình thường" },
   { value: "ATTENTION", label: "Có trầy xước nhẹ" },
-  { value: "BROKEN",    label: "Hỏng cần sửa" },
-  { value: "MISSING",   label: "Thiếu thiết bị" },
+  { value: "BROKEN", label: "Hỏng cần sửa" },
+  { value: "MISSING", label: "Thiếu thiết bị" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -71,11 +71,10 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label
-        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] px-3 text-xs font-bold ${
-          disabled
+        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] px-3 text-xs font-bold ${disabled
             ? "cursor-not-allowed bg-slate-100 text-slate-400"
             : "cursor-pointer text-[#607089] hover:border-[#091426] hover:bg-[#f8fafc]"
-        }`}
+          }`}
       >
         <Camera className="h-3.5 w-3.5 shrink-0" />
         {imageUrl ? "Đổi ảnh" : label}
@@ -112,26 +111,26 @@ export default function ContractHandoverSection({
   readonly = false,
 }) {
   /* meter readings -------------------------------------------------- */
-  const [handoverDate, setHandoverDate]         = useState("");
-  const [electricReading, setElectricReading]   = useState("");
-  const [waterReading, setWaterReading]         = useState("");
+  const [handoverDate, setHandoverDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [electricReading, setElectricReading] = useState("");
+  const [waterReading, setWaterReading] = useState("");
   const [electricReadingDate, setElectricReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [waterReadingDate, setWaterReadingDate]       = useState(() => new Date().toISOString().split("T")[0]);
+  const [waterReadingDate, setWaterReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricImageFile, setElectricImageFile] = useState(null);
-  const [electricImageUrl,  setElectricImageUrl]  = useState("");
-  const [waterImageFile, setWaterImageFile]     = useState(null);
-  const [waterImageUrl,  setWaterImageUrl]      = useState("");
+  const [electricImageUrl, setElectricImageUrl] = useState("");
+  const [waterImageFile, setWaterImageFile] = useState(null);
+  const [waterImageUrl, setWaterImageUrl] = useState("");
 
   /* assets ---------------------------------------------------------- */
-  const [assets, setAssets]         = useState(HANDOVER_ASSET_TEMPLATE);
-  const [fromApi, setFromApi]       = useState(false);   // true once loaded from backend
+  const [assets, setAssets] = useState(HANDOVER_ASSET_TEMPLATE);
+  const [fromApi, setFromApi] = useState(false);   // true once loaded from backend
   const [loadingAssets, setLoadingAssets] = useState(false);
-  const [loadError, setLoadError]   = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   /* save ------------------------------------------------------------ */
-  const [note, setNote]             = useState("");
-  const [saving, setSaving]         = useState(false);
-  const [saveError, setSaveError]   = useState(null);
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const previewUrlsRef = useRef(new Set());
@@ -184,24 +183,20 @@ export default function ContractHandoverSection({
     fetchLatestReadings(roomId)
       .then((data) => {
         if (signal?.aborted) return;
-        
+
         const elec = data?.electricity || {};
         const elecValue = elec.suggested_value ?? elec.suggestedValue;
         const elecDate = elec.last_reading_date ?? elec.lastReadingDate;
-        
-        if (elecValue != null) {
-          setElectricReading(String(elecValue));
-          if (elecDate) setElectricReadingDate(elecDate);
-        }
+
+        setElectricReading(prev => prev === "" && elecValue != null ? String(elecValue) : prev);
+        if (elecDate) setElectricReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? elecDate : prev);
 
         const wat = data?.water || {};
         const watValue = wat.suggested_value ?? wat.suggestedValue;
         const watDate = wat.last_reading_date ?? wat.lastReadingDate;
 
-        if (watValue != null) {
-          setWaterReading(String(watValue));
-          if (watDate) setWaterReadingDate(watDate);
-        }
+        setWaterReading(prev => prev === "" && watValue != null ? String(watValue) : prev);
+        if (watDate) setWaterReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? watDate : prev);
       })
       .catch((err) => {
         if (signal?.aborted) return;
@@ -211,13 +206,42 @@ export default function ContractHandoverSection({
 
   useEffect(() => {
     if (readonly) return;
-    if (electricReading === "" && waterReading === "") {
-      const controller = new AbortController();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadReadings(controller.signal);
-      return () => controller.abort();
+    const controller = new AbortController();
+
+    // If contractId is provided, fetch handover record first
+    if (contractId) {
+      import('@/services/contractHandoverService').then(({ fetchContractHandover }) => {
+        fetchContractHandover(contractId, "MOVE_IN")
+          .then((data) => {
+            if (controller.signal.aborted) return;
+            if (data) {
+              const hDate = data.handover_date || data.handoverDate;
+              if (hDate) setHandoverDate(hDate.split("T")[0]);
+              
+              const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
+              if (elecValue != null) {
+                setElectricReading(String(elecValue));
+              }
+              const watValue = data.water?.current_value ?? data.water?.currentValue;
+              if (watValue != null) {
+                setWaterReading(String(watValue));
+              }
+              if (data.note) setNote(data.note);
+            } else {
+              if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
+            }
+          })
+          .catch((err) => {
+            if (controller.signal.aborted) return;
+            if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
+          });
+      });
+    } else {
+      if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
     }
-  }, [loadReadings, readonly, electricReading, waterReading]);
+
+    return () => controller.abort();
+  }, [loadReadings, readonly, contractId]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -279,7 +303,7 @@ export default function ContractHandoverSection({
     electricReading !== "" &&
     waterReading !== "" &&
     Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
-    Number.isFinite(Number(waterReading))    && Number(waterReading) >= 0 &&
+    Number.isFinite(Number(waterReading)) && Number(waterReading) >= 0 &&
     assets.every((a) => a.assetName.trim() && a.assetCategory.trim() && Number(a.quantity) > 0);
 
   /* Save ------------------------------------------------------------ */
@@ -313,14 +337,20 @@ export default function ContractHandoverSection({
       // 2. Lưu chỉ số điện/nước
       await createHandoverReadings(contractId, {
         electricity: {
-          currentValue: Number(electricReading),
+          currentValue: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
+          current_value: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
           photoFileId: electricPhotoId,
+          photo_file_id: electricPhotoId,
           readingDate: electricReadingDate || undefined,
+          reading_date: electricReadingDate || undefined,
         },
         water: {
-          currentValue: Number(waterReading),
+          currentValue: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
+          current_value: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
           photoFileId: waterPhotoId,
+          photo_file_id: waterPhotoId,
           readingDate: waterReadingDate || undefined,
+          reading_date: waterReadingDate || undefined,
         },
       });
 
@@ -330,11 +360,11 @@ export default function ContractHandoverSection({
           let assetImageId = null;
           // Nếu có file ảnh mới, upload trước
           if (asset.imageFile) {
-             const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
-             assetImageId = res?.id;
+            const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
+            assetImageId = res?.id;
           } else if (asset.imageUrl && asset.fileImageId) {
-             // Giữ nguyên ID ảnh cũ nếu không đổi
-             assetImageId = asset.fileImageId;
+            // Giữ nguyên ID ảnh cũ nếu không đổi
+            assetImageId = asset.fileImageId;
           }
           const body = {
             asset_name: asset.assetName.trim(),
@@ -360,7 +390,7 @@ export default function ContractHandoverSection({
 
       // 4. Xác nhận bàn giao
       await confirmHandover(contractId, {
-        handoverType: "CHECK_IN", // Hoặc dựa vào ngữ cảnh
+        handover_type: "MOVE_IN",
         note: note.trim(),
       });
 
@@ -410,9 +440,9 @@ export default function ContractHandoverSection({
           <input
             type="date"
             value={handoverDate}
-            disabled={readonly}
+            disabled={true}
             onChange={(e) => setHandoverDate(e.target.value)}
-            className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+            className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:opacity-70"
           />
         </label>
       </div>
@@ -422,7 +452,7 @@ export default function ContractHandoverSection({
         {/* Electric Card */}
         <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
           <h4 className="font-extrabold text-[#091426]">Đồng hồ điện</h4>
-          
+
           <div className="grid gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (kWh) *</span>
             <input
@@ -460,7 +490,7 @@ export default function ContractHandoverSection({
         {/* Water Card */}
         <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
           <h4 className="font-extrabold text-[#091426]">Đồng hồ nước</h4>
-          
+
           <div className="grid gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (m³) *</span>
             <input
@@ -606,11 +636,10 @@ export default function ContractHandoverSection({
                   </td>
                   <td className="px-3 py-2.5">
                     <label
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${
-                        readonly
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${readonly
                           ? "cursor-not-allowed bg-slate-100 text-slate-400"
                           : "cursor-pointer hover:bg-[#f8fafc]"
-                      }`}
+                        }`}
                     >
                       <Camera className="h-3.5 w-3.5" />
                       {asset.imageUrl ? "Đổi" : "Thêm"}

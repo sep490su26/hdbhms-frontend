@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarDays, Download, FileText, Gauge, Home, Printer, Users, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CalendarDays, Download, FileText, Gauge, Home, Printer, Users, X, Loader2 } from "lucide-react";
+import { createHandoverReadings } from "@/services/contractHandoverService";
+import { fetchRoomAssets, createRoomAsset, updateRoomAsset } from "@/services/roomAssetsService";
 
 const OWNER_INFO = {
   fullName: "ĐẶNG VĂN NHUẬN",
@@ -213,8 +215,8 @@ function buildPrintableHtml({ form, handover, assets }) {
     )
     .join("");
   const meterRows = [
-    ["ĐỒNG HỒ ĐO ĐIỆN", "CÁI", "01", `Chỉ số: ${handover.electricReading || "............"}, ngày ${formatDate(handover.handoverDate)}`],
-    ["ĐỒNG HỒ ĐO NƯỚC", "CÁI", "01", `Chỉ số: ${handover.waterReading || "............"}, ngày ${formatDate(handover.handoverDate)}`],
+    ["ĐỒNG HỒ ĐO ĐIỆN", "CÁI", "01", `Chỉ số: ${(handover.electricReading !== "" && handover.electricReading != null) ? handover.electricReading : "............"}, ngày ${formatDate(handover.handoverDate)}`],
+    ["ĐỒNG HỒ ĐO NƯỚC", "CÁI", "01", `Chỉ số: ${(handover.waterReading !== "" && handover.waterReading != null) ? handover.waterReading : "............"}, ngày ${formatDate(handover.handoverDate)}`],
     ["CHÌA KHÓA CỬA CHÍNH", "BỘ", "01", ""],
   ]
     .map(
@@ -293,8 +295,8 @@ function buildPrintableHtml({ form, handover, assets }) {
 
     <p class="section-title">4. Bàn giao phòng</p>
     <p class="indent">Ngày bàn giao: <span class="line">${e(formatDate(handover.handoverDate))}</span></p>
-    <p class="indent">Chỉ số điện ban đầu: <span class="line">${e(handover.electricReading || "..........")}</span></p>
-    <p class="indent">Chỉ số nước ban đầu: <span class="line">${e(handover.waterReading || "..........")}</span></p>
+    <p class="indent">Chỉ số điện ban đầu: <span class="line">${e((handover.electricReading !== "" && handover.electricReading != null) ? handover.electricReading : "..........")}</span></p>
+    <p class="indent">Chỉ số nước ban đầu: <span class="line">${e((handover.waterReading !== "" && handover.waterReading != null) ? handover.waterReading : "..........")}</span></p>
     <table>
       <thead>
         <tr><th>STT</th><th>Tên thiết bị</th><th>Đơn vị</th><th>SL</th><th>Hiện trạng</th><th>Ghi chú</th></tr>
@@ -335,12 +337,114 @@ export default function ContractPrintWizard({ contract, details, occupants = [],
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => buildInitialForm(contract, details, occupants));
   const [handover, setHandover] = useState({
-    handoverDate: toDateInput(firstValue(contract?.startDate, details?.startDate)),
+    handoverDate: new Date().toISOString().split("T")[0],
     electricReading: "",
     waterReading: "",
     note: "",
   });
   const [assets, setAssets] = useState(HANDOVER_ASSET_TEMPLATE);
+  const [saving, setSaving] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      const contractId = contract?.leaseContractId || contract?.id;
+      const roomId = contract?.roomId || details?.room?.id;
+      if (!contractId || !roomId) return;
+
+      try {
+        let hData = null;
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/lease-contracts/${contractId}/handover?type=MOVE_IN`,
+            { headers: { Authorization: `Bearer ${window.localStorage.getItem("token") || ""}` } }
+          );
+          if (res.ok) {
+            const body = await res.json();
+            hData = body.data;
+          }
+        } catch (e) {
+          console.warn("Could not fetch handover record", e);
+        }
+
+        if (hData) {
+          setHandover(prev => ({
+            ...prev,
+            handoverDate: (hData.handover_date || hData.handoverDate) ? (hData.handover_date || hData.handoverDate).split("T")[0] : prev.handoverDate,
+            electricReading: hData.electricity?.current_value ?? hData.electricity?.currentValue ?? "",
+            waterReading: hData.water?.current_value ?? hData.water?.currentValue ?? "",
+            note: hData.note || "",
+          }));
+        } else {
+          try {
+            const latestRes = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/rooms/${roomId}/meter-readings/latest`,
+              { headers: { Authorization: `Bearer ${window.localStorage.getItem("token") || ""}` } }
+            );
+            if (latestRes.ok) {
+              const body = await latestRes.json();
+              const elec = body.data?.electricity?.suggested_value ?? body.data?.electricity?.suggestedValue ?? "";
+              const water = body.data?.water?.suggested_value ?? body.data?.water?.suggestedValue ?? "";
+              setHandover(prev => ({
+                ...prev,
+                electricReading: elec,
+                waterReading: water,
+              }));
+            }
+          } catch (e) {
+            console.warn("Could not fetch latest readings", e);
+          }
+        }
+
+        try {
+          const assetsRes = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1"}/rooms/${roomId}/assets`,
+            { headers: { Authorization: `Bearer ${window.localStorage.getItem("token") || ""}` } }
+          );
+          if (assetsRes.ok) {
+            const body = await assetsRes.json();
+            if (body.data && body.data.length > 0) {
+              setAssets(body.data.map(a => {
+                const condition = a.current_condition || a.currentCondition;
+                return {
+                  name: a.asset_name || a.assetName || "",
+                  unit: "Cái",
+                  quantity: a.quantity || 1,
+                  condition: condition === "GOOD" ? "Hoạt động bình thường" :
+                             condition === "ATTENTION" ? "Có trầy xước nhẹ" :
+                             condition === "BROKEN" ? "Hỏng cần sửa" : "Thiếu thiết bị",
+                  note: a.description || "",
+                };
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch room assets", e);
+        }
+
+      } finally {
+        setDataLoaded(true);
+      }
+    }
+
+    if (!dataLoaded) {
+      loadData();
+    }
+  }, [contract, details, dataLoaded]);
+
+  const CONDITION_MAPPING = {
+    "Hoạt động bình thường": "GOOD",
+    "Có trầy xước nhẹ": "ATTENTION",
+    "Hỏng cần sửa": "BROKEN",
+    "Thiếu thiết bị": "MISSING",
+    "Còn nguyên vẹn": "GOOD",
+  };
+
+  async function handleSaveStep2() {
+    // Theo yêu cầu của người dùng, bỏ tính năng lưu (create) qua API ở bước này.
+    // Dữ liệu nhập vào ở UI vẫn được giữ trong state (handover, assets) để in PDF ở bước 3.
+    return true;
+  }
   const previewHtml = buildPrintableHtml({ form, handover, assets }).replace(
     /<div class="toolbar">[\s\S]*?<\/div>/,
     "",
@@ -503,6 +607,16 @@ export default function ContractPrintWizard({ contract, details, occupants = [],
                     </tbody>
                   </table>
                 </div>
+                <div className="mt-4 grid gap-1.5">
+                  <span className="text-xs font-bold text-[#58667c]">Ngày bàn giao *</span>
+                  <input
+                    type="date"
+                    value={handover.handoverDate}
+                    disabled={true}
+                    onChange={(e) => updateHandover("handoverDate", e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:opacity-70"
+                  />
+                </div>
                 <label className="mt-4 grid gap-1.5">
                   <span className="text-xs font-bold text-[#58667c]">Ghi chú bàn giao</span>
                   <textarea value={handover.note} rows={3} onChange={(event) => updateHandover("note", event.target.value)} className="rounded-lg border border-[#cbd5e1] p-3 outline-none focus:border-[#091426]" />
@@ -558,11 +672,23 @@ export default function ContractPrintWizard({ contract, details, occupants = [],
             )}
 
             <div className="mt-6 flex justify-between border-t border-[#dfe5ef] pt-4">
-              <button type="button" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1} className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold disabled:opacity-50">
+              <button type="button" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || saving} className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold disabled:opacity-50">
                 Quay lại
               </button>
-              <button type="button" onClick={() => setStep((current) => Math.min(3, current + 1))} disabled={step === 3} className="h-10 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white disabled:opacity-50">
-                Tiếp tục
+              <button 
+                type="button" 
+                onClick={async () => {
+                  if (step === 2) {
+                    const ok = await handleSaveStep2();
+                    if (!ok) return; // Wait if it failed? Or continue? Let's just let them fix it or skip.
+                  }
+                  setStep((current) => Math.min(3, current + 1));
+                }} 
+                disabled={step === 3 || saving} 
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white disabled:opacity-50"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saving ? "Đang lưu..." : "Tiếp tục"}
               </button>
             </div>
           </main>

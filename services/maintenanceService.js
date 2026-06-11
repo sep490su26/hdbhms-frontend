@@ -97,6 +97,16 @@ export function normalizeTicket(raw = {}) {
     title: readField(raw, "title") || "Phiếu sự cố",
     description: readField(raw, "description") || "",
     status: normalizeStatus(readField(raw, "status")),
+    ticketStatus: normalizeStatus(readField(raw, "ticketStatus", "ticket_status", "status")),
+    ticketStatusLabel: readField(raw, "ticketStatusLabel", "ticket_status_label") || "",
+    billingStatus: readField(raw, "billingStatus", "billing_status") || "",
+    billingStatusLabel: readField(raw, "billingStatusLabel", "billing_status_label") || "",
+    invoiceId: readField(raw, "invoiceId", "invoice_id"),
+    invoiceCode: readField(raw, "invoiceCode", "invoice_code") || "",
+    invoiceStatus: readField(raw, "invoiceStatus", "invoice_status") || "",
+    lineType: readField(raw, "lineType", "line_type") || "",
+    chargeAmount: toNumber(readField(raw, "chargeAmount", "charge_amount")),
+    checkoutUrl: readField(raw, "checkoutUrl", "checkout_url") || "",
     createdBy: normalizeUser(readField(raw, "createdBy", "created_by")),
     assignedTo: normalizeUser(readField(raw, "assignedTo", "assigned_to")),
     workerName: readField(raw, "repairmanName", "repairman_name", "workerName", "worker_name") || "",
@@ -166,6 +176,7 @@ export async function fetchMaintenanceTickets(filters = {}) {
     severity = "all",
     scope = "all",
     roomId = "",
+    propertyId = "",
   } = filters;
   const params = new URLSearchParams({ page: String(page), size: String(size), sort: "createdAt,desc" });
   if (keyword.trim()) params.set("code", keyword.trim());
@@ -174,6 +185,7 @@ export async function fetchMaintenanceTickets(filters = {}) {
   if (severity && severity !== "all") params.set("severity", severity);
   if (scope && scope !== "all") params.set("scope", scope);
   if (roomId) params.set("roomId", String(roomId));
+  if (propertyId) params.set("propertyId", String(propertyId));
 
   const data = await request(`/maintenance/tickets?${params.toString()}`);
   const rows = Array.isArray(data.data) ? data.data : [];
@@ -194,6 +206,13 @@ export async function createMaintenanceTicket(payload) {
     method: "POST",
     body: JSON.stringify(payload),
   }));
+}
+
+export async function createMaintenanceViolation(payload) {
+  return request("/maintenance/violations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function approveMaintenanceTicket(id) {

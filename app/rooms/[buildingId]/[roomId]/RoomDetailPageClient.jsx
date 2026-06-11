@@ -225,6 +225,8 @@ function BookingCard({ room }) {
     viewingTime: "",
   });
   const [viewingErrors, setViewingErrors] = useState({});
+  const [viewingNotice, setViewingNotice] = useState({ type: "", message: "" });
+  const [isSubmittingViewing, setIsSubmittingViewing] = useState(false);
 
   // Hàm helper lấy class màu sắc theo trạng thái
   const getStatusClass = () => {
@@ -283,6 +285,7 @@ function BookingCard({ room }) {
   const closeViewingModal = () => {
     setIsViewingModalOpen(false);
     setViewingErrors({});
+    setViewingNotice({ type: "", message: "" });
   };
 
   const validateViewingDate = (value) => {
@@ -312,9 +315,10 @@ function BookingCard({ room }) {
       return;
     }
 
+    setIsSubmittingViewing(true);
+    setViewingNotice({ type: "", message: "" });
     try {
       const appointmentAt = combineAppointmentParts(viewingForm.viewingDate, viewingForm.viewingTime);
-      console.log("Current room object:", room);
       const payload = {
         fullName: viewingForm.fullName.trim(),
         phone: viewingForm.phone.trim(),
@@ -323,13 +327,20 @@ function BookingCard({ room }) {
         appointmentAt,
         note: `Yêu cầu từ trang chi tiết phòng ${roomLabel}`,
       };
-      console.log("Submitting payload:", payload);
 
       await publicCreateViewingCustomer(payload);
-      alert("Yêu cầu xem phòng của bạn đã được gửi thành công! Chúng tôi sẽ liên hệ lại sớm nhất.");
-      closeViewingModal();
+      setViewingForm({ fullName: "", phone: "", viewingDate: "", viewingTime: "" });
+      setViewingNotice({
+        type: "success",
+        message: "Đã gửi lịch xem phòng. Chủ nhà sẽ liên hệ xác nhận sớm nhất.",
+      });
     } catch (error) {
-      alert("Có lỗi xảy ra: " + (error.message || "Không thể gửi yêu cầu."));
+      setViewingNotice({
+        type: "error",
+        message: error.message || "Không thể gửi yêu cầu xem phòng. Vui lòng thử lại.",
+      });
+    } finally {
+      setIsSubmittingViewing(false);
     }
   };
 
@@ -411,14 +422,14 @@ function BookingCard({ room }) {
 
       {isViewingModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
           onClick={closeViewingModal}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="viewing-modal-title"
-            className="max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto rounded-[24px] border border-slate-100 bg-white p-6 text-[#091426] shadow-2xl shadow-slate-950/20 sm:p-8"
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[24px] border border-slate-100 bg-white p-5 text-[#091426] shadow-2xl shadow-slate-950/20 sm:max-h-[calc(100vh-3rem)] sm:p-8"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -440,6 +451,17 @@ function BookingCard({ room }) {
                 <X className="h-5 w-5" />
               </button>
             </div>
+
+            {viewingNotice.message && (
+              <div
+                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${viewingNotice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-rose-200 bg-rose-50 text-rose-700"
+                  }`}
+              >
+                {viewingNotice.message}
+              </div>
+            )}
 
             <form className="mt-7 grid gap-5" onSubmit={handleViewingSubmit} noValidate>
               <div className="grid gap-2">
@@ -546,13 +568,15 @@ function BookingCard({ room }) {
               <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]">
                 <button
                   type="submit"
-                  className="flex min-h-12 items-center justify-center rounded-[14px] bg-[#232946] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#232946]/20 transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
+                  disabled={isSubmittingViewing}
+                  className="flex min-h-12 items-center justify-center rounded-[14px] bg-[#232946] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#232946]/20 transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Xác nhận
+                  {isSubmittingViewing ? "Đang gửi..." : "Xác nhận"}
                 </button>
                 <button
                   type="button"
                   onClick={closeViewingModal}
+                  disabled={isSubmittingViewing}
                   className="flex min-h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                 >
                   Hủy
@@ -587,7 +611,7 @@ export function RoomDetailPageClient({ roomId }) {
         if (!isMounted) return;
         if (!nextRoom) throw new Error("Room not found");
         setRoom(nextRoom);
-        setActiveImage(nextRoom.images?.[0] ?? nextRoom.image);
+        setActiveImage(nextRoom.images?.[0] ?? nextRoom.image ?? "/assets/rooms/room-101.svg");
         setIsError(false);
       } catch {
         if (isMounted) setIsError(true);
@@ -688,7 +712,7 @@ export function RoomDetailPageClient({ roomId }) {
               ? "onHold"
               : isServerSoonVacant
                 ? "soonVacant"
-              : room.status,
+                : room.status,
       holdExpiresAt: serverHoldStatus?.holdExpiresAt ?? localHold?.expiresAt,
       holdRemainingMs: hasServerHold ? serverHoldStatus.remainingMs : localRemainingMs,
     };
@@ -736,7 +760,7 @@ export function RoomDetailPageClient({ roomId }) {
               <section className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm">
                 <div className="relative aspect-[16/10] min-h-[280px] bg-slate-900">
                   <Image
-                    src={activeImage || displayRoom.image}
+                    src={activeImage || displayRoom.image || "/assets/rooms/room-101.svg"}
                     alt={`Ảnh thực tế phòng ${displayRoom.id}`}
                     fill
                     priority
@@ -754,7 +778,7 @@ export function RoomDetailPageClient({ roomId }) {
                 </div>
 
                 <div className="grid grid-cols-4 gap-3 bg-white p-4 sm:p-5">
-                  {displayRoom.images.map((image, index) => (
+                  {(displayRoom.images?.length ? displayRoom.images : [displayRoom.image || "/assets/rooms/room-101.svg"]).map((image, index) => (
                     <button
                       key={`${image}-${index}`}
                       type="button"
@@ -771,9 +795,9 @@ export function RoomDetailPageClient({ roomId }) {
 
               {/* 3 Khối Thông số */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <MetricCard icon={Maximize2} label="Diện tích" value={`${displayRoom.area}m²`} />
-                <MetricCard icon={Users} label="Tối đa" value={`${displayRoom.maxPeople} người`} />
-                <MetricCard icon={Building2} label="Tầng" value={`T${displayRoom.floorNumber}`} />
+                <MetricCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} />
+                <MetricCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} />
+                <MetricCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} />
               </div>
 
               {/* Các thông tin chi tiết */}

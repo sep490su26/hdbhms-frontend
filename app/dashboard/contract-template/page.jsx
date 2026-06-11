@@ -47,10 +47,11 @@ const STATUS_FILTERS = [
   { id: "ACTIVE", label: "Đang hiệu lực" },
   { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
   { id: "EXPIRED", label: "Hết hạn" },
-  { id: "history", label: "Lịch sử" },
   { id: "RENEWED", label: "Đã gia hạn" },
   { id: "LIQUIDATED", label: "Đã thanh lý" },
 ];
+
+const HISTORY_FILTER = { id: "history", label: "Lịch sử" };
 
 const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "PENDING_SIGNATURE",
@@ -336,11 +337,10 @@ function FileBadge({ item }) {
   const Icon = uploaded ? FileCheck2 : FileWarning;
   return (
     <span
-      className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
-        uploaded
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-red-200 bg-red-50 text-red-700"
-      }`}
+      className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${uploaded
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-red-200 bg-red-50 text-red-700"
+        }`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
       {uploaded ? "Đã upload" : "Chưa upload"}
@@ -367,9 +367,8 @@ function StatusBadge({ item }) {
 
   return (
     <span
-      className={`inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
-        classes[workflow] || "border-slate-200 bg-slate-50 text-slate-600"
-      }`}
+      className={`inline-flex max-w-full items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${classes[workflow] || "border-slate-200 bg-slate-50 text-slate-600"
+        }`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
       {label}
@@ -611,7 +610,7 @@ export default function ContractTemplatePage() {
 
   async function openPrintWizard(item) {
     let targetContractId = item?.leaseContractId;
-    
+
     if (!targetContractId) {
       if (item?.depositAgreementId) {
         setActionLoading(`draft-${item.depositAgreementId}`);
@@ -714,15 +713,15 @@ export default function ContractTemplatePage() {
       setDetails((current) =>
         current
           ? {
-              ...current,
-              status: activatedStatus,
-              canSendAccount: activatedStatus === "ACTIVE",
-              accountProvisioningStatus: "NOT_PROVISIONED",
-              canRenew: ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(activatedStatus),
-              canLiquidate: ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(
-                activatedStatus,
-              ),
-            }
+            ...current,
+            status: activatedStatus,
+            canSendAccount: activatedStatus === "ACTIVE",
+            accountProvisioningStatus: "NOT_PROVISIONED",
+            canRenew: ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(activatedStatus),
+            canLiquidate: ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(
+              activatedStatus,
+            ),
+          }
           : current,
       );
 
@@ -1072,21 +1071,31 @@ export default function ContractTemplatePage() {
             Làm mới
           </button>
         </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              onClick={() => setStatusFilter(filter.id)}
-              className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
-                statusFilter === filter.id
+        <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setStatusFilter(filter.id)}
+                className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${statusFilter === filter.id
                   ? "border-[#091426] bg-[#091426] text-white"
                   : "border-[#d7deea] bg-white text-[#56647a] hover:border-[#9ba8ba] hover:text-[#091426]"
-              }`}
+                  }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end lg:w-[130px] lg:shrink-0">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(HISTORY_FILTER.id)}
+              className="h-11 shrink-0 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white transition hover:bg-[#16253a]"
             >
-              {filter.label}
+              {HISTORY_FILTER.label}
             </button>
-          ))}
+          </div>
         </div>
       </section>
 
@@ -1353,11 +1362,10 @@ export default function ContractTemplatePage() {
                         value={termsForm.monthlyRent}
                         onChange={(event) => updateTermsField("monthlyRent", event.target.value)}
                         aria-invalid={Boolean(termsFieldErrors.monthlyRent)}
-                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                          termsFieldErrors.monthlyRent
-                            ? "border-red-500 text-red-700 focus:border-red-600"
-                            : "border-[#cbd5e1] focus:border-[#091426]"
-                        }`}
+                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.monthlyRent
+                          ? "border-red-500 text-red-700 focus:border-red-600"
+                          : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
                       />
                       {termsFieldErrors.monthlyRent && (
                         <span className="text-xs font-semibold leading-4 text-red-600">
@@ -1382,11 +1390,10 @@ export default function ContractTemplatePage() {
                         value={termsForm.depositAmount}
                         onChange={(event) => updateTermsField("depositAmount", event.target.value)}
                         aria-invalid={Boolean(termsFieldErrors.depositAmount)}
-                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                          termsFieldErrors.depositAmount
-                            ? "border-red-500 text-red-700 focus:border-red-600"
-                            : "border-[#cbd5e1] focus:border-[#091426]"
-                        }`}
+                        className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.depositAmount
+                          ? "border-red-500 text-red-700 focus:border-red-600"
+                          : "border-[#cbd5e1] focus:border-[#091426]"
+                          }`}
                       />
                       {termsFieldErrors.depositAmount && (
                         <span className="text-xs font-semibold leading-4 text-red-600">
@@ -1422,7 +1429,7 @@ export default function ContractTemplatePage() {
                 icon={CalendarDays}
                 action={
                   mergedSelected.leaseContractId &&
-                  !["LIQUIDATED", "EXPIRED", "CANCELLED", "RENEWED"].includes(getWorkflow(mergedSelected)) ? (
+                    !["LIQUIDATED", "EXPIRED", "CANCELLED", "RENEWED"].includes(getWorkflow(mergedSelected)) ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -1459,11 +1466,10 @@ export default function ContractTemplatePage() {
                           value={termsForm.startDate}
                           onChange={(event) => updateTermsField("startDate", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.startDate)}
-                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                            termsFieldErrors.startDate
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
-                          }`}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.startDate
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
+                            }`}
                         />
                         {termsFieldErrors.startDate && (
                           <span className="text-xs font-semibold leading-4 text-red-600">
@@ -1479,11 +1485,10 @@ export default function ContractTemplatePage() {
                           min={termsForm.startDate || undefined}
                           onChange={(event) => updateTermsField("endDate", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.endDate)}
-                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                            termsFieldErrors.endDate
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
-                          }`}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.endDate
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
+                            }`}
                         />
                         {termsFieldErrors.endDate && (
                           <span className="text-xs font-semibold leading-4 text-red-600">
@@ -1497,11 +1502,10 @@ export default function ContractTemplatePage() {
                           value={termsForm.paymentCycleMonths}
                           onChange={(event) => updateTermsField("paymentCycleMonths", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.paymentCycleMonths)}
-                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                            termsFieldErrors.paymentCycleMonths
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
-                          }`}
+                          className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.paymentCycleMonths
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
+                            }`}
                         >
                           <option value="1">1 tháng/lần</option>
                           <option value="3">3 tháng/lần</option>
@@ -1614,48 +1618,48 @@ export default function ContractTemplatePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#edf1f6] text-xs xl:text-sm">
-                  {detailLoading && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-5 text-sm font-bold text-[#607089]">
-                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                        Đang tải danh sách người ở...
-                      </td>
-                    </tr>
-                  )}
-                  {!detailLoading && selectedOccupants.length > 0 ? (
-                    selectedOccupants.map((occupant, index) => (
-                      <tr
-                        key={occupant.tenantProfileId || occupant.id || `${occupant.occupantRole}-${occupant.fullName}-${index}`}
-                      >
-                        <td data-label="Họ tên" className="px-4 py-3">
-                          <p className="truncate font-bold text-[#091426]" title={occupant.fullName || "Chưa cập nhật"}>
-                            {occupant.fullName || "Chưa cập nhật"}
-                          </p>
-                        </td>
-                        <td data-label="Vai trò" className="px-4 py-3">
-                          <span className="inline-flex max-w-full rounded-full border border-[#d8e1f2] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs">
-                            <span className="truncate">
-                              {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
-                            </span>
-                          </span>
-                        </td>
-                        <td data-label="SĐT" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
-                          {occupant.phone || "Chưa có"}
-                        </td>
-                        <td data-label="CCCD" className="break-words px-4 py-3 text-[#4b5563]" title={formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}>
-                          {formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    !detailLoading && (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-5 text-sm font-semibold text-[#607089]">
-                          Chưa có danh sách người ở trong hợp đồng.
-                        </td>
-                      </tr>
-                    )
-                  )}
+                      {detailLoading && (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-5 text-sm font-bold text-[#607089]">
+                            <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                            Đang tải danh sách người ở...
+                          </td>
+                        </tr>
+                      )}
+                      {!detailLoading && selectedOccupants.length > 0 ? (
+                        selectedOccupants.map((occupant, index) => (
+                          <tr
+                            key={occupant.tenantProfileId || occupant.id || `${occupant.occupantRole}-${occupant.fullName}-${index}`}
+                          >
+                            <td data-label="Họ tên" className="px-4 py-3">
+                              <p className="truncate font-bold text-[#091426]" title={occupant.fullName || "Chưa cập nhật"}>
+                                {occupant.fullName || "Chưa cập nhật"}
+                              </p>
+                            </td>
+                            <td data-label="Vai trò" className="px-4 py-3">
+                              <span className="inline-flex max-w-full rounded-full border border-[#d8e1f2] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs">
+                                <span className="truncate">
+                                  {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole || "Chưa rõ"}
+                                </span>
+                              </span>
+                            </td>
+                            <td data-label="SĐT" className="break-words px-4 py-3 text-[#4b5563]" title={occupant.phone || "Chưa có"}>
+                              {occupant.phone || "Chưa có"}
+                            </td>
+                            <td data-label="CCCD" className="break-words px-4 py-3 text-[#4b5563]" title={formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}>
+                              {formatIdentityNumber(occupant.citizenId || occupant.identityNumber)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        !detailLoading && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-5 text-sm font-semibold text-[#607089]">
+                              Chưa có danh sách người ở trong hợp đồng.
+                            </td>
+                          </tr>
+                        )
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1764,7 +1768,7 @@ export default function ContractTemplatePage() {
                 {getWorkflow(mergedSelected) === "ACTIVE" && (() => {
                   const accountAction =
                     ACCOUNT_PROVISIONING_ACTIONS[
-                      details?.accountProvisioningStatus || "NOT_PROVISIONED"
+                    details?.accountProvisioningStatus || "NOT_PROVISIONED"
                     ] || ACCOUNT_PROVISIONING_ACTIONS.NOT_PROVISIONED;
                   const isSendingAccount =
                     actionLoading === `send-${mergedSelected.leaseContractId}`;
@@ -1791,16 +1795,16 @@ export default function ContractTemplatePage() {
                 )}
                 {(details?.canRenew ??
                   ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) && (
-                  <button
-                    type="button"
-                    onClick={openRenewModal}
-                    disabled={isBusy}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Tái ký / Gia hạn
-                  </button>
-                )}
+                    <button
+                      type="button"
+                      onClick={openRenewModal}
+                      disabled={isBusy}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Tái ký / Gia hạn
+                    </button>
+                  )}
                 {getWorkflow(mergedSelected) === "EXPIRING_SOON" && (
                   <button
                     type="button"
@@ -1814,16 +1818,16 @@ export default function ContractTemplatePage() {
                 )}
                 {(details?.canLiquidate ??
                   ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(getWorkflow(mergedSelected))) && (
-                  <button
-                    type="button"
-                    onClick={() => handleLiquidate(mergedSelected)}
-                    disabled={isBusy}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:opacity-60"
-                  >
-                    <AlertTriangle className="h-4 w-4" />
-                    Thanh lý hợp đồng
-                  </button>
-                )}
+                    <button
+                      type="button"
+                      onClick={() => handleLiquidate(mergedSelected)}
+                      disabled={isBusy}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      Thanh lý hợp đồng
+                    </button>
+                  )}
                 <button
                   type="button"
                   disabled
@@ -1884,11 +1888,9 @@ export default function ContractTemplatePage() {
                     value={renewForm[field]}
                     readOnly={field === "newContractCode"}
                     onChange={(event) => updateRenewField(field, event.target.value)}
-                    className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${
-                      field === "newContractCode" ? "bg-slate-100 text-slate-600 " : ""
-                    }${
-                      renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
-                    }`}
+                    className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${field === "newContractCode" ? "bg-slate-100 text-slate-600 " : ""
+                      }${renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
+                      }`}
                   />
                   {renewFieldErrors[field] && (
                     <span className="text-xs font-semibold text-red-600">{renewFieldErrors[field]}</span>
@@ -1901,9 +1903,8 @@ export default function ContractTemplatePage() {
                 <select
                   value={renewForm.paymentCycleMonths}
                   onChange={(event) => updateRenewField("paymentCycleMonths", event.target.value)}
-                  className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                    renewFieldErrors.paymentCycleMonths ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
-                  }`}
+                  className={`h-11 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${renewFieldErrors.paymentCycleMonths ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
+                    }`}
                 >
                   <option value="1">1 tháng/lần</option>
                   <option value="3">3 tháng/lần</option>

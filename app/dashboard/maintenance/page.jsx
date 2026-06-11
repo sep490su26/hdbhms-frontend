@@ -22,11 +22,12 @@ import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
 import {
   approveMaintenanceTicket,
   createMaintenanceTicket,
+  createMaintenanceViolation,
   declineMaintenanceTicket,
   fetchMaintenanceTickets,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
-import { fetchViewingProperties } from "@/services/viewingCustomersService";
+import { fetchViewingProperties, fetchViewingRooms } from "@/services/viewingCustomersService";
 
 const STATUS_OPTIONS = [
   ["all", "Tất cả trạng thái"],
@@ -48,8 +49,18 @@ const STATUS_META = {
   CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
+const BILLING_META = {
+  NO_CHARGE: ["Không thu khách", "bg-slate-100 text-slate-700 ring-slate-200"],
+  NOT_INVOICED: ["Chưa tạo hóa đơn", "bg-amber-50 text-amber-800 ring-amber-200"],
+  PENDING_PAYMENT: ["Chờ thanh toán", "bg-orange-50 text-orange-800 ring-orange-200"],
+  PAID: ["Đã thanh toán", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
+  OVERDUE: ["Quá hạn", "bg-rose-50 text-rose-800 ring-rose-200"],
+  FAILED: ["Thanh toán thất bại", "bg-rose-50 text-rose-800 ring-rose-200"],
+};
+
 const CATEGORY_OPTIONS = [
   ["all", "Tất cả hạng mục"],
+  ["RULE_VIOLATION", "Vi phạm nội quy"],
   ["ELECTRICITY", "Điện"],
   ["WATER", "Nước"],
   ["AIR_CONDITIONER", "Máy lạnh"],
@@ -100,6 +111,12 @@ function formatMoney(value) {
   return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} đ`;
 }
 
+function formatMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return MONEY_FORMAT.format(Number(digits));
+}
+
 function statusMeta(status) {
   return STATUS_META[status] || [status || "Không rõ", "bg-slate-100 text-slate-700 ring-slate-200"];
 }
@@ -109,6 +126,15 @@ function StatusBadge({ status }) {
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
       {label}
+    </span>
+  );
+}
+
+function BillingBadge({ status, label }) {
+  const [fallbackLabel, className] = BILLING_META[status] || BILLING_META.NO_CHARGE;
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
+      {label || fallbackLabel}
     </span>
   );
 }
@@ -172,13 +198,29 @@ function buildDefaultForm(propertyId = "") {
   };
 }
 
+function buildDefaultViolationForm(propertyId = "") {
+  return {
+    propertyId: propertyId ? String(propertyId) : "",
+    roomId: "",
+    occupantId: "",
+    violationType: "RESET_WIFI_PASSWORD",
+    amount: formatMoneyInput("200000"),
+    description: "Khách tự ý reset mật khẩu modem/wifi, vi phạm nội quy phòng trọ.",
+    includeInMonthlyInvoice: true,
+    occurredAt: new Date().toISOString().slice(0, 10),
+    images: [],
+  };
+}
+
 export default function MaintenancePage() {
   const { activeRole, query } = useDashboardLayout();
   const canManage = ["owner", "manager"].includes(activeRole);
   const [tickets, setTickets] = useState([]);
   const [properties, setProperties] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [filters, setFilters] = useState({
     keyword: "",
+    propertyId: "",
     status: "all",
     category: "all",
     severity: "all",
@@ -192,29 +234,27 @@ export default function MaintenancePage() {
   const [createForm, setCreateForm] = useState(buildDefaultForm());
   const [createError, setCreateError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isViolationOpen, setIsViolationOpen] = useState(false);
+  const [violationForm, setViolationForm] = useState(buildDefaultViolationForm());
+  const [violationError, setViolationError] = useState("");
+  const [violationSuccess, setViolationSuccess] = useState("");
+  const [isCreatingViolation, setIsCreatingViolation] = useState(false);
 
   const propertyOptions = useMemo(() => {
-    const map = new Map();
-    for (const property of properties) {
-      if (property?.id) map.set(String(property.id), property.name || `Cơ sở ${property.id}`);
-    }
-    for (const ticket of tickets) {
-      if (ticket.propertyId) {
-        map.set(String(ticket.propertyId), ticket.propertyName || `Cơ sở ${ticket.propertyId}`);
-      }
-    }
-    return [...map.entries()].map(([id, name]) => ({ id, name }));
-  }, [properties, tickets]);
+    return properties
+      .filter((property) => property?.id)
+      .map((property) => ({ id: String(property.id), name: property.name || `Cơ sở ${property.id}` }));
+  }, [properties]);
 
   const roomOptions = useMemo(() => {
-    const map = new Map();
-    for (const ticket of tickets) {
-      if (ticket.roomId) {
-        map.set(String(ticket.roomId), ticket.roomCode || ticket.roomName || `Phòng ${ticket.roomId}`);
-      }
-    }
-    return [...map.entries()].map(([id, label]) => ({ id, label }));
-  }, [tickets]);
+    return rooms
+      .filter((room) => room?.id)
+      .map((room) => ({
+        id: String(room.id),
+        label: room.roomCode || room.name || `Phòng ${room.id}`,
+      }));
+  }, [rooms]);
+  const selectedViolationPropertyId = String(violationForm.propertyId || filters.propertyId || propertyOptions[0]?.id || "");
 
   const metrics = useMemo(() => {
     const count = (statuses) => tickets.filter((ticket) => statuses.includes(ticket.status)).length;
@@ -228,6 +268,11 @@ export default function MaintenancePage() {
   }, [tickets]);
 
   const loadTickets = useCallback(async () => {
+    if (!filters.propertyId) {
+      setTickets([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError("");
     try {
@@ -247,7 +292,14 @@ export default function MaintenancePage() {
 
     async function loadProperties() {
       const data = await fetchViewingProperties();
-      if (isMounted) setProperties(data);
+      if (!isMounted) return;
+      setProperties(data);
+      const firstPropertyId = data[0]?.id ? String(data[0].id) : "";
+      if (firstPropertyId) {
+        setFilters((current) => current.propertyId ? current : { ...current, propertyId: firstPropertyId });
+        setCreateForm((current) => current.propertyId ? current : buildDefaultForm(firstPropertyId));
+        setViolationForm((current) => current.propertyId ? current : buildDefaultViolationForm(firstPropertyId));
+      }
     }
 
     loadProperties();
@@ -257,16 +309,53 @@ export default function MaintenancePage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    async function loadRooms() {
+      if (!filters.propertyId) {
+        setRooms([]);
+        return;
+      }
+      const data = await fetchViewingRooms(filters.propertyId);
+      if (isMounted) setRooms(data);
+    }
+    loadRooms();
+    return () => {
+      isMounted = false;
+    };
+  }, [filters.propertyId]);
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTickets();
   }, [loadTickets]);
 
   function updateFilter(name, value) {
-    setFilters((current) => ({ ...current, [name]: value }));
+    setFilters((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "propertyId" ? { roomId: "" } : {}),
+    }));
+    if (name === "propertyId") {
+      setCreateForm((current) => ({ ...current, propertyId: value }));
+      setViolationForm((current) => ({ ...current, propertyId: value, roomId: "" }));
+    }
   }
 
   function updateCreateForm(name, value) {
     setCreateForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function updateViolationForm(name, value) {
+    const nextValue = name === "amount" ? formatMoneyInput(value) : value;
+    setViolationForm((current) => ({
+      ...current,
+      [name]: nextValue,
+      ...(name === "propertyId" ? { roomId: "" } : {}),
+      ...(name === "violationType" && value === "RESET_WIFI_PASSWORD" ? { amount: formatMoneyInput("200000") } : {}),
+    }));
+    if (name === "propertyId") {
+      updateFilter("propertyId", value);
+    }
   }
 
   function handleImageChange(event) {
@@ -274,6 +363,14 @@ export default function MaintenancePage() {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
     const nextFiles = [...createForm.images, ...imageFiles].slice(0, 3);
     setCreateForm((current) => ({ ...current, images: nextFiles }));
+    event.target.value = "";
+  }
+
+  function handleViolationImageChange(event) {
+    const files = Array.from(event.target.files || []);
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    const nextFiles = [...violationForm.images, ...imageFiles].slice(0, 3);
+    setViolationForm((current) => ({ ...current, images: nextFiles }));
     event.target.value = "";
   }
 
@@ -311,6 +408,57 @@ export default function MaintenancePage() {
       setCreateError(createTicketError?.message || "Không tạo được phiếu bảo trì.");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleCreateViolation(event) {
+    event.preventDefault();
+    setViolationError("");
+    setViolationSuccess("");
+
+    const propertyId = Number(selectedViolationPropertyId);
+    const roomId = Number(violationForm.roomId);
+    const amount = Number(String(violationForm.amount).replace(/[^\d]/g, ""));
+    if (!Number.isFinite(propertyId) || propertyId <= 0) {
+      setViolationError("Vui lòng chọn cơ sở.");
+      return;
+    }
+    if (!Number.isFinite(roomId) || roomId <= 0) {
+      setViolationError("Vui lòng chọn phòng.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setViolationError("Số tiền phạt phải lớn hơn 0.");
+      return;
+    }
+    if (violationForm.description.trim().length < 10) {
+      setViolationError("Vui lòng nhập mô tả vi phạm tối thiểu 10 ký tự.");
+      return;
+    }
+
+    setIsCreatingViolation(true);
+    try {
+      const uploaded = await Promise.all(violationForm.images.map((file) => uploadMaintenanceImage(file)));
+      const attachmentIds = uploaded.map((file) => file.fileId).filter(Boolean);
+      const result = await createMaintenanceViolation({
+        property_id: propertyId,
+        room_id: roomId,
+        occupant_id: violationForm.occupantId ? Number(violationForm.occupantId) : null,
+        violation_type: violationForm.violationType,
+        amount,
+        description: violationForm.description.trim(),
+        include_in_monthly_invoice: Boolean(violationForm.includeInMonthlyInvoice),
+        occurred_at: violationForm.occurredAt || new Date().toISOString().slice(0, 10),
+        attachment_ids: attachmentIds,
+      });
+      setViolationSuccess(result?.message || "Đã ghi nhận vi phạm reset wifi 200.000đ và phát hành hóa đơn cho khách thanh toán.");
+      setViolationForm(buildDefaultViolationForm(String(propertyId)));
+      setIsViolationOpen(false);
+      await loadTickets();
+    } catch (createViolationError) {
+      setViolationError(createViolationError?.message || "Không ghi nhận được vi phạm nội quy.");
+    } finally {
+      setIsCreatingViolation(false);
     }
   }
 
@@ -363,7 +511,25 @@ export default function MaintenancePage() {
           {canManage && (
             <button
               type="button"
-              onClick={() => setIsCreateOpen((value) => !value)}
+              onClick={() => {
+                setViolationForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
+                setIsCreateOpen(false);
+                setIsViolationOpen((value) => !value);
+              }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-4 text-sm font-bold text-white hover:bg-[#971b12]"
+            >
+              {isViolationOpen ? <X className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+              {isViolationOpen ? "Đóng vi phạm" : "Ghi nhận vi phạm"}
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                setCreateForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
+                setIsViolationOpen(false);
+                setIsCreateOpen((value) => !value);
+              }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a]"
             >
               {isCreateOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -378,6 +544,142 @@ export default function MaintenancePage() {
           <Metric key={item.label} {...item} />
         ))}
       </div>
+      <p className="text-xs font-semibold text-[#64748b]">
+        Chi phí ghi nhận là tổng chi phí/phạt đã ghi nhận, không đồng nghĩa đã thanh toán. Xem badge thanh toán trên từng phiếu để biết trạng thái thu tiền.
+      </p>
+
+      {violationSuccess && <InlineNotice>{violationSuccess}</InlineNotice>}
+
+      {isViolationOpen && (
+        <form
+          onSubmit={handleCreateViolation}
+          className="grid gap-5 rounded-lg border border-rose-200 bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-[#091426]">Ghi nhận vi phạm nội quy</h2>
+              <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là khoản phạt VIOLATION_FINE.
+              </p>
+            </div>
+            <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200">
+              VIOLATION_FINE
+            </span>
+          </div>
+          {violationError && <InlineNotice type="error">{violationError}</InlineNotice>}
+          <div className="grid gap-4 lg:grid-cols-4">
+            <Field label="Cơ sở *">
+              <select
+                value={selectedViolationPropertyId}
+                onChange={(event) => updateViolationForm("propertyId", event.target.value)}
+                className={selectClassName()}
+              >
+                <option value="">Chọn cơ sở</option>
+                {propertyOptions.map((property) => (
+                  <option key={property.id} value={property.id}>{property.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Phòng *">
+              <select
+                value={violationForm.roomId}
+                onChange={(event) => updateViolationForm("roomId", event.target.value)}
+                disabled={!selectedViolationPropertyId}
+                className={selectClassName()}
+              >
+                <option value="">{roomOptions.length > 0 ? "Chọn phòng" : "Chọn cơ sở trước"}</option>
+                {roomOptions.map((room) => (
+                  <option key={room.id} value={room.id}>{room.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Người vi phạm">
+              <input
+                value="Ghi nhận ở cấp phòng"
+                disabled
+                className={`${inputClassName()} disabled:bg-[#f8fafc] disabled:text-[#64748b]`}
+              />
+            </Field>
+            <Field label="Ngày ghi nhận">
+              <input
+                type="date"
+                value={violationForm.occurredAt}
+                onChange={(event) => updateViolationForm("occurredAt", event.target.value)}
+                className={inputClassName()}
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Field label="Loại vi phạm *">
+              <select
+                value={violationForm.violationType}
+                onChange={(event) => updateViolationForm("violationType", event.target.value)}
+                className={selectClassName()}
+              >
+                <option value="RESET_WIFI_PASSWORD">Tự ý reset mật khẩu modem/wifi</option>
+              </select>
+            </Field>
+            <Field label="Số tiền phạt *">
+              <input
+                value={violationForm.amount}
+                onChange={(event) => updateViolationForm("amount", event.target.value)}
+                className={inputClassName()}
+                inputMode="numeric"
+                placeholder="200000"
+              />
+            </Field>
+            <label className="flex min-h-11 items-center gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 text-sm font-bold text-[#091426]">
+              <input
+                type="checkbox"
+                checked={violationForm.includeInMonthlyInvoice}
+                onChange={(event) => updateViolationForm("includeInMonthlyInvoice", event.target.checked)}
+                className="h-4 w-4 rounded border-[#cbd5e1]"
+              />
+              Đưa khoản phạt vào hóa đơn tháng
+            </label>
+          </div>
+          <Field label="Mô tả/ghi chú *">
+            <textarea
+              value={violationForm.description}
+              onChange={(event) => updateViolationForm("description", event.target.value)}
+              className={textareaClassName()}
+              placeholder="Ví dụ: Khách tự ý reset modem wifi trong phòng, làm thay đổi mật khẩu hệ thống."
+            />
+          </Field>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap gap-3">
+              {violationForm.images.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]">
+                  <span className="line-clamp-2">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setViolationForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}
+                    className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white"
+                    aria-label="Xóa ảnh"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {violationForm.images.length < 3 && (
+                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569] hover:border-[#091426]">
+                  <ImagePlus className="h-5 w-5" />
+                  Thêm bằng chứng
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleViolationImageChange} className="sr-only" />
+                </label>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={isCreatingViolation}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-5 text-sm font-bold text-white hover:bg-[#971b12] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isCreatingViolation ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+              Ghi nhận vi phạm
+            </button>
+          </div>
+        </form>
+      )}
 
       {isCreateOpen && (
         <form
@@ -493,6 +795,17 @@ export default function MaintenancePage() {
               placeholder="Tìm theo mã phiếu"
             />
           </label>
+          <select
+            value={filters.propertyId}
+            onChange={(event) => updateFilter("propertyId", event.target.value)}
+            disabled={propertyOptions.length <= 1 && activeRole === "manager"}
+            className={selectClassName()}
+          >
+            <option value="">Chọn cơ sở</option>
+            {propertyOptions.map((property) => (
+              <option key={property.id} value={property.id}>{property.name}</option>
+            ))}
+          </select>
           <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)} className={selectClassName()}>
             {STATUS_OPTIONS.map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
@@ -514,9 +827,9 @@ export default function MaintenancePage() {
             ))}
           </select>
         </div>
-        {roomOptions.length > 0 && (
+        {filters.propertyId && (
           <select value={filters.roomId} onChange={(event) => updateFilter("roomId", event.target.value)} className={`${selectClassName()} max-w-xs`}>
-            <option value="">Tất cả phòng</option>
+            <option value="">{roomOptions.length > 0 ? "Tất cả phòng" : "Chưa có phòng"}</option>
             {roomOptions.map((room) => (
               <option key={room.id} value={room.id}>{room.label}</option>
             ))}
@@ -566,13 +879,28 @@ export default function MaintenancePage() {
                     <p className="mt-1 text-xs text-[#64748b]">{ticket.propertyName || "Chưa có cơ sở"}</p>
                   </td>
                   <td data-label="Hạng mục" className="px-5 py-4 text-sm font-bold text-[#334155]">
-                    {CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"}
+                    {ticket.category === "RULE_VIOLATION" ? (
+                      <span className="inline-flex flex-col gap-1">
+                        <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
+                          Vi phạm nội quy
+                        </span>
+                        <span className="text-xs font-black text-[#64748b]">Reset wifi · VIOLATION_FINE</span>
+                      </span>
+                    ) : (
+                      CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"
+                    )}
                   </td>
                   <td data-label="Mức độ" className="px-5 py-4 text-sm font-bold text-[#334155]">
                     {PRIORITY_LABELS[ticket.priority] || ticket.priority || "Trung bình"}
                   </td>
                   <td data-label="Trạng thái" className="px-5 py-4">
-                    <StatusBadge status={ticket.status} />
+                    <div className="flex flex-col items-start gap-1.5">
+                      <StatusBadge status={ticket.ticketStatus || ticket.status} />
+                      <BillingBadge status={ticket.billingStatus} label={ticket.billingStatusLabel} />
+                      {ticket.invoiceCode && (
+                        <span className="text-xs font-bold text-[#64748b]">{ticket.invoiceCode}</span>
+                      )}
+                    </div>
                   </td>
                   <td data-label="Cập nhật" className="px-5 py-4 text-sm font-semibold text-[#475569]">
                     {formatDateTime(ticket.updatedAt || ticket.createdAt)}

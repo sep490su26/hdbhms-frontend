@@ -318,11 +318,11 @@ export async function fetchViewingProperties() {
 export async function fetchViewingRooms(propertyId) {
     if (!propertyId || propertyId === 'all') return [];
     try {
-        const envelope = await authenticatedFetch(`/rooms?propertyId=${propertyId}`);
-        const propertiesArray = envelope?.data?.data ?? envelope?.data ?? [];
+        const envelope = await authenticatedFetch(`/properties/${propertyId}/rooms/simple`);
+        const propertiesArray = Array.isArray(envelope) ? envelope : (envelope?.data?.data ?? envelope?.data ?? []);
         return propertiesArray.map((room) => ({
             id: room.id,
-            propertyId: room.property?.id ?? propertyId,   // nested object
+            propertyId: room.propertyId ?? room.property_id ?? room.property?.id ?? propertyId,
             roomCode: room.roomCode ?? room.room_code,
             name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
             status: room.currentStatus ?? room.current_status,

@@ -25,6 +25,22 @@ function normalizeScope(value) {
   return scope === "TENANT_ROOM" ? "ROOM" : scope;
 }
 
+function maintenanceDisplayText(value) {
+  return String(value || "")
+    .replaceAll("RESET_WIFI_PASSWORD", "Tự ý reset mật khẩu modem/wifi")
+    .replaceAll("VIOLATION_FINE", "Phạt vi phạm nội quy")
+    .replaceAll("MAINTENANCE_COMPENSATION", "Bồi thường chi phí bảo trì")
+    .replaceAll("NO_CHARGE", "Không thu khách")
+    .replaceAll("SCHEDULE_FAILED", "Lỗi lên lịch hóa đơn")
+    .replaceAll("SCHEDULED", "Đã lên lịch gộp hóa đơn đầu tháng")
+    .replaceAll("DRAFT", "Chờ phát hành")
+    .replaceAll("PARTIALLY_PAID", "Thanh toán một phần")
+    .replaceAll("VOIDED", "Đã hủy")
+    .replaceAll("PENDING_PAYMENT", "Chờ thanh toán")
+    .replaceAll("PAID", "Đã thanh toán")
+    .replaceAll("NOT_INVOICED", "Chưa tạo hóa đơn");
+}
+
 export function resolveFileUrl(url) {
   if (!url) return "";
   if (/^https?:\/\//i.test(url)) return url;
@@ -56,13 +72,26 @@ function normalizeAttachment(raw = {}) {
   };
 }
 
+function splitAttachments(raw = {}) {
+  const beforeAttachments = (readField(raw, "beforeAttachments", "before_attachments") || []).map(normalizeAttachment);
+  const afterAttachments = (readField(raw, "afterAttachments", "after_attachments") || []).map(normalizeAttachment);
+  const allAttachments = (readField(raw, "attachments") || []).map(normalizeAttachment);
+  const before = beforeAttachments.length
+    ? beforeAttachments
+    : allAttachments.filter((attachment) => String(attachment.phase || "").toUpperCase() === "BEFORE");
+  const after = afterAttachments.length
+    ? afterAttachments
+    : allAttachments.filter((attachment) => String(attachment.phase || "").toUpperCase() === "AFTER");
+  return { before, after, all: allAttachments.length ? allAttachments : [...before, ...after] };
+}
+
 function normalizeEvent(raw = {}) {
   return {
     id: readField(raw, "id"),
     fromStatus: normalizeStatus(readField(raw, "fromStatus", "from_status")),
     toStatus: normalizeStatus(readField(raw, "toStatus", "to_status")),
     action: readField(raw, "action") || "",
-    note: readField(raw, "note") || "",
+    note: maintenanceDisplayText(readField(raw, "note") || ""),
     createdBy: normalizeUser(readField(raw, "createdBy", "created_by")),
     createdAt: readField(raw, "createdAt", "created_at") || "",
   };
@@ -81,8 +110,7 @@ function normalizeReview(raw = {}) {
 
 export function normalizeTicket(raw = {}) {
   const id = readField(raw, "id");
-  const beforeAttachments = (readField(raw, "beforeAttachments", "before_attachments") || []).map(normalizeAttachment);
-  const afterAttachments = (readField(raw, "afterAttachments", "after_attachments") || []).map(normalizeAttachment);
+  const attachments = splitAttachments(raw);
   return {
     id,
     ticketCode: readField(raw, "ticketCode", "ticket_code", "code") || `#SC-${id || ""}`,
@@ -94,13 +122,14 @@ export function normalizeTicket(raw = {}) {
     ticketScope: normalizeScope(readField(raw, "scope", "ticketScope", "ticket_scope")),
     priority: readField(raw, "severity", "priority") || "MEDIUM",
     category: readField(raw, "category") || "OTHER",
-    title: readField(raw, "title") || "Phiếu sự cố",
-    description: readField(raw, "description") || "",
+    title: maintenanceDisplayText(readField(raw, "title") || "Phiếu sự cố"),
+    description: maintenanceDisplayText(readField(raw, "description") || ""),
     status: normalizeStatus(readField(raw, "status")),
     ticketStatus: normalizeStatus(readField(raw, "ticketStatus", "ticket_status", "status")),
     ticketStatusLabel: readField(raw, "ticketStatusLabel", "ticket_status_label") || "",
     billingStatus: readField(raw, "billingStatus", "billing_status") || "",
     billingStatusLabel: readField(raw, "billingStatusLabel", "billing_status_label") || "",
+    billingPeriod: readField(raw, "billingPeriod", "billing_period") || "",
     invoiceId: readField(raw, "invoiceId", "invoice_id"),
     invoiceCode: readField(raw, "invoiceCode", "invoice_code") || "",
     invoiceStatus: readField(raw, "invoiceStatus", "invoice_status") || "",
@@ -114,15 +143,15 @@ export function normalizeTicket(raw = {}) {
     repairItems: readField(raw, "repairItems", "repair_items") || "",
     rootCause: readField(raw, "rootCause", "root_cause") || "",
     costAmount: toNumber(readField(raw, "actualCost", "actual_cost", "costAmount", "cost_amount")),
-    costDescription: readField(raw, "costDescription", "cost_description") || "",
+    costDescription: maintenanceDisplayText(readField(raw, "costDescription", "cost_description") || ""),
     costResponsibility: readField(raw, "costResponsibility", "cost_responsibility") || "UNDECIDED",
     rejectionReason: readField(raw, "rejectionReason", "rejection_reason") || "",
     createdAt: readField(raw, "createdAt", "created_at") || "",
     updatedAt: readField(raw, "updatedAt", "updated_at") || "",
     completedAt: readField(raw, "completedAt", "completed_at") || "",
-    beforeAttachments,
-    afterAttachments,
-    attachments: (readField(raw, "attachments") || [...beforeAttachments, ...afterAttachments]).map(normalizeAttachment),
+    beforeAttachments: attachments.before,
+    afterAttachments: attachments.after,
+    attachments: attachments.all,
     events: (readField(raw, "events") || []).map(normalizeEvent),
     review: normalizeReview(readField(raw, "review")),
   };
@@ -245,6 +274,10 @@ export async function completeMaintenanceTicket(id, payload = {}) {
     method: "POST",
     body: JSON.stringify(payload),
   }));
+}
+
+export async function issueMaintenanceInvoice(id) {
+  return normalizeTicket(await request(`/maintenance/tickets/${id}/invoice/issue`, { method: "POST" }));
 }
 
 export async function confirmMaintenanceTicket(id) {

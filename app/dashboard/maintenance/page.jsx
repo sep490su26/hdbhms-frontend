@@ -52,10 +52,12 @@ const STATUS_META = {
 const BILLING_META = {
   NO_CHARGE: ["Không thu khách", "bg-slate-100 text-slate-700 ring-slate-200"],
   NOT_INVOICED: ["Chưa tạo hóa đơn", "bg-amber-50 text-amber-800 ring-amber-200"],
+  DRAFT: ["Chờ phát hành", "bg-blue-50 text-blue-800 ring-blue-200"],
   PENDING_PAYMENT: ["Chờ thanh toán", "bg-orange-50 text-orange-800 ring-orange-200"],
+  PARTIALLY_PAID: ["Thanh toán một phần", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
   PAID: ["Đã thanh toán", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
   OVERDUE: ["Quá hạn", "bg-rose-50 text-rose-800 ring-rose-200"],
-  FAILED: ["Thanh toán thất bại", "bg-rose-50 text-rose-800 ring-rose-200"],
+  VOIDED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
 const CATEGORY_OPTIONS = [
@@ -198,6 +200,12 @@ function buildDefaultForm(propertyId = "") {
   };
 }
 
+function nextBillingPeriod() {
+  const date = new Date();
+  date.setMonth(date.getMonth() + 1, 1);
+  return date.toISOString().slice(0, 7);
+}
+
 function buildDefaultViolationForm(propertyId = "") {
   return {
     propertyId: propertyId ? String(propertyId) : "",
@@ -206,7 +214,8 @@ function buildDefaultViolationForm(propertyId = "") {
     violationType: "RESET_WIFI_PASSWORD",
     amount: formatMoneyInput("200000"),
     description: "Khách tự ý reset mật khẩu modem/wifi, vi phạm nội quy phòng trọ.",
-    includeInMonthlyInvoice: true,
+    collectionMethod: "MONTHLY_SCHEDULED",
+    billingPeriod: nextBillingPeriod(),
     occurredAt: new Date().toISOString().slice(0, 10),
     images: [],
   };
@@ -447,11 +456,17 @@ export default function MaintenancePage() {
         violation_type: violationForm.violationType,
         amount,
         description: violationForm.description.trim(),
-        include_in_monthly_invoice: Boolean(violationForm.includeInMonthlyInvoice),
+        collection_method: violationForm.collectionMethod,
+        billing_period: violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? violationForm.billingPeriod : null,
+        include_in_monthly_invoice: violationForm.collectionMethod === "MONTHLY_SCHEDULED",
         occurred_at: violationForm.occurredAt || new Date().toISOString().slice(0, 10),
         attachment_ids: attachmentIds,
       });
-      setViolationSuccess(result?.message || "Đã ghi nhận vi phạm reset wifi 200.000đ và phát hành hóa đơn cho khách thanh toán.");
+      setViolationSuccess(
+        violationForm.collectionMethod === "MONTHLY_SCHEDULED"
+          ? `Đã lên lịch gộp vào hóa đơn đầu tháng kỳ ${violationForm.billingPeriod}.`
+          : result?.message || "Đã tạo hóa đơn nháp. Khách thuê chỉ thấy sau khi phát hành."
+      );
       setViolationForm(buildDefaultViolationForm(String(propertyId)));
       setIsViolationOpen(false);
       await loadTickets();
@@ -559,11 +574,11 @@ export default function MaintenancePage() {
             <div>
               <h2 className="text-lg font-black text-[#091426]">Ghi nhận vi phạm nội quy</h2>
               <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là khoản phạt VIOLATION_FINE.
+                Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là khoản phạt vi phạm nội quy.
               </p>
             </div>
             <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200">
-              VIOLATION_FINE
+              Phạt vi phạm nội quy
             </span>
           </div>
           {violationError && <InlineNotice type="error">{violationError}</InlineNotice>}
@@ -628,16 +643,36 @@ export default function MaintenancePage() {
                 placeholder="200000"
               />
             </Field>
-            <label className="flex min-h-11 items-center gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 text-sm font-bold text-[#091426]">
-              <input
-                type="checkbox"
-                checked={violationForm.includeInMonthlyInvoice}
-                onChange={(event) => updateViolationForm("includeInMonthlyInvoice", event.target.checked)}
-                className="h-4 w-4 rounded border-[#cbd5e1]"
-              />
-              Đưa khoản phạt vào hóa đơn tháng
-            </label>
+            <Field label="Cách thu tiền *">
+              <select
+                value={violationForm.collectionMethod}
+                onChange={(event) => updateViolationForm("collectionMethod", event.target.value)}
+                className={selectClassName()}
+              >
+                <option value="BILL_NOW">Thanh toán hóa đơn luôn</option>
+                <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
+              </select>
+            </Field>
           </div>
+          {violationForm.collectionMethod === "MONTHLY_SCHEDULED" && (
+            <Field label="Kỳ hóa đơn gộp *">
+              <input
+                type="month"
+                value={violationForm.billingPeriod}
+                onChange={(event) => updateViolationForm("billingPeriod", event.target.value)}
+                className={inputClassName()}
+              />
+            </Field>
+          )}
+          {violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? (
+            <InlineNotice>
+              Khoản phạt sẽ được lưu chờ gộp vào hóa đơn đầu tháng. Khách thuê chưa thấy khoản này cho đến khi hóa đơn nháp được phát hành.
+            </InlineNotice>
+          ) : (
+            <InlineNotice>
+              Hóa đơn nháp sẽ được tạo ngay. Khách thuê chỉ thấy hóa đơn và QR sau khi bạn phát hành.
+            </InlineNotice>
+          )}
           <Field label="Mô tả/ghi chú *">
             <textarea
               value={violationForm.description}
@@ -884,7 +919,7 @@ export default function MaintenancePage() {
                         <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
                           Vi phạm nội quy
                         </span>
-                        <span className="text-xs font-black text-[#64748b]">Reset wifi · VIOLATION_FINE</span>
+                        <span className="text-xs font-black text-[#64748b]">Reset wifi · Phạt vi phạm nội quy</span>
                       </span>
                     ) : (
                       CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"

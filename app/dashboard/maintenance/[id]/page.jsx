@@ -24,9 +24,11 @@ import {
   confirmMaintenanceTicket,
   declineMaintenanceTicket,
   fetchMaintenanceTicket,
+  issueMaintenanceInvoice,
   startMaintenanceProgress,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
+import { getAuthToken } from "@/services/identityAccessService";
 
 const STATUS_META = {
   PENDING: ["Chờ tiếp nhận", "bg-amber-50 text-amber-800 ring-amber-200"],
@@ -71,6 +73,30 @@ const COST_RESPONSIBILITY_OPTIONS = [
 
 const COST_RESPONSIBILITY_LABELS = Object.fromEntries(COST_RESPONSIBILITY_OPTIONS);
 const MONEY_FORMAT = new Intl.NumberFormat("vi-VN");
+const BILLING_STATUS_LABELS = {
+  NO_CHARGE: "Không thu khách",
+  NOT_INVOICED: "Chưa lập hóa đơn",
+  SCHEDULED: "Đã lên lịch gộp hóa đơn đầu tháng",
+  SCHEDULE_FAILED: "Lỗi lên lịch hóa đơn",
+  DRAFT: "Chờ phát hành",
+  PENDING_PAYMENT: "Chờ thanh toán",
+  ISSUED: "Chờ thanh toán",
+  PARTIALLY_PAID: "Thanh toán một phần",
+  PAID: "Đã thanh toán",
+  OVERDUE: "Quá hạn",
+  VOIDED: "Đã hủy",
+};
+const ACTION_LABELS = {
+  CREATE: "Tạo phiếu",
+  ACCEPT: "Tiếp nhận",
+  START_PROGRESS: "Bắt đầu xử lý",
+  CONFIRM_COMPLETED: "Xác nhận hoàn tất",
+  COMPLETE: "Hoàn tất xử lý",
+  REJECT: "Từ chối",
+  DECLINE: "Từ chối",
+  REPORT_NOT_FIXED: "Báo chưa xử lý xong",
+  REVIEW: "Đánh giá",
+};
 
 function formatDateTime(value) {
   if (!value) return "Chưa có";
@@ -90,8 +116,40 @@ function formatMoney(value) {
   return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} đ`;
 }
 
+function formatMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return MONEY_FORMAT.format(Number(digits));
+}
+
+function parseMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
+}
+
+function formatActionLabel(action) {
+  const normalized = String(action || "").trim().toUpperCase();
+  return ACTION_LABELS[normalized] || normalized.replaceAll("_", " ").toLowerCase().replace(/^\p{L}/u, (char) => char.toUpperCase()) || "Cập nhật trạng thái";
+}
+
 function statusMeta(status) {
   return STATUS_META[status] || [status || "Không rõ", "bg-slate-100 text-slate-700 ring-slate-200"];
+}
+
+function formatBillingPeriod(value) {
+  const match = String(value || "").trim().match(/^(\d{4})-(\d{2})$/);
+  return match ? `${match[2]}/${match[1]}` : "";
+}
+
+function billingBadgeLabel(status, label, billingPeriod) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "SCHEDULED") {
+    const formattedPeriod = formatBillingPeriod(billingPeriod);
+    return formattedPeriod
+      ? `Đã lên lịch gộp hóa đơn đầu tháng ${formattedPeriod}`
+      : "Đã lên lịch gộp hóa đơn đầu tháng";
+  }
+  return label || BILLING_STATUS_LABELS[normalized] || "Không thu khách";
 }
 
 function StatusBadge({ status }) {
@@ -99,6 +157,28 @@ function StatusBadge({ status }) {
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
       {label}
+    </span>
+  );
+}
+
+function BillingBadge({ status, label, billingPeriod }) {
+  const normalized = String(status || "").toUpperCase();
+  const tone = normalized === "DRAFT"
+    ? "bg-blue-50 text-blue-800 ring-blue-200"
+    : normalized === "SCHEDULED"
+      ? "bg-cyan-50 text-cyan-800 ring-cyan-200"
+      : normalized === "SCHEDULE_FAILED"
+        ? "bg-rose-50 text-rose-800 ring-rose-200"
+    : normalized === "PENDING_PAYMENT" || normalized === "ISSUED"
+      ? "bg-orange-50 text-orange-800 ring-orange-200"
+      : normalized === "PAID"
+        ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+        : normalized === "OVERDUE"
+          ? "bg-rose-50 text-rose-800 ring-rose-200"
+          : "bg-slate-100 text-slate-700 ring-slate-200";
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${tone}`}>
+      {billingBadgeLabel(normalized, label, billingPeriod)}
     </span>
   );
 }
@@ -151,15 +231,11 @@ function AttachmentGrid({ title, attachments }) {
       {attachments.length > 0 ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,140px),1fr))] gap-3">
           {attachments.map((attachment) => (
-            <a
+            <AuthorizedAttachmentLink
               key={`${attachment.id}-${attachment.fileId}`}
-              href={attachment.url}
-              target="_blank"
-              rel="noreferrer"
-              className="group overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]"
-            >
-              <img src={attachment.url} alt={attachment.name || title} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
-            </a>
+              attachment={attachment}
+              title={title}
+            />
           ))}
         </div>
       ) : (
@@ -168,6 +244,70 @@ function AttachmentGrid({ title, attachments }) {
         </div>
       )}
     </section>
+  );
+}
+
+function AuthorizedAttachmentLink({ attachment, title }) {
+  const [objectUrl, setObjectUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let currentObjectUrl = "";
+
+    async function loadImage() {
+      if (!attachment.url) {
+        setFailed(true);
+        return;
+      }
+      try {
+        const token = getAuthToken();
+        const response = await fetch(attachment.url, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+          throw new Error(`download_failed_${response.status}`);
+        }
+        const blob = await response.blob();
+        currentObjectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setObjectUrl(currentObjectUrl);
+          setFailed(false);
+        }
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    }
+
+    loadImage();
+    return () => {
+      cancelled = true;
+      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    };
+  }, [attachment.url]);
+
+  const href = objectUrl || attachment.url || "#";
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="group overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]"
+    >
+      {failed ? (
+        <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-[#64748b]">
+          Không tải được ảnh.
+        </div>
+      ) : objectUrl ? (
+        <img src={objectUrl} alt={attachment.name || title} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
+      ) : (
+        <div className="grid h-36 place-items-center text-xs font-bold text-[#64748b]">
+          Đang tải ảnh...
+        </div>
+      )}
+    </a>
   );
 }
 
@@ -186,7 +326,7 @@ function Timeline({ events }) {
         <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-black text-[#091426]">{event.action || "Cập nhật trạng thái"}</p>
+              <p className="text-sm font-black text-[#091426]">{formatActionLabel(event.action)}</p>
               <p className="mt-1 text-sm font-semibold leading-6 text-[#475569]">{event.note || "Không có ghi chú."}</p>
             </div>
             <span className="shrink-0 text-xs font-bold text-[#64748b]">{formatDateTime(event.createdAt)}</span>
@@ -204,13 +344,17 @@ function Timeline({ events }) {
 }
 
 function buildCompleteForm(ticket) {
+  const nextPeriod = new Date();
+  nextPeriod.setMonth(nextPeriod.getMonth() + 1, 1);
   return {
     repairmanName: ticket?.workerName || "",
     repairmanPhone: ticket?.repairmanPhone || "",
     rootCause: ticket?.rootCause || "",
     repairItems: ticket?.repairItems || "",
-    actualCost: ticket?.costAmount ? String(ticket.costAmount) : "",
+    actualCost: ticket?.costAmount ? formatMoneyInput(ticket.costAmount) : "",
     costResponsibility: ticket?.costResponsibility || "UNDECIDED",
+    collectionMethod: "MONTHLY_SCHEDULED",
+    billingPeriod: nextPeriod.toISOString().slice(0, 7),
     completionNote: "",
     images: [],
   };
@@ -257,7 +401,7 @@ export default function MaintenanceTicketDetailPage() {
   }, [loadTicket]);
 
   function updateCompleteForm(name, value) {
-    setCompleteForm((current) => ({ ...current, [name]: value }));
+    setCompleteForm((current) => ({ ...current, [name]: name === "actualCost" ? formatMoneyInput(value) : value }));
   }
 
   function handleAfterImages(event) {
@@ -291,9 +435,7 @@ export default function MaintenanceTicketDetailPage() {
   }
 
   function handleStartProgress() {
-    const note = window.prompt("Ghi chú bắt đầu xử lý", "Đã bắt đầu xử lý sự cố");
-    if (note === null) return;
-    runAction("progress", () => startMaintenanceProgress(ticketId, { note: note.trim() || "Đã bắt đầu xử lý sự cố" }));
+    runAction("progress", () => startMaintenanceProgress(ticketId, { note: "Đã bắt đầu xử lý sự cố" }));
   }
 
   async function handleComplete(event) {
@@ -306,7 +448,7 @@ export default function MaintenanceTicketDetailPage() {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi chuyển chờ xác nhận.");
       return;
     }
-    const amount = completeForm.actualCost === "" ? 0 : Number(completeForm.actualCost);
+    const amount = parseMoneyInput(completeForm.actualCost);
     if (!Number.isFinite(amount) || amount < 0) {
       setError("Chi phí thực tế không hợp lệ.");
       return;
@@ -321,6 +463,10 @@ export default function MaintenanceTicketDetailPage() {
         repairItems: completeForm.repairItems.trim(),
         actualCost: amount,
         costResponsibility: completeForm.costResponsibility,
+        collectionMethod: completeForm.costResponsibility === "TENANT" ? completeForm.collectionMethod : null,
+        billingPeriod: completeForm.costResponsibility === "TENANT" && completeForm.collectionMethod === "MONTHLY_SCHEDULED"
+          ? completeForm.billingPeriod
+          : null,
         costDescription: completeForm.repairItems.trim(),
         completionNote: completeForm.completionNote.trim(),
         attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
@@ -331,6 +477,10 @@ export default function MaintenanceTicketDetailPage() {
 
   function handleConfirmCommonArea() {
     runAction("confirm", () => confirmMaintenanceTicket(ticketId));
+  }
+
+  function handleIssueInvoice() {
+    runAction("issue-invoice", () => issueMaintenanceInvoice(ticketId));
   }
 
   if (isLoading) {
@@ -355,6 +505,11 @@ export default function MaintenanceTicketDetailPage() {
       </section>
     );
   }
+
+  const incidentalBillingStatus = String(ticket.billingStatus || ticket.invoiceStatus || "").toUpperCase();
+  const shouldShowIncidentalPayment = Boolean(ticket.invoiceId)
+    || ["SCHEDULED", "SCHEDULE_FAILED", "DRAFT", "PENDING_PAYMENT", "ISSUED", "PARTIALLY_PAID", "PAID", "OVERDUE", "VOIDED"]
+      .includes(incidentalBillingStatus);
 
   return (
     <section className="grid gap-6">
@@ -481,6 +636,26 @@ export default function MaintenanceTicketDetailPage() {
               </select>
             </Field>
           </div>
+          {completeForm.costResponsibility === "TENANT" && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Field label="Cách thu tiền *">
+                <select value={completeForm.collectionMethod} onChange={(event) => updateCompleteForm("collectionMethod", event.target.value)} className={inputClassName()}>
+                  <option value="BILL_NOW">Thanh toán hóa đơn luôn</option>
+                  <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
+                </select>
+              </Field>
+              {completeForm.collectionMethod === "MONTHLY_SCHEDULED" && (
+                <Field label="Kỳ hóa đơn gộp *">
+                  <input
+                    type="month"
+                    value={completeForm.billingPeriod}
+                    onChange={(event) => updateCompleteForm("billingPeriod", event.target.value)}
+                    className={inputClassName()}
+                  />
+                </Field>
+              )}
+            </div>
+          )}
           <div className="grid gap-4 lg:grid-cols-2">
             <Field label="Nguyên nhân">
               <textarea value={completeForm.rootCause} onChange={(event) => updateCompleteForm("rootCause", event.target.value)} className={textareaClassName()} placeholder="Nguyên nhân sự cố" />
@@ -543,6 +718,45 @@ export default function MaintenanceTicketDetailPage() {
           </div>
           {ticket.rootCause && <InfoItem label="Nguyên nhân" value={ticket.rootCause} />}
           {ticket.repairItems && <InfoItem label="Hạng mục đã sửa" value={ticket.repairItems} />}
+        </section>
+      )}
+
+      {shouldShowIncidentalPayment && (
+        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-[#091426]">Thanh toán phát sinh</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <BillingBadge
+                  status={ticket.billingStatus || ticket.invoiceStatus}
+                  label={ticket.billingStatusLabel}
+                  billingPeriod={ticket.billingPeriod}
+                />
+                {ticket.invoiceCode && <span className="text-sm font-bold text-[#64748b]">{ticket.invoiceCode}</span>}
+              </div>
+            </div>
+            {canManage && ticket.invoiceStatus === "DRAFT" && (
+              <button
+                type="button"
+                onClick={handleIssueInvoice}
+                disabled={Boolean(actionLoading)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
+              >
+                {actionLoading === "issue-invoice" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Phát hành hóa đơn
+              </button>
+            )}
+          </div>
+          {ticket.invoiceStatus === "DRAFT" && (
+            <Notice>
+              Hóa đơn đang ở trạng thái nháp. Khách thuê chưa thấy hóa đơn này cho đến khi bạn phát hành.
+            </Notice>
+          )}
+          {ticket.invoiceStatus && ticket.invoiceStatus !== "DRAFT" && (
+            <p className="text-sm font-semibold text-[#475569]">
+              Hóa đơn đã phát hành mới được hiển thị trên mobile tenant và mới có thể thanh toán qua QR/PayOS.
+            </p>
+          )}
         </section>
       )}
 

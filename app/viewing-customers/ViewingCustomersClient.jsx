@@ -39,6 +39,7 @@ import {
   forceDeleteViewingCustomer,
   getAppointmentParts,
   getCurrentLocalDateTimeInputValue,
+  getViewingCustomerErrorMessage,
   isFutureAppointment,
   isValidVietnamPhone,
   restoreViewingCustomer,
@@ -429,7 +430,7 @@ export default function ViewingCustomersClient() {
   useEffect(() => {
     fetchViewingProperties()
       .then(setProperties)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, []);
 
   useEffect(() => {
@@ -439,7 +440,7 @@ export default function ViewingCustomersClient() {
     }
     fetchViewingRooms(form.propertyId)
       .then(setFormRooms)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, [form.propertyId]);
 
   useEffect(() => {
@@ -449,7 +450,7 @@ export default function ViewingCustomersClient() {
     }
     fetchViewingRooms(filters.propertyId)
       .then(setFilterRooms)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, [filters.propertyId]);
 
   const loadCustomers = useCallback(async (nextPage = 1) => {
@@ -463,7 +464,7 @@ export default function ViewingCustomersClient() {
       setStats(statsData);
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   }, [filters, pageSize]);
 
@@ -474,7 +475,7 @@ export default function ViewingCustomersClient() {
       setTrashPagination(data);
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   }, [filters, pageSize]);
 
@@ -556,7 +557,7 @@ export default function ViewingCustomersClient() {
       setModalMode(null);
       await loadCustomers(modalMode === "edit" ? pagination.page : 1);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -567,7 +568,7 @@ export default function ViewingCustomersClient() {
         await loadCustomers(pagination.page);
         if (trashOpen) await loadTrash(trashPagination.page);
       } catch (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(getViewingCustomerErrorMessage(error));
       }
     }
   };
@@ -584,7 +585,7 @@ export default function ViewingCustomersClient() {
       setCustomers((current) =>
         current.map((item) => (item.id === customer.id ? { ...item, status: previousStatus } : item)),
       );
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -598,7 +599,7 @@ export default function ViewingCustomersClient() {
       await restoreViewingCustomer(customer.id);
       await Promise.all([loadCustomers(pagination.page), loadTrash(trashPagination.page)]);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -608,7 +609,7 @@ export default function ViewingCustomersClient() {
       await forceDeleteViewingCustomer(customer.id);
       await loadTrash(trashPagination.page);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 

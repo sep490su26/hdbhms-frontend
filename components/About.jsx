@@ -3,7 +3,7 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 export function About() {
   return (
@@ -41,7 +41,6 @@ export function About() {
                 variant="link"
                 size="lg"
                 icon={<ChevronRight className="h-4 w-4" />}
-                iconPosition="right"
                 className="text-white font-bold hover:text-white/80"
               >
                 Xem thêm

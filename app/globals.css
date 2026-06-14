@@ -9,6 +9,7 @@
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -29,7 +30,7 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.985 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
@@ -53,7 +54,7 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
+  --background: oklch(0.145 0 0);
   --foreground: oklch(0.145 0 0);
 }
 
@@ -147,8 +148,8 @@ body {
   }
 }
 
-.dashboard-content > *,
-.dashboard-content :where(.grid, .flex) > * {
+.dashboard-content>*,
+.dashboard-content :where(.grid, .flex)>* {
   min-width: 0;
 }
 
@@ -198,12 +199,11 @@ body {
 }
 
 .dashboard-table td,
-.dashboard-table td > * {
+.dashboard-table td>* {
   min-width: 0;
 }
 
-.dashboard-table td:is(
-  [data-label^="Mã"],
+.dashboard-table td:is([data-label^="Mã"],
   [data-label^="Ngày"],
   [data-label^="Số"],
   [data-label="ID"],
@@ -220,8 +220,7 @@ body {
   [data-label="Xem"],
   [data-label="Chi tiết"],
   [data-label="Thao tác"],
-  [data-label="Hành động"]
-) {
+  [data-label="Hành động"]) {
   overflow: hidden;
   min-width: max-content;
   text-overflow: ellipsis;
@@ -229,16 +228,14 @@ body {
   word-break: normal;
 }
 
-.dashboard-table td:is(
-  [data-label="Vai trò"],
+.dashboard-table td:is([data-label="Vai trò"],
   [data-label="Mức độ"],
   [data-label="Trạng thái"],
   [data-label="File"],
   [data-label="Xem"],
   [data-label="Chi tiết"],
   [data-label="Thao tác"],
-  [data-label="Hành động"]
-) > * {
+  [data-label="Hành động"])>* {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -286,8 +283,7 @@ body {
     text-align: left;
   }
 
-  .dashboard-table tbody td:is(
-    [data-label^="Mã"],
+  .dashboard-table tbody td:is([data-label^="Mã"],
     [data-label^="Ngày"],
     [data-label^="Số"],
     [data-label="ID"],
@@ -304,8 +300,7 @@ body {
     [data-label="Xem"],
     [data-label="Chi tiết"],
     [data-label="Thao tác"],
-    [data-label="Hành động"]
-  ) {
+    [data-label="Hành động"]) {
     min-width: 0;
   }
 
@@ -332,14 +327,13 @@ body {
     content: none;
   }
 
-  .dashboard-table tbody td > * {
+  .dashboard-table tbody td>* {
     min-width: 0;
     max-width: 100%;
     justify-self: start;
   }
 
-  .dashboard-table tbody td:is(
-    [data-label^="Mã"],
+  .dashboard-table tbody td:is([data-label^="Mã"],
     [data-label^="Ngày"],
     [data-label^="Số"],
     [data-label="ID"],
@@ -348,8 +342,7 @@ body {
     [data-label="Tầng"],
     [data-label="Diện tích"],
     [data-label="Hạn thu"],
-    [data-label="Thời hạn"]
-  ) {
+    [data-label="Thời hạn"]) {
     text-overflow: ellipsis;
   }
 }
@@ -371,16 +364,20 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
@@ -452,9 +449,11 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }

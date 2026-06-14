@@ -38,6 +38,8 @@ import {
   writeDepositBatchDraft,
 } from "../../../services/depositBatchDraftStorage";
 import { previewDepositContract } from "../../../services/depositContractsService";
+import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import { getAuthToken } from "../../../services/identityAccessService";
 
 const DEPOSIT_PER_ROOM = 2000;
 const FALLBACK_HOLD_DURATION_MS = 5 * 60 * 1000;
@@ -128,7 +130,7 @@ function TextField({ label, required, error, ...props }) {
         required={required}
         {...props}
         aria-invalid={error ? "true" : "false"}
-        className={`h-12 rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition ${error
+        className={`h-12 w-full rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition ${error
             ? "border-rose-500 focus:border-rose-500"
             : "border-[#c5c6cd] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
           }`}
@@ -342,34 +344,108 @@ export function BatchDepositClient({ initialRooms }) {
   });
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    let isMounted = true;
+
+    const loadDraftAndProfile = async () => {
       const draft = readDepositBatchDraft();
-      const draftData = draft?.data;
-      if (draftData) {
-        setForm((current) => ({ ...current, ...(draftData.form || {}), idNumber: "" }));
-        setRoomForms((current) => {
-          const restoredRoomForms = { ...current };
-          rooms.forEach((room) => {
-            const savedRoom = draftData.roomForms?.[room.roomId];
-            if (!savedRoom) return;
-            const maxPeople = Number(room.maxPeople || 3);
-            const occupantCount = Math.max(1, Math.min(maxPeople, Number(savedRoom.occupantCount || 1)));
-            restoredRoomForms[room.roomId] = {
-              occupantCount,
-              coOccupants: (savedRoom.coOccupants || [])
-                .slice(0, occupantCount - 1)
-                .map((occupant) => ({
-                  fullName: occupant.fullName || "",
-                  phone: occupant.phone || "",
-                })),
-            };
-          });
-          return restoredRoomForms;
-        });
+      const draftData = draft?.data || {};
+
+      let profileData = null;
+      if (getAuthToken()) {
+        try {
+          const profile = await fetchMyTenantProfile();
+          if (profile && profile.person) {
+            profileData = profile;
+          }
+        } catch (error) {
+          // Ignore profile fetch failures
+        }
       }
+
+      if (!isMounted) return;
+
+      const savedForm = draftData.form || {};
+
+      // Fill form fields from profile if available, otherwise from draft
+      const mappedForm = {
+        fullName: profileData?.person?.full_name || profileData?.person?.fullName || savedForm.fullName || "",
+        dob: profileData?.person?.dob || savedForm.dob || "",
+        phone: profileData?.person?.phone || savedForm.phone || "",
+        email: profileData?.person?.email || savedForm.email || "",
+        idNumber: profileData?.identity_document?.doc_number || profileData?.identityDocument?.docNumber || profileData?.identity_document?.docNumber || savedForm.idNumber || "",
+        idIssueDate: profileData?.identity_document?.issued_date || profileData?.identityDocument?.issuedDate || profileData?.identity_document?.issuedDate || savedForm.idIssueDate || "",
+        idIssuePlace: profileData?.identity_document?.issued_place || profileData?.identityDocument?.issuedPlace || profileData?.identity_document?.issuedPlace || savedForm.idIssuePlace || "",
+        permanentAddress: profileData?.person?.permanent_address || profileData?.person?.permanentAddress || savedForm.permanentAddress || "",
+        expectedMoveInDate: savedForm.expectedMoveInDate || todayValue(1),
+        expectedLeaseSignDate: savedForm.expectedLeaseSignDate || todayValue(1),
+        paymentCycleMonths: savedForm.paymentCycleMonths || "1",
+      };
+
+      setForm((current) => ({
+        ...current,
+        ...mappedForm,
+      }));
+
+      // Restoring room occupants
+      setRoomForms((current) => {
+        const restoredRoomForms = { ...current };
+        rooms.forEach((room) => {
+          const savedRoom = draftData.roomForms?.[room.roomId];
+          if (!savedRoom) return;
+          const maxPeople = Number(room.maxPeople || 3);
+          const occupantCount = Math.max(1, Math.min(maxPeople, Number(savedRoom.occupantCount || 1)));
+          restoredRoomForms[room.roomId] = {
+            occupantCount,
+            coOccupants: (savedRoom.coOccupants || [])
+              .slice(0, occupantCount - 1)
+              .map((occupant) => ({
+                fullName: occupant.fullName || "",
+                phone: occupant.phone || "",
+              })),
+          };
+        });
+        return restoredRoomForms;
+      });
+
+      // Fetch private files if profile is loaded
+      if (profileData) {
+        const frontUrl = profileData.identity_document?.front_file_url || profileData.identityDocument?.frontFileUrl;
+        const backUrl = profileData.identity_document?.back_file_url || profileData.identityDocument?.backFileUrl;
+        const portraitUrl = profileData.person?.portrait_url || profileData.person?.portraitUrl;
+
+        if (frontUrl || backUrl || portraitUrl) {
+          Promise.all([
+            fetchPrivateFile(frontUrl, "cccd_front.jpg"),
+            fetchPrivateFile(backUrl, "cccd_back.jpg"),
+            fetchPrivateFile(portraitUrl, "portrait.jpg")
+          ]).then(([frontFile, backFile, portraitFile]) => {
+            if (!isMounted) return;
+
+            if (frontFile) {
+              setFiles(prev => ({ ...prev, front: frontFile }));
+              setFilePreviews(prev => ({ ...prev, front: URL.createObjectURL(frontFile) }));
+            }
+            if (backFile) {
+              setFiles(prev => ({ ...prev, back: backFile }));
+              setFilePreviews(prev => ({ ...prev, back: URL.createObjectURL(backFile) }));
+            }
+            if (portraitFile) {
+              setFiles(prev => ({ ...prev, portrait: portraitFile }));
+              setFilePreviews(prev => ({ ...prev, portrait: URL.createObjectURL(portraitFile) }));
+            }
+          }).catch(console.error);
+        }
+      }
+
       setDraftReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    };
+
+    const timer = window.setTimeout(loadDraftAndProfile, 0);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
   }, [rooms]);
 
   useEffect(() => {
@@ -1265,7 +1341,7 @@ export function BatchDepositClient({ initialRooms }) {
                     value={form.paymentCycleMonths}
                     aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
                     onChange={(event) => updateFormField("paymentCycleMonths", event.target.value)}
-                    className={`h-12 rounded-lg border bg-white px-4 text-[#091426] outline-none focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10 ${fieldErrors.paymentCycleMonths ? "border-rose-500" : "border-[#c5c6cd]"
+                    className={`h-12 w-full rounded-lg border bg-white px-4 text-[#091426] outline-none focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10 ${fieldErrors.paymentCycleMonths ? "border-rose-500" : "border-[#c5c6cd]"
                       }`}
                   >
                     <option value="1">1 tháng/lần</option>

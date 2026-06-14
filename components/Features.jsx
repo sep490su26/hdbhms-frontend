@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import {Button} from "@/components/ui/button";
-import {ChevronRight} from 'lucide-react';
-import {motion} from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const features = [
     {
@@ -51,10 +51,10 @@ export function Features() {
                     {features.map((feature, index) => (
                         <motion.div
                             key={index}
-                            initial={{opacity: 0, y: 20}}
-                            whileInView={{opacity: 1, y: 0}}
-                            viewport={{once: true}}
-                            transition={{duration: 0.5, delay: index * 0.1}}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
                             className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full"
                         >
                             <div
@@ -62,7 +62,7 @@ export function Features() {
                                 role="img"
                                 aria-label={`Ảnh minh họa: ${feature.title}`}
                             >
-                                <div className="absolute inset-0 bg-black/40"/>
+                                <div className="absolute inset-0 bg-black/40" />
                                 <span className="text-white relative z-10 font-medium">Ảnh minh họa</span>
                             </div>
                             <div className="p-6 flex flex-col flex-grow">
@@ -78,7 +78,7 @@ export function Features() {
                                 <div className="mt-auto pt-4">
                                     <Button
                                         variant="link"
-                                        icon={<ChevronRight className="h-4 w-4"/>}
+                                        icon={<ChevronRight className="h-4 w-4" />}
                                     >
                                         {feature.actionText}
                                     </Button>

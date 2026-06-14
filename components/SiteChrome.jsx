@@ -1,10 +1,10 @@
 "use client";
 
-import {usePathname} from "next/navigation";
-import {Navbar} from "@/components/Navbar";
-import {Footer} from "@/components/Footer";
+import { usePathname } from "next/navigation";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 
-export function SiteChrome({children, isWebView}) {
+export function SiteChrome({ children, isWebView }) {
     const pathname = usePathname();
     const isManagementRoute =
         pathname?.startsWith("/management")
@@ -14,15 +14,15 @@ export function SiteChrome({children, isWebView}) {
         pathname?.startsWith("/login")
         || pathname?.startsWith("/forgot-password");
 
-  if (isWebView || isManagementRoute || isAuthRoute) {
+    if (isWebView || isManagementRoute || isAuthRoute) {
         return <>{children}</>;
     }
 
     return (
         <>
-            <Navbar/>
-            <main className="flex-grow" style={{paddingTop: 'var(--navbar-height)'}}>{children}</main>
-            <Footer/>
+            <Navbar />
+            <main className="flex-grow" style={{ paddingTop: 'var(--navbar-height)' }}>{children}</main>
+            <Footer />
         </>
     );
 }

@@ -47,10 +47,11 @@ const STATUS_FILTERS = [
   { id: "ACTIVE", label: "Đang hiệu lực" },
   { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
   { id: "EXPIRED", label: "Hết hạn" },
-  { id: "history", label: "Lịch sử" },
   { id: "RENEWED", label: "Đã gia hạn" },
   { id: "LIQUIDATED", label: "Đã thanh lý" },
 ];
+
+const HISTORY_FILTER = { id: "history", label: "Lịch sử" };
 
 const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "PENDING_SIGNATURE",
@@ -337,8 +338,8 @@ function FileBadge({ item }) {
   return (
     <span
       className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${uploaded
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-red-200 bg-red-50 text-red-700"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-red-200 bg-red-50 text-red-700"
         }`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -609,7 +610,7 @@ export default function ContractTemplatePage() {
 
   async function openPrintWizard(item) {
     let targetContractId = item?.leaseContractId;
-    
+
     if (!targetContractId) {
       if (item?.depositAgreementId) {
         setActionLoading(`draft-${item.depositAgreementId}`);
@@ -1070,20 +1071,31 @@ export default function ContractTemplatePage() {
             Làm mới
           </button>
         </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              onClick={() => setStatusFilter(filter.id)}
-              className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${statusFilter === filter.id
+        <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                onClick={() => setStatusFilter(filter.id)}
+                className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${statusFilter === filter.id
                   ? "border-[#091426] bg-[#091426] text-white"
                   : "border-[#d7deea] bg-white text-[#56647a] hover:border-[#9ba8ba] hover:text-[#091426]"
-                }`}
+                  }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end lg:w-[130px] lg:shrink-0">
+            <button
+              type="button"
+              onClick={() => setStatusFilter(HISTORY_FILTER.id)}
+              className="h-11 shrink-0 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white transition hover:bg-[#16253a]"
             >
-              {filter.label}
+              {HISTORY_FILTER.label}
             </button>
-          ))}
+          </div>
         </div>
       </section>
 
@@ -1351,8 +1363,8 @@ export default function ContractTemplatePage() {
                         onChange={(event) => updateTermsField("monthlyRent", event.target.value)}
                         aria-invalid={Boolean(termsFieldErrors.monthlyRent)}
                         className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.monthlyRent
-                            ? "border-red-500 text-red-700 focus:border-red-600"
-                            : "border-[#cbd5e1] focus:border-[#091426]"
+                          ? "border-red-500 text-red-700 focus:border-red-600"
+                          : "border-[#cbd5e1] focus:border-[#091426]"
                           }`}
                       />
                       {termsFieldErrors.monthlyRent && (
@@ -1379,8 +1391,8 @@ export default function ContractTemplatePage() {
                         onChange={(event) => updateTermsField("depositAmount", event.target.value)}
                         aria-invalid={Boolean(termsFieldErrors.depositAmount)}
                         className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.depositAmount
-                            ? "border-red-500 text-red-700 focus:border-red-600"
-                            : "border-[#cbd5e1] focus:border-[#091426]"
+                          ? "border-red-500 text-red-700 focus:border-red-600"
+                          : "border-[#cbd5e1] focus:border-[#091426]"
                           }`}
                       />
                       {termsFieldErrors.depositAmount && (
@@ -1455,8 +1467,8 @@ export default function ContractTemplatePage() {
                           onChange={(event) => updateTermsField("startDate", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.startDate)}
                           className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.startDate
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
                             }`}
                         />
                         {termsFieldErrors.startDate && (
@@ -1474,8 +1486,8 @@ export default function ContractTemplatePage() {
                           onChange={(event) => updateTermsField("endDate", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.endDate)}
                           className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.endDate
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
                             }`}
                         />
                         {termsFieldErrors.endDate && (
@@ -1491,8 +1503,8 @@ export default function ContractTemplatePage() {
                           onChange={(event) => updateTermsField("paymentCycleMonths", event.target.value)}
                           aria-invalid={Boolean(termsFieldErrors.paymentCycleMonths)}
                           className={`h-10 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${termsFieldErrors.paymentCycleMonths
-                              ? "border-red-500 text-red-700 focus:border-red-600"
-                              : "border-[#cbd5e1] focus:border-[#091426]"
+                            ? "border-red-500 text-red-700 focus:border-red-600"
+                            : "border-[#cbd5e1] focus:border-[#091426]"
                             }`}
                         >
                           <option value="1">1 tháng/lần</option>

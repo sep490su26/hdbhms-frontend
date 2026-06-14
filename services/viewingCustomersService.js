@@ -94,6 +94,33 @@ export function isValidVietnamPhone(value) {
     return /^(0|\+84)\d{9,10}$/.test(normalizePhone(value));
 }
 
+export function getViewingCustomerErrorMessage(error, fallback = "Không thể tải dữ liệu khách xem phòng. Vui lòng thử lại.") {
+    const rawMessage = String(error?.message || error?.details || "").trim();
+    const normalized = rawMessage.toLowerCase();
+
+    if (!rawMessage) return fallback;
+
+    if (
+        normalized.includes("unauthenticated") ||
+        normalized.includes("unauthorized") ||
+        normalized.includes("forbidden") ||
+        error?.status === 401 ||
+        error?.status === 403
+    ) {
+        return "Phiên đăng nhập đã hết hạn hoặc bạn không có quyền truy cập. Vui lòng đăng nhập lại.";
+    }
+
+    if (
+        normalized.includes("failed to fetch") ||
+        normalized.includes("networkerror") ||
+        normalized.includes("load failed")
+    ) {
+        return "Không thể kết nối máy chủ. Vui lòng kiểm tra backend hoặc thử lại sau.";
+    }
+
+    return rawMessage;
+}
+
 /**
  * Maps a VisitRequestResponse (list) or VisitRequestDetailsResponse (detail) to frontend shape.
  * List response: visitorName, visitorPhone, visitorEmail, preferredStart, createdAt (NO id, property, room)
@@ -318,11 +345,11 @@ export async function fetchViewingProperties() {
 export async function fetchViewingRooms(propertyId) {
     if (!propertyId || propertyId === 'all') return [];
     try {
-        const envelope = await authenticatedFetch(`/rooms?propertyId=${propertyId}`);
-        const propertiesArray = envelope?.data?.data ?? envelope?.data ?? [];
+        const envelope = await authenticatedFetch(`/properties/${propertyId}/rooms/simple`);
+        const propertiesArray = Array.isArray(envelope) ? envelope : (envelope?.data?.data ?? envelope?.data ?? []);
         return propertiesArray.map((room) => ({
             id: room.id,
-            propertyId: room.property?.id ?? propertyId,   // nested object
+            propertyId: room.propertyId ?? room.property_id ?? room.property?.id ?? propertyId,
             roomCode: room.roomCode ?? room.room_code,
             name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
             status: room.currentStatus ?? room.current_status,

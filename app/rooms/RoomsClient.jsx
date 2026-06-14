@@ -688,7 +688,7 @@ function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor,
   );
 }
 
-function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatch }) {
+function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatch, priority = false }) {
   const selectable = room.status === "available";
   return (
     <button
@@ -707,6 +707,8 @@ function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatc
           src={room.image}
           alt={`Ảnh phòng ${room.id}`}
           fill
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 350px"
           className="object-cover transition duration-700 group-hover:scale-105"
         />
@@ -1125,10 +1127,11 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                   <div className="mx-auto w-full max-w-6xl">
                     {filteredRooms.length > 0 ? (
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
-                        {filteredRooms.map((room) => (
+                        {filteredRooms.map((room, index) => (
                           <RoomListingCard
                             key={room.id}
                             room={room}
+                            priority={index === 0}
                             isSelected={selectedRooms.some((item) => item.roomId === room.roomId)}
                             onSelect={openRoom}
                             multiSelect={multiSelect}

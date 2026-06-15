@@ -43,15 +43,20 @@ import { getAuthToken } from "../../../services/identityAccessService";
 
 const DEPOSIT_PER_ROOM = 2000;
 const FALLBACK_HOLD_DURATION_MS = 5 * 60 * 1000;
+const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
-const VIETNAM_PHONE_PATTERN = /^0[35789]\d{8}$/;
+const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function todayValue(offsetDays = 0) {
   const date = new Date();
+  date.setHours(12, 0, 0, 0);
   date.setDate(date.getDate() + offsetDays);
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatMoney(value) {
@@ -59,8 +64,7 @@ function formatMoney(value) {
 }
 
 function normalizePhone(value) {
-  const cleaned = String(value || "").replace(/[\s.\-()]/g, "");
-  return cleaned.startsWith("+84") ? `0${cleaned.slice(3)}` : cleaned;
+  return String(value || "").replace(/[\s.\-()]/g, "");
 }
 
 function formatCountdown(remainingMs) {
@@ -78,7 +82,7 @@ function resolveExpiresAtMs(checkout) {
 function validateField(name, value, form = {}) {
   const normalized = String(value || "").trim();
   const today = todayValue();
-  const tomorrow = todayValue(1);
+  const maxScheduleDate = todayValue(MAX_DEPOSIT_SCHEDULE_DAYS);
   const requiredMessages = {
     fullName: "Vui lòng nhập họ và tên.",
     dob: "Vui lòng chọn ngày sinh.",
@@ -113,8 +117,11 @@ function validateField(name, value, form = {}) {
   if (name === "idIssueDate" && form.dob && normalized && normalized < form.dob) {
     return "Ngày cấp CCCD không được trước ngày sinh.";
   }
-  if ((name === "expectedMoveInDate" || name === "expectedLeaseSignDate") && normalized < tomorrow) {
-    return "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
+  if ((name === "expectedMoveInDate" || name === "expectedLeaseSignDate") && normalized < today) {
+    return "Ngày chọn không được là ngày trong quá khứ.";
+  }
+  if ((name === "expectedMoveInDate" || name === "expectedLeaseSignDate") && normalized > maxScheduleDate) {
+    return "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
   }
   return "";
 }
@@ -231,6 +238,18 @@ function contractSignature(room, form) {
 }
 
 function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
+  const resizePreviewFrame = (event) => {
+    const frameDocument = event.currentTarget.contentDocument;
+    if (frameDocument?.documentElement) frameDocument.documentElement.style.overflow = "hidden";
+    if (frameDocument?.body) frameDocument.body.style.overflow = "hidden";
+    const contentHeight = Math.max(
+      frameDocument?.documentElement?.scrollHeight || 0,
+      frameDocument?.body?.scrollHeight || 0,
+      1123,
+    );
+    event.currentTarget.style.height = `${contentHeight}px`;
+  };
+
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm"
@@ -268,7 +287,9 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
             <iframe
               title={`Xem trước hợp đồng đặt cọc phòng ${room.roomCode}`}
               srcDoc={review?.preview?.html || ""}
-              className="h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+              scrolling="no"
+              onLoad={resizePreviewFrame}
+              className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
             />
           </div>
         </div>
@@ -1333,8 +1354,8 @@ export function BatchDepositClient({ initialRooms }) {
                 <div className="sm:col-span-2">
                   <TextField label="Địa chỉ thường trú" required error={fieldErrors.permanentAddress} value={form.permanentAddress} onChange={(event) => updateFormField("permanentAddress", event.target.value)} onBlur={(event) => updateFormField("permanentAddress", event.target.value)} />
                 </div>
-                <TextField label="Ngày dự kiến vào ở" required type="date" min={todayValue(1)} error={fieldErrors.expectedMoveInDate} value={form.expectedMoveInDate} onChange={(event) => updateFormField("expectedMoveInDate", event.target.value)} onBlur={(event) => updateFormField("expectedMoveInDate", event.target.value)} />
-                <TextField label="Ngày dự kiến ký hợp đồng" required type="date" min={todayValue(1)} error={fieldErrors.expectedLeaseSignDate} value={form.expectedLeaseSignDate} onChange={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} onBlur={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} />
+                <TextField label="Ngày dự kiến vào ở" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedMoveInDate} value={form.expectedMoveInDate} onChange={(event) => updateFormField("expectedMoveInDate", event.target.value)} onBlur={(event) => updateFormField("expectedMoveInDate", event.target.value)} />
+                <TextField label="Ngày hẹn ký hợp đồng" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedLeaseSignDate} value={form.expectedLeaseSignDate} onChange={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} onBlur={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} />
                 <label className="grid gap-2 text-sm font-bold text-slate-700">
                   <span>Chu kỳ thanh toán</span>
                   <select

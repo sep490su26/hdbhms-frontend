@@ -37,6 +37,10 @@ function guestStatusCopy(status) {
   return copy[status] || "Đã thuê";
 }
 
+function isVacantOrSoonVacant(room) {
+  return room.status === "available" || room.status === "soonVacant";
+}
+
 function publicStatusClass(status) {
   if (status === "available") return "border-emerald-400/30 bg-emerald-400/15 text-emerald-100";
   if (status === "onHold") return "border-orange-400/30 bg-orange-400/15 text-orange-100";
@@ -957,7 +961,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
   const filteredRooms = useMemo(() => {
     return visibleRooms.filter((room) => {
       if (activeFloorFilter !== allFloorsLabel && room.floor !== activeFloorFilter) return false;
-      if (availableOnly && room.status !== "available") return false;
+      if (availableOnly && !isVacantOrSoonVacant(room)) return false;
       if (searchQuery && !room.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });

@@ -150,13 +150,26 @@ const toBlockingStatusFromMessage = (message) => {
   };
 };
 
-const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
+const DATE_IN_PAST_ERROR_MESSAGE = "Ngày chọn không được là ngày trong quá khứ.";
+const DATE_TOO_FAR_ERROR_MESSAGE = "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
+const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 
-const getTomorrowDateString = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().split("T")[0];
+const toLocalDateInputValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
+
+const getDateStringWithOffset = (days) => {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return toLocalDateInputValue(date);
+};
+
+const getTodayDateString = () => getDateStringWithOffset(0);
+const getMaxDepositScheduleDateString = () => getDateStringWithOffset(MAX_DEPOSIT_SCHEDULE_DAYS);
 
 const REQUIRED_DEPOSIT_MESSAGES = {
   fullName: "Vui lòng nhập họ và tên.",
@@ -166,6 +179,7 @@ const REQUIRED_DEPOSIT_MESSAGES = {
   idIssueDate: "Vui lòng chọn ngày cấp CCCD.",
   idIssuePlace: "Vui lòng nhập nơi cấp CCCD.",
   permanentAddress: "Vui lòng nhập địa chỉ thường trú.",
+  paymentCycleMonths: "Vui lòng chọn chu kỳ thanh toán.",
   contractDate: "Vui lòng chọn ngày hẹn ký hợp đồng.",
   moveInDate: "Vui lòng chọn ngày dự kiến vào ở.",
   citizenIdFront: "Vui lòng tải lên ảnh mặt trước CCCD.",
@@ -197,6 +211,8 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
   id_issue_place: "idIssuePlace",
   permanentAddress: "permanentAddress",
   permanent_address: "permanentAddress",
+  paymentCycleMonths: "paymentCycleMonths",
+  payment_cycle_months: "paymentCycleMonths",
   expectedLeaseSignDate: "contractDate",
   expected_lease_sign_date: "contractDate",
   expectedMoveInDate: "moveInDate",
@@ -222,6 +238,7 @@ const API_ERROR_HINTS = [
   { pattern: /id\s*issue\s*date|idIssueDate|id_issue_date|ngày\s*cấp/i, field: "idIssueDate" },
   { pattern: /id\s*issue\s*place|idIssuePlace|id_issue_place|nơi\s*cấp/i, field: "idIssuePlace" },
   { pattern: /permanent\s*address|permanentAddress|permanent_address|địa\s*chỉ/i, field: "permanentAddress" },
+  { pattern: /payment\s*cycle|paymentCycleMonths|payment_cycle_months|chu\s*kỳ\s*thanh\s*toán/i, field: "paymentCycleMonths" },
   { pattern: /lease\s*sign|expectedLeaseSignDate|expected_lease_sign_date|ký\s*hợp\s*đồng/i, field: "contractDate" },
   { pattern: /move\s*in|expectedMoveInDate|expected_move_in_date|vào\s*ở/i, field: "moveInDate" },
   { pattern: /id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
@@ -239,6 +256,7 @@ const DEPOSIT_FIELD_LABELS = {
   idIssueDate: "ngày cấp CCCD",
   idIssuePlace: "nơi cấp CCCD",
   permanentAddress: "địa chỉ thường trú",
+  paymentCycleMonths: "chu kỳ thanh toán",
   contractDate: "ngày hẹn ký hợp đồng",
   moveInDate: "ngày dự kiến vào ở",
   citizenIdFront: "ảnh mặt trước CCCD",
@@ -306,8 +324,8 @@ const extractDepositApiFieldErrors = (error) => {
 };
 
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
-const VIETNAM_PHONE_PATTERN = /^0[35789]\d{8}$/;
-const CITIZEN_ID_PATTERN = /^\d{12}$/;
+const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
+const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
 const DEPOSIT_DRAFT_MAX_AGE_SECONDS = 30 * 60;
@@ -317,6 +335,7 @@ const DEPOSIT_DRAFT_FIELDS = [
   "phone",
   "email",
   "permanentAddress",
+  "paymentCycleMonths",
   "contractDate",
   "moveInDate",
   "note",
@@ -421,17 +440,14 @@ const collectDepositFormData = (form) => {
 
 const hasDepositDraftValue = (draft) => Object.values(draft || {}).some((value) => String(value || "").trim());
 
-const getTodayDateString = () => new Date().toISOString().split("T")[0];
-
 const normalizePhoneValue = (value) => {
-  const cleaned = String(value || "").replace(/[\s.\-()]/g, "");
-  return cleaned.startsWith("+84") ? `0${cleaned.slice(3)}` : cleaned;
+  return String(value || "").replace(/[\s.\-()]/g, "");
 };
 
 const validateDepositValue = (name, value) => {
   const normalizedValue = String(value || "").trim();
-  const tomorrowDate = getTomorrowDateString();
   const todayDate = getTodayDateString();
+  const maxScheduleDate = getMaxDepositScheduleDateString();
 
   if (name !== "email" && !normalizedValue) {
     return REQUIRED_DEPOSIT_MESSAGES[name] || "";
@@ -449,6 +465,10 @@ const validateDepositValue = (name, value) => {
     return "Số lượng người ở chỉ được chọn từ 1 đến 3.";
   }
 
+  if (name === "paymentCycleMonths" && !["1", "3"].includes(normalizedValue)) {
+    return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
+  }
+
   if ((name === "coOccupant1Phone" || name === "coOccupant2Phone") && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
     return "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
   }
@@ -458,7 +478,7 @@ const validateDepositValue = (name, value) => {
   }
 
   if (name === "citizenId" && !CITIZEN_ID_PATTERN.test(normalizedValue)) {
-    return "Số CCCD phải gồm 12 chữ số.";
+    return "Số CCCD phải gồm 9, 10 hoặc 12 chữ số.";
   }
 
   if (name === "birthDate" && normalizedValue > todayDate) {
@@ -469,8 +489,12 @@ const validateDepositValue = (name, value) => {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
   }
 
-  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < tomorrowDate) {
-    return DATE_ERROR_MESSAGE;
+  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < todayDate) {
+    return DATE_IN_PAST_ERROR_MESSAGE;
+  }
+
+  if ((name === "contractDate" || name === "moveInDate") && normalizedValue > maxScheduleDate) {
+    return DATE_TOO_FAR_ERROR_MESSAGE;
   }
 
   return "";
@@ -550,7 +574,7 @@ const buildDepositMetadata = (room, data) => ({
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
 
-function Field({ label, name, placeholder, type = "text", className = "", required = true, min, error, onChange, onBlur, defaultValue = "" }) {
+function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "" }) {
   const { errors: formErrors, setError } = useContext(DepositFormErrorContext);
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
@@ -581,6 +605,7 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
         placeholder={placeholder}
         required={required}
         min={min}
+        max={max}
         defaultValue={defaultValue}
         onChange={handleChange}
         onBlur={handleBlur}
@@ -627,6 +652,18 @@ function FileUploadZone({ id, name, label, helperText, preview, onChange, requir
 }
 
 function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) {
+  const resizePreviewFrame = (event) => {
+    const frameDocument = event.currentTarget.contentDocument;
+    if (frameDocument?.documentElement) frameDocument.documentElement.style.overflow = "hidden";
+    if (frameDocument?.body) frameDocument.body.style.overflow = "hidden";
+    const contentHeight = Math.max(
+      frameDocument?.documentElement?.scrollHeight || 0,
+      frameDocument?.body?.scrollHeight || 0,
+      1123,
+    );
+    event.currentTarget.style.height = `${contentHeight}px`;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
       <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -649,7 +686,9 @@ function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) 
             <iframe
               title="Xem trước hợp đồng đặt cọc"
               srcDoc={preview?.html || ""}
-              className="h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+              scrolling="no"
+              onLoad={resizePreviewFrame}
+              className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
             />
           </div>
         </div>
@@ -731,7 +770,8 @@ function RoomSummary({ room }) {
 }
 
 function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFieldErrors }) {
-  const tomorrowDate = getTomorrowDateString();
+  const todayDate = getTodayDateString();
+  const maxScheduleDate = getMaxDepositScheduleDateString();
   const formRef = useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [savedDraft, setSavedDraft] = useState({});
@@ -1055,7 +1095,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
           <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.birthDate} />
+          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
           <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
           <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
           <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
@@ -1071,6 +1111,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
               defaultValue={savedDraft.paymentCycleMonths || "1"}
               required
               aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
+              onChange={(event) => validateAndSetDepositField("paymentCycleMonths", event.target.value)}
               className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.paymentCycleMonths
                 ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
                 : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
@@ -1166,7 +1207,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             name="contractDate"
             type="date"
             placeholder="mm/dd/yyyy"
-            min={tomorrowDate}
+            min={todayDate}
+            max={maxScheduleDate}
             error={fieldErrors.contractDate}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
@@ -1177,7 +1219,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             name="moveInDate"
             type="date"
             placeholder="mm/dd/yyyy"
-            min={tomorrowDate}
+            min={todayDate}
+            max={maxScheduleDate}
             error={fieldErrors.moveInDate}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}

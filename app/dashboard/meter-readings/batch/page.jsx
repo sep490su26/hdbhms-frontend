@@ -175,7 +175,10 @@ export default function MeterReadings() {
         }
     }
     useEffect(() => {
-        loadData();
+        const timeoutId = window.setTimeout(() => {
+            loadData();
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
     }, [period]);
 
     // handleSaveBatch removed

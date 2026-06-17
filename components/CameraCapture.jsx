@@ -60,13 +60,18 @@ export default function CameraCapture({ open, onClose, onCapture }) {
     };
 
     useEffect(() => {
-        if (open) {
-            setError(null);
-            startCamera();
-        } else {
+        const timeoutId = window.setTimeout(() => {
+            if (open) {
+                setError(null);
+                startCamera();
+            } else {
+                stopCamera();
+            }
+        }, 0);
+        return () => {
+            window.clearTimeout(timeoutId);
             stopCamera();
-        }
-        return () => stopCamera();
+        };
     }, [open]);
 
     return (

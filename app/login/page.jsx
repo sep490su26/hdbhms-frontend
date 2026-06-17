@@ -42,9 +42,11 @@ function LoginForm() {
     const savedPhone = window.localStorage.getItem("rememberedPhone");
     const savedPassword = window.localStorage.getItem("rememberedPassword");
     if (savedPhone && savedPassword) {
-      setPhone(savedPhone);
-      setPassword(savedPassword);
-      setRememberMe(true);
+      window.setTimeout(() => {
+        setPhone(savedPhone);
+        setPassword(savedPassword);
+        setRememberMe(true);
+      }, 0);
     }
   }, [refreshUser, router]);
 

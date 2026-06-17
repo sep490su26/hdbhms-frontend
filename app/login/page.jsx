@@ -25,6 +25,7 @@ function LoginForm() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false); // toggle state
@@ -36,6 +37,14 @@ function LoginForm() {
       refreshUser(token)
         .then(() => router.replace("/dashboard"))
         .catch(() => clearAuthSession());
+    }
+
+    const savedPhone = window.localStorage.getItem("rememberedPhone");
+    const savedPassword = window.localStorage.getItem("rememberedPassword");
+    if (savedPhone && savedPassword) {
+      setPhone(savedPhone);
+      setPassword(savedPassword);
+      setRememberMe(true);
     }
   }, [refreshUser, router]);
 
@@ -56,6 +65,14 @@ function LoginForm() {
       window.localStorage.setItem("token", accessToken);
       if (userRole) {
         window.localStorage.setItem("userRole", userRole);
+      }
+
+      if (rememberMe) {
+        window.localStorage.setItem("rememberedPhone", phone);
+        window.localStorage.setItem("rememberedPassword", password);
+      } else {
+        window.localStorage.removeItem("rememberedPhone");
+        window.localStorage.removeItem("rememberedPassword");
       }
 
       const profile = await getCurrentUserProfile();
@@ -153,6 +170,8 @@ function LoginForm() {
               <label className="inline-flex items-center gap-2 text-sm font-medium text-[#334155]">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 rounded border-[#d8dee8] accent-[#0b1220]"
                 />
                 Ghi nhớ mật khẩu

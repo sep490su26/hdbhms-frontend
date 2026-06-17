@@ -104,6 +104,23 @@ const ROLE_LABELS = {
   CO_OCCUPANT: "Người ở cùng",
 };
 
+const TENANT_INTENTION_OPTIONS = [
+  { value: "RENEW", label: "Muốn tái ký / gia hạn" },
+  { value: "TRANSFER", label: "Muốn chuyển phòng" },
+  { value: "MOVE_OUT", label: "Sẽ chuyển đi / Không tái ký" },
+  { value: "UNDECIDED", label: "Chưa có ý định" },
+];
+
+const TENANT_INTENTION_LABELS = TENANT_INTENTION_OPTIONS.reduce((labels, option) => {
+  labels[option.value] = option.label;
+  return labels;
+}, {});
+
+const TENANT_INTENTION_SOURCE_LABELS = {
+  TENANT_MOBILE: "Khách tự phản hồi trên mobile",
+  MANAGEMENT_WEB: "Quản lý ghi nhận/cập nhật trên web",
+};
+
 const ACCOUNT_PROVISIONING_ACTIONS = {
   NOT_PROVISIONED: {
     label: "Gửi tài khoản cho khách",
@@ -142,6 +159,71 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("vi-VN").format(date);
+}
+
+function formatDateTime(value) {
+  if (!value) return "Chưa có";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function parseEventData(value) {
+  if (!value || typeof value !== "string") return {};
+  return value.split(";").reduce((result, part) => {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex === -1) return result;
+    const key = part.slice(0, separatorIndex).trim();
+    const fieldValue = part.slice(separatorIndex + 1).trim();
+    if (key) result[key] = fieldValue;
+    return result;
+  }, {});
+}
+
+function getLatestIntentionEvent(details) {
+  if (!Array.isArray(details?.events)) return null;
+  return [...details.events]
+    .filter((event) => event.eventType === "INTENTION_RECORDED")
+    .sort((a, b) => {
+      const timeDiff = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return Number(b.id || 0) - Number(a.id || 0);
+    })[0] || null;
+}
+
+function buildTenantIntentionInfo(contract, details) {
+  const latestEvent = getLatestIntentionEvent(details);
+  const eventData = parseEventData(latestEvent?.eventData);
+  const rawIntention =
+    contract?.tenantIntention ||
+    details?.tenantIntention ||
+    eventData.intention ||
+    "UNDECIDED";
+  const intention = rawIntention === "TRANSFER_ROOM" ? "TRANSFER" : rawIntention;
+  const source = contract?.intentionSource || details?.intentionSource || eventData.source || "";
+  const note = contract?.intentionNote || details?.intentionNote || eventData.note || "";
+  return {
+    intention,
+    label: TENANT_INTENTION_LABELS[intention] || TENANT_INTENTION_LABELS.UNDECIDED,
+    expectedVacantDate:
+      contract?.expectedVacantDate ||
+      details?.expectedVacantDate ||
+      eventData.expectedVacantDate ||
+      null,
+    note,
+    sourceLabel: TENANT_INTENTION_SOURCE_LABELS[source] || (source ? source : "Chưa xác định nguồn ghi nhận"),
+    recordedAt:
+      contract?.intentionRecordedAt ||
+      details?.intentionRecordedAt ||
+      latestEvent?.createdAt ||
+      null,
+  };
 }
 
 function formatIdentityNumber(value) {
@@ -561,6 +643,11 @@ export default function ContractTemplatePage() {
       endDate: details.endDate ?? selected.endDate,
       rentStartDate: details.rentStartDate ?? selected.rentStartDate,
       status: details.status ?? selected.status,
+      tenantIntention: details.tenantIntention ?? selected.tenantIntention ?? null,
+      expectedVacantDate: details.expectedVacantDate ?? selected.expectedVacantDate ?? null,
+      intentionRecordedAt: details.intentionRecordedAt ?? selected.intentionRecordedAt ?? null,
+      intentionNote: details.intentionNote ?? selected.intentionNote ?? null,
+      intentionSource: details.intentionSource ?? selected.intentionSource ?? null,
     };
   }, [details, selected]);
 
@@ -569,6 +656,11 @@ export default function ContractTemplatePage() {
     if (Array.isArray(selected?.occupants) && selected.occupants.length > 0) return selected.occupants;
     return [];
   }, [details, selected]);
+
+  const tenantIntentionInfo = useMemo(
+    () => buildTenantIntentionInfo(mergedSelected, details),
+    [details, mergedSelected],
+  );
 
   const amountPerPeriod = useMemo(() => {
     const monthlyRent = Number(termsForm.monthlyRent);
@@ -990,10 +1082,13 @@ export default function ContractTemplatePage() {
   }
 
   function openIntentionModal() {
+    const currentIntention = tenantIntentionInfo?.intention || "UNDECIDED";
     setIntentionForm({
-      intention: "UNDECIDED",
-      expectedMoveOutDate: "",
-      note: "",
+      intention: currentIntention,
+      expectedMoveOutDate: ["MOVE_OUT", "TRANSFER"].includes(currentIntention)
+        ? toDateInputValue(tenantIntentionInfo?.expectedVacantDate)
+        : "",
+      note: tenantIntentionInfo?.note || "",
     });
     setIntentionError("");
     setIntentionModalOpen(true);
@@ -1004,9 +1099,14 @@ export default function ContractTemplatePage() {
     setActionLoading(`intention-${mergedSelected.leaseContractId}`);
     setIntentionError("");
     try {
-      await recordLeaseContractTenantIntention(mergedSelected.leaseContractId, intentionForm);
+      const requiresMoveOutDate = ["MOVE_OUT", "TRANSFER"].includes(intentionForm.intention);
+      await recordLeaseContractTenantIntention(mergedSelected.leaseContractId, {
+        ...intentionForm,
+        expectedMoveOutDate: requiresMoveOutDate ? intentionForm.expectedMoveOutDate : "",
+      });
       const refreshedDetails = await fetchManagementLeaseContractDetails(mergedSelected.leaseContractId);
       setDetails(refreshedDetails);
+      await loadContracts();
       setIntentionModalOpen(false);
     } catch (err) {
       setIntentionError(err?.details || err?.message || "Không thể ghi nhận ý định khách.");
@@ -1742,6 +1842,29 @@ export default function ContractTemplatePage() {
                 </div>
               </DetailCard>
 
+              {mergedSelected.leaseContractId && (
+                <DetailCard title="Nguyện vọng khách thuê" icon={FileWarning} className="lg:col-span-2">
+                  <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoValue label="Trạng thái" value={tenantIntentionInfo.label} />
+                    <InfoValue
+                      label="Ngày dự kiến trả phòng"
+                      value={formatDate(tenantIntentionInfo.expectedVacantDate)}
+                    />
+                    <InfoValue label="Nguồn ghi nhận" value={tenantIntentionInfo.sourceLabel} />
+                    <InfoValue label="Cập nhật lần cuối" value={formatDateTime(tenantIntentionInfo.recordedAt)} />
+                  </div>
+                  <div className="mt-4 rounded-xl border border-[#dfe5ef] bg-[#f8fafc] px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#718096]">Lý do / ghi chú</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#091426]">
+                      {tenantIntentionInfo.note || "Chưa có ghi chú"}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-xs font-semibold leading-5 text-[#607089]">
+                    Dữ liệu này được đọc trực tiếp từ backend. Nút bên dưới chỉ dùng khi quản lý ghi nhận thay khách hoặc cập nhật lại sau khi trao đổi trực tiếp.
+                  </p>
+                </DetailCard>
+              )}
+
               <section className="grid gap-3 lg:col-span-2 sm:grid-cols-2">
                 {!mergedSelected.leaseContractId && mergedSelected.depositAgreementId && (
                   <button
@@ -1805,6 +1928,13 @@ export default function ContractTemplatePage() {
                       Tái ký / Gia hạn
                     </button>
                   )}
+                {details?.canRenew === false &&
+                  ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected)) &&
+                  details?.canRenewBlockedReason && (
+                    <p className="flex min-h-11 items-center rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 sm:col-span-2">
+                      {details.canRenewBlockedReason}
+                    </p>
+                  )}
                 {getWorkflow(mergedSelected) === "EXPIRING_SOON" && (
                   <button
                     type="button"
@@ -1813,7 +1943,7 @@ export default function ContractTemplatePage() {
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-extrabold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
                   >
                     <Pencil className="h-4 w-4" />
-                    Ghi nhận ý định khách
+                    Ghi nhận / Cập nhật ý định khách
                   </button>
                 )}
                 {(details?.canLiquidate ??
@@ -1977,7 +2107,7 @@ export default function ContractTemplatePage() {
           <section className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="flex items-start justify-between border-b border-[#dfe5ef] px-5 py-5">
               <div>
-                <h2 className="text-xl font-extrabold text-[#091426]">Ghi nhận ý định khách</h2>
+                <h2 className="text-xl font-extrabold text-[#091426]">Ghi nhận / Cập nhật ý định khách</h2>
                 <p className="mt-1 text-sm text-[#607089]">{mergedSelected.contractCode}</p>
               </div>
               <button
@@ -1994,24 +2124,37 @@ export default function ContractTemplatePage() {
                 <span className="text-sm font-bold text-[#34445c]">Ý định</span>
                 <select
                   value={intentionForm.intention}
-                  onChange={(event) => setIntentionForm((current) => ({ ...current, intention: event.target.value }))}
+                  onChange={(event) => {
+                    const nextIntention = event.target.value;
+                    setIntentionForm((current) => ({
+                      ...current,
+                      intention: nextIntention,
+                      expectedMoveOutDate: ["MOVE_OUT", "TRANSFER"].includes(nextIntention)
+                        ? current.expectedMoveOutDate
+                        : "",
+                    }));
+                  }}
                   className="h-11 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold"
                 >
-                  <option value="RENEW">Tái ký / Gia hạn</option>
-                  <option value="MOVE_OUT">Chuyển đi</option>
-                  <option value="TRANSFER_ROOM">Chuyển phòng</option>
-                  <option value="UNDECIDED">Chưa quyết định</option>
+                  {TENANT_INTENTION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="grid gap-1.5">
-                <span className="text-sm font-bold text-[#34445c]">Ngày dự kiến chuyển đi</span>
-                <input
-                  type="date"
-                  value={intentionForm.expectedMoveOutDate}
-                  onChange={(event) => setIntentionForm((current) => ({ ...current, expectedMoveOutDate: event.target.value }))}
-                  className="h-11 rounded-lg border border-[#cbd5e1] px-3 text-sm font-semibold"
-                />
-              </label>
+              {["MOVE_OUT", "TRANSFER"].includes(intentionForm.intention) && (
+                <label className="grid gap-1.5">
+                  <span className="text-sm font-bold text-[#34445c]">Ngày dự kiến trả phòng / bàn giao phòng</span>
+                  <input
+                    type="date"
+                    value={intentionForm.expectedMoveOutDate}
+                    onChange={(event) => setIntentionForm((current) => ({ ...current, expectedMoveOutDate: event.target.value }))}
+                    required
+                    className="h-11 rounded-lg border border-[#cbd5e1] px-3 text-sm font-semibold"
+                  />
+                </label>
+              )}
               <label className="grid gap-1.5">
                 <span className="text-sm font-bold text-[#34445c]">Ghi chú</span>
                 <textarea

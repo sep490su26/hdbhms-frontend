@@ -139,6 +139,16 @@ export function normalizeLeaseContractItem(item = {}) {
       item.nextContractCode ??
       item.next_contract_code ??
       null,
+    tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
+    expectedVacantDate: item.expectedVacantDate ?? item.expected_vacant_date ?? null,
+    intentionRecordedAt: item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
+    intentionNote:
+      item.intentionNote ??
+      item.intention_note ??
+      item.tenantIntentionNote ??
+      item.tenant_intention_note ??
+      null,
+    intentionSource: item.intentionSource ?? item.intention_source ?? null,
   };
 }
 
@@ -425,7 +435,21 @@ function normalizeLeaseContractDetails(details = {}) {
       details.nextContractCode ??
       details.next_contract_code ??
       null,
+    tenantIntention: details.tenantIntention ?? details.tenant_intention ?? null,
+    expectedVacantDate: details.expectedVacantDate ?? details.expected_vacant_date ?? null,
+    intentionRecordedAt: details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
+    intentionNote:
+      details.intentionNote ??
+      details.intention_note ??
+      details.tenantIntentionNote ??
+      details.tenant_intention_note ??
+      null,
+    intentionSource: details.intentionSource ?? details.intention_source ?? null,
     canRenew: details.canRenew ?? details.can_renew ?? false,
+    canRenewBlockedReason:
+      details.canRenewBlockedReason ??
+      details.can_renew_blocked_reason ??
+      "",
     canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
     canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
     accountProvisioningStatus:

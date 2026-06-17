@@ -28,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoGallery } from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
+import Image from "next/image";
 
 const SAMPLE_PHOTOS = [
     {
@@ -881,7 +882,7 @@ export default function MeterReadings() {
                                     <div className="pt-2">
                                         {capturedPhotos[room.id] ? (
                                             <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                                                <img src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-32 object-cover" />
+                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-32 object-cover" />
                                                 <button 
                                                     onClick={() => {
                                                         const newPhotos = {...capturedPhotos};

@@ -25,6 +25,7 @@ import {
   fetchPrivateFileObjectUrl,
   fetchTenantProfiles,
 } from "@/services/tenantProfilesService";
+import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 
 const MOCK_TENANT_PROFILES = [
   {
@@ -279,9 +280,27 @@ const contractStatusLabel = (status) => {
   const value = String(status || "").toUpperCase();
   if (value === "ACTIVE") return "Đang hiệu lực";
   if (value === "EXPIRING_SOON") return "Sắp hết hạn";
+  if (value === "EXPIRED") return "Hết hạn";
   if (value === "PENDING_SIGNATURE") return "Chờ ký";
   if (value === "DRAFT") return "Bản nháp";
+  if (value === "WAITING_UPLOAD") return "Chờ upload";
+  if (value === "WAITING_ACTIVATE") return "Chờ kích hoạt";
+  if (value === "RENEWED") return "Đã gia hạn";
+  if (value === "LIQUIDATED") return "Đã thanh lý";
+  if (value === "CANCELLED") return "Đã hủy";
   return value || "Chưa cập nhật";
+};
+
+const contractStatusClass = (status) => {
+  const value = String(status || "").toUpperCase();
+  if (value === "ACTIVE") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (value === "EXPIRING_SOON") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (value === "EXPIRED") return "border-red-200 bg-red-50 text-red-700";
+  if (["PENDING_SIGNATURE", "DRAFT", "WAITING_UPLOAD", "WAITING_ACTIVATE"].includes(value)) {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+  if (value === "RENEWED") return "border-indigo-200 bg-indigo-50 text-indigo-700";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 };
 
 const genderLabel = (gender) => {
@@ -436,7 +455,141 @@ function ContactLine({ icon: Icon, label, value }) {
   );
 }
 
-function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
+function getProfileContractId(profile) {
+  return valueOf(profile, "contractId", "contract_id", "leaseContractId", "lease_contract_id");
+}
+
+function ContractDetailInfo({ label, value, strong = false }) {
+  return (
+    <div className="rounded-xl bg-[#f8fafc] p-4">
+      <p className="text-xs font-black uppercase tracking-[0.06em] text-[#7b8494]">{label}</p>
+      <p className={`mt-2 text-sm ${strong ? "font-black text-[#091426]" : "font-bold text-[#243247]"}`}>
+        {value || "Chưa cập nhật"}
+      </p>
+    </div>
+  );
+}
+
+function LeaseContractDetailModal({ contract, onClose }) {
+  if (!contract) return null;
+
+  const room = valueOf(contract, "room") || {};
+  const property = valueOf(contract, "property") || {};
+  const occupants = valueOf(contract, "occupants") || [];
+  const contractFile = valueOf(contract, "contractFile", "contract_file") || null;
+  const paymentCycleMonths = Number(valueOf(contract, "paymentCycleMonths", "payment_cycle_months")) || 0;
+  const monthlyRent = Number(valueOf(contract, "monthlyRent", "monthly_rent")) || 0;
+  const amountPerPeriod = paymentCycleMonths > 0 && monthlyRent > 0 ? monthlyRent * paymentCycleMonths : null;
+  const status = valueOf(contract, "status", "contractStatus", "contract_status");
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-4" role="dialog" aria-modal="true">
+      <section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <header className="relative bg-[#05091d] px-6 py-7 text-white">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng chi tiết hợp đồng"
+            className="absolute right-4 top-4 rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <p className="text-xs font-bold uppercase tracking-[0.26em] text-slate-300">Chi tiết hợp đồng</p>
+          <h2 className="mt-4 text-3xl font-black tracking-[-0.02em]">
+            {valueOf(contract, "contractCode", "contract_code") || "Chưa có mã hợp đồng"}
+          </h2>
+          <span className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-black ${contractStatusClass(status)}`}>
+            {contractStatusLabel(status)}
+          </span>
+        </header>
+
+        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] p-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <DetailSection icon={MapPin} title="Thông tin phòng">
+              <div className="grid gap-4 md:grid-cols-2">
+                <ContractDetailInfo label="Cơ sở" value={valueOf(contract, "propertyName", "property_name") || valueOf(property, "name", "propertyName", "property_name")} />
+                <ContractDetailInfo label="Phòng" value={valueOf(contract, "roomCode", "room_code") || valueOf(room, "roomCode", "room_code")} strong />
+                <ContractDetailInfo label="Giá thuê/tháng" value={formatMoney(monthlyRent)} />
+                <ContractDetailInfo label="Số tiền đóng mỗi kỳ" value={amountPerPeriod ? formatMoney(amountPerPeriod) : "Chưa cập nhật"} />
+                <ContractDetailInfo label="Tiền cọc" value={formatMoney(valueOf(contract, "depositAmount", "deposit_amount"))} />
+                <ContractDetailInfo label="Số người" value={`${occupants.length || valueOf(contract, "occupantsCount", "occupants_count") || 1} người`} />
+              </div>
+            </DetailSection>
+
+            <DetailSection icon={BriefcaseBusiness} title="Thông tin hợp đồng">
+              <div className="grid gap-4 md:grid-cols-2">
+                <ContractDetailInfo label="Mã hợp đồng" value={valueOf(contract, "contractCode", "contract_code")} strong />
+                <ContractDetailInfo label="Trạng thái" value={contractStatusLabel(status)} />
+                <ContractDetailInfo label="Ngày bắt đầu" value={formatDate(valueOf(contract, "startDate", "start_date"))} />
+                <ContractDetailInfo label="Ngày kết thúc" value={formatDate(valueOf(contract, "endDate", "end_date"))} />
+                <ContractDetailInfo label="Ngày bắt đầu tính tiền" value={formatDate(valueOf(contract, "rentStartDate", "rent_start_date"))} />
+                <ContractDetailInfo label="Chu kỳ thanh toán" value={paymentCycleMonths ? `${paymentCycleMonths} tháng/lần` : "Chưa cập nhật"} />
+                <ContractDetailInfo label="Hợp đồng trước" value={valueOf(contract, "previousContractCode", "previous_contract_code") || "Không có"} />
+                <ContractDetailInfo label="Hợp đồng tái ký" value={valueOf(contract, "renewedContractCode", "renewed_contract_code") || "Chưa có"} />
+              </div>
+            </DetailSection>
+          </div>
+
+          <DetailSection icon={Users} title="Người ở trong hợp đồng">
+            {occupants.length ? (
+              <div className="dashboard-table rounded-xl border border-[#e2e8f0]">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
+                    <tr>
+                      <th className="px-4 py-3">Họ tên</th>
+                      <th className="px-4 py-3">Vai trò</th>
+                      <th className="px-4 py-3">SĐT</th>
+                      <th className="px-4 py-3">CCCD</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e2e8f0]">
+                    {occupants.map((occupant, index) => (
+                      <tr key={valueOf(occupant, "tenantProfileId", "tenant_profile_id", "id") || index}>
+                        <td className="px-4 py-3 font-black text-[#091426]">{valueOf(occupant, "fullName", "full_name") || "Chưa cập nhật"}</td>
+                        <td className="px-4 py-3">{roleLabel(valueOf(occupant, "occupantRole", "occupant_role", "roomRole", "room_role"))}</td>
+                        <td className="px-4 py-3">{valueOf(occupant, "phone") || "Chưa cập nhật"}</td>
+                        <td className="px-4 py-3">{valueOf(occupant, "citizenId", "citizen_id", "docNumber", "doc_number") || "Chưa cập nhật"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+                Chưa có danh sách người ở trong hợp đồng.
+              </p>
+            )}
+          </DetailSection>
+
+          <DetailSection icon={FileText} title="File hợp đồng đã ký">
+            {contractFile ? (
+              <div className="rounded-xl bg-[#f8fafc] p-4">
+                <p className="font-black text-[#091426]">{valueOf(contractFile, "fileName", "file_name", "name") || "File hợp đồng"}</p>
+                <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                  Upload: {formatDate(valueOf(contractFile, "uploadedAt", "uploaded_at", "createdAt", "created_at"))}
+                </p>
+              </div>
+            ) : (
+              <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+                Chưa có file hợp đồng đã ký.
+              </p>
+            )}
+          </DetailSection>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function TenantProfileModal({
+  profile,
+  profiles,
+  onClose,
+  onSelectProfile,
+  onOpenContractDetails,
+  contractDetailsLoadingId,
+  contractDetailsError,
+}) {
   const identity = valueOf(profile, "identityDocument", "identity_document") || {};
   const vehicles = valueOf(profile, "vehicles") || [];
   const emergencyContacts = valueOf(profile, "emergencyContacts", "emergency_contacts") || [];
@@ -444,7 +597,8 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
   const maxOccupants = Number(valueOf(profile, "roomMaxOccupants", "room_max_occupants")) || 3;
   const occupantCount = Number(valueOf(profile, "roomOccupantCount", "room_occupant_count")) || 1;
   const firstEmergency = emergencyContacts[0];
-  const contractId = valueOf(profile, "contractId", "contract_id");
+  const contractId = getProfileContractId(profile);
+  const isLoadingContractDetails = contractId && String(contractDetailsLoadingId) === String(contractId);
 
   const openRoommateProfile = (roommateId) => {
     const nextProfile = profiles.find((item) => Number(valueOf(item, "id")) === Number(roommateId));
@@ -592,12 +746,21 @@ function TenantProfileModal({ profile, profiles, onClose, onSelectProfile }) {
               </p>
               <button
                 type="button"
-                onClick={() => alert(contractId ? "Chức năng xem chi tiết hợp đồng đang phát triển." : "Chưa có hợp đồng để xem.")}
-                className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 text-sm font-black hover:bg-white/15"
+                onClick={() => onOpenContractDetails(profile)}
+                disabled={!contractId || isLoadingContractDetails}
+                className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 text-sm font-black hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Eye className="h-4 w-4" />
-                Xem chi tiết
+                {isLoadingContractDetails ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                {isLoadingContractDetails ? "Đang tải..." : "Xem chi tiết"}
               </button>
+              {!contractId && (
+                <p className="mt-3 text-xs font-semibold text-white/60">Chưa có hợp đồng để xem chi tiết.</p>
+              )}
+              {contractDetailsError && contractId && (
+                <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-100">
+                  {contractDetailsError}
+                </p>
+              )}
             </section>
 
             <DetailSection icon={FolderOpen} title="Danh mục hồ sơ">
@@ -670,11 +833,48 @@ export default function TenantsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedContract, setSelectedContract] = useState(null);
+  const [contractDetailsLoadingId, setContractDetailsLoadingId] = useState("");
+  const [contractDetailsError, setContractDetailsError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [profileStatusFilter, setProfileStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+
+  const openContractDetails = async (profile) => {
+    const contractId = getProfileContractId(profile);
+    if (!contractId) {
+      setContractDetailsError("Chưa có hợp đồng để xem chi tiết.");
+      return;
+    }
+
+    try {
+      setContractDetailsError("");
+      setContractDetailsLoadingId(contractId);
+      const details = await fetchManagementLeaseContractDetails(contractId);
+      setSelectedContract({
+        ...details,
+        contractId: details?.contractId || contractId,
+        roomCode:
+          details?.roomCode ||
+          details?.room_code ||
+          valueOf(profile, "roomCode", "room_code"),
+        propertyName:
+          details?.propertyName ||
+          details?.property_name ||
+          valueOf(profile, "propertyName", "property_name"),
+        contractCode:
+          details?.contractCode ||
+          details?.contract_code ||
+          valueOf(profile, "contractCode", "contract_code"),
+      });
+    } catch (loadError) {
+      setContractDetailsError(loadError?.message || "Không tải được chi tiết hợp đồng.");
+    } finally {
+      setContractDetailsLoadingId("");
+    }
+  };
 
   const loadProfiles = async () => {
     try {
@@ -920,6 +1120,16 @@ export default function TenantsPage() {
           profiles={profiles}
           onClose={() => setSelectedProfile(null)}
           onSelectProfile={setSelectedProfile}
+          onOpenContractDetails={openContractDetails}
+          contractDetailsLoadingId={contractDetailsLoadingId}
+          contractDetailsError={contractDetailsError}
+        />
+      )}
+
+      {selectedContract && (
+        <LeaseContractDetailModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
         />
       )}
     </>

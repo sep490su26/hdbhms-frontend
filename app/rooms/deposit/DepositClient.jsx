@@ -171,6 +171,52 @@ const getDateStringWithOffset = (days) => {
 const getTodayDateString = () => getDateStringWithOffset(0);
 const getMaxDepositScheduleDateString = () => getDateStringWithOffset(MAX_DEPOSIT_SCHEDULE_DAYS);
 
+const normalizeDateInputString = (value) => {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+};
+
+const addDaysToDateString = (value, days) => {
+  const normalizedValue = normalizeDateInputString(value);
+  if (!normalizedValue) return "";
+
+  const [year, month, day] = normalizedValue.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return toLocalDateInputValue(date);
+};
+
+const formatDateForMessage = (value) => {
+  const normalizedValue = normalizeDateInputString(value);
+  if (!normalizedValue) return "";
+
+  const [year, month, day] = normalizedValue.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+const buildDepositScheduleWindow = (room) => {
+  const todayDate = getTodayDateString();
+  const defaultMaxDate = getMaxDepositScheduleDateString();
+  const isSoonVacant = room?.status === "soonVacant";
+  const expectedVacantDate = normalizeDateInputString(room?.expectedVacantDate);
+
+  if (!isSoonVacant || !expectedVacantDate) {
+    return {
+      isSoonVacant: false,
+      expectedVacantDate: "",
+      minDate: todayDate,
+      maxDate: defaultMaxDate,
+    };
+  }
+
+  return {
+    isSoonVacant: true,
+    expectedVacantDate,
+    minDate: addDaysToDateString(expectedVacantDate, 1),
+    maxDate: addDaysToDateString(expectedVacantDate, MAX_DEPOSIT_SCHEDULE_DAYS),
+  };
+};
+
 const REQUIRED_DEPOSIT_MESSAGES = {
   fullName: "Vui lòng nhập họ và tên.",
   birthDate: "Vui lòng chọn ngày sinh.",
@@ -444,10 +490,13 @@ const normalizePhoneValue = (value) => {
   return String(value || "").replace(/[\s.\-()]/g, "");
 };
 
-const validateDepositValue = (name, value) => {
+const validateDepositValue = (name, value, scheduleWindow = null) => {
   const normalizedValue = String(value || "").trim();
   const todayDate = getTodayDateString();
-  const maxScheduleDate = getMaxDepositScheduleDateString();
+  const maxScheduleDate = scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
+  const minScheduleDate = scheduleWindow?.minDate || todayDate;
+  const isSoonVacantSchedule = Boolean(scheduleWindow?.isSoonVacant && scheduleWindow?.expectedVacantDate);
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow?.expectedVacantDate);
 
   if (name !== "email" && !normalizedValue) {
     return REQUIRED_DEPOSIT_MESSAGES[name] || "";
@@ -489,11 +538,17 @@ const validateDepositValue = (name, value) => {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
   }
 
-  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < todayDate) {
+  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < minScheduleDate) {
+    if (isSoonVacantSchedule) {
+      return `${DATE_FIELD_LABELS[name]} phải sau ngày khách cũ trả phòng (${expectedVacantDateLabel}).`;
+    }
     return DATE_IN_PAST_ERROR_MESSAGE;
   }
 
   if ((name === "contractDate" || name === "moveInDate") && normalizedValue > maxScheduleDate) {
+    if (isSoonVacantSchedule) {
+      return `${DATE_FIELD_LABELS[name]} chỉ được tối đa 14 ngày kể từ ngày khách cũ trả phòng.`;
+    }
     return DATE_TOO_FAR_ERROR_MESSAGE;
   }
 
@@ -574,20 +629,20 @@ const buildDepositMetadata = (room, data) => ({
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
 
-function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "" }) {
+function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "", validateValue = validateDepositValue }) {
   const { errors: formErrors, setError } = useContext(DepositFormErrorContext);
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
 
   const handleChange = (event) => {
-    const message = validateDepositValue(name, event.target.value);
+    const message = validateValue(name, event.target.value);
     setLocalError(message);
     setError(name, message);
     onChange?.(event);
   };
 
   const handleBlur = (event) => {
-    const message = validateDepositValue(name, event.target.value);
+    const message = validateValue(name, event.target.value);
     setLocalError(message);
     setError(name, message);
     onBlur?.(event);
@@ -727,14 +782,20 @@ function SummaryLine({ icon: Icon, children }) {
 }
 
 function RoomSummary({ room }) {
+  const scheduleWindow = buildDepositScheduleWindow(room);
+  const isSoonVacant = room?.status === "soonVacant";
+  const statusCopy = isSoonVacant ? "Sắp trống" : "Còn trống";
+  const statusClassName = isSoonVacant ? "bg-[#5b6472]" : "bg-[#006c49]";
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
+
   return (
     <aside
       className="overflow-hidden rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
       <div className="relative h-48 overflow-hidden">
         <Image src={room.image} alt={`Phòng ${room.id}`} fill sizes="352px" className="object-cover" priority />
         <div
-          className="absolute right-4 top-4 rounded-full bg-[#006c49] px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow">
-          Còn trống
+          className={`absolute right-4 top-4 rounded-full px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow ${statusClassName}`}>
+          {statusCopy}
         </div>
       </div>
 
@@ -748,6 +809,11 @@ function RoomSummary({ room }) {
         </div>
 
         <p className="mt-3 text-sm leading-6 text-[#45474c]">{room.description}</p>
+        {isSoonVacant && expectedVacantDateLabel && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
+            Sắp trống từ {expectedVacantDateLabel}. Chỉ đặt cọc với ngày ký/vào ở sau ngày này và trong vòng 14 ngày.
+          </div>
+        )}
 
         <div className="mt-7 border-t border-[#c5c6cd] pt-6">
           <div className="grid gap-4">
@@ -770,8 +836,11 @@ function RoomSummary({ room }) {
 }
 
 function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFieldErrors }) {
+  const scheduleWindow = buildDepositScheduleWindow(room);
   const todayDate = getTodayDateString();
-  const maxScheduleDate = getMaxDepositScheduleDateString();
+  const minScheduleDate = scheduleWindow.minDate;
+  const maxScheduleDate = scheduleWindow.maxDate;
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
   const formRef = useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [savedDraft, setSavedDraft] = useState({});
@@ -901,7 +970,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   };
 
   const validateDepositField = (name, value) => {
-    return validateDepositValue(name, value);
+    return validateDepositValue(name, value, scheduleWindow);
   };
 
   const validateAndSetDepositField = (name, value) => {
@@ -1207,9 +1276,10 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             name="contractDate"
             type="date"
             placeholder="mm/dd/yyyy"
-            min={todayDate}
+            min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.contractDate}
+            validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
             defaultValue={savedDraft.contractDate}
@@ -1219,13 +1289,19 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             name="moveInDate"
             type="date"
             placeholder="mm/dd/yyyy"
-            min={todayDate}
+            min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.moveInDate}
+            validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
             defaultValue={savedDraft.moveInDate}
           />
+          {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
+              Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong vòng 14 ngày.
+            </div>
+          )}
 
           <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
             <FileUploadZone

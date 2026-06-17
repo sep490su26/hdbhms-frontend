@@ -141,6 +141,14 @@ function BillingBadge({ status, label }) {
   );
 }
 
+function shouldShowBillingStatus(ticket) {
+  const ticketStatus = String(ticket?.ticketStatus || ticket?.status || "").toUpperCase();
+  if (ticketStatus === "PENDING" || ticketStatus === "PENDING_ACCEPTANCE" || ticketStatus === "ACCEPTED") {
+    return false;
+  }
+  return Boolean(ticket?.billingStatus);
+}
+
 function Field({ label, children, className = "" }) {
   return (
     <label className={`grid gap-1.5 text-sm font-bold text-[#091426] ${className}`}>
@@ -931,7 +939,9 @@ export default function MaintenancePage() {
                   <td data-label="Trạng thái" className="px-5 py-4">
                     <div className="flex flex-col items-start gap-1.5">
                       <StatusBadge status={ticket.ticketStatus || ticket.status} />
-                      <BillingBadge status={ticket.billingStatus} label={ticket.billingStatusLabel} />
+                      {shouldShowBillingStatus(ticket) && (
+                        <BillingBadge status={ticket.billingStatus} label={ticket.billingStatusLabel} />
+                      )}
                       {ticket.invoiceCode && (
                         <span className="text-xs font-bold text-[#64748b]">{ticket.invoiceCode}</span>
                       )}

@@ -19,9 +19,9 @@ import {
   fetchDepositAgreementDetails,
   fetchDepositAgreements,
   downloadSignedDepositContractPdf,
+  fetchDepositAssetObjectUrl,
   openDepositContractPdf,
   openSignedDepositContractPdf,
-  toApiAssetUrl,
   updateDepositAgreementManagementInfo,
   updateDepositAgreementStatus,
   uploadSignedDepositContractFile,
@@ -84,10 +84,21 @@ function getAgreementItems(response) {
   return response?.data || response?.content || response?.items || [];
 }
 
+function normalizeSignatureStatusLabel(label, signatureStatus, signedFileId) {
+  if (signatureStatus === "SIGNED" || signedFileId) return "Đã ký";
+  const normalized = String(label || "").trim();
+  if (!normalized || normalized === "Chờ upload" || normalized === "Chờ upload bản đã ký") {
+    return "Chờ ký";
+  }
+  return normalized;
+}
+
 function normalizeAgreement(item) {
   const rawStatus = String(item.status || "").toUpperCase();
   const status = rawStatus === "CONFIRMED" ? "PAID" : rawStatus;
   const roomCode = item.roomCode || item.room_code || "";
+  const signedFileId = item.signedFileId || item.signed_file_id || null;
+  const signatureStatus = item.signatureStatus || item.signature_status || (signedFileId ? "SIGNED" : "PENDING_SIGNATURE");
   return {
     id: item.id ?? item.depositAgreementId ?? item.deposit_agreement_id,
     depositCode: item.depositCode || item.deposit_code || `DC-${item.id}`,
@@ -106,9 +117,9 @@ function normalizeAgreement(item) {
     expectedMoveInDate: item.expectedMoveInDate || item.expected_move_in_date || null,
     contractFileId: item.contractFileId || item.contract_file_id || null,
     contractDownloadUrl: item.contractDownloadUrl || item.contract_download_url || null,
-    signatureStatus: item.signatureStatus || item.signature_status || (item.signedFileId || item.signed_file_id ? "SIGNED" : "PENDING_SIGNATURE"),
-    signatureStatusLabel: item.signatureStatusLabel || item.signature_status_label || (item.signedFileId || item.signed_file_id ? "Đã ký" : "Chờ upload bản đã ký"),
-    signedFileId: item.signedFileId || item.signed_file_id || null,
+    signatureStatus,
+    signatureStatusLabel: normalizeSignatureStatusLabel(item.signatureStatusLabel || item.signature_status_label, signatureStatus, signedFileId),
+    signedFileId,
     signedFileName: item.signedFileName || item.signed_file_name || "",
     signedAt: item.signedAt || item.signed_at || null,
     signedUploadedById: item.signedUploadedById || item.signed_uploaded_by_id || null,
@@ -116,7 +127,7 @@ function normalizeAgreement(item) {
     canPreviewDraft: item.canPreviewDraft ?? item.can_preview_draft ?? true,
     canDownloadDraft: item.canDownloadDraft ?? item.can_download_draft ?? true,
     canUploadSignedFile: item.canUploadSignedFile ?? item.can_upload_signed_file ?? true,
-    canViewSignedFile: item.canViewSignedFile ?? item.can_view_signed_file ?? Boolean(item.signedFileId || item.signed_file_id),
+    canViewSignedFile: item.canViewSignedFile ?? item.can_view_signed_file ?? Boolean(signedFileId),
   };
 }
 
@@ -171,8 +182,37 @@ function DetailField({ label, value }) {
   );
 }
 
-function SensitiveImage({ title, url }) {
-  const src = toApiAssetUrl(url);
+function SensitiveImage({ title, url, fileId }) {
+  const imagePath = url || (fileId ? `/api/v1/files/private/${fileId}` : "");
+  const [imageState, setImageState] = useState({ path: "", src: "", error: "" });
+  const src = imageState.path === imagePath ? imageState.src : "";
+  const error = imageState.path === imagePath ? imageState.error : "";
+
+  useEffect(() => {
+    let isMounted = true;
+    let objectUrl = "";
+
+    if (!imagePath) return undefined;
+
+    fetchDepositAssetObjectUrl(imagePath)
+      .then((nextUrl) => {
+        objectUrl = nextUrl;
+        if (isMounted) {
+          setImageState({ path: imagePath, src: nextUrl, error: "" });
+        } else if (nextUrl) {
+          URL.revokeObjectURL(nextUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setImageState({ path: imagePath, src: "", error: "Không tải được ảnh" });
+      });
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imagePath]);
+
   return (
     <div className="rounded-xl border border-[#d7dde8] bg-white p-3">
       <p className="mb-3 text-sm font-bold text-[#102033]">{title}</p>
@@ -188,6 +228,9 @@ function SensitiveImage({ title, url }) {
           <ImageIcon className="mr-2 h-5 w-5" />
           Chưa có ảnh
         </div>
+      )}
+      {!src && error && imagePath && (
+        <p className="mt-2 text-xs font-bold text-rose-600">{error}</p>
       )}
     </div>
   );
@@ -218,6 +261,12 @@ function DetailModal({
   const depositorPermanentAddress = valueOf(details, "depositorPermanentAddress", "depositor_permanent_address")
     || safeAgreement.depositorPermanentAddress
     || "";
+  const idFrontFileId = valueOf(details, "idFrontFileId", "id_front_file_id");
+  const idFrontFileUrl = valueOf(details, "idFrontFileUrl", "id_front_file_url");
+  const idBackFileId = valueOf(details, "idBackFileId", "id_back_file_id");
+  const idBackFileUrl = valueOf(details, "idBackFileUrl", "id_back_file_url");
+  const portraitFileId = valueOf(details, "portraitFileId", "portrait_file_id");
+  const portraitFileUrl = valueOf(details, "portraitFileUrl", "portrait_file_url");
   const canEditManagementInfo = MANAGEMENT_INFO_EDITABLE_STATUSES.has(safeAgreement.status);
   const formDefaults = useMemo(() => ({
     depositorPhone: safeAgreement.depositorPhone || "",
@@ -227,6 +276,7 @@ function DetailModal({
   }), [safeAgreement.depositorPhone, depositorPermanentAddress, expectedLeaseSignDate, expectedMoveInDate]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingSigned, setIsUploadingSigned] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState(null);
   const activeForm = form || formDefaults;
@@ -270,6 +320,21 @@ function DetailModal({
       setFormError(error.message || "Không thể cập nhật thông tin hợp đồng cọc.");
     } finally {
       setIsSaving(false);
+    }
+  };
+  const handleSignedFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setIsUploadingSigned(true);
+    setFormError("");
+    try {
+      await onUploadSignedFile(agreement, file);
+    } catch (error) {
+      setFormError(error.message || "Không thể upload bản hợp đồng đặt cọc đã ký.");
+    } finally {
+      setIsUploadingSigned(false);
     }
   };
 
@@ -375,10 +440,89 @@ function DetailModal({
                     Dữ liệu này nhạy cảm, chỉ tài khoản có quyền quản lý mới nên xem.
                   </p>
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    <SensitiveImage title="Mặt trước CCCD" url={details.idFrontFileUrl} />
-                    <SensitiveImage title="Mặt sau CCCD" url={details.idBackFileUrl} />
-                    <SensitiveImage title="Ảnh chân dung" url={details.portraitFileUrl} />
+                    <SensitiveImage title="Mặt trước CCCD" url={idFrontFileUrl} fileId={idFrontFileId} />
+                    <SensitiveImage title="Mặt sau CCCD" url={idBackFileUrl} fileId={idBackFileId} />
+                    <SensitiveImage title="Ảnh chân dung" url={portraitFileUrl} fileId={portraitFileId} />
                   </div>
+                </section>
+
+                <section className="rounded-2xl border border-[#d7dde8] bg-white p-5 shadow-[0_12px_28px_rgba(9,20,38,0.06)]">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-2xl">
+                      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#4160ad]">Hợp đồng đặt cọc đã ký</p>
+                      <h3 className="mt-1 text-2xl font-extrabold tracking-[-0.02em] text-[#102033]">
+                        {hasSignedFile ? "Đã upload bản đã ký" : "Chờ ký"}
+                      </h3>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#5a6678]">
+                        File sau ký là bản chính thức để quản lý và khách thuê xem/tải. Bản nháp vẫn có ở cụm thao tác bên phải để in trước khi ký trực tiếp.
+                      </p>
+                    </div>
+                    <span className={`w-fit rounded-full px-3 py-1 text-xs font-extrabold ${hasSignedFile ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                      {safeAgreement.signatureStatusLabel || (hasSignedFile ? "Đã ký" : "Chờ ký")}
+                    </span>
+                  </div>
+
+                  {hasSignedFile ? (
+                    <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div>
+                        <DetailField label="Tên file" value={safeAgreement.signedFileName || "Bản hợp đồng đặt cọc đã ký"} />
+                      </div>
+                      <div>
+                        <DetailField label="Ngày ký/upload" value={formatDateTime(safeAgreement.signedAt)} />
+                      </div>
+                      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => onOpenSignedContract(agreement)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a]"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Xem file đã ký
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDownloadSignedContract(agreement)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
+                        >
+                          <Download className="h-4 w-4" />
+                          Tải về
+                        </button>
+                        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]">
+                          <Upload className="h-4 w-4" />
+                          Thay file
+                          <input
+                            type="file"
+                            accept="application/pdf,image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            disabled={isUploadingSigned}
+                            onChange={handleSignedFileChange}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-xl border border-dashed border-[#c7cfdd] bg-[#f7f9fc] p-5">
+                      <p className="max-w-2xl text-sm font-semibold leading-6 text-[#5a6678]">
+                        Chưa upload bản hợp đồng đặt cọc đã ký. Chỉ upload sau khi khách đã ký giấy trực tiếp; file này mới là bản chính thức để khách xem/tải.
+                      </p>
+                      <label className={`mt-4 inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-extrabold text-white ${safeAgreement.canUploadSignedFile === false ? "cursor-not-allowed bg-slate-400" : "bg-[#102033] hover:bg-[#1c2f4a]"}`}>
+                        <Upload className="h-4 w-4" />
+                        {isUploadingSigned ? "Đang upload..." : "Upload bản đã ký"}
+                        <input
+                          type="file"
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          disabled={isUploadingSigned || safeAgreement.canUploadSignedFile === false}
+                          onChange={handleSignedFileChange}
+                        />
+                      </label>
+                      {safeAgreement.canUploadSignedFile === false && (
+                        <p className="mt-3 text-xs font-bold text-rose-600">
+                          Chỉ upload bản đã ký khi khoản cọc đã thanh toán/xác nhận và chưa ở trạng thái hoàn cọc hoặc mất cọc.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </section>
               </section>
 
@@ -432,7 +576,7 @@ function DetailModal({
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a]"
                   >
                     <FileText className="h-4 w-4" />
-                    Xem hợp đồng cọc
+                    Xem bản nháp
                   </button>
                   <button
                     type="button"
@@ -440,7 +584,7 @@ function DetailModal({
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
                   >
                     <Download className="h-4 w-4" />
-                    Tải PDF
+                    Tải PDF bản nháp
                   </button>
                   {!canEditManagementInfo && (
                     <p className="rounded-lg bg-[#f7f9fc] p-3 text-sm font-semibold text-[#5a6678]">
@@ -467,6 +611,7 @@ export default function DepositsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState(null);
+  const [uploadingSignedId, setUploadingSignedId] = useState(null);
 
   const loadAgreements = useCallback(async () => {
     try {
@@ -584,6 +729,74 @@ export default function DepositsPage() {
     }
   };
 
+  const handleOpenSignedContract = async (agreement) => {
+    if (!agreement?.id) {
+      setNotice("Chưa có mã hợp đồng đặt cọc để mở bản đã ký.");
+      return;
+    }
+    try {
+      await openSignedDepositContractPdf(agreement.id);
+    } catch (error) {
+      setNotice(error.message || "Không thể mở bản hợp đồng đặt cọc đã ký.");
+    }
+  };
+
+  const handleDownloadSignedContract = async (agreement) => {
+    if (!agreement?.id) {
+      setNotice("Chưa có mã hợp đồng đặt cọc để tải bản đã ký.");
+      return;
+    }
+    try {
+      await downloadSignedDepositContractPdf(
+        agreement.id,
+        agreement.signedFileName || `hop-dong-dat-coc-da-ky-${agreement.roomCode || agreement.depositCode}.pdf`,
+      );
+    } catch (error) {
+      setNotice(error.message || "Không thể tải bản hợp đồng đặt cọc đã ký.");
+    }
+  };
+
+  const handleUploadSignedFile = async (agreement, file) => {
+    if (!agreement?.id) {
+      throw new Error("Chưa có mã hợp đồng đặt cọc để upload bản đã ký.");
+    }
+    const response = await uploadSignedDepositContractFile(agreement.id, file);
+    const latestDetails = await fetchDepositAgreementDetails(agreement.id);
+    const signedFileId = response?.signedFileId ?? response?.signed_file_id ?? latestDetails?.signedFileId ?? latestDetails?.signed_file_id;
+    const merged = mergeAgreement(agreement, {
+      ...latestDetails,
+      ...response,
+      signedFileId,
+      signedFileName: response?.signedFileName ?? response?.signed_file_name ?? latestDetails?.signedFileName ?? latestDetails?.signed_file_name,
+      signedAt: response?.signedAt ?? response?.signed_at ?? latestDetails?.signedAt ?? latestDetails?.signed_at,
+      signatureStatus: signedFileId ? "SIGNED" : "PENDING_SIGNATURE",
+      signatureStatusLabel: signedFileId ? "Đã ký" : "Chờ ký",
+      canViewSignedFile: Boolean(signedFileId),
+    });
+    setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
+    if (selectedAgreement?.id === agreement.id) {
+      setSelectedAgreement(merged);
+    }
+    setNotice(response?.message || "Tải lên bản hợp đồng đặt cọc đã ký thành công.");
+    return merged;
+  };
+
+  const handleTableSignedFileChange = async (agreement, event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setUploadingSignedId(agreement.id);
+    setNotice("");
+    try {
+      await handleUploadSignedFile(agreement, file);
+    } catch (error) {
+      setNotice(error.message || "Không thể upload bản hợp đồng đặt cọc đã ký.");
+    } finally {
+      setUploadingSignedId(null);
+    }
+  };
+
   return (
     <>
       <section className="grid gap-6">
@@ -665,13 +878,14 @@ export default function DepositsPage() {
                   <th className="px-5 py-4">Ngày tạo</th>
                   <th className="px-5 py-4">Ngày hẹn ký HĐ</th>
                   <th className="px-5 py-4">Trạng thái</th>
+                  <th className="px-5 py-4">Ký HĐ cọc</th>
                   <th className="px-5 py-4 text-center">Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAgreements.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-sm font-bold text-[#6b7280]">
+                    <td colSpan={8} className="px-5 py-10 text-center text-sm font-bold text-[#6b7280]">
                       Không có hợp đồng đặt cọc phù hợp.
                     </td>
                   </tr>
@@ -710,6 +924,11 @@ export default function DepositsPage() {
                           ))}
                         </select>
                       </td>
+                      <td data-label="Ký HĐ cọc" className="px-5 py-4">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${agreement.signatureStatus === "SIGNED" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                          {agreement.signatureStatusLabel || (agreement.signatureStatus === "SIGNED" ? "Đã ký" : "Chờ ký")}
+                        </span>
+                      </td>
                       <td data-label="Hành động" className="px-5 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -736,6 +955,24 @@ export default function DepositsPage() {
                           >
                             <Download className="h-5 w-5" />
                           </button>
+                          <label
+                            className={`rounded-full p-2 ${
+                              agreement.canUploadSignedFile === false || uploadingSignedId === agreement.id
+                                ? "cursor-not-allowed text-slate-400"
+                                : "cursor-pointer text-[#102033] hover:bg-[#eef4ff]"
+                            }`}
+                            title={agreement.signatureStatus === "SIGNED" ? "Thay file đã ký" : "Upload bản đã ký"}
+                            aria-label={`${agreement.signatureStatus === "SIGNED" ? "Thay file đã ký" : "Upload bản đã ký"} ${agreement.depositCode}`}
+                          >
+                            <Upload className="h-5 w-5" />
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              disabled={agreement.canUploadSignedFile === false || uploadingSignedId === agreement.id}
+                              onChange={(event) => handleTableSignedFileChange(agreement, event)}
+                            />
+                          </label>
                         </div>
                       </td>
                     </tr>
@@ -757,8 +994,12 @@ export default function DepositsPage() {
         onClose={() => setSelectedAgreement(null)}
         onOpenContract={handleOpenContract}
         onDownloadContract={handleDownloadContract}
+        onOpenSignedContract={handleOpenSignedContract}
+        onDownloadSignedContract={handleDownloadSignedContract}
+        onUploadSignedFile={handleUploadSignedFile}
         onSaveManagementInfo={handleSaveManagementInfo}
       />
     </>
   );
 }
+

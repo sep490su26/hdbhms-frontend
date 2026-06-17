@@ -445,7 +445,7 @@ export default function MaintenanceTicketDetailPage() {
       return;
     }
     if (ticket.afterAttachments.length === 0 && completeForm.images.length === 0) {
-      setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi chuyển chờ xác nhận.");
+      setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
       return;
     }
     const amount = parseMoneyInput(completeForm.actualCost);
@@ -612,7 +612,7 @@ export default function MaintenanceTicketDetailPage() {
             </span>
             <div>
               <h2 className="text-lg font-black text-[#091426]">Hoàn tất xử lý</h2>
-              <p className="text-sm font-semibold text-[#64748b]">Ghi nhận kết quả sửa chữa và chuyển phiếu sang chờ xác nhận.</p>
+              <p className="text-sm font-semibold text-[#64748b]">Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.</p>
             </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -669,7 +669,7 @@ export default function MaintenanceTicketDetailPage() {
               <input value={completeForm.actualCost} onChange={(event) => updateCompleteForm("actualCost", event.target.value)} className={inputClassName()} inputMode="numeric" placeholder="0" />
             </Field>
             <Field label="Ghi chú hoàn tất">
-              <input value={completeForm.completionNote} onChange={(event) => updateCompleteForm("completionNote", event.target.value)} className={inputClassName()} placeholder="Ghi chú gửi người xác nhận" />
+              <input value={completeForm.completionNote} onChange={(event) => updateCompleteForm("completionNote", event.target.value)} className={inputClassName()} placeholder="Ghi chú hoàn tất nếu có" />
             </Field>
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -698,7 +698,7 @@ export default function MaintenanceTicketDetailPage() {
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
             >
               {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
-              Chuyển chờ xác nhận
+              Hoàn tất
             </button>
           </div>
         </form>

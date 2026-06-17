@@ -64,6 +64,20 @@ export function toApiAssetUrl(path) {
   return `${apiRoot}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+export async function fetchDepositAssetObjectUrl(path) {
+  const url = toApiAssetUrl(path);
+  if (!url) return "";
+
+  const response = await authenticatedDepositFetch(url, {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw new Error("Không thể tải ảnh giấy tờ.");
+  }
+
+  return URL.createObjectURL(await response.blob());
+}
+
 export async function previewDepositContract(metadata) {
   const response = await fetch(`${API_BASE_URL}/deposit/contracts/preview`, {
     method: "POST",
@@ -143,7 +157,7 @@ export async function fetchDepositContractBlob(depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/contract`, {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/draft-pdf`, {
     method: "GET",
   });
 
@@ -158,6 +172,50 @@ export async function fetchDepositContractBlob(depositAgreementId) {
   }
 
   return response.blob();
+}
+
+export async function fetchSignedDepositContractBlob(depositAgreementId) {
+  if (!depositAgreementId) {
+    throw new Error("Thiếu mã hợp đồng đặt cọc.");
+  }
+
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`, {
+    method: "GET",
+  });
+
+  if (response.status === 401) {
+    throw new Error("Vui lòng đăng nhập để xem hợp đồng đặt cọc đã ký.");
+  }
+  if (response.status === 403) {
+    throw new Error("Bạn không có quyền xem hợp đồng đặt cọc đã ký này.");
+  }
+  if (response.status === 404) {
+    throw new Error("Chưa có bản hợp đồng đặt cọc đã ký.");
+  }
+  if (!response.ok) {
+    throw new Error("Không thể tải hợp đồng đặt cọc đã ký.");
+  }
+
+  return response.blob();
+}
+
+export async function uploadSignedDepositContractFile(depositAgreementId, file) {
+  if (!depositAgreementId) {
+    throw new Error("Thiếu mã hợp đồng đặt cọc.");
+  }
+  if (!file) {
+    throw new Error("Vui lòng chọn file hợp đồng đặt cọc đã ký.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`, {
+    method: "POST",
+    body: formData,
+  });
+
+  return readEnvelope(response, "Không thể upload bản hợp đồng đặt cọc đã ký.");
 }
 
 export async function fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent) {
@@ -220,12 +278,28 @@ export async function openDepositContractPdf(depositAgreementId) {
   return openBlobInNewTab(() => fetchDepositContractBlob(depositAgreementId));
 }
 
+export async function openSignedDepositContractPdf(depositAgreementId) {
+  return openBlobInNewTab(() => fetchSignedDepositContractBlob(depositAgreementId));
+}
+
 export async function openDepositContractByPaymentPdf(paymentIntentId, paymentContent) {
   return openBlobInNewTab(() => fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent));
 }
 
 export async function downloadDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc.pdf") {
   const blob = await fetchDepositContractBlob(depositAgreementId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadSignedDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc-da-ky.pdf") {
+  const blob = await fetchSignedDepositContractBlob(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -247,3 +321,4 @@ export async function downloadDepositContractByPaymentPdf(paymentIntentId, payme
   link.remove();
   URL.revokeObjectURL(url);
 }
+

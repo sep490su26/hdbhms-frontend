@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -152,9 +152,9 @@ function AccessDeniedPage() {
   );
 }
 
-function Sidebar({ isOpen, onClose }) {
+function Sidebar({ isOpen, onClose, onLogout, isLoggingOut }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   return (
     <>
@@ -217,12 +217,35 @@ function Sidebar({ isOpen, onClose }) {
           })}
         </nav>
 
+        <div className="mt-5 border-t border-[#172235] pt-5">
+          <div className="flex items-center gap-3 rounded-lg px-3 py-3">
+            <UserAvatar user={user} size="sm" className="bg-white/10 text-white" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold text-white">
+                {user?.fullName || user?.name || "Người dùng"}
+              </span>
+              <span className="block truncate text-xs text-[#8590a6]">
+                {user?.email || user?.phone || ROLE_LABELS[user?.role] || "Tài khoản"}
+              </span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={isLoggingOut}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2.5 text-sm font-bold text-[#d8deeb] transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+            Đăng xuất
+          </button>
+        </div>
+
       </aside>
     </>
   );
 }
 
-function Topbar({ search, onSearchChange, onToggleMobileMenu }) {
+function Topbar({ search, onSearchChange, onToggleMobileMenu, onLogout, isLoggingOut }) {
   const { user } = useAuth();
 
   return (
@@ -257,6 +280,17 @@ function Topbar({ search, onSearchChange, onToggleMobileMenu }) {
           <Bell className="h-5 w-5" />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
         </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          aria-label="Đăng xuất"
+          title="Đăng xuất"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] px-2.5 text-sm font-bold text-[#505f76] transition hover:bg-[#f2f4f6] hover:text-[#091426] disabled:cursor-not-allowed disabled:opacity-60 sm:px-3"
+        >
+          {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          <span className="hidden sm:inline">Đăng xuất</span>
+        </button>
         <div className="hidden items-center gap-3 border-l border-[#e2e8f0] pl-3 sm:flex">
           <span className="rounded-full border border-[#e2e8f0] bg-[#f7f9fb] px-3 py-2 text-xs font-bold text-[#091426]">
             {ROLE_LABELS[user?.role] || user?.roleLabel || "User"}
@@ -275,10 +309,11 @@ function Topbar({ search, onSearchChange, onToggleMobileMenu }) {
 function DashboardLayoutShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, refreshUser, isLoadingUser } = useAuth();
+  const { user, refreshUser, isLoadingUser, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const effectiveRole = user?.role || "";
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
@@ -318,6 +353,7 @@ function DashboardLayoutShell({ children }) {
   useEffect(() => {
     if (!hasHydratedAuth) return;
     if (!user) {
+      if (isLoggingOut) return;
       const redirect = pathname ? `?redirect=${encodeURIComponent(pathname)}` : "";
       router.replace(`/login${redirect}`);
       return;
@@ -326,7 +362,18 @@ function DashboardLayoutShell({ children }) {
     if (!isAllowed) {
       router.replace(getFirstAllowedPath(effectiveRole));
     }
-  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, pathname, router, user]);
+  }, [activeNavigationItem, effectiveRole, hasHydratedAuth, isAllowed, isLoggingOut, pathname, router, user]);
+
+  const handleLogout = useCallback(async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsMobileMenuOpen(false);
+      router.replace("/login");
+    }
+  }, [isLoggingOut, logout, router]);
 
   const contextValue = useMemo(
     () => ({
@@ -343,11 +390,15 @@ function DashboardLayoutShell({ children }) {
         <Sidebar
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
         />
         <Topbar
           search={query}
           onSearchChange={setQuery}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
         />
         <main className="dashboard-main px-4 py-6 sm:px-6 lg:ml-[280px]">
           <div className="dashboard-content mx-auto grid w-full max-w-[1440px] gap-8">

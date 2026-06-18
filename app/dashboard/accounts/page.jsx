@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  Ban,
   CheckCircle2,
   Home,
   KeyRound,
@@ -14,6 +15,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import {
+  disableTenantAccountAccess,
   fetchTenantAccountCandidates,
   sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
@@ -148,6 +150,15 @@ function roleClass(role) {
 }
 
 function resolveAccountState(item) {
+  if (item.occupantStatus === "DISABLED" || item.provisioningStatus === "DISABLED") {
+    return {
+      key: "DISABLED",
+      label: "Đã vô hiệu hóa",
+      hint: item.disabledReason ? `Lý do: ${item.disabledReason}` : "Tenant không còn quyền truy cập phòng/hợp đồng này.",
+      className: "border-slate-300 bg-slate-100 text-slate-700",
+    };
+  }
+
   if (!item.recipientEmail) {
     return {
       key: "MISSING_EMAIL",
@@ -265,6 +276,10 @@ function rowKey(item, index) {
   return `row-${index}`;
 }
 
+function tenantContextKey(item) {
+  return `${item.contractId || "contract"}-${item.profileId || item.userId || item.phone || "tenant"}`;
+}
+
 export default function AccountsPage() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState("");
@@ -274,6 +289,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sendingContractId, setSendingContractId] = useState(null);
+  const [disablingKey, setDisablingKey] = useState(null);
   const [message, setMessage] = useState("");
 
   const loadData = useCallback(async () => {
@@ -394,6 +410,31 @@ export default function AccountsPage() {
     }
   };
 
+  const handleDisable = async (item) => {
+    if (!item?.contractId || !item?.profileId || disablingKey) return;
+    const reason = window.prompt("Nhập lý do vô hiệu hóa quyền truy cập tenant này");
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      setError("Vui lòng nhập lý do vô hiệu hóa.");
+      return;
+    }
+
+    const key = tenantContextKey(item);
+    setDisablingKey(key);
+    setMessage("");
+    setError("");
+    try {
+      const result = await disableTenantAccountAccess(item.contractId, item.profileId, { reason: trimmedReason });
+      setMessage(result?.message === "TENANT_CONTEXT_DISABLED" ? "Đã vô hiệu hóa quyền truy cập tenant." : (result?.message || "Đã vô hiệu hóa quyền truy cập tenant."));
+      await loadData();
+    } catch (disableError) {
+      setError(disableError?.message || "Không vô hiệu hóa được quyền truy cập tenant.");
+    } finally {
+      setDisablingKey(null);
+    }
+  };
+
   return (
     <div className="grid gap-7 text-[#0f1d33]">
       <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -450,6 +491,7 @@ export default function AccountsPage() {
               "Đang gửi",
               "Đã gửi",
               "Đã kích hoạt",
+              "Đã vô hiệu hóa",
               "Gửi thất bại",
               "Thiếu email",
             ]}
@@ -567,11 +609,15 @@ export default function AccountsPage() {
                           <th className="px-5 py-4">Email cá nhân</th>
                           <th className="px-5 py-4">Ngày ký</th>
                           <th className="px-5 py-4">Trạng thái</th>
+                          <th className="px-5 py-4 text-right">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#eef1f6]">
                         {group.rows.map((item, index) => {
                           const state = resolveAccountState(item);
+                          const isDisabled = state.key === "DISABLED";
+                          const isDisabling = disablingKey === tenantContextKey(item);
+                          const disableActionDisabled = isDisabled || isDisabling || !item.contractId || !item.profileId;
                           return (
                             <tr key={rowKey(item, index)}>
                               <td data-label="Khách thuê" className="px-5 py-4">
@@ -601,6 +647,19 @@ export default function AccountsPage() {
                                 <div className="grid gap-1">
                                   <StatusBadge item={item} />
                                   <span className="text-xs text-[#687184]">{state.hint}</span>
+                                </div>
+                              </td>
+                              <td data-label="Thao tác" className="px-5 py-4">
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDisable(item)}
+                                    disabled={disableActionDisabled}
+                                    className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                    {isDisabled ? "Đã vô hiệu hóa" : isDisabling ? "Đang xử lý..." : "Vô hiệu hóa"}
+                                  </button>
                                 </div>
                               </td>
                             </tr>

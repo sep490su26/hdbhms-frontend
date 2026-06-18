@@ -254,6 +254,7 @@ function normalizeTenantAccountCandidate(item = {}) {
         occupantId: item.occupantId ?? item.occupant_id ?? null,
         profileId: item.profileId ?? item.profile_id ?? null,
         roomRole: item.roomRole ?? item.room_role ?? null,
+        occupantStatus: item.occupantStatus ?? item.occupant_status ?? null,
         roomOccupantCount: item.roomOccupantCount ?? item.room_occupant_count ?? null,
         roomMaxOccupants: item.roomMaxOccupants ?? item.room_max_occupants ?? null,
         userId: item.userId ?? item.user_id ?? null,
@@ -275,6 +276,9 @@ function normalizeTenantAccountCandidate(item = {}) {
         sentAt: item.sentAt ?? item.sent_at ?? null,
         failedAt: item.failedAt ?? item.failed_at ?? null,
         failureReason: item.failureReason ?? item.failure_reason ?? "",
+        disabledReason: item.disabledReason ?? item.disabled_reason ?? "",
+        disabledBy: item.disabledBy ?? item.disabled_by ?? null,
+        disabledAt: item.disabledAt ?? item.disabled_at ?? null,
         attemptCount: item.attemptCount ?? item.attempt_count ?? 0,
         lastAttemptAt: item.lastAttemptAt ?? item.last_attempt_at ?? null,
         profileStatus: item.profileStatus ?? item.profile_status ?? null,
@@ -301,6 +305,15 @@ export async function sendTenantAccountCredentials(contractId, { retry = false }
     const params = retry ? "?retry=true" : "";
     const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send${params}`, {
         method: "POST",
+    });
+    return normalizeTenantAccountCandidate(data);
+}
+
+export async function disableTenantAccountAccess(contractId, profileId, { reason } = {}) {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/profiles/${profileId}/disable`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
     });
     return normalizeTenantAccountCandidate(data);
 }

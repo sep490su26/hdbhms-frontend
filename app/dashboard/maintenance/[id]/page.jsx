@@ -35,7 +35,7 @@ const STATUS_META = {
   ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-800 ring-blue-200"],
   IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
   WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Hoàn tất", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
+  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
   REJECTED: ["Từ chối", "bg-rose-50 text-rose-800 ring-rose-200"],
 };
 

@@ -123,7 +123,7 @@ function DropdownMenuRadioItem({
       <span
         className="pointer-events-none absolute right-2 flex items-center justify-center"
         data-slot="dropdown-menu-radio-item-indicator">
-        <DropdownMenuPrimitive.ItemIndicator>
+        <DropdownMenuPrimitive.ItemIndicator>avatar
           <CheckIcon />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>

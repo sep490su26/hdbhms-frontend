@@ -22,6 +22,7 @@ import {
   WalletCards,
   Wrench,
   X,
+  Inbox,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "./_contexts/AuthContext";
 import { DashboardLayoutProvider } from "./_contexts/DashboardLayoutContext";
@@ -43,6 +44,7 @@ const navigation = [
   { path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench, permissionKey: "maintenance" },
   { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2, permissionKey: "deposits" },
   { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText, permissionKey: "contract" },
+  { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox, permissionKey: "requests" },
   { path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards, permissionKey: "finance" },
   { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings, permissionKey: "settings" },
 ];

@@ -31,6 +31,7 @@ export const SECTION_PERMISSIONS = {
   contract: [ROLES.OWNER],
   finance: [ROLES.OWNER, ROLES.ACCOUNTANT],
   settings: [ROLES.OWNER],
+  requests: [ROLES.OWNER, ROLES.MANAGER],
 };
 
 export const ACTION_PERMISSIONS = {

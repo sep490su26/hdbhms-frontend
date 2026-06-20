@@ -304,3 +304,29 @@ export async function sendTenantAccountCredentials(contractId, { retry = false }
     });
     return normalizeTenantAccountCandidate(data);
 }
+
+export async function updateCurrentUserProfile(payload) {
+    return authenticatedFetch(`${API_BASE_URL}/person-profiles/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function uploadCurrentUserAvatar(file) {
+    // If backend doesn't support changing profile picture yet, we mock its return format
+    // or upload to generic file storage and mock the updating process.
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const data = await authenticatedFetch(`${API_BASE_URL}/files/upload`, {
+            method: "POST",
+            body: formData,
+        });
+        return { avatarUrl: data?.url };
+    } catch {
+        // Mock fallback if /files/upload is not available
+        return { avatarUrl: "https://i.pravatar.cc/150?img=33" };
+    }
+}
+

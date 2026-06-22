@@ -21,6 +21,7 @@ import {
 import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
 import {
   approveMaintenanceTicket,
+  createInternalMaintenanceTicket,
   createMaintenanceTicket,
   createMaintenanceViolation,
   declineMaintenanceTicket,
@@ -66,8 +67,11 @@ const CATEGORY_OPTIONS = [
   ["ELECTRICITY", "Điện"],
   ["WATER", "Nước"],
   ["AIR_CONDITIONER", "Máy lạnh"],
+  ["DOOR_LOCK", "Khóa cửa"],
   ["INTERNET", "Internet"],
   ["FURNITURE", "Nội thất"],
+  ["PAINTING", "Sơn sửa"],
+  ["CLEANING", "Vệ sinh"],
   ["SANITARY", "Vệ sinh"],
   ["SECURITY", "An ninh"],
   ["COMMON_EQUIPMENT", "Thiết bị chung"],
@@ -142,6 +146,7 @@ function BillingBadge({ status, label }) {
 }
 
 function shouldShowBillingStatus(ticket) {
+  if (ticket?.ticketScope === "PROPERTY_OPERATION") return true;
   const ticketStatus = String(ticket?.ticketStatus || ticket?.status || "").toUpperCase();
   if (ticketStatus === "PENDING" || ticketStatus === "PENDING_ACCEPTANCE" || ticketStatus === "ACCEPTED") {
     return false;
@@ -208,6 +213,21 @@ function buildDefaultForm(propertyId = "") {
   };
 }
 
+function buildDefaultInternalForm(propertyId = "") {
+  return {
+    propertyId: propertyId ? String(propertyId) : "",
+    locationScope: "ROOM",
+    roomId: "",
+    category: "AIR_CONDITIONER",
+    priority: "MEDIUM",
+    title: "",
+    description: "",
+    actualCost: "",
+    accountingNote: "",
+    images: [],
+  };
+}
+
 function nextBillingPeriod() {
   const date = new Date();
   date.setMonth(date.getMonth() + 1, 1);
@@ -251,6 +271,11 @@ export default function MaintenancePage() {
   const [createForm, setCreateForm] = useState(buildDefaultForm());
   const [createError, setCreateError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isInternalOpen, setIsInternalOpen] = useState(false);
+  const [internalForm, setInternalForm] = useState(buildDefaultInternalForm());
+  const [internalError, setInternalError] = useState("");
+  const [internalSuccess, setInternalSuccess] = useState("");
+  const [isCreatingInternal, setIsCreatingInternal] = useState(false);
   const [isViolationOpen, setIsViolationOpen] = useState(false);
   const [violationForm, setViolationForm] = useState(buildDefaultViolationForm());
   const [violationError, setViolationError] = useState("");
@@ -269,6 +294,7 @@ export default function MaintenancePage() {
       .map((room) => ({
         id: String(room.id),
         label: room.roomCode || room.name || `Phòng ${room.id}`,
+        status: String(room.status || room.currentStatus || room.current_status || "").toUpperCase(),
       }));
   }, [rooms]);
   const selectedViolationPropertyId = String(violationForm.propertyId || filters.propertyId || propertyOptions[0]?.id || "");
@@ -276,11 +302,15 @@ export default function MaintenancePage() {
   const metrics = useMemo(() => {
     const count = (statuses) => tickets.filter((ticket) => statuses.includes(ticket.status)).length;
     const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.costAmount || 0), 0);
+    const landlordCost = tickets
+      .filter((ticket) => String(ticket.payer || "").toUpperCase() === "LANDLORD")
+      .reduce((sum, ticket) => sum + Number(ticket.costAmount || 0), 0);
     return [
       { label: "Chờ tiếp nhận", value: count(["PENDING"]), icon: Clock3, tone: "bg-amber-50 text-amber-700" },
       { label: "Đang xử lý", value: count(["ACCEPTED", "IN_PROGRESS"]), icon: Wrench, tone: "bg-blue-50 text-blue-700" },
       { label: "Chờ xác nhận", value: count(["WAITING_CONFIRMATION"]), icon: TimerReset, tone: "bg-violet-50 text-violet-700" },
       { label: "Chi phí ghi nhận", value: formatMoney(totalCost), icon: Check, tone: "bg-emerald-50 text-emerald-700" },
+      { label: "Chi phí chủ trọ chịu", value: formatMoney(landlordCost), icon: Wrench, tone: "bg-slate-100 text-slate-700" },
     ];
   }, [tickets]);
 
@@ -315,6 +345,7 @@ export default function MaintenancePage() {
       if (firstPropertyId) {
         setFilters((current) => current.propertyId ? current : { ...current, propertyId: firstPropertyId });
         setCreateForm((current) => current.propertyId ? current : buildDefaultForm(firstPropertyId));
+        setInternalForm((current) => current.propertyId ? current : buildDefaultInternalForm(firstPropertyId));
         setViolationForm((current) => current.propertyId ? current : buildDefaultViolationForm(firstPropertyId));
       }
     }
@@ -354,12 +385,23 @@ export default function MaintenancePage() {
     }));
     if (name === "propertyId") {
       setCreateForm((current) => ({ ...current, propertyId: value }));
+      setInternalForm((current) => ({ ...current, propertyId: value, roomId: "" }));
       setViolationForm((current) => ({ ...current, propertyId: value, roomId: "" }));
     }
   }
 
   function updateCreateForm(name, value) {
     setCreateForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function updateInternalForm(name, value) {
+    const nextValue = name === "actualCost" ? formatMoneyInput(value) : value;
+    setInternalForm((current) => ({
+      ...current,
+      [name]: nextValue,
+      ...(name === "propertyId" || (name === "locationScope" && value === "COMMON_AREA") ? { roomId: "" } : {}),
+    }));
+    if (name === "propertyId") updateFilter("propertyId", value);
   }
 
   function updateViolationForm(name, value) {
@@ -389,6 +431,62 @@ export default function MaintenancePage() {
     const nextFiles = [...violationForm.images, ...imageFiles].slice(0, 3);
     setViolationForm((current) => ({ ...current, images: nextFiles }));
     event.target.value = "";
+  }
+
+  function handleInternalImageChange(event) {
+    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
+    setInternalForm((current) => ({ ...current, images: [...current.images, ...files].slice(0, 3) }));
+    event.target.value = "";
+  }
+
+  async function handleCreateInternalTicket(event) {
+    event.preventDefault();
+    setInternalError("");
+    setInternalSuccess("");
+    const propertyId = Number(internalForm.propertyId || filters.propertyId);
+    const roomId = internalForm.locationScope === "ROOM" ? Number(internalForm.roomId) : null;
+    const actualCost = Number(String(internalForm.actualCost || "0").replace(/[^\d]/g, ""));
+    if (!Number.isFinite(propertyId) || propertyId <= 0) {
+      setInternalError("Vui lòng chọn cơ sở.");
+      return;
+    }
+    if (internalForm.locationScope === "ROOM" && (!Number.isFinite(roomId) || roomId <= 0)) {
+      setInternalError("Vui lòng chọn phòng.");
+      return;
+    }
+    if (internalForm.description.trim().length < 10) {
+      setInternalError("Mô tả công việc phải có tối thiểu 10 ký tự.");
+      return;
+    }
+    if (!Number.isFinite(actualCost) || actualCost < 0) {
+      setInternalError("Chi phí thực tế không hợp lệ.");
+      return;
+    }
+    setIsCreatingInternal(true);
+    try {
+      const uploaded = await Promise.all(internalForm.images.map((file) => uploadMaintenanceImage(file)));
+      await createInternalMaintenanceTicket({
+        propertyId,
+        roomId,
+        ticketScope: "PROPERTY_OPERATION",
+        category: internalForm.category,
+        priority: internalForm.priority,
+        title: internalForm.title.trim() || `Bảo trì nội bộ - ${CATEGORY_LABELS[internalForm.category] || "Khác"}`,
+        description: internalForm.description.trim(),
+        actualCost,
+        accountingNote: internalForm.accountingNote.trim(),
+        costType: "COMMON_OPERATING",
+        attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
+      });
+      setInternalSuccess("Đã tạo phiếu bảo trì nội bộ. Chi phí được ghi nhận là chủ trọ chịu và không tạo hóa đơn khách thuê.");
+      setInternalForm(buildDefaultInternalForm(String(propertyId)));
+      setIsInternalOpen(false);
+      await loadTickets();
+    } catch (createError) {
+      setInternalError(createError?.message || "Không tạo được phiếu bảo trì nội bộ.");
+    } finally {
+      setIsCreatingInternal(false);
+    }
   }
 
   async function handleCreateCommonTicket(event) {
@@ -535,8 +633,24 @@ export default function MaintenancePage() {
             <button
               type="button"
               onClick={() => {
+                setInternalForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
+                setIsViolationOpen(false);
+                setIsCreateOpen(false);
+                setIsInternalOpen((value) => !value);
+              }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
+            >
+              {isInternalOpen ? <X className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+              {isInternalOpen ? "Đóng phiếu nội bộ" : "Tạo phiếu nội bộ"}
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
                 setViolationForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
                 setIsCreateOpen(false);
+                setIsInternalOpen(false);
                 setIsViolationOpen((value) => !value);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-4 text-sm font-bold text-white hover:bg-[#971b12]"
@@ -551,6 +665,7 @@ export default function MaintenancePage() {
               onClick={() => {
                 setCreateForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
                 setIsViolationOpen(false);
+                setIsInternalOpen(false);
                 setIsCreateOpen((value) => !value);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a]"
@@ -572,6 +687,107 @@ export default function MaintenancePage() {
       </p>
 
       {violationSuccess && <InlineNotice>{violationSuccess}</InlineNotice>}
+      {internalSuccess && <InlineNotice>{internalSuccess}</InlineNotice>}
+
+      {isInternalOpen && (
+        <form
+          onSubmit={handleCreateInternalTicket}
+          className="grid gap-5 rounded-xl border border-teal-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,118,110,0.08)]"
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-[#091426]">Tạo phiếu bảo trì nội bộ</h2>
+              <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và không phát sinh hóa đơn tenant.
+              </p>
+            </div>
+            <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
+              Chi phí nội bộ
+            </span>
+          </div>
+          {internalError && <InlineNotice type="error">{internalError}</InlineNotice>}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="Phạm vi *">
+              <select value={internalForm.locationScope} onChange={(event) => updateInternalForm("locationScope", event.target.value)} className={selectClassName()}>
+                <option value="ROOM">Phòng cụ thể</option>
+                <option value="COMMON_AREA">Tài sản/khu vực chung</option>
+              </select>
+            </Field>
+            <Field label="Cơ sở *">
+              <select value={internalForm.propertyId} onChange={(event) => updateInternalForm("propertyId", event.target.value)} className={selectClassName()}>
+                <option value="">Chọn cơ sở</option>
+                {propertyOptions.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
+              </select>
+            </Field>
+            {internalForm.locationScope === "ROOM" && (
+              <Field label="Phòng *">
+                <select value={internalForm.roomId} onChange={(event) => updateInternalForm("roomId", event.target.value)} className={selectClassName()}>
+                  <option value="">Chọn phòng</option>
+                  {roomOptions.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.label}{room.status ? ` · ${room.status}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="Người chịu phí">
+              <input value="Chủ trọ chịu" readOnly className={`${inputClassName()} bg-slate-50 text-slate-600`} />
+            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="Hạng mục *">
+              <select value={internalForm.category} onChange={(event) => updateInternalForm("category", event.target.value)} className={selectClassName()}>
+                {CATEGORY_OPTIONS.slice(1).filter(([value]) => value !== "RULE_VIOLATION").map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Mức độ">
+              <select value={internalForm.priority} onChange={(event) => updateInternalForm("priority", event.target.value)} className={selectClassName()}>
+                {PRIORITY_OPTIONS.slice(1).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </Field>
+            <Field label="Chi phí thực tế (VND)">
+              <input value={internalForm.actualCost} onChange={(event) => updateInternalForm("actualCost", event.target.value)} className={inputClassName()} inputMode="numeric" placeholder="0" />
+            </Field>
+            <Field label="Tiêu đề">
+              <input value={internalForm.title} onChange={(event) => updateInternalForm("title", event.target.value)} className={inputClassName()} placeholder="VD: Sửa điều hòa trước khi cho thuê" />
+            </Field>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Mô tả sự cố/công việc *">
+              <textarea value={internalForm.description} onChange={(event) => updateInternalForm("description", event.target.value)} className={textareaClassName()} placeholder="Mô tả hiện trạng và công việc cần xử lý" />
+            </Field>
+            <Field label="Ghi chú kế toán">
+              <textarea value={internalForm.accountingNote} onChange={(event) => updateInternalForm("accountingNote", event.target.value)} className={textareaClassName()} placeholder="Nội dung chi phí, nhà cung cấp hoặc ghi chú chứng từ" />
+            </Field>
+          </div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap gap-3">
+              {internalForm.images.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]">
+                  <span className="line-clamp-2">{file.name}</span>
+                  <button type="button" onClick={() => setInternalForm((current) => ({ ...current, images: current.images.filter((_, itemIndex) => itemIndex !== index) }))} className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white" aria-label="Xóa ảnh">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {internalForm.images.length < 3 && (
+                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569]">
+                  <ImagePlus className="h-5 w-5" />
+                  Ảnh/chứng từ
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleInternalImageChange} className="sr-only" />
+                </label>
+              )}
+            </div>
+            <button type="submit" disabled={isCreatingInternal} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-5 text-sm font-bold text-white hover:bg-[#115e59] disabled:opacity-60">
+              {isCreatingInternal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Tạo phiếu nội bộ
+            </button>
+          </div>
+        </form>
+      )}
 
       {isViolationOpen && (
         <form
@@ -918,11 +1134,18 @@ export default function MaintenancePage() {
                     </div>
                   </td>
                   <td data-label="Vị trí" className="px-5 py-4 text-sm font-semibold text-[#334155]">
-                    <p>{ticket.ticketScope === "ROOM" ? (ticket.roomCode || ticket.roomName || "Phòng thuê") : SCOPE_LABELS[ticket.ticketScope] || ticket.ticketScope}</p>
+                    <p>{ticket.roomCode || ticket.roomName || SCOPE_LABELS[ticket.ticketScope] || ticket.ticketScope}</p>
                     <p className="mt-1 text-xs text-[#64748b]">{ticket.propertyName || "Chưa có cơ sở"}</p>
                   </td>
                   <td data-label="Hạng mục" className="px-5 py-4 text-sm font-bold text-[#334155]">
-                    {ticket.category === "RULE_VIOLATION" ? (
+                    {ticket.ticketScope === "PROPERTY_OPERATION" ? (
+                      <span className="inline-flex flex-col gap-1">
+                        <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
+                          Bảo trì nội bộ
+                        </span>
+                        <span className="text-xs font-bold text-[#64748b]">{CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"}</span>
+                      </span>
+                    ) : ticket.category === "RULE_VIOLATION" ? (
                       <span className="inline-flex flex-col gap-1">
                         <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
                           Vi phạm nội quy
@@ -941,6 +1164,12 @@ export default function MaintenancePage() {
                       <StatusBadge status={ticket.ticketStatus || ticket.status} />
                       {shouldShowBillingStatus(ticket) && (
                         <BillingBadge status={ticket.billingStatus} label={ticket.billingStatusLabel} />
+                      )}
+                      {ticket.ticketScope === "PROPERTY_OPERATION" && (
+                        <>
+                          <span className="text-xs font-black text-teal-700">Chi phí nội bộ · Chủ trọ chịu</span>
+                          <span className="text-xs font-bold text-[#475569]">{formatMoney(ticket.costAmount)}</span>
+                        </>
                       )}
                       {ticket.invoiceCode && (
                         <span className="text-xs font-bold text-[#64748b]">{ticket.invoiceCode}</span>

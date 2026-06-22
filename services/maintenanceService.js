@@ -240,6 +240,32 @@ export async function createMaintenanceTicket(payload) {
   }));
 }
 
+export async function createInternalMaintenanceTicket(payload) {
+  return normalizeTicket(await request("/maintenance/tickets/internal", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+export async function fetchInternalMaintenanceCosts() {
+  const rows = await request("/maintenance/tickets/internal-costs");
+  return (Array.isArray(rows) ? rows : []).map((item) => ({
+    ticketId: readField(item, "ticketId", "ticket_id"),
+    ticketCode: readField(item, "ticketCode", "ticket_code") || "",
+    propertyId: readField(item, "propertyId", "property_id"),
+    propertyName: readField(item, "propertyName", "property_name") || "",
+    roomId: readField(item, "roomId", "room_id"),
+    roomCode: readField(item, "roomCode", "room_code") || "",
+    category: readField(item, "category") || "OTHER",
+    ticketStatus: normalizeStatus(readField(item, "ticketStatus", "ticket_status")),
+    amount: toNumber(readField(item, "amount")),
+    payer: readField(item, "payer") || "LANDLORD",
+    billingStatus: readField(item, "billingStatus", "billing_status") || "NO_CHARGE",
+    accountingNote: readField(item, "accountingNote", "accounting_note") || "",
+    recordedAt: readField(item, "recordedAt", "recorded_at"),
+  }));
+}
+
 export async function createMaintenanceViolation(payload) {
   return request("/maintenance/violations", {
     method: "POST",

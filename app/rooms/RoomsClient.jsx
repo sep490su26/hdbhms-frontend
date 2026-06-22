@@ -19,9 +19,20 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
+import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom, floorPlans, ROOM_PLACEHOLDER_IMAGE } from "../../services/roomsService";
 
 const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
+
+const ROOM_LAYOUT_BY_CODE = new Map();
+floorPlans.forEach((plan, floorIndex) => {
+  [...plan.left, ...plan.right].forEach((roomCode, roomIndex) => {
+    ROOM_LAYOUT_BY_CODE.set(roomCode, {
+      floor: plan.floor,
+      order: floorIndex * 100 + roomIndex,
+      position: roomIndex < plan.left.length ? "left" : "right",
+    });
+  });
+});
 
 function guestStatusCopy(status) {
   const copy = {
@@ -155,17 +166,35 @@ function getRoomSuffix(room) {
   return Number(digits.slice(-2)) || Number(digits) || 0;
 }
 
+function resolveRoomLayout(room) {
+  return ROOM_LAYOUT_BY_CODE.get(getRoomCode(room)) ?? null;
+}
+
 function sortRoomsByCode(left, right) {
-  return getRoomSuffix(left) - getRoomSuffix(right) || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
+  const leftLayout = resolveRoomLayout(left);
+  const rightLayout = resolveRoomLayout(right);
+  const leftOrder = leftLayout?.order ?? getRoomSuffix(left);
+  const rightOrder = rightLayout?.order ?? getRoomSuffix(right);
+  return leftOrder - rightOrder || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
 }
 
 function buildFloorLayoutRooms(rooms) {
   const sortedRooms = [...rooms].sort(sortRoomsByCode);
-  const leftCandidates = sortedRooms.filter((room) => {
-    const suffix = getRoomSuffix(room);
-    return suffix === 1 || suffix === 2;
-  });
-  const fallbackLeft = leftCandidates.length > 0 ? leftCandidates : sortedRooms.slice(0, 2);
+  const floorName = rooms[0]?.floor ?? "";
+  const floorPlan = floorPlans.find((plan) => plan.floor === floorName) ?? null;
+
+  if (floorPlan) {
+    const roomMap = new Map(sortedRooms.map((room) => [getRoomCode(room), room]));
+    const leftRooms = floorPlan.left.map((roomCode) => roomMap.get(roomCode)).filter(Boolean);
+    const rightRooms = floorPlan.right.map((roomCode) => roomMap.get(roomCode)).filter(Boolean);
+
+    return {
+      leftRooms,
+      rightRooms,
+    };
+  }
+
+  const fallbackLeft = sortedRooms.slice(0, Math.min(2, sortedRooms.length));
   const leftCodes = new Set(fallbackLeft.map(getRoomCode));
   const rightRooms = sortedRooms.filter((room) => !leftCodes.has(getRoomCode(room)));
 
@@ -223,11 +252,10 @@ function Stair({ x, y }) {
   );
 }
 
-function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFirstRoom, isLastRoom }) {
   const statusKey = getFloorPlanStatus(room);
   const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
   const isVertical = orientation === "vertical";
-  const suffix = getRoomSuffix(room);
   const roomCode = getRoomCode(room);
 
   const handleKeyDown = (event) => {
@@ -262,15 +290,15 @@ function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRig
       {isVertical ? (
         <>
           <Door x={x + w} y={y + h - 42} side="right" radius={24} />
-          {suffix === 2 && <WindowLine x={x + 18} y={y + 4} width={w - 36} />}
-          {suffix === 1 && <VerticalWindowLine x={x + 4} y={y + h - 62} height={48} />}
+          {isFirstRoom && <WindowLine x={x + 18} y={y + 4} width={w - 36} />}
+          {isLastRoom && <VerticalWindowLine x={x + 4} y={y + h - 62} height={48} />}
         </>
       ) : (
         <>
           <Door x={x} y={y + h * 0.42} side="left" radius={22} />
           <VerticalWindowLine x={x + w - 4} y={y + h / 2 - 23} height={46} />
-          {suffix === 3 && <WindowLine x={x + w / 2 - 26} y={y + 4} width={52} />}
-          {isLastRightRoom && <WindowLine x={x + w / 2 - 26} y={y + h - 4} width={52} />}
+          {isFirstRoom && <WindowLine x={x + w / 2 - 26} y={y + 4} width={52} />}
+          {isLastRoom && <WindowLine x={x + w / 2 - 26} y={y + h - 4} width={52} />}
         </>
       )}
 
@@ -358,6 +386,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={LEFT_ROOM_H}
               orientation="vertical"
               onSelect={onSelect}
+              isFirstRoom={index === 0}
+              isLastRoom={index === leftRooms.length - 1}
             />
           ))}
 
@@ -373,7 +403,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelect}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={index === 0}
+              isLastRoom={index === rightRooms.length - 1}
             />
           ))}
 
@@ -387,7 +418,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelect}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={false}
+              isLastRoom={index === rightRooms.slice(3).length - 1}
             />
           ))}
         </svg>
@@ -479,11 +511,10 @@ function MiniStair({ x, y }) {
   );
 }
 
-function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFirstRoom, isLastRoom }) {
   const statusKey = getFloorPlanStatus(room);
   const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
   const isVertical = orientation === "vertical";
-  const suffix = getRoomSuffix(room);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -517,15 +548,15 @@ function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLas
       {isVertical ? (
         <>
           <MiniDoor x={x + w} y={y + h - 28} side="right" radius={14} />
-          {suffix === 2 && <MiniWindowLine x={x + 12} y={y + 3} width={w - 24} />}
-          {suffix === 1 && <MiniVerticalWindowLine x={x + 3} y={y + h - 38} height={30} />}
+          {isFirstRoom && <MiniWindowLine x={x + 12} y={y + 3} width={w - 24} />}
+          {isLastRoom && <MiniVerticalWindowLine x={x + 3} y={y + h - 38} height={30} />}
         </>
       ) : (
         <>
           <MiniDoor x={x} y={y + h * 0.42} side="left" radius={13} />
           <MiniVerticalWindowLine x={x + w - 3} y={y + h / 2 - 14} height={28} />
-          {suffix === 3 && <MiniWindowLine x={x + w / 2 - 17} y={y + 3} width={34} />}
-          {isLastRightRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + h - 3} width={34} />}
+          {isFirstRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + 3} width={34} />}
+          {isLastRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + h - 3} width={34} />}
         </>
       )}
 
@@ -615,6 +646,8 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
               h={LEFT_ROOM_H}
               orientation="vertical"
               onSelect={onSelectRoom}
+              isFirstRoom={index === 0}
+              isLastRoom={index === leftRooms.length - 1}
             />
           ))}
 
@@ -630,7 +663,8 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelectRoom}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={index === 0}
+              isLastRoom={index === rightRooms.length - 1}
             />
           ))}
         </svg>
@@ -766,13 +800,14 @@ function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatc
 }
 
 function RoomDetail({ room, onClose }) {
-  const [activeImage, setActiveImage] = useState(room.images[0]);
+  const [activeImage, setActiveImage] = useState(room.images?.[0] ?? room.image ?? ROOM_PLACEHOLDER_IMAGE);
+  const galleryImages = room.images?.length ? room.images : [room.image || ROOM_PLACEHOLDER_IMAGE];
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[#1e2746]/95 shadow-2xl">
       <div className="relative h-56 shrink-0 overflow-hidden bg-slate-900">
         <Image
-          src={activeImage}
+          src={activeImage || ROOM_PLACEHOLDER_IMAGE}
           alt={`Ảnh phòng ${room.id}`}
           fill
           sizes="(max-width: 1024px) 100vw, 420px"
@@ -814,7 +849,7 @@ function RoomDetail({ room, onClose }) {
 
       <div className="custom-scrollbar flex-1 overflow-y-auto bg-white p-5 text-[#091426]">
         <div className="mb-5 grid grid-cols-4 gap-2">
-          {room.images.map((image, index) => (
+          {galleryImages.map((image, index) => (
             <button
               key={`${image}-${index}`}
               type="button"

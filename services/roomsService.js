@@ -6,19 +6,27 @@ export const floorPlans = [
   { floor: "Tầng 5", left: ["P502", "P501"], right: ["P503", "P504", "P505", "P506", "P507"] },
 ];
 
+export const ROOM_PLACEHOLDER_IMAGE = "/room-placeholder.svg";
+
+const ROOM_LAYOUT_BY_CODE = new Map();
+floorPlans.forEach((plan, floorIndex) => {
+  [...plan.left, ...plan.right].forEach((roomCode, roomIndex) => {
+    ROOM_LAYOUT_BY_CODE.set(roomCode, {
+      floor: plan.floor,
+      floorIndex,
+      order: floorIndex * 100 + roomIndex,
+      position: roomIndex < plan.left.length ? "left" : "right",
+    });
+  });
+});
+
 const availableRoomIds = ["P101", "P103", "P202", "P203", "P208", "P303", "P308", "P401", "P403", "P408", "P503", "P507"];
 const maintenanceRoomIds = ["P204", "P306"];
 const premiumRoomIds = ["P101", "P102", "P201", "P202", "P301", "P302", "P401", "P402", "P501", "P502"];
 const quietRoomIds = ["P103", "P203", "P208", "P303", "P308", "P403", "P408", "P503", "P507"];
 
-const roomImages = [
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1200&q=80",
-  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&q=80",
-  "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&q=80",
-  "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=900&q=80&crop=entropy",
-  "https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=900&q=80",
-];
-const defaultRoomImage = roomImages[0];
+const roomImages = [ROOM_PLACEHOLDER_IMAGE];
+
 
 const amenitiesByType = {
   premium: ["Ban công riêng", "Cửa sổ lớn", "Máy lạnh Inverter", "Tủ quần áo", "Bàn làm việc", "Wifi tốc độ cao"],
@@ -44,6 +52,18 @@ function resolveStatus(code) {
   if (maintenanceRoomIds.includes(code)) return "maintenance";
   if (availableRoomIds.includes(code)) return "available";
   return "occupied";
+}
+
+function normalizeRoomCode(roomCode) {
+  const normalized = String(roomCode ?? "").trim().toUpperCase();
+  if (!normalized) {
+    return normalized;
+  }
+  return normalized.startsWith("P") ? normalized : "P" + normalized;
+}
+
+function resolveRoomLayout(roomCode) {
+  return ROOM_LAYOUT_BY_CODE.get(normalizeRoomCode(roomCode)) ?? null;
 }
 
 export const rooms = floorPlans.flatMap((plan, floorIndex) =>
@@ -96,6 +116,30 @@ export const rooms = floorPlans.flatMap((plan, floorIndex) =>
 export const floors = ["Tất cả", ...floorPlans.map((plan) => plan.floor)];
 
 import { API_BASE_URL } from "@/lib/apiConfig";
+const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+
+function resolveRoomImageUrl(url) {
+  if (!url) return null;
+
+  const normalized = String(url).trim();
+  if (!normalized) return null;
+  if (/^(data:|blob:)/i.test(normalized)) return normalized;
+  if (
+    normalized === ROOM_PLACEHOLDER_IMAGE ||
+    normalized.startsWith(`${ROOM_PLACEHOLDER_IMAGE}?`) ||
+    normalized.startsWith(`${ROOM_PLACEHOLDER_IMAGE}#`)
+  ) {
+    return normalized;
+  }
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  if (normalized.startsWith("/api/v1")) return `${API_ROOT}${normalized}`;
+  if (normalized.startsWith("/room-samples/")) return `${API_ROOT}${normalized}`;
+  // Relative path without leading slash (e.g. "room-samples/P102/1.jpg")
+  // must use API_ROOT (not API_BASE_URL which contains /api/v1)
+  if (normalized.startsWith("room-samples/")) return `${API_ROOT}/${normalized}`;
+  if (normalized.startsWith("/")) return `${API_BASE_URL}${normalized}`;
+  return `${API_BASE_URL}/${normalized}`;
+}
 export const PUBLIC_ROOMS_API_URL = `${API_BASE_URL}/rooms`;
 export const LANDLORD_CONTACT_PHONE = "0914339682";
 export const CONTACT_PHONE_HREF = `tel:${LANDLORD_CONTACT_PHONE}`;
@@ -123,6 +167,33 @@ export function mapApiRoomStatus(currentStatus) {
   return "occupied";
 }
 
+function normalizeRoomImageValue(image) {
+  if (!image) return null;
+  if (typeof image === "string") {
+    const trimmed = image.trim();
+    return resolveRoomImageUrl(trimmed);
+  }
+  if (typeof image === "object") {
+    return resolveRoomImageUrl(image.url ?? image.imageUrl ?? image.image_url ?? null);
+  }
+  return null;
+}
+
+export function normalizeRoomImages(apiRoom) {
+  const rawImages = [
+    apiRoom?.firstImageUrl,
+    apiRoom?.first_image_url,
+    apiRoom?.imageUrl,
+    apiRoom?.image_url,
+    ...(Array.isArray(apiRoom?.imageUrls) ? apiRoom.imageUrls : []),
+    ...(Array.isArray(apiRoom?.image_urls) ? apiRoom.image_urls : []),
+    ...(Array.isArray(apiRoom?.images) ? apiRoom.images : []),
+  ];
+
+  const uniqueImages = [...new Set(rawImages.map(normalizeRoomImageValue).filter(Boolean))];
+  return uniqueImages.length > 0 ? uniqueImages : [ROOM_PLACEHOLDER_IMAGE];
+}
+
 export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   const roomCode = apiRoom.room_code ?? apiRoom.roomCode ?? apiRoom.code ?? apiRoom.name ?? "";
   const listedPrice = apiRoom.listed_price ?? apiRoom.listedPrice ?? apiRoom.price ?? 0;
@@ -136,16 +207,8 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   const floorOrder = apiRoom.floor?.sort_order ?? apiRoom.floor?.sortOrder ?? apiRoom.floor_sort_order ?? apiRoom.floorSortOrder;
   const floorNumber = floorOrder ?? parseInt(floorName?.replace(/\D/g, "") || "1", 10);
 
-  // Handle image collections
-  const backendImages = (apiRoom.images || []).map(img => typeof img === 'string' ? img : img.url).filter(Boolean);
-  const imageUrls = [
-    apiRoom.first_image_url,
-    apiRoom.firstImageUrl,
-    apiRoom.imageUrl,
-    ...backendImages
-  ].filter(Boolean);
-
-  const uniqueImages = [...new Set(imageUrls)];
+  const imageUrls = normalizeRoomImages(apiRoom);
+  const roomLayout = resolveRoomLayout(roomCode);
   const status = mapApiRoomStatus(apiRoom.current_status ?? apiRoom.currentStatus);
 
   const normalizedRoom = {
@@ -161,8 +224,9 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     status,
     expectedVacantDate: apiRoom.expected_vacant_date ?? apiRoom.expectedVacantDate ?? null,
     type: apiRoom.type ?? "standard",
-    image: uniqueImages[0] ?? defaultRoomImage,
-    images: uniqueImages.length > 0 ? uniqueImages : [defaultRoomImage],
+    image: imageUrls[0],
+    images: imageUrls,
+    imageUrls,
     floor: floorName,
     floorNumber,
     priceLabel: listedPrice ? `${(listedPrice / 1000000).toLocaleString("vi-VN")} tr/tháng` : "Liên hệ",
@@ -186,7 +250,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
       ? apiRoom.amenities
       : ["Wifi tốc độ cao", "Điều hòa", "Bình nóng lạnh", "Máy giặt", "Vệ sinh khép kín", "Khu phơi đồ"],
     buildingFacilities: ["An ninh 24/7", "Camera giám sát", "Bãi xe", "Khu giặt phơi", "Internet nhanh"],
-    position: (roomCode?.endsWith("01") || roomCode?.endsWith("02")) ? "left" : "right",
+    position: roomLayout?.position ?? "right",
   };
 
   return {

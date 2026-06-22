@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchChangeRequests, fetchChangeRequestStats } from "@/services/changeRequestsService";
+import { Loader2 } from "lucide-react";
 import {
     ArrowRightLeft,
     LogOut,
@@ -39,43 +41,37 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 
-const REQUESTS = [
-    { id: "TR-2026-001", type: "Transfer Request", typeKey: "transfer", tenant: "Nguyen Van A", phone: "0901 234 567", room: "A101 → B203", requestedDate: "20/06/2026", submittedAgo: "2 hours ago", submittedAt: "18/06/2026 10:30", status: "Pending" },
-    { id: "MO-2026-005", type: "Move Out Request", typeKey: "moveout", tenant: "Tran Thi B", phone: "0912 345 678", room: "A205", requestedDate: "30/06/2026", submittedAgo: "1 day ago", submittedAt: "17/06/2026 16:45", status: "Pending" },
-    { id: "CR-2026-003", type: "Contract Renewal", typeKey: "renewal", tenant: "Le Van C", phone: "0933 556 789", room: "B105", requestedDate: "15/07/2026", submittedAgo: "2 days ago", submittedAt: "16/06/2026 09:20", status: "Pending" },
-    { id: "CT-2026-002", type: "Contract Termination", typeKey: "termination", tenant: "Pham Thi D", phone: "0988 776 655", room: "C302", requestedDate: "10/07/2026", submittedAgo: "2 days ago", submittedAt: "16/06/2026 11:15", status: "Pending" },
-    { id: "MA-2026-011", type: "Maintenance Request", typeKey: "maintenance", tenant: "Hoang Van E", phone: "0911 223 344", room: "A301", requestedDate: "—", submittedAgo: "3 days ago", submittedAt: "15/06/2026 14:05", status: "Pending" },
-    { id: "CP-2026-007", type: "Complaint", typeKey: "complaint", tenant: "Vu Thi F", phone: "0944 889 900", room: "B201", requestedDate: "—", submittedAgo: "3 days ago", submittedAt: "15/06/2026 10:40", status: "Pending" },
-    { id: "AC-2026-004", type: "Access Card Request", typeKey: "access", tenant: "Ngo Van G", phone: "0977 665 544", room: "A101", requestedDate: "—", submittedAgo: "4 days ago", submittedAt: "14/06/2026 09:10", status: "Pending" },
-];
-
-const TYPE_CONFIG = {
-    transfer: { color: "bg-blue-50", icon: <ArrowRightLeft className="w-5 h-5 text-blue-500" /> },
-    moveout: { color: "bg-orange-50", icon: <LogOut className="w-5 h-5 text-orange-500" /> },
-    renewal: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" /> },
-    termination: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" /> },
-    maintenance: { color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500" /> },
-    complaint: { color: "bg-yellow-50", icon: <MessageSquareWarning className="w-5 h-5 text-yellow-500" /> },
-    access: { color: "bg-green-50", icon: <Key className="w-5 h-5 text-green-600" /> },
+const translateType = (type) => {
+    const map = {
+        TRANSFER: "Chuyển phòng",
+        MOVEOUT: "Trả phòng",
+        RENEWAL: "Gia hạn HĐ",
+        TERMINATION: "Thanh lý HĐ",
+        MAINTENANCE: "Bảo trì",
+        COMPLAINT: "Khiếu nại",
+        ACCESS: "Yêu cầu thẻ"
+    };
+    return map[type] || type;
 };
 
-const BREAKDOWN = [
-    { label: "Transfer Request", count: 4, color: "bg-blue-500" },
-    { label: "Move Out Request", count: 3, color: "bg-green-500" },
-    { label: "Contract Termination", count: 5, color: "bg-yellow-400" },
-    { label: "Maintenance Request", count: 2, color: "bg-purple-500" },
-    { label: "Complaint", count: 1, color: "bg-pink-400" },
-    { label: "Others", count: 2, color: "bg-gray-300" },
-];
+const translateStatus = (status) => {
+    const map = {
+        PENDING: "Pending",
+        APPROVED: "Approved",
+        REJECTED: "Rejected"
+    };
+    return map[status] || status;
+};
 
-const DONUT_SEGMENTS = [
-    { name: "Transfer", value: 23, color: "#3B82F6" },
-    { name: "Move Out", value: 18, color: "#22C55E" },
-    { name: "Termination", value: 29, color: "#FACC15" },
-    { name: "Maintenance", value: 12, color: "#A855F7" },
-    { name: "Complaint", value: 6, color: "#F472B6" },
-    { name: "Others", value: 12, color: "#D1D5DB" },
-];
+const TYPE_CONFIG = {
+    TRANSFER: { color: "bg-blue-50", icon: <ArrowRightLeft className="w-5 h-5 text-blue-500" /> },
+    MOVEOUT: { color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500" /> },
+    RENEWAL: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" /> },
+    TERMINATION: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" /> },
+    MAINTENANCE: { color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500" /> },
+    COMPLAINT: { color: "bg-yellow-50", icon: <MessageSquareWarning className="w-5 h-5 text-yellow-500" /> },
+    ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" /> },
+};
 
 export default function ApprovalCenter() {
     const [typeFilter, setTypeFilter] = useState("All Types");
@@ -83,13 +79,47 @@ export default function ApprovalCenter() {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
 
-    const filtered = REQUESTS.filter((r) => {
-        const matchSearch = r.tenant.toLowerCase().includes(search.toLowerCase()) ||
-            r.id.toLowerCase().includes(search.toLowerCase()) ||
-            r.room.toLowerCase().includes(search.toLowerCase());
-        const matchType = typeFilter === "All Types" || r.type === typeFilter;
-        return matchSearch && matchType;
-    });
+    const [data, setData] = useState([]);
+    const [stats, setStats] = useState({ breakdown: [], pendingCount: 0, approvedCount: 0, rejectedCount: 0, totalCount: 0 });
+    const [loading, setLoading] = useState(true);
+    const [total, setTotal] = useState(0);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [dataRes, statsRes] = await Promise.all([
+                fetchChangeRequests({ page: page - 1, size: 8, type: typeFilter === "All Types" ? "all" : typeFilter, status: statusFilter === "All" ? "all" : statusFilter, search }),
+                fetchChangeRequestStats()
+            ]);
+            setData(dataRes.requests || []);
+            setTotal(dataRes.total || 0);
+
+            if (statsRes) {
+                const colors = { TRANSFER: "#3B82F6", MOVEOUT: "#22C55E", TERMINATION: "#FACC15", MAINTENANCE: "#A855F7", COMPLAINT: "#F472B6", ACCESS: "#9CA3AF" };
+                const breakdown = (statsRes.breakdown || []).map(b => ({
+                    ...b,
+                    label: translateType(b.type),
+                    color: colors[b.type] || "#D1D5DB"
+                }));
+                setStats({
+                    pendingCount: statsRes.pendingCount || 0,
+                    approvedCount: statsRes.approvedCount || 0,
+                    rejectedCount: statsRes.rejectedCount || 0,
+                    totalCount: statsRes.totalCount || 0,
+                    breakdown
+                });
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const t = setTimeout(loadData, 300);
+        return () => clearTimeout(t);
+    }, [search, typeFilter, statusFilter, page]);
 
     return (
         <div className="font-sans">
@@ -105,10 +135,10 @@ export default function ApprovalCenter() {
                     {/* Stat cards */}
                     <div className="grid grid-cols-4 gap-4">
                         {[
-                            { label: "Pending Approval", value: 12, sub: "Requests waiting for you", iconBg: "bg-blue-50", icon: <FileCheck2 className="w-7 h-7 text-blue-500" /> },
-                            { label: "Approved Today", value: 35, sub: "Requests approved", iconBg: "bg-green-50", icon: <CalendarCheck className="w-7 h-7 text-green-500" /> },
-                            { label: "Rejected Today", value: 3, sub: "Requests rejected", iconBg: "bg-red-50", icon: <XCircle className="w-7 h-7 text-red-500" /> },
-                            { label: "This Month", value: 50, sub: "Total requests", iconBg: "bg-purple-50", icon: <CalendarRange className="w-7 h-7 text-purple-500" /> },
+                            { label: "Pending Approval", value: stats.pendingCount, sub: "Requests waiting for you", iconBg: "bg-blue-50", icon: <FileCheck2 className="w-7 h-7 text-blue-500" /> },
+                            { label: "Approved Today", value: stats.approvedCount, sub: "Requests approved", iconBg: "bg-green-50", icon: <CalendarCheck className="w-7 h-7 text-green-500" /> },
+                            { label: "Rejected Today", value: stats.rejectedCount, sub: "Requests rejected", iconBg: "bg-red-50", icon: <XCircle className="w-7 h-7 text-red-500" /> },
+                            { label: "Total Month", value: stats.totalCount, sub: "Total requests", iconBg: "bg-purple-50", icon: <CalendarRange className="w-7 h-7 text-purple-500" /> },
                         ].map((card) => (
                             <div key={card.label} className="bg-white border border-gray-200 rounded-2xl p-5 flex items-start gap-4">
                                 <div className={`w-12 h-12 ${card.iconBg} rounded-xl flex items-center justify-center shrink-0`}>{card.icon}</div>
@@ -135,10 +165,10 @@ export default function ApprovalCenter() {
                         <select
                             className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700 font-medium h-10"
                             value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
+                            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
                         >
-                            <option>All Types</option>
-                            {Object.keys(REQUESTS.reduce((acc, r) => { acc[r.type] = true; return acc; }, {})).map(t => <option key={t}>{t}</option>)}
+                            <option value="All Types">All Types</option>
+                            {Object.keys(TYPE_CONFIG).map(t => <option key={t} value={t}>{translateType(t)}</option>)}
                         </select>
                         <select
                             className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700 font-medium h-10"
@@ -170,64 +200,71 @@ export default function ApprovalCenter() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filtered.map((req) => {
-                                    const tc = TYPE_CONFIG[req.typeKey];
-                                    return (
-                                        <TableRow key={req.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <TableCell className="px-5 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-9 h-9 ${tc.color} rounded-xl flex items-center justify-center shrink-0`}>
-                                                        {tc.icon}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900 text-sm">{req.type}</p>
-                                                        <p className="text-xs text-gray-400">{req.id}</p>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4">
-                                                <p className="font-medium text-gray-900">{req.tenant}</p>
-                                                <p className="text-xs text-gray-400">{req.phone}</p>
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4 text-gray-600 font-medium">
-                                                {req.room}
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4 text-gray-600">
-                                                {req.requestedDate}
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4">
-                                                <p className="text-gray-700 font-medium">{req.submittedAgo}</p>
-                                                <p className="text-xs text-gray-400">{req.submittedAt}</p>
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4">
-                                                <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">
-                                                    {req.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="px-5 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 px-4">
-                                                        Review
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                                {filtered.length === 0 && (
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-10 text-gray-500">
+                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
+                                            Đang tải dữ liệu...
+                                        </TableCell>
+                                    </TableRow>
+                                ) : data.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="text-center py-10 text-gray-500">
                                             No requests found.
                                         </TableCell>
                                     </TableRow>
+                                ) : (
+                                    data.map((req) => {
+                                        const tc = TYPE_CONFIG[req.requestType] || TYPE_CONFIG.ACCESS;
+                                        return (
+                                            <TableRow key={req.id} className="hover:bg-gray-50/50 transition-colors">
+                                                <TableCell className="px-5 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-9 h-9 ${tc.color} rounded-xl flex items-center justify-center shrink-0`}>
+                                                            {tc.icon}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-semibold text-gray-900 text-sm">{translateType(req.requestType)}</p>
+                                                            <p className="text-xs text-gray-400">{req.requestCode}</p>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4">
+                                                    <p className="font-medium text-gray-900">Guest #{req.requesterId || "--"}</p>
+                                                    <p className="text-xs text-gray-400">---</p>
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4 text-gray-600 font-medium">
+                                                    --
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4 text-gray-600">
+                                                    {new Date(req.createdAt).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4">
+                                                    <p className="text-gray-700 font-medium">{new Date(req.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                                    <p className="text-xs text-gray-400">Today</p>
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4">
+                                                    <Badge variant="outline" className={`bg-white border-gray-200 capitalize ${req.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50' : req.status === 'APPROVED' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                                        {translateStatus(req.status)}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="px-5 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 px-4">
+                                                            Review
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </div>
 
-                    {/* Pagination */}
                     <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-500">Showing {filtered.length > 0 ? 1 : 0} to {filtered.length} of 87 requests</p>
+                        <p className="text-sm text-gray-500">Showing {Math.min(1 + (page - 1) * 8, total)} to {Math.min(page * 8, total)} of {total} requests</p>
                         <Pagination className="mx-0 w-auto">
                             <PaginationContent>
                                 <PaginationItem>
@@ -270,16 +307,16 @@ export default function ApprovalCenter() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={DONUT_SEGMENTS}
+                                        data={stats.breakdown.length > 0 ? stats.breakdown : [{ type: "OTHER", count: 1, color: "#D1D5DB" }]}
                                         cx="50%"
                                         cy="50%"
                                         innerRadius={45}
                                         outerRadius={65}
                                         paddingAngle={2}
-                                        dataKey="value"
+                                        dataKey="count"
                                         stroke="none"
                                     >
-                                        {DONUT_SEGMENTS.map((entry, index) => (
+                                        {(stats.breakdown.length > 0 ? stats.breakdown : [{ type: "OTHER", count: 1, color: "#D1D5DB" }]).map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -287,10 +324,10 @@ export default function ApprovalCenter() {
                             </ResponsiveContainer>
                         </div>
                         <div className="space-y-3">
-                            {BREAKDOWN.map((item) => (
+                            {stats.breakdown.map((item) => (
                                 <div key={item.label} className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.color}`}></span>
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }}></span>
                                         <span className="text-xs text-gray-600">{item.label}</span>
                                     </div>
                                     <span className="text-xs font-semibold text-gray-700">{item.count}</span>

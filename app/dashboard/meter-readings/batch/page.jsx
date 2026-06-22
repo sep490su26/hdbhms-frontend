@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
@@ -177,6 +177,38 @@ export default function MeterReadings() {
     useEffect(() => {
         loadData();
     }, [period]);
+
+    useEffect(() => {
+        if (focusRoomId) {
+            document.documentElement.classList.add("overflow-hidden");
+            document.body.classList.add("overflow-hidden");
+        } else {
+            document.documentElement.classList.remove("overflow-hidden");
+            document.body.classList.remove("overflow-hidden");
+        }
+        return () => {
+            document.documentElement.classList.remove("overflow-hidden");
+            document.body.classList.remove("overflow-hidden");
+        };
+    }, [focusRoomId]);
+
+    const scrollRef = useRef(null);
+    const handleWheel = useCallback((e) => {
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            e.currentTarget.scrollLeft += e.deltaY;
+        }
+    }, []);
+
+    const horizontalScrollRef = useCallback((node) => {
+        if (scrollRef.current) {
+            scrollRef.current.removeEventListener("wheel", handleWheel);
+        }
+        if (node) {
+            node.addEventListener("wheel", handleWheel, { passive: false });
+        }
+        scrollRef.current = node;
+    }, [handleWheel]);
 
     // handleSaveBatch removed
 
@@ -447,7 +479,8 @@ export default function MeterReadings() {
             </div>
 
             <div className="mb-4">
-                <Accordion type="multiple" defaultValue={defaultAccordionValues} className="w-full space-y-4">
+                {defaultAccordionValues.length > 0 && (
+                    <Accordion type="multiple" defaultValue={defaultAccordionValues} className="w-full space-y-4">
                     {Object.entries(groupedByFloor).map(([floor, floorRooms]) => (
                         <AccordionItem key={floor} value={floor}
                             className="border border-gray-200 rounded-xl bg-white shadow-sm">
@@ -777,6 +810,7 @@ export default function MeterReadings() {
                         </AccordionItem>
                     ))}
                 </Accordion>
+                )}
             </div>
 
             {/* Footer */}
@@ -818,6 +852,17 @@ export default function MeterReadings() {
                                 <DialogHeader>
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
+                                <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 mb-2" ref={horizontalScrollRef}>
+                                    {filtered.map(r => (
+                                        <button 
+                                            key={r.id} 
+                                            onClick={() => setFocusRoomId(r.id)} 
+                                            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                        >
+                                            {r.id}
+                                        </button>
+                                    ))}
+                                </div>
                                 <div className="space-y-6 py-4">
                                     {/* Electricity */}
                                     <div className="space-y-3">
@@ -882,7 +927,7 @@ export default function MeterReadings() {
                                     <div className="pt-2">
                                         {capturedPhotos[room.id] ? (
                                             <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-32 object-cover" />
+                                                <img src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-48 object-contain bg-gray-50 bg-black/5" />
                                                 <button 
                                                     onClick={() => {
                                                         const newPhotos = {...capturedPhotos};

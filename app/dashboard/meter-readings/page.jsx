@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { fetchBatchHistory, fetchUtilityDashboard, startBatchReading } from "@/services/meterReadingService";
-import { toast } from "sonner";
+import {useState, useEffect} from "react";
+import {useRouter} from "next/navigation";
+import {fetchBatchHistory, fetchUtilityDashboard, startBatchReading} from "@/services/meterReadingService";
+import {toast} from "sonner";
 import {
     Table,
     TableBody,
@@ -23,24 +23,24 @@ import {
 } from "@/components/ui/pagination";
 
 const NAV_ITEMS = [
-    { icon: "grid", label: "Tổng quan" },
-    { icon: "home", label: "Phòng trọ" },
-    { icon: "file-text", label: "Hợp đồng" },
-    { icon: "users", label: "Khách thuê" },
-    { icon: "dollar", label: "Thu chi" },
-    { icon: "alert-circle", label: "Công nợ" },
-    { icon: "zap", label: "Điện nước", active: true },
-    { icon: "tool", label: "Dịch vụ" },
-    { icon: "clipboard", label: "Yêu cầu" },
-    { icon: "bar-chart", label: "Báo cáo" },
-    { icon: "settings", label: "Cài đặt" },
+    {icon: "grid", label: "Tổng quan"},
+    {icon: "home", label: "Phòng trọ"},
+    {icon: "file-text", label: "Hợp đồng"},
+    {icon: "users", label: "Khách thuê"},
+    {icon: "dollar", label: "Thu chi"},
+    {icon: "alert-circle", label: "Công nợ"},
+    {icon: "zap", label: "Điện nước", active: true},
+    {icon: "tool", label: "Dịch vụ"},
+    {icon: "clipboard", label: "Yêu cầu"},
+    {icon: "bar-chart", label: "Báo cáo"},
+    {icon: "settings", label: "Cài đặt"},
 ];
 
 const STATUS_MAP = {
-    DRAFT: { label: "ĐANG NHẬP DỮ LIỆU", bg: "bg-blue-50 text-blue-600 border border-blue-200" },
-    PREVIEWED: { label: "CHỜ DUYỆT", bg: "bg-yellow-50 text-yellow-600 border border-yellow-200" },
-    CONFIRMED: { label: "ĐÃ CHỐT", bg: "bg-green-50 text-green-600 border border-green-200" },
-    CANCELLED: { label: "ĐÃ HỦY", bg: "bg-gray-100 text-gray-500 border border-gray-200" },
+    DRAFT: {label: "ĐANG NHẬP DỮ LIỆU", bg: "bg-blue-50 text-blue-600 border border-blue-200"},
+    PREVIEWED: {label: "CHỜ DUYỆT", bg: "bg-yellow-50 text-yellow-600 border border-yellow-200"},
+    CONFIRMED: {label: "ĐÃ CHỐT", bg: "bg-green-50 text-green-600 border border-green-200"},
+    CANCELLED: {label: "ĐÃ HỦY", bg: "bg-gray-100 text-gray-500 border border-gray-200"},
 };
 
 const formatTime = (startDate, endDate) => {
@@ -50,9 +50,9 @@ const formatTime = (startDate, endDate) => {
     return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
 };
 
-function NavIcon({ type, className = "w-5 h-5" }) {
-    const p = { className, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" };
-    const s = { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.8 };
+function NavIcon({type, className = "w-5 h-5"}) {
+    const p = {className, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24"};
+    const s = {strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.8};
     const icons = {
         grid: <>
             <rect x="3" y="3" width="7" height="7" rx="1" {...s} />
@@ -142,7 +142,7 @@ export default function UtilityManagement() {
                 if (dashboardRes) {
                     const canCreate = dashboardRes.canCreateCurrentPeriod ?? dashboardRes.can_create_current_period;
                     const nextDate = dashboardRes.nextAvailableDate ?? dashboardRes.next_available_date;
-                    
+
                     setDashboard({
                         ...dashboardRes,
                         canCreateCurrentPeriod: canCreate,
@@ -169,7 +169,10 @@ export default function UtilityManagement() {
 
     const handleStartBatch = async () => {
         try {
-            const periodToStart = dashboard?.currentPeriod || new Date().toLocaleDateString("en-GB", {month: "2-digit", year: "numeric"});
+            const periodToStart = dashboard?.currentPeriod || new Date().toLocaleDateString("en-GB", {
+                month: "2-digit",
+                year: "numeric"
+            });
             await startBatchReading(periodToStart, 1);
             router.push(`/dashboard/meter-readings/batch?period=${periodToStart}`);
         } catch (error) {
@@ -218,28 +221,31 @@ export default function UtilityManagement() {
                         </div>
                         <div className="flex items-center gap-3">
                             {!currentPeriod && canStartCurrentPeriod && (
-                                <button 
+                                <button
                                     onClick={handleStartBatch}
                                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                              d="M12 4v16m8-8H4"/>
                                     </svg>
                                     Bắt đầu kỳ ghi tháng này
                                 </button>
                             )}
 
                             {!currentPeriod && !canStartCurrentPeriod && (
-                                <div className="px-4 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium">
+                                <div
+                                    className="px-4 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium">
                                     Kỳ ghi mới mở từ ngày {nextOpenDate}
                                 </div>
                             )}
 
                             {currentPeriod && (
-                                <button 
+                                <button
                                     onClick={() => router.push('/dashboard/meter-readings/batch')}
                                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                              d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                                     </svg>
                                     Tiếp tục nhập
                                 </button>
@@ -270,13 +276,15 @@ export default function UtilityManagement() {
                                     <span
                                         className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${currentStatus.bg}`}>
                                         {currentPeriod?.status === "DRAFT" &&
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
+                                            <span
+                                                className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
                                         {currentStatus.label}
                                     </span>
                                     <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-400">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                             viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                         </svg>
                                         {currentPeriod ? formatTime(currentPeriod.startDate, currentPeriod.endDate) : ""}
                                     </div>
@@ -289,7 +297,7 @@ export default function UtilityManagement() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex-1 bg-gray-100 rounded-full h-3 mr-4">
                                             <div className="bg-blue-500 h-3 rounded-full"
-                                                style={{ width: `${progress}%` }}></div>
+                                                 style={{width: `${progress}%`}}></div>
                                         </div>
                                         <span className="text-base font-bold text-blue-600 shrink-0">{progress}%</span>
                                     </div>
@@ -302,9 +310,9 @@ export default function UtilityManagement() {
                                         <div
                                             className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-1">
                                             <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
+                                                 viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                             </svg>
                                         </div>
                                         <p className="text-2xl font-bold text-gray-900">{completedRooms}</p>
@@ -314,9 +322,9 @@ export default function UtilityManagement() {
                                         <div
                                             className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center mx-auto mb-1">
                                             <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
+                                                 viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                             </svg>
                                         </div>
                                         <p className="text-2xl font-bold text-gray-900">{currentPeriod?.anomalyCount || 0}</p>
@@ -326,9 +334,9 @@ export default function UtilityManagement() {
                                         <div
                                             className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-1">
                                             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
+                                                 viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
                                         </div>
                                         <p className="text-2xl font-bold text-gray-900">{missingRooms}</p>
@@ -377,7 +385,7 @@ export default function UtilityManagement() {
                                             const prog = h.totalRooms === 0 ? 0 : Math.round((h.completedRooms / h.totalRooms) * 100);
                                             return (
                                                 <TableRow key={h.period}
-                                                    className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                                                          className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
                                                     <TableCell className="py-3.5">
                                                         {h.isCurrent ? (
                                                             <span className="font-semibold text-blue-600">{h.period}
@@ -399,7 +407,7 @@ export default function UtilityManagement() {
                                                                 className="text-sm font-medium text-gray-700 w-10">{prog}%</span>
                                                             <div className="w-24 bg-gray-100 rounded-full h-2">
                                                                 <div className="bg-blue-500 h-2 rounded-full"
-                                                                    style={{ width: `${prog}%` }}></div>
+                                                                     style={{width: `${prog}%`}}></div>
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -411,7 +419,7 @@ export default function UtilityManagement() {
                                                     </TableCell>
                                                     <TableCell className="py-3.5">
                                                         <div className="flex items-center gap-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={() => router.push(`/dashboard/meter-readings/batch?period=${h.period}`)}
                                                                 className="text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors">Xem
                                                                 chi tiết
@@ -431,12 +439,12 @@ export default function UtilityManagement() {
                                     const prog = h.totalRooms === 0 ? 0 : Math.round((h.completedRooms / h.totalRooms) * 100);
                                     return (
                                         <div key={h.period}
-                                            className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                                             className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div>
                                                     <h3 className={`font-bold text-lg ${h.isCurrent ? "text-blue-600" : "text-gray-900"}`}>
                                                         {h.period} {h.isCurrent &&
-                                                            <span className="text-xs font-medium ml-1">(Hiện tại)</span>}
+                                                        <span className="text-xs font-medium ml-1">(Hiện tại)</span>}
                                                     </h3>
                                                     <p className="text-xs text-gray-500 mt-0.5">{formatTime(h.startDate, h.endDate)}</p>
                                                 </div>
@@ -453,7 +461,7 @@ export default function UtilityManagement() {
                                                     </div>
                                                     <div className="w-full bg-gray-200 rounded-full h-2">
                                                         <div className="bg-blue-500 h-2 rounded-full"
-                                                            style={{ width: `${prog}%` }}></div>
+                                                             style={{width: `${prog}%`}}></div>
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
@@ -520,15 +528,15 @@ export default function UtilityManagement() {
                             )}
                         </div>
                     </div>
-
                     {/* Bottom: Hướng dẫn + Ghi chú */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* Hướng dẫn nhanh */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-5">
                             <div className="flex items-center gap-2 mb-4">
-                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                                 </svg>
                                 <div>
                                     <p className="text-sm font-semibold text-gray-800">Hướng dẫn nhanh</p>
@@ -537,10 +545,10 @@ export default function UtilityManagement() {
                             </div>
                             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-1">
                                 {[
-                                    { num: "1", label: "Tạo kỳ ghi chỉ số", icon: "📋" },
-                                    { num: "2", label: "Nhập chỉ số", icon: "✏️" },
-                                    { num: "3", label: "Chốt kỳ", icon: "✅" },
-                                    { num: "4", label: "Tính tiêu thụ & tạo hóa đơn", icon: "📊" },
+                                    {num: "1", label: "Tạo kỳ ghi chỉ số", icon: "📋"},
+                                    {num: "2", label: "Nhập chỉ số", icon: "✏️"},
+                                    {num: "3", label: "Chốt kỳ", icon: "✅"},
+                                    {num: "4", label: "Tính tiêu thụ & tạo hóa đơn", icon: "📊"},
                                 ].map((step, i) => (
                                     <div key={step.num} className="flex items-center gap-1 flex-1">
                                         <div className="flex flex-col items-center text-center flex-1">
@@ -550,16 +558,17 @@ export default function UtilityManagement() {
                                         </div>
                                         {i < 3 && (
                                             <svg className="hidden sm:block w-4 h-4 text-gray-300 shrink-0" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                 stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                    d="M9 5l7 7-7 7" />
+                                                      d="M9 5l7 7-7 7"/>
                                             </svg>
                                         )}
                                         {i < 3 && (
-                                            <svg className="block sm:hidden w-4 h-4 text-gray-300 shrink-0 my-1" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="block sm:hidden w-4 h-4 text-gray-300 shrink-0 my-1"
+                                                 fill="none"
+                                                 stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                    d="M19 9l-7 7-7-7" />
+                                                      d="M19 9l-7 7-7-7"/>
                                             </svg>
                                         )}
                                     </div>
@@ -570,28 +579,33 @@ export default function UtilityManagement() {
                         {/* Ghi chú */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-5 relative overflow-hidden">
                             <div className="flex items-center gap-2 mb-3">
-                                <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                                 </svg>
                                 <p className="text-sm font-semibold text-gray-800">Ghi chú</p>
                             </div>
                             <ul className="space-y-2 text-sm text-gray-600 pr-16">
-                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Nhập chỉ
+                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Nhập
+                                    chỉ
                                     số ít nhất 1 lần trước khi chốt kỳ.
                                 </li>
-                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Sau khi
+                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Sau
+                                    khi
                                     chốt kỳ, bạn có thể xem, không thể chỉnh sửa.
                                 </li>
-                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Các phòng
+                                <li className="flex items-start gap-2"><span className="text-gray-400 mt-0.5">•</span>Các
+                                    phòng
                                     có cảnh báo cần được kiểm tra lại trước khi chốt.
                                 </li>
                             </ul>
                             {/* Decorative illustration */}
                             <div className="absolute right-4 bottom-3 opacity-20">
-                                <svg className="w-16 h-16 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-16 h-16 text-blue-400" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                                 </svg>
                             </div>
                         </div>

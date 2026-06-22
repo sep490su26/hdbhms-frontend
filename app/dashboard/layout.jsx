@@ -22,7 +22,8 @@ import {
     UsersRound,
     WalletCards,
     User,
-    X
+    X,
+    Armchair
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -44,6 +45,7 @@ import {
 const navigation = [
     {path: "/dashboard", label: "Tổng quan", icon: LayoutDashboard, permissionKey: "dashboard"},
     {path: "/dashboard/rooms", label: "Quản lý Phòng & Tầng", icon: Building2, permissionKey: "rooms"},
+    {path: "/dashboard/facilities", label: "Cơ sở vật chất", icon: Armchair, permissionKey: "facilities"},
     {path: "/dashboard/tenants", label: "Quản lý hồ sơ", icon: UsersRound, permissionKey: "tenants"},
     {
         path: "/dashboard/viewing-customers",

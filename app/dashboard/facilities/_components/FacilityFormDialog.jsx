@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { facilityStatusOptions } from "../_data/mockFacilities";
 
 function FieldError({ id, message }) {
   if (!message) return null;
@@ -124,6 +125,23 @@ export function FacilityFormDialog({
                 id="facility-address-error"
                 message={formState.errors.address}
               />
+            </label>
+
+           <label className="grid gap-2">
+              <span className="text-sm font-bold text-[#243047]">
+                Trạng thái <span className="text-rose-600">*</span>
+              </span>
+              <select
+                value={formState.values.status || "ACTIVE"} 
+                onChange={(event) => onChange("status", event.target.value)} 
+                className="h-12 w-full rounded-lg border border-[#cbd3df] bg-white px-4 text-sm font-medium text-[#091426] outline-none transition focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+              >
+                {facilityStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="grid gap-2">

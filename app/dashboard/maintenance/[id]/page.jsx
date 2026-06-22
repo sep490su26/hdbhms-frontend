@@ -409,7 +409,9 @@ export default function MaintenanceTicketDetailPage() {
   function handleAfterImages(event) {
     const files = Array.from(event.target.files || []);
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-    setCompleteForm((current) => ({ ...current, images: [...current.images, ...imageFiles].slice(0, 6) }));
+    const existingCount = ticket?.afterAttachments?.length || 0;
+    const remainingSlots = Math.max(0, 3 - existingCount);
+    setCompleteForm((current) => ({ ...current, images: [...current.images, ...imageFiles].slice(0, remainingSlots) }));
     event.target.value = "";
   }
 
@@ -446,8 +448,12 @@ export default function MaintenanceTicketDetailPage() {
       setError("Vui lòng nhập hạng mục đã sửa.");
       return;
     }
-    if (ticket.afterAttachments.length === 0 && completeForm.images.length === 0) {
+    if ((ticket.afterAttachments?.length || 0) === 0 && completeForm.images.length === 0) {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
+      return;
+    }
+    if ((ticket.afterAttachments?.length || 0) + completeForm.images.length > 3) {
+      setError("Ảnh sau sửa tối đa 3 ảnh.");
       return;
     }
     const amount = parseMoneyInput(completeForm.actualCost);
@@ -712,10 +718,12 @@ export default function MaintenanceTicketDetailPage() {
                   </button>
                 </div>
               ))}
-              <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-[#475569] hover:border-[#091426]">
-                <ImagePlus className="h-6 w-6" />
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
-              </label>
+              {((ticket.afterAttachments?.length || 0) + completeForm.images.length) < 3 && (
+                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-[#475569] hover:border-[#091426]">
+                  <ImagePlus className="h-6 w-6" />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
+                </label>
+              )}
             </div>
             <button
               type="submit"

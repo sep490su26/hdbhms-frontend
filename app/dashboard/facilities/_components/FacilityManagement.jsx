@@ -19,6 +19,7 @@ import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
 import { facilityStatusOptions } from "../_data/mockFacilities";
+import { FacilityFloorPlanDesigner } from "./FacilityFloorPlanDesigner";
 
 const statCards = [
   {
@@ -90,6 +91,7 @@ export function FacilityManagement() {
   const facility = useFacilityManagement();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [designerFacility, setDesignerFacility] = useState(null);
 
   const visibleFacilities = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("vi");
@@ -192,9 +194,8 @@ export function FacilityManagement() {
         facilities={visibleFacilities}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
+        onOpenDesigner={(item) => setDesignerFacility(item)}
       />
-
-  
       <FacilityFormDialog
         formState={facility.formState}
         onClose={facility.closeForm}
@@ -212,6 +213,17 @@ export function FacilityManagement() {
         toasts={facility.toasts}
         onDismiss={facility.dismissToast}
       />
+      {designerFacility && (
+  <FacilityFloorPlanDesigner
+    facility={designerFacility}
+    onClose={() => setDesignerFacility(null)}
+    onSave={(updatedFloors) => {
+      facility.updateFacilityFloors(designerFacility.id, updatedFloors); // call APi after
+      setDesignerFacility(null);
+      facility.pushToast("Đã lưu sơ đồ tầng thành công");
+    }}
+  />
+)}
     </>
   );
 }

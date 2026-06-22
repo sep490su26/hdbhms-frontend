@@ -90,6 +90,7 @@ export function useFacilityManagement() {
         name: facility.name,
         address: facility.address,
         description: facility.description || "",
+        status: facility.status || "hehe",
       },
       errors: {},
       isSubmitting: false,
@@ -126,7 +127,7 @@ export function useFacilityManagement() {
       name: formState.values.name.trim(),
       address: formState.values.address.trim(),
       description: formState.values.description.trim(),
-      status: FACILITY_STATUS.ACTIVE,
+      status: formState.values.status,
     };
 
     setFormState((current) => ({ ...current, isSubmitting: true }));
@@ -147,7 +148,7 @@ export function useFacilityManagement() {
         setFacilities((current) =>
           current.map((facility) =>
             facility.id === formState.editingId
-              ? { ...facility, ...updated, status: facility.status }
+              ? { ...facility, ...updated }
               : facility,
           ),
         );
@@ -230,6 +231,16 @@ export function useFacilityManagement() {
     }
   }, [networkFailure, pushToast, statusFlow]);
 
+  const updateFacilityFloors = useCallback((facilityId, updatedFloors) => {
+    setFacilities((current) =>
+      current.map((facility) =>
+        facility.id === facilityId
+          ? { ...facility, floors: updatedFloors }
+          : facility
+      )
+    );
+  }, []);
+  
   const stats = useMemo(() => {
     const rooms = facilities.flatMap((facility) =>
       facility.floors.flatMap((floor) => floor.rooms),
@@ -271,5 +282,7 @@ export function useFacilityManagement() {
     setStatusAcknowledged,
     closeStatusFlow,
     confirmStatusChange,
+    updateFacilityFloors,
+    pushToast
   };
 }

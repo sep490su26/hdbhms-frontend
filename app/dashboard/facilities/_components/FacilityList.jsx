@@ -10,6 +10,7 @@ import {
   Layers3,
   MapPin,
   Pencil,
+  LayoutGrid
 } from "lucide-react";
 import {
   FACILITY_STATUS,
@@ -54,23 +55,6 @@ function StatusBadge({ status }) {
       <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
       {meta.label}
     </span>
-  );
-}
-
-function StatusSelect({ facility, onStatusChange }) {
-  return (
-    <select
-      value={facility.status}
-      onChange={(event) => onStatusChange(facility, event.target.value)}
-      aria-label={`Đổi trạng thái ${facility.name}`}
-      className="h-9 max-w-44 rounded-lg border border-[#cbd3df] bg-white px-3 text-xs font-bold text-[#243047] outline-none transition focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
-    >
-      {facilityStatusOptions.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -183,10 +167,7 @@ function MobileFacilityCard({
           ))}
         </div>
         <div className="mt-4 grid gap-2">
-          <StatusSelect
-            facility={facility}
-            onStatusChange={onStatusChange}
-          />
+         
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -224,6 +205,7 @@ export function FacilityList({
   facilities,
   onEdit,
   onStatusChange,
+  onOpenDesigner,
 }) {
   const [expandedIds, setExpandedIds] = useState(
     () => new Set([facilities[0]?.id].filter(Boolean)),
@@ -336,10 +318,7 @@ export function FacilityList({
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <StatusSelect
-                            facility={facility}
-                            onStatusChange={onStatusChange}
-                          />
+                         
                           <button
                             type="button"
                             onClick={() => onEdit(facility)}
@@ -348,7 +327,18 @@ export function FacilityList({
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenDesigner(facility)} // 
+                            className="rounded-lg border border-[#cbd3df] p-2 text-[#505f76] transition hover:border-[#091426] hover:text-[#091426]"
+                            title="Thiết kế sơ đồ tầng"
+                          >
+                            <LayoutGrid className="h-4 w-4" />
+                          </button>
                         </div>
+                      </td>
+                      <td>
+                        
                       </td>
                     </tr>
                     {expanded && (

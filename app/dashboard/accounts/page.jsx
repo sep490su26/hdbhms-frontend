@@ -439,12 +439,8 @@ export default function AccountsPage() {
     <div className="grid gap-7 text-[#0f1d33]">
       <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#3d4759]">
-            <span>Hệ thống</span>
-            <span>/</span>
-            <span className="font-bold text-[#0f1d33]">Quản lý tài khoản</span>
-          </div>
-          <h1 className="mt-4 text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">
+          <div className="flex items-center gap-2 text-xs text-[#3d4759]"></div>
+          <h1 className="text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">
             Quản lý tài khoản khách thuê
           </h1>
           <p className="mt-2 text-sm text-[#526179]">

@@ -37,6 +37,7 @@ import {
   updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
 import { sendTenantAccountCredentials } from "@/services/identityAccessService";
+import { fetchContractHandover } from "@/services/contractHandoverService";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
 
@@ -791,9 +792,26 @@ export default function ContractTemplatePage() {
 
   async function handleActivate(item) {
     if (!item?.leaseContractId) return;
+
+    if (!item.contractFileId) {
+      window.alert("Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.");
+      return;
+    }
+
     setActionLoading(`activate-${item.leaseContractId}`);
     setError("");
     try {
+      try {
+        const handoverData = await fetchContractHandover(item.leaseContractId, "MOVE_IN");
+        if (!handoverData || !handoverData.electricity || !handoverData.water) {
+          throw new Error("Missing handover data");
+        }
+      } catch (err) {
+        window.alert("Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.");
+        setActionLoading("");
+        return;
+      }
+
       const activated = await activateLeaseContract(item.leaseContractId);
       const activatedStatus = activated.status ?? activated.contractStatus;
 

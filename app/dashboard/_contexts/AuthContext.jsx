@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 import { clearAuthSession, getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
+import {readCachedProfile, writeCachedProfile} from "@/lib/profileCache";
 
 const AuthContext = createContext(null);
 
@@ -61,8 +62,16 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
       const normalizedProfile = normalizeUser(profile, storedRole);
 
       setUserState(normalizedProfile);
+      writeCachedProfile(normalizedProfile);
       return normalizedProfile;
     } catch (error) {
+      const cachedProfile = isBrowser ? readCachedProfile() : null;
+      if (error instanceof TypeError && cachedProfile) {
+        const normalizedProfile = normalizeUser(cachedProfile, storedRole);
+        setUserState(normalizedProfile);
+        return normalizedProfile;
+      }
+
       setUserState(null);
       clearAuthSession();
       throw error;
@@ -83,8 +92,9 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
   }, []);
 
   const setUser = useCallback((profile) => {
-    console.log(profile);
-    setUserState(normalizeUser(profile));
+    const normalizedProfile = normalizeUser(profile);
+    setUserState(normalizedProfile);
+    writeCachedProfile(normalizedProfile);
   }, []);
 
   const logout = useCallback(async () => {

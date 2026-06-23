@@ -23,13 +23,13 @@ export async function uploadFile(file, category = "OTHER") {
 
 /**
  * Fetch latest meter readings for a room
- * GET /api/v1/tenants/{tenantId}/rooms/{roomId}/meter-readings/latest
+ * GET /api/v1/rooms/{roomId}/meter-readings/latest
  */
-export async function fetchLatestReadings(tenantId, roomId) {
-  if (!tenantId || !roomId) return null;
+export async function fetchLatestReadings(roomId) {
+  if (!roomId) return null;
   try {
     return await authenticatedFetch(
-      `${BASE}/tenants/${encodeURIComponent(tenantId)}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`,
+      `${BASE}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`,
     );
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;

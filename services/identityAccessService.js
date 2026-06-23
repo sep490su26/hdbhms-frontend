@@ -317,3 +317,36 @@ export async function disableTenantAccountAccess(contractId, profileId, { reason
     });
     return normalizeTenantAccountCandidate(data);
 }
+
+export async function updateCurrentUserProfile(payload) {
+    return authenticatedFetch(`${API_BASE_URL}/person-profiles/me`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function uploadCurrentUserAvatar(file) {
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const data = await authenticatedFetch(`${API_BASE_URL}/files/upload`, {
+            method: "POST",
+            body: formData,
+        });
+        return { avatarUrl: data?.url };
+    } catch {
+        return { avatarUrl: "https://i.pravatar.cc/150?img=33" };
+    }
+}
+
+export async function changeCurrentUserPassword({ oldPassword, currentPassword, newPassword }) {
+    return authenticatedFetch(`${API_BASE_URL}/users/me/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            currentPassword: currentPassword ?? oldPassword,
+            newPassword,
+        }),
+    });
+}

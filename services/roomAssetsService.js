@@ -2,11 +2,11 @@ import { API_BASE_URL, ApiError, authenticatedFetch } from "@/services/identityA
 
 const BASE = API_BASE_URL;
 
-function roomAssetsUrl(tenantId, roomId, assetId = null) {
-  if (!tenantId || !roomId) {
-    throw new Error("Missing tenantId or roomId");
+function roomAssetsUrl(roomId, assetId = null) {
+  if (!roomId) {
+    throw new Error("Missing roomId");
   }
-  const base = `${BASE}/tenants/${encodeURIComponent(tenantId)}/rooms/${encodeURIComponent(roomId)}/assets`;
+  const base = `${BASE}/rooms/${encodeURIComponent(roomId)}/assets`;
   return assetId ? `${base}/${encodeURIComponent(assetId)}` : base;
 }
 
@@ -14,43 +14,43 @@ function isNotFound(error) {
   return error instanceof ApiError && error.status === 404;
 }
 
-/** GET /api/v1/tenants/{tenantId}/rooms/{roomId}/assets */
-export async function fetchRoomAssets(tenantId, roomId) {
-  if (!tenantId || !roomId) return [];
+/** GET /api/v1/rooms/{roomId}/assets */
+export async function fetchRoomAssets(roomId) {
+  if (!roomId) return [];
   try {
-    return await authenticatedFetch(roomAssetsUrl(tenantId, roomId));
+    return await authenticatedFetch(roomAssetsUrl(roomId));
   } catch (error) {
     if (isNotFound(error)) return [];
     throw error;
   }
 }
 
-/** GET /api/v1/tenants/{tenantId}/rooms/{roomId}/assets/{assetId} */
-export async function fetchRoomAsset(tenantId, roomId, assetId) {
-  return authenticatedFetch(roomAssetsUrl(tenantId, roomId, assetId));
+/** GET /api/v1/rooms/{roomId}/assets/{assetId} */
+export async function fetchRoomAsset(roomId, assetId) {
+  return authenticatedFetch(roomAssetsUrl(roomId, assetId));
 }
 
-/** POST /api/v1/tenants/{tenantId}/rooms/{roomId}/assets */
-export async function createRoomAsset(tenantId, roomId, body) {
-  return authenticatedFetch(roomAssetsUrl(tenantId, roomId), {
+/** POST /api/v1/rooms/{roomId}/assets */
+export async function createRoomAsset(roomId, body) {
+  return authenticatedFetch(roomAssetsUrl(roomId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 }
 
-/** PUT /api/v1/tenants/{tenantId}/rooms/{roomId}/assets/{assetId} */
-export async function updateRoomAsset(tenantId, roomId, assetId, body) {
-  return authenticatedFetch(roomAssetsUrl(tenantId, roomId, assetId), {
+/** PUT /api/v1/rooms/{roomId}/assets/{assetId} */
+export async function updateRoomAsset(roomId, assetId, body) {
+  return authenticatedFetch(roomAssetsUrl(roomId, assetId), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 }
 
-/** DELETE /api/v1/tenants/{tenantId}/rooms/{roomId}/assets/{assetId} */
-export async function deleteRoomAsset(tenantId, roomId, assetId) {
-  return authenticatedFetch(roomAssetsUrl(tenantId, roomId, assetId), {
+/** DELETE /api/v1/rooms/{roomId}/assets/{assetId} */
+export async function deleteRoomAsset(roomId, assetId) {
+  return authenticatedFetch(roomAssetsUrl(roomId, assetId), {
     method: "DELETE",
   });
 }

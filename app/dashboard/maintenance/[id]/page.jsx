@@ -448,6 +448,10 @@ export default function MaintenanceTicketDetailPage() {
       setError("Vui lòng nhập hạng mục đã sửa.");
       return;
     }
+    if (ticket.ticketScope === "PROPERTY_OPERATION" && !completeForm.repairmanName.trim()) {
+      setError("Vui lòng nhập tên thợ sửa hoặc nhân sự xử lý.");
+      return;
+    }
     if ((ticket.afterAttachments?.length || 0) === 0 && completeForm.images.length === 0) {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
       return;
@@ -459,6 +463,10 @@ export default function MaintenanceTicketDetailPage() {
     const amount = parseMoneyInput(completeForm.actualCost);
     if (!Number.isFinite(amount) || amount < 0) {
       setError("Chi phí thực tế không hợp lệ.");
+      return;
+    }
+    if (ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
+      setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
       return;
     }
 
@@ -731,7 +739,7 @@ export default function MaintenanceTicketDetailPage() {
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
             >
               {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
-              Hoàn tất
+              Xác nhận hoàn tất
             </button>
           </div>
         </form>

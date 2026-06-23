@@ -106,7 +106,6 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
 
 export default function ContractHandoverSection({
   contractId,
-  tenantId,
   roomId,
   roomCode,
   readonly = false,
@@ -138,17 +137,17 @@ export default function ContractHandoverSection({
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
-    if (!tenantId || !roomId) {
-      console.warn("[ContractHandoverSection] tenantId/roomId is null — skipping fetch");
+    if (!roomId) {
+      console.warn("[ContractHandoverSection] roomId is null — skipping fetch");
       return;
     }
     setLoadingAssets(true);
     setLoadError(null);
     setSaveSuccess(false);
 
-    console.log("[ContractHandoverSection] fetching assets for tenantId/roomId:", tenantId, roomId);
+    console.log("[ContractHandoverSection] fetching assets for roomId:", roomId);
 
-    fetchRoomAssets(tenantId, roomId)
+    fetchRoomAssets(roomId)
       .then((data) => {
         if (signal?.aborted) return;
         console.log("[ContractHandoverSection] API response:", data);
@@ -169,7 +168,7 @@ export default function ContractHandoverSection({
       .finally(() => {
         if (!signal?.aborted) setLoadingAssets(false);
       });
-  }, [tenantId, roomId]);
+  }, [roomId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -180,8 +179,8 @@ export default function ContractHandoverSection({
 
   /* Fetch latest meter readings ------------------------------------- */
   const loadReadings = useCallback((signal) => {
-    if (!tenantId || !roomId) return;
-    fetchLatestReadings(tenantId, roomId)
+    if (!roomId) return;
+    fetchLatestReadings(roomId)
       .then((data) => {
         if (signal?.aborted) return;
 
@@ -203,7 +202,7 @@ export default function ContractHandoverSection({
         if (signal?.aborted) return;
         console.error("Failed to fetch latest readings:", err);
       });
-  }, [tenantId, roomId]);
+  }, [roomId]);
 
   useEffect(() => {
     if (readonly) return;
@@ -313,8 +312,8 @@ export default function ContractHandoverSection({
       window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
       return;
     }
-    if (!tenantId || !roomId) {
-      window.alert("Không xác định được tenant hoặc phòng để lưu thiết bị.");
+    if (!roomId) {
+      window.alert("Không xác định được phòng để lưu thiết bị.");
       return;
     }
 
@@ -377,8 +376,8 @@ export default function ContractHandoverSection({
             file_image_id: assetImageId,
           };
           return asset.id
-            ? updateRoomAsset(tenantId, roomId, asset.id, body)
-            : createRoomAsset(tenantId, roomId, body);
+            ? updateRoomAsset(roomId, asset.id, body)
+            : createRoomAsset(roomId, body);
         }),
       );
 
@@ -421,9 +420,9 @@ export default function ContractHandoverSection({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(!tenantId || !roomId) && (
+          {!roomId && (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-              Chưa xác định tenant/phòng
+              Chưa xác định phòng
             </span>
           )}
           {readonly && (
@@ -437,7 +436,11 @@ export default function ContractHandoverSection({
       {/* Handover Date */}
       <div className="mt-5 rounded-xl border border-[#dfe5ef] bg-white p-4">
         <label className="grid gap-1.5 max-w-xs">
-          <span className="text-xs font-bold text-[#58667c]">Ngày bàn giao *</span>
+          <span className="text-xs font-bold text-[#607089]">
+            Ngày bàn giao
+            <span className="ml-1 text-rose-600">*</span>
+          </span>
+
           <input
             type="date"
             value={handoverDate}
@@ -550,7 +553,7 @@ export default function ContractHandoverSection({
                 Đang tải…
               </span>
             )}
-            {!loadingAssets && tenantId && roomId && (
+            {!loadingAssets && roomId && (
               <button
                 type="button"
                 onClick={loadAssets}

@@ -156,7 +156,7 @@ function UserAvatar({user, size = "md", className = ""}) {
 
 function UserMenu({user, logout}) {
     return (
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"

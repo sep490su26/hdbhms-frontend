@@ -389,10 +389,10 @@ export default function AccountsPage() {
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
     const contractRows = items.filter((item) => item.contractId === contractId);
-    const retry = contractRows.some((item) => item.provisioningStatus === "FAILED");
+    const retry = contractRows.some((item) => ["FAILED", "SENT"].includes(resolveAccountState(item).key));
     const confirmed = window.confirm(
       retry
-        ? "Lần gửi trước thất bại. Bạn có chắc muốn thử gửi lại cho các người thuê chưa được cấp tài khoản?"
+        ? "Hệ thống sẽ gửi lại tài khoản cho người thuê chưa kích hoạt. Tài khoản đã kích hoạt sẽ được bỏ qua."
         : "Hệ thống sẽ gửi tài khoản cho các người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
     );
     if (!confirmed) return;
@@ -537,8 +537,9 @@ export default function AccountsPage() {
           <div className="divide-y divide-[#d4dbe8]">
             {groupedContracts.map((group) => {
               const groupStates = group.rows.map((row) => resolveAccountState(row).key);
-              const canSend = groupStates.some((state) => ["NOT_SENT", "FAILED"].includes(state));
+              const canSend = groupStates.some((state) => ["NOT_SENT", "FAILED", "SENT"].includes(state));
               const hasFailed = groupStates.includes("FAILED");
+              const hasSent = groupStates.includes("SENT");
               const allActivated = groupStates.every((state) => state === "ACTIVATED");
               const isSending = sendingContractId === group.contractId;
               const contractCanSend = group.contractStatus === "ACTIVE";
@@ -586,7 +587,9 @@ export default function AccountsPage() {
                             ? "Đang gửi..."
                             : hasFailed
                               ? "Thử gửi lại"
-                              : allActivated
+                              : hasSent
+                                ? "Gửi bổ sung"
+                                : allActivated
                                 ? "Đã hoàn tất"
                                 : canSend
                                   ? "Gửi tài khoản"

@@ -126,6 +126,10 @@ export function normalizeLeaseContractItem(item = {}) {
       item.contractFile?.uploadedAt ??
       item.contract_file?.uploaded_at ??
       null,
+    depositSignedFileId:
+      item.depositSignedFileId ??
+      item.deposit_signed_file_id ??
+      null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
     accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
@@ -332,6 +336,34 @@ export async function downloadLeaseContractFile(fileId, filename = "hop-dong-thu
   URL.revokeObjectURL(url);
 }
 
+export async function downloadLeaseContractDraftPdf(contractId) {
+  const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
+  if (popup) {
+    popup.document.write("<!doctype html><title>Đang xử lý PDF</title><p style=\"font-family:Arial,sans-serif;padding:24px\">Đang tải PDF hợp đồng...</p>");
+  }
+
+  try {
+    const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/draft-pdf`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      throw new Error("Không thể tải file PDF hợp đồng.");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    if (popup) {
+      popup.opener = null;
+      popup.location.href = url;
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    popup?.close();
+    throw error;
+  }
+}
+
 function normalizeLeaseContractDetails(details = {}) {
   if (!details || typeof details !== "object") return null;
   const rawContractFile = details.contractFile ?? details.contract_file ?? null;
@@ -406,6 +438,8 @@ function normalizeLeaseContractDetails(details = {}) {
     ...details,
     contractId: details.contractId ?? details.contract_id ?? null,
     contractCode: details.contractCode ?? details.contract_code ?? "",
+    depositAgreementId: details.depositAgreementId ?? details.deposit_agreement_id ?? null,
+    depositSignedFileId: details.depositSignedFileId ?? details.deposit_signed_file_id ?? null,
     tenantId: details.tenantId ?? details.tenant_id ?? null,
     startDate: details.startDate ?? details.start_date ?? null,
     endDate: details.endDate ?? details.end_date ?? null,

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,
   CheckCircle2,
   Home,
   KeyRound,
@@ -148,15 +147,6 @@ function roleClass(role) {
 }
 
 function resolveAccountState(item) {
-  if (!item.recipientEmail) {
-    return {
-      key: "MISSING_EMAIL",
-      label: "Thiếu email",
-      hint: "Bổ sung email người ký chính trước khi gửi tài khoản.",
-      className: "border-rose-200 bg-rose-50 text-rose-700",
-    };
-  }
-
   if (item.provisioningStatus === "PENDING") {
     return {
       key: "PENDING",
@@ -321,7 +311,6 @@ export default function AccountsPage() {
       notSent: items.filter((item) => resolveAccountState(item).key === "NOT_SENT").length,
       sent: items.filter((item) => resolveAccountState(item).key === "SENT").length,
       activated: items.filter((item) => resolveAccountState(item).key === "ACTIVATED").length,
-      missingEmail: items.filter((item) => resolveAccountState(item).key === "MISSING_EMAIL").length,
     };
   }, [items]);
 
@@ -422,7 +411,6 @@ export default function AccountsPage() {
         <MetricCard icon={KeyRound} label="Chưa cấp" value={metrics.notSent} tone="amber" />
         <MetricCard icon={Mail} label="Đã gửi" value={metrics.sent} tone="blue" />
         <MetricCard icon={ShieldCheck} label="Đã kích hoạt" value={metrics.activated} tone="emerald" />
-        <MetricCard icon={AlertCircle} label="Thiếu email" value={metrics.missingEmail} tone="rose" />
       </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
@@ -447,7 +435,6 @@ export default function AccountsPage() {
               "Đã gửi",
               "Đã kích hoạt",
               "Gửi thất bại",
-              "Thiếu email",
             ]}
             onChange={setStateFilter}
           />
@@ -501,7 +488,7 @@ export default function AccountsPage() {
               const isSending = sendingContractId === group.contractId;
               const contractCanSend = group.contractStatus === "ACTIVE";
               const sendDisabled =
-                !contractCanSend || !group.recipientEmail || !canSend || isSending;
+                !contractCanSend || !canSend || isSending;
 
               return (
                 <article key={group.safeKey} className="bg-white">

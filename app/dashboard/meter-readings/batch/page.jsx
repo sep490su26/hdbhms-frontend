@@ -239,9 +239,38 @@ export default function MeterReadings() {
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
     const handleCurrChange = (roomId, field, val) => {
+        const room = rooms.find(r => r.id === roomId);
+        if (!room) return;
+
+        const numVal = val === "" ? null : Number(val);
+
+        // Validation: new reading must be >= old reading
+        if (field === "elecCurr" && numVal !== null && room.elecPrev !== null) {
+            if (numVal < room.elecPrev) {
+                toast.error("Chỉ số điện mới không được nhỏ hơn chỉ số cũ");
+                return;
+            }
+        }
+        if (field === "waterCurr" && numVal !== null && room.waterPrev !== null) {
+            if (numVal < room.waterPrev) {
+                toast.error("Chỉ số nước mới không được nhỏ hơn chỉ số cũ");
+                return;
+            }
+        }
+
+        // Validation: old reading must be >= 0
+        if (field === "elecPrev" && numVal !== null && numVal < 0) {
+            toast.error("Chỉ số điện cũ không được âm");
+            return;
+        }
+        if (field === "waterPrev" && numVal !== null && numVal < 0) {
+            toast.error("Chỉ số nước cũ không được âm");
+            return;
+        }
+
         setRooms((prev) =>
             prev.map((r) =>
-                r.id === roomId ? { ...r, [field]: val === "" ? null : Number(val) } : r
+                r.id === roomId ? { ...r, [field]: numVal } : r
             )
         );
     };
@@ -559,6 +588,7 @@ export default function MeterReadings() {
                                                                 </svg>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
@@ -585,6 +615,7 @@ export default function MeterReadings() {
                                                                 </svg>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
@@ -708,6 +739,7 @@ export default function MeterReadings() {
                                                                     className="text-xs text-gray-400 mb-1">Current</span>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
@@ -743,6 +775,7 @@ export default function MeterReadings() {
                                                                     className="text-xs text-gray-400 mb-1">Current</span>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
@@ -885,6 +918,7 @@ export default function MeterReadings() {
                                                 <p className="text-xs text-blue-600 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
+                                                    min="0"
                                                     className="w-full bg-white text-base border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.elecCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
@@ -915,6 +949,7 @@ export default function MeterReadings() {
                                                 <p className="text-xs text-blue-600 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
+                                                    min="0"
                                                     className="w-full bg-white text-base border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.waterCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}

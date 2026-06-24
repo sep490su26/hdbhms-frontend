@@ -10,7 +10,6 @@ import {
   FileCheck2,
   FileWarning,
   Home,
-  KeyRound,
   Loader2,
   Mail,
   Pencil,
@@ -38,8 +37,11 @@ import {
 } from "@/services/leaseContractsService";
 import { sendTenantAccountCredentials } from "@/services/identityAccessService";
 import { fetchContractHandover } from "@/services/contractHandoverService";
+import ContractActivationFlow from "./ContractActivationFlow";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
+import ContractWorkflowStepper from "./ContractWorkflowStepper";
+import { toast } from "sonner";
 
 const STATUS_FILTERS = [
   { id: "current", label: "Hợp đồng hiện tại" },
@@ -68,6 +70,13 @@ const HISTORY_CONTRACT_WORKFLOWS = new Set([
   "LIQUIDATED",
   "CANCELLED",
   "AUTO_TERMINATED",
+]);
+
+const ACTIVATION_FLOW_WORKFLOWS = new Set([
+  "DRAFT",
+  "PENDING_SIGNATURE",
+  "MISSING_FILE",
+  "PENDING_ACTIVATION",
 ]);
 
 const WORKFLOW_LABELS = {
@@ -120,39 +129,6 @@ const TENANT_INTENTION_LABELS = TENANT_INTENTION_OPTIONS.reduce((labels, option)
 const TENANT_INTENTION_SOURCE_LABELS = {
   TENANT_MOBILE: "Khách tự phản hồi trên mobile",
   MANAGEMENT_WEB: "Quản lý ghi nhận/cập nhật trên web",
-};
-
-const ACCOUNT_PROVISIONING_ACTIONS = {
-  NOT_PROVISIONED: {
-    label: "Gửi tài khoản cho khách",
-    disabled: false,
-    className: "bg-indigo-600 text-white hover:bg-indigo-700",
-  },
-  PENDING: {
-    label: "Đang gửi tài khoản",
-    disabled: true,
-    className: "border border-blue-200 bg-blue-50 text-blue-700",
-  },
-  SENT: {
-    label: "Đã gửi tài khoản",
-    disabled: true,
-    className: "border border-blue-200 bg-blue-50 text-blue-700",
-  },
-  ACTIVE: {
-    label: "Đã kích hoạt tài khoản",
-    disabled: true,
-    className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
-  },
-  FAILED: {
-    label: "Thử gửi lại tài khoản",
-    disabled: false,
-    className: "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-  },
-  MISSING_EMAIL: {
-    label: "Thiếu email nhận tài khoản",
-    disabled: true,
-    className: "border border-amber-200 bg-amber-50 text-amber-700",
-  },
 };
 
 function formatDate(value) {
@@ -399,6 +375,24 @@ function getWorkflow(item) {
   return "PENDING_SIGNATURE";
 }
 
+function needsActivationFlow(item) {
+  if (!item) return false;
+  if (!item.leaseContractId && item.depositAgreementId) return true;
+  return Boolean(item.leaseContractId && ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item)));
+}
+
+function unwrapHandoverResponse(response) {
+  return response?.data || response || null;
+}
+
+function hasHandoverReadings(handover) {
+  return Boolean(handover?.electricity && handover?.water);
+}
+
+function hasSignedHandoverDocument(handover) {
+  return Boolean(handover?.signedDocumentId || handover?.signed_document_id);
+}
+
 function matchesStatusFilter(item, statusFilter) {
   const workflow = getWorkflow(item);
   if (statusFilter === "all") return true;
@@ -531,6 +525,7 @@ export default function ContractTemplatePage() {
   });
   const [intentionError, setIntentionError] = useState("");
   const [printWizard, setPrintWizard] = useState(null);
+  const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
 
   async function loadContracts() {
     setLoading(true);
@@ -781,13 +776,44 @@ export default function ContractTemplatePage() {
     setActionLoading(`draft-${item.depositAgreementId}`);
     setError("");
     try {
-      await createDraftLeaseContractFromDeposit(item.depositAgreementId);
-      await loadContracts();
+      const draft = await createDraftLeaseContractFromDeposit(item.depositAgreementId);
+      const items = await loadContracts();
+      const created = items.find((contract) =>
+        String(contract.depositAgreementId) === String(item.depositAgreementId) ||
+        String(contract.leaseContractId) === String(draft?.leaseContractId),
+      );
+      const nextSelected = created || draft;
+      if (nextSelected?.leaseContractId) {
+        setSelected(nextSelected);
+        const refreshedDetails = await fetchManagementLeaseContractDetails(nextSelected.leaseContractId);
+        setDetails(refreshedDetails);
+      }
+      return nextSelected;
     } catch (err) {
       setError(err?.message || "Không tạo được hợp đồng thuê từ cọc.");
     } finally {
       setActionLoading("");
     }
+  }
+
+  async function handleContractUpdated() {
+    if (!mergedSelected?.leaseContractId) return;
+    try {
+      const refreshedDetails = await fetchManagementLeaseContractDetails(mergedSelected.leaseContractId);
+      setDetails(refreshedDetails);
+      const items = await loadContracts();
+      const updatedContract = items.find(i => String(i.leaseContractId) === String(mergedSelected.leaseContractId));
+      if (updatedContract) {
+        setSelected(updatedContract);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function handleHandoverSaved() {
+    setHandoverRefreshKey((v) => v + 1);
+    handleContractUpdated();
   }
 
   async function handleActivate(item) {
@@ -802,8 +828,8 @@ export default function ContractTemplatePage() {
     setError("");
     try {
       try {
-        const handoverData = await fetchContractHandover(item.leaseContractId, "MOVE_IN");
-        if (!handoverData || !handoverData.electricity || !handoverData.water) {
+        const handoverData = unwrapHandoverResponse(await fetchContractHandover(item.leaseContractId, "MOVE_IN"));
+        if (!hasHandoverReadings(handoverData) || !hasSignedHandoverDocument(handoverData)) {
           throw new Error("Missing handover data");
         }
       } catch (err) {
@@ -850,8 +876,49 @@ export default function ContractTemplatePage() {
       const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
       setDetails(refreshedDetails);
       setTermsForm(buildTermsForm(refreshedDetails));
+
+      // Auto-send account credentials after activation
+      try {
+        const provResult = await sendTenantAccountCredentials(item.leaseContractId, { retry: false });
+        const provDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+        setDetails(provDetails);
+        setActionMessage(provResult?.message || "Đã kích hoạt và cấp tài khoản thành công.");
+        toast.success(provResult?.message || "Đã kích hoạt và cấp tài khoản thành công.");
+      } catch (provErr) {
+        // Account send failed — activation succeeded. Stepper will show retry button.
+        toast.warning(provErr?.message || "Kích hoạt thành công nhưng chưa gửi được tài khoản.");
+      }
     } catch (err) {
       setError(err?.message || "Không kích hoạt được hợp đồng.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function handleRetrySendAccount(item) {
+    if (!item?.leaseContractId) return;
+    const confirmed = window.confirm(
+      "Lần gửi trước thất bại. Bạn có chắc muốn thử gửi lại cho các người thuê chưa được cấp tài khoản?",
+    );
+    if (!confirmed) return;
+
+    setActionLoading(`send-${item.leaseContractId}`);
+    setError("");
+    setActionMessage("");
+    try {
+      const result = await sendTenantAccountCredentials(item.leaseContractId, { retry: true });
+      const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+      setDetails(refreshedDetails);
+      setActionMessage(result?.message || "Đã cập nhật trạng thái cấp tài khoản.");
+      toast.success(result?.message || "Đã gửi tài khoản thành công.");
+    } catch (err) {
+      setError(err?.message || "Không gửi được tài khoản cho khách thuê.");
+      try {
+        const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+        setDetails(refreshedDetails);
+      } catch {
+        // Keep the original provisioning error visible.
+      }
     } finally {
       setActionLoading("");
     }
@@ -971,39 +1038,6 @@ export default function ContractTemplatePage() {
       setSelected((current) => current ? { ...current, ...updated } : current);
     } catch (err) {
       setError(err?.message || "Không thanh lý được hợp đồng.");
-    } finally {
-      setActionLoading("");
-    }
-  }
-
-  async function handleSendAccount(item) {
-    if (!item?.leaseContractId) return;
-    const provisioningStatus = details?.accountProvisioningStatus || "NOT_PROVISIONED";
-    const retry = provisioningStatus === "FAILED";
-    const confirmed = window.confirm(
-      retry
-        ? "Lần gửi trước thất bại. Bạn có chắc muốn thử gửi lại cho các người thuê chưa được cấp tài khoản?"
-        : "Hệ thống sẽ gửi tài khoản cho các người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
-    );
-    if (!confirmed) return;
-
-    setActionLoading(`send-${item.leaseContractId}`);
-    setError("");
-    setActionMessage("");
-    try {
-      const result = await sendTenantAccountCredentials(item.leaseContractId, { retry });
-      await loadContracts();
-      const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
-      setDetails(refreshedDetails);
-      setActionMessage(result?.message || "Đã cập nhật trạng thái cấp tài khoản.");
-    } catch (err) {
-      setError(err?.message || "Không gửi được tài khoản cho khách thuê.");
-      try {
-        const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
-        setDetails(refreshedDetails);
-      } catch {
-        // Keep the original provisioning error visible.
-      }
     } finally {
       setActionLoading("");
     }
@@ -1134,6 +1168,10 @@ export default function ContractTemplatePage() {
   }
 
   const isBusy = Boolean(actionLoading);
+  const stepperVisible = mergedSelected && (
+    ["DRAFT", "PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(getWorkflow(mergedSelected)) ||
+    (getWorkflow(mergedSelected) === "ACTIVE" && !["SENT", "ACTIVE"].includes(details?.accountProvisioningStatus))
+  );
 
   return (
     <div className="grid gap-5 text-[#091426] text-[13px] xl:gap-6 xl:text-sm">
@@ -1360,32 +1398,21 @@ export default function ContractTemplatePage() {
                       <StatusBadge item={item} />
                     </td>
                     <td data-label="Xem" className="text-center align-middle">
-                      <div className="flex flex-col items-center justify-center gap-2 xl:flex-row">
+                      <div className="flex items-center justify-center">
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             selectContract(item);
                           }}
-                          className="h-9 rounded-lg border border-[#d1d7e0] bg-white px-2 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:px-3 xl:text-sm"
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d1d7e0] bg-white px-3 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:text-sm"
                         >
-                          Xem
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openPrintWizard(item);
-                          }}
-                          disabled={actionLoading === `print-${item.leaseContractId}` || actionLoading === `draft-${item.depositAgreementId}`}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 text-xs font-extrabold text-red-700 shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 xl:h-10 xl:px-3 xl:text-sm"
-                        >
-                          {actionLoading === `print-${item.leaseContractId}` || actionLoading === `draft-${item.depositAgreementId}` ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {needsActivationFlow(item) ? (
+                            <FileCheck2 className="h-3.5 w-3.5" />
                           ) : (
-                            <Printer className="h-3.5 w-3.5" />
+                            <Eye className="h-3.5 w-3.5" />
                           )}
-                          In Hợp Đồng
+                          {needsActivationFlow(item) ? "Kích hoạt hợp đồng" : "Xem hợp đồng"}
                         </button>
                       </div>
                     </td>
@@ -1435,7 +1462,20 @@ export default function ContractTemplatePage() {
               </div>
             </header>
 
-            <div className="grid gap-4 p-5 xl:gap-5 xl:p-7 lg:grid-cols-2">
+            <div className="grid gap-4 px-5 xl:gap-5 xl:px-7 lg:grid-cols-2">
+              {needsActivationFlow(mergedSelected) ? (
+                <ContractActivationFlow
+                  contract={mergedSelected}
+                  details={details}
+                  actionLoading={actionLoading}
+                  handoverRefreshKey={handoverRefreshKey}
+                  onCreateDraft={handleCreateDraft}
+                  onContractUpdated={handleContractUpdated}
+                  onHandoverSaved={handleHandoverSaved}
+                  onActivate={() => handleActivate(mergedSelected)}
+                />
+              ) : (
+                <>
               {getWorkflow(mergedSelected) === "EXPIRED" && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 lg:col-span-2">
                   Hợp đồng đã hết hạn. Vui lòng tái ký hoặc thanh lý.
@@ -1797,10 +1837,23 @@ export default function ContractTemplatePage() {
                   readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(
                     getWorkflow(mergedSelected),
                   )}
+                  onSaved={handleHandoverSaved}
                 />
               )}
 
-              <DetailCard title="File hợp đồng đã ký" icon={FileCheck2} className="lg:col-span-2">
+              {mergedSelected.leaseContractId && stepperVisible && (
+                <div className="lg:col-span-2">
+                  <ContractWorkflowStepper
+                    contractDetails={mergedSelected}
+                    onContractUpdated={handleContractUpdated}
+                    onActivate={() => handleActivate(mergedSelected)}
+                    isActivating={actionLoading === `activate-${mergedSelected.leaseContractId}`}
+                  />
+                </div>
+              )}
+
+              {mergedSelected.leaseContractId && !stepperVisible && (
+                <DetailCard title="File hợp đồng đã ký" icon={FileCheck2} className="lg:col-span-2">
                 <div className="mt-5 rounded-lg bg-white p-4">
                   {mergedSelected.contractFileId ? (
                     <>
@@ -1859,7 +1912,7 @@ export default function ContractTemplatePage() {
                   )}
                 </div>
               </DetailCard>
-
+              )}
               {mergedSelected.leaseContractId && (
                 <DetailCard title="Nguyện vọng khách thuê" icon={FileWarning} className="lg:col-span-2">
                   <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1895,40 +1948,7 @@ export default function ContractTemplatePage() {
                     Tạo hợp đồng thuê
                   </button>
                 )}
-                {mergedSelected.leaseContractId && ["DRAFT", "PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(getWorkflow(mergedSelected)) && (
-                  <button
-                    type="button"
-                    onClick={() => handleActivate(mergedSelected)}
-                    disabled={isBusy || !mergedSelected.contractFileId}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Kích hoạt hợp đồng
-                  </button>
-                )}
-                {getWorkflow(mergedSelected) === "ACTIVE" && (() => {
-                  const accountAction =
-                    ACCOUNT_PROVISIONING_ACTIONS[
-                    details?.accountProvisioningStatus || "NOT_PROVISIONED"
-                    ] || ACCOUNT_PROVISIONING_ACTIONS.NOT_PROVISIONED;
-                  const isSendingAccount =
-                    actionLoading === `send-${mergedSelected.leaseContractId}`;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => handleSendAccount(mergedSelected)}
-                      disabled={isBusy || accountAction.disabled}
-                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${accountAction.className}`}
-                    >
-                      {isSendingAccount ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <KeyRound className="h-4 w-4" />
-                      )}
-                      {isSendingAccount ? "Đang gửi tài khoản" : accountAction.label}
-                    </button>
-                  );
-                })()}
+
                 {getWorkflow(mergedSelected) === "RENEWED" && (
                   <p className="flex min-h-11 items-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 sm:col-span-2">
                     Hợp đồng đã gia hạn. Tài khoản khách thuê được sử dụng tiếp ở hợp đồng mới.
@@ -1985,6 +2005,8 @@ export default function ContractTemplatePage() {
                   Nhắc lịch ký hợp đồng
                 </button>
               </section>
+                </>
+              )}
             </div>
           </section>
         </div>

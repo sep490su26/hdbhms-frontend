@@ -1071,6 +1071,13 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       if (message) nextErrors[fieldName] = message;
     });
 
+    // Validate CCCD issue date must be after birth date
+    const birthDate = data.birthDate;
+    const idIssueDate = data.idIssueDate;
+    if (birthDate && idIssueDate && idIssueDate <= birthDate) {
+      nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
+    }
+
     Object.assign(nextErrors, validateOccupancyData(data));
 
     if (includeFiles) {

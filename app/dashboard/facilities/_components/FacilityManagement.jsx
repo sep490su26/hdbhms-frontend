@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -18,8 +18,7 @@ import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
-import { facilityStatusOptions } from "../_data/mockFacilities";
-import { FacilityFloorPlanDesigner } from "./FacilityFloorPlanDesigner";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 const statCards = [
   {
@@ -87,33 +86,50 @@ function ToastViewport({ toasts, onDismiss }) {
   );
 }
 
+function FacilityLoadingState() {
+  return (
+    <div className="grid gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-24 animate-pulse rounded-2xl border border-[#dbe1ea] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
+        />
+      ))}
+    </div>
+  );
+}
+
+function FacilityErrorState({ message, onRetry }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <ServerCrash className="mt-0.5 h-5 w-5 shrink-0" />
+        <div>
+          <p className="text-sm font-black">Không thể tải danh sách cơ sở</p>
+          <p className="mt-1 text-sm font-semibold">{message}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+      >
+        Thử lại
+      </button>
+    </div>
+  );
+}
+
 export function FacilityManagement() {
-  const facility = useFacilityManagement();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [designerFacility, setDesignerFacility] = useState(null);
-
-  const visibleFacilities = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase("vi");
-
-    return facility.facilities.filter((item) => {
-      const matchesStatus =
-        statusFilter === "ALL" || item.status === statusFilter;
-      const matchesQuery =
-        !normalizedQuery ||
-        [item.name, item.code, item.address].some((value) =>
-          value.toLocaleLowerCase("vi").includes(normalizedQuery),
-        );
-
-      return matchesStatus && matchesQuery;
-    });
-  }, [facility.facilities, query, statusFilter]);
+  const facility = useFacilityManagement({ keyword: query, status: statusFilter });
 
   return (
     <>
       <section className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
-
+          
           <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-[#091426]">
             Quản lý cơ sở
           </h1>
@@ -185,16 +201,15 @@ export function FacilityManagement() {
               </option>
             ))}
           </select>
-
+        
         </div>
-
+        
       </section>
 
       <FacilityList
-        facilities={visibleFacilities}
+        facilities={facility.facilities}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
-        onOpenDesigner={(item) => setDesignerFacility(item)}
       />
       <FacilityFormDialog
         formState={facility.formState}
@@ -213,17 +228,6 @@ export function FacilityManagement() {
         toasts={facility.toasts}
         onDismiss={facility.dismissToast}
       />
-      {designerFacility && (
-  <FacilityFloorPlanDesigner
-    facility={designerFacility}
-    onClose={() => setDesignerFacility(null)}
-    onSave={(updatedFloors) => {
-      facility.updateFacilityFloors(designerFacility.id, updatedFloors); // call APi after
-      setDesignerFacility(null);
-      facility.pushToast("Đã lưu sơ đồ tầng thành công");
-    }}
-  />
-)}
     </>
   );
 }

@@ -40,11 +40,10 @@ function LoginForm() {
     }
 
     const savedPhone = window.localStorage.getItem("rememberedPhone");
-    const savedPassword = window.localStorage.getItem("rememberedPassword");
-    if (savedPhone && savedPassword) {
+    window.localStorage.removeItem("rememberedPassword");
+    if (savedPhone) {
       window.setTimeout(() => {
         setPhone(savedPhone);
-        setPassword(savedPassword);
         setRememberMe(true);
       }, 0);
     }
@@ -57,7 +56,7 @@ function LoginForm() {
 
     try {
       const loginData = await loginWithPhonePassword({ phone, password });
-      const accessToken = loginData?.token || "mock-jwt-token-fake";
+      const accessToken = loginData?.token;
       const userRole = loginData?.role;
 
       if (!accessToken) {
@@ -71,11 +70,10 @@ function LoginForm() {
 
       if (rememberMe) {
         window.localStorage.setItem("rememberedPhone", phone);
-        window.localStorage.setItem("rememberedPassword", password);
       } else {
         window.localStorage.removeItem("rememberedPhone");
-        window.localStorage.removeItem("rememberedPassword");
       }
+      window.localStorage.removeItem("rememberedPassword");
 
       const profile = await getCurrentUserProfile();
       setUser({ ...profile, role: userRole || profile.role });

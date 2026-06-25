@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   AlertOctagon,
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { facilityStatusOptions } from "../_data/mockFacilities";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -163,3 +163,4 @@ export function FacilityStatusDialog({
     </Dialog>
   );
 }
+

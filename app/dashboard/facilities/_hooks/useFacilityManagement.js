@@ -1,15 +1,13 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  FACILITY_STATUS,
   createFacility as createFacilityRequest,
+  getFacilitiesDashboard,
   updateFacility as updateFacilityRequest,
   updateFacilityStatus as updateFacilityStatusRequest,
 } from "@/services/facilityService";
-import {
-  FACILITY_STATUS,
-  initialFacilities,
-} from "../_data/mockFacilities";
 
 const EMPTY_FORM = {
   name: "",
@@ -42,8 +40,11 @@ function validateFacility(values, facilities, editingId) {
   return errors;
 }
 
-export function useFacilityManagement() {
-  const [facilities, setFacilities] = useState(initialFacilities);
+export function useFacilityManagement({ keyword = "", status = "" } = {}) {
+  const [facilities, setFacilities] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [formState, setFormState] = useState({
     isOpen: false,
     mode: "create",
@@ -54,7 +55,6 @@ export function useFacilityManagement() {
   });
   const [statusFlow, setStatusFlow] = useState(null);
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
-  const [networkFailure, setNetworkFailure] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   const pushToast = useCallback((message, tone = "success") => {
@@ -69,6 +69,26 @@ export function useFacilityManagement() {
   const dismissToast = useCallback((id) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
+
+  const retry = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const data = await getFacilitiesDashboard({ keyword, status });
+      setFacilities(data.facilities);
+      setSummary(data.summary);
+    } catch (err) {
+      setFacilities([]);
+      setSummary(null);
+      setError(err?.message || "Không thể tải danh sách cơ sở");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [keyword, status]);
+
+  useEffect(() => {
+    void Promise.resolve().then(retry);
+  }, [retry]);
 
   const openCreateForm = useCallback(() => {
     setFormState({
@@ -90,7 +110,7 @@ export function useFacilityManagement() {
         name: facility.name,
         address: facility.address,
         description: facility.description || "",
-        status: facility.status || "hehe",
+        status: facility.status || FACILITY_STATUS.ACTIVE,
       },
       errors: {},
       isSubmitting: false,
@@ -127,31 +147,17 @@ export function useFacilityManagement() {
       name: formState.values.name.trim(),
       address: formState.values.address.trim(),
       description: formState.values.description.trim(),
-      status: formState.values.status,
+      status: formState.values.status || FACILITY_STATUS.ACTIVE,
     };
 
     setFormState((current) => ({ ...current, isSubmitting: true }));
 
     try {
       if (formState.mode === "create") {
-        const created = await createFacilityRequest(payload, {
-          shouldFail: networkFailure,
-        });
-        setFacilities((current) => [...current, created]);
+        await createFacilityRequest(payload);
         pushToast("Đã thêm cơ sở mới");
       } else {
-        const updated = await updateFacilityRequest(
-          formState.editingId,
-          payload,
-          { shouldFail: networkFailure },
-        );
-        setFacilities((current) =>
-          current.map((facility) =>
-            facility.id === formState.editingId
-              ? { ...facility, ...updated }
-              : facility,
-          ),
-        );
+        await updateFacilityRequest(formState.editingId, payload);
         pushToast("Đã cập nhật thông tin cơ sở");
       }
 
@@ -160,11 +166,12 @@ export function useFacilityManagement() {
         isOpen: false,
         isSubmitting: false,
       }));
-    } catch {
+      await retry();
+    } catch (err) {
       setFormState((current) => ({ ...current, isSubmitting: false }));
-      pushToast("Mất kết nối, vui lòng thử lại", "error");
+      pushToast(err?.message || "Mất kết nối, vui lòng thử lại", "error");
     }
-  }, [facilities, formState, networkFailure, pushToast]);
+  }, [facilities, formState, pushToast, retry]);
 
   const requestStatusChange = useCallback((facility, nextStatus) => {
     if (facility.status === nextStatus) return;
@@ -210,69 +217,55 @@ export function useFacilityManagement() {
 
     setIsStatusSubmitting(true);
     try {
-      const result = await updateFacilityStatusRequest(
-        statusFlow.facility.id,
-        statusFlow.nextStatus,
-        { shouldFail: networkFailure },
-      );
-      setFacilities((current) =>
-        current.map((facility) =>
-          facility.id === result.id
-            ? { ...facility, status: result.status }
-            : facility,
-        ),
-      );
+      await updateFacilityStatusRequest(statusFlow.facility.id, statusFlow.nextStatus);
       setStatusFlow(null);
       pushToast("Đã cập nhật trạng thái cơ sở");
-    } catch {
-      pushToast("Mất kết nối, vui lòng thử lại", "error");
+      await retry();
+    } catch (err) {
+      pushToast(err?.message || "Mất kết nối, vui lòng thử lại", "error");
     } finally {
       setIsStatusSubmitting(false);
     }
-  }, [networkFailure, pushToast, statusFlow]);
+  }, [pushToast, retry, statusFlow]);
 
   const updateFacilityFloors = useCallback((facilityId, updatedFloors) => {
     setFacilities((current) =>
       current.map((facility) =>
         facility.id === facilityId
           ? { ...facility, floors: updatedFloors }
-          : facility
-      )
+          : facility,
+      ),
     );
   }, []);
 
-  const stats = useMemo(() => {
-    const rooms = facilities.flatMap((facility) =>
-      facility.floors.flatMap((floor) => floor.rooms),
-    );
-    const vacantRooms = rooms.filter((room) => room.status === "VACANT").length;
-
-    return {
-      totalFacilities: facilities.length,
-      activeFacilities: facilities.filter(
-        (facility) => facility.status === FACILITY_STATUS.ACTIVE,
-      ).length,
-      totalFloors: facilities.reduce(
-        (sum, facility) => sum + facility.floors.length,
-        0,
-      ),
-      totalRooms: rooms.length,
-      vacancyRate: rooms.length
-        ? Math.round((vacantRooms / rooms.length) * 100)
-        : 0,
-    };
-  }, [facilities]);
+  const stats = useMemo(() => ({
+    totalFacilities: summary?.totalProperties ?? facilities.length,
+    activeFacilities: summary?.activeProperties ?? facilities.filter(
+      (facility) => facility.status === FACILITY_STATUS.ACTIVE,
+    ).length,
+    totalFloors: summary?.totalFloors ?? facilities.reduce(
+      (sum, facility) => sum + (facility.floorCount || facility.floors?.length || 0),
+      0,
+    ),
+    totalRooms: summary?.totalRooms ?? facilities.reduce(
+      (sum, facility) => sum + (facility.roomCount || 0),
+      0,
+    ),
+    vacancyRate: summary?.vacancyRate ?? 0,
+  }), [facilities, summary]);
 
   return {
     facilities,
     stats,
+    isLoading,
+    error,
+    retry,
     formState,
     statusFlow,
     isStatusSubmitting,
-    networkFailure,
     toasts,
-    setNetworkFailure,
     dismissToast,
+    pushToast,
     openCreateForm,
     openEditForm,
     closeForm,
@@ -283,6 +276,11 @@ export function useFacilityManagement() {
     closeStatusFlow,
     confirmStatusChange,
     updateFacilityFloors,
-    pushToast
+    setNetworkFailure: () => {},
+    networkFailure: false,
+    availableStatuses: Object.values(FACILITY_STATUS),
   };
 }
+
+
+

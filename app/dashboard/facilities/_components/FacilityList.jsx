@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { Fragment, useState } from "react";
+import Link from "next/link";
 import {
   BedDouble,
   Building2,
@@ -15,7 +16,7 @@ import {
 import {
   FACILITY_STATUS,
   facilityStatusOptions,
-} from "../_data/mockFacilities";
+} from "@/services/facilityService";
 
 const statusMeta = {
   [FACILITY_STATUS.ACTIVE]: {
@@ -167,7 +168,14 @@ function MobileFacilityCard({
           ))}
         </div>
         <div className="mt-4 grid gap-2">
-
+          <Link
+            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] text-xs font-bold text-[#243047]"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Thiết kế sơ đồ
+          </Link>
+         
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -205,7 +213,6 @@ export function FacilityList({
   facilities,
   onEdit,
   onStatusChange,
-  onOpenDesigner,
 }) {
   const [expandedIds, setExpandedIds] = useState(
     () => new Set([facilities[0]?.id].filter(Boolean)),
@@ -318,7 +325,7 @@ export function FacilityList({
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-2">
-
+                         
                           <button
                             type="button"
                             onClick={() => onEdit(facility)}
@@ -327,18 +334,17 @@ export function FacilityList({
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onOpenDesigner(facility)} //
+                          <Link
+                            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
                             className="rounded-lg border border-[#cbd3df] p-2 text-[#505f76] transition hover:border-[#091426] hover:text-[#091426]"
                             title="Thiết kế sơ đồ tầng"
                           >
                             <LayoutGrid className="h-4 w-4" />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                       <td>
-
+                        
                       </td>
                     </tr>
                     {expanded && (
@@ -372,3 +378,4 @@ export function FacilityList({
     </>
   );
 }
+

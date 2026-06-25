@@ -1,41 +1,131 @@
-const NETWORK_DELAY_MS = 550;
+﻿import { API_BASE_URL, authenticatedFetch } from "@/services/identityAccessService";
 
-function wait(ms = NETWORK_DELAY_MS) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export const FACILITY_STATUS = {
+  ACTIVE: "ACTIVE",
+  TEMPORARILY_CLOSED: "TEMP_CLOSED",
+  PERMANENTLY_CLOSED: "CLOSED",
+};
+
+export const facilityStatusOptions = [
+  { value: "ACTIVE", label: "Đang hoạt động" },
+  { value: "TEMP_CLOSED", label: "Tạm ngừng" },
+  { value: "CLOSED", label: "Ngừng hoạt động" },
+];
+
+function numberValue(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-async function runMockRequest(value, { shouldFail = false } = {}) {
-  await wait();
-
-  if (shouldFail) {
-    const error = new Error("Mất kết nối, vui lòng thử lại");
-    error.code = "NETWORK_ERROR";
-    throw error;
-  }
-
-  return structuredClone(value);
+function normalizeRoom(room = {}) {
+  return {
+    id: room.id ?? null,
+    name: room.name ?? room.roomCode ?? room.room_code ?? "",
+    status: room.currentStatus ?? room.current_status ?? room.status ?? "VACANT",
+  };
 }
 
-export async function createFacility(data, options) {
-  const timestamp = Date.now();
+function normalizeFloor(floor = {}) {
+  const rooms = Array.isArray(floor.rooms) ? floor.rooms.map(normalizeRoom) : [];
+  return {
+    id: floor.id ?? null,
+    name: floor.name ?? "",
+    sortOrder: numberValue(floor.sortOrder ?? floor.sort_order),
+    roomCount: numberValue(floor.roomCount ?? floor.room_count ?? rooms.length),
+    occupiedRoomCount: numberValue(floor.occupiedRoomCount ?? floor.occupied_room_count),
+    rooms,
+  };
+}
 
-  return runMockRequest(
-    {
-      ...data,
-      id: `facility-${timestamp}`,
-      code: `CS-${String(timestamp).slice(-4)}`,
-      floors: [],
-      hasActiveContracts: false,
-      hasOutstandingDebts: false,
-    },
-    options,
+function normalizeFacility(facility = {}) {
+  const floors = Array.isArray(facility.floors) ? facility.floors.map(normalizeFloor) : [];
+  return {
+    id: facility.id ?? null,
+    code: facility.code ?? facility.propertyCode ?? facility.property_code ?? "",
+    name: facility.name ?? "",
+    address: facility.address ?? facility.addressLine ?? facility.address_line ?? "",
+    description: facility.description ?? "",
+    status: facility.status ?? "ACTIVE",
+    floorCount: numberValue(facility.floorCount ?? facility.floor_count ?? floors.length),
+    roomCount: numberValue(facility.roomCount ?? facility.room_count),
+    occupiedRoomCount: numberValue(facility.occupiedRoomCount ?? facility.occupied_room_count),
+    vacantRoomCount: numberValue(facility.vacantRoomCount ?? facility.vacant_room_count),
+    hasActiveContracts: Boolean(facility.hasActiveContracts ?? facility.has_active_contracts ?? false),
+    hasOutstandingDebts: Boolean(facility.hasOutstandingDebts ?? facility.has_outstanding_debts ?? false),
+    outstandingDebtAmount: numberValue(facility.outstandingDebtAmount ?? facility.outstanding_debt_amount),
+    floors,
+  };
+}
+
+function dashboardItems(data) {
+  if (Array.isArray(data?.facilities)) return data.facilities;
+  if (Array.isArray(data?.properties)) return data.properties;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+export async function getFacilitiesDashboard({ keyword = "", status = "" } = {}) {
+  const params = new URLSearchParams();
+  if (keyword.trim()) params.set("keyword", keyword.trim());
+  if (status && status !== "ALL") params.set("status", status);
+
+  const query = params.toString();
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/dashboard/facilities${query ? `?${query}` : ""}`,
+    { method: "GET" },
   );
+
+  return {
+    summary: {
+      totalProperties: numberValue(data?.summary?.totalProperties ?? data?.summary?.total_properties),
+      activeProperties: numberValue(data?.summary?.activeProperties ?? data?.summary?.active_properties),
+      totalFloors: numberValue(data?.summary?.totalFloors ?? data?.summary?.total_floors),
+      totalRooms: numberValue(data?.summary?.totalRooms ?? data?.summary?.total_rooms),
+      occupiedRooms: numberValue(data?.summary?.occupiedRooms ?? data?.summary?.occupied_rooms),
+      vacantRooms: numberValue(data?.summary?.vacantRooms ?? data?.summary?.vacant_rooms),
+      vacancyRate: numberValue(data?.summary?.vacancyRate ?? data?.summary?.vacancy_rate),
+    },
+    facilities: dashboardItems(data).map(normalizeFacility),
+  };
 }
 
-export async function updateFacility(id, data, options) {
-  return runMockRequest({ id, ...data }, options);
+export async function createFacility(payload) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/properties`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: payload.name,
+      address: payload.address,
+      description: payload.description ?? "",
+      status: payload.status ?? "ACTIVE",
+    }),
+  });
+
+  return normalizeFacility(data);
 }
 
-export async function updateFacilityStatus(id, status, options) {
-  return runMockRequest({ id, status }, options);
+export async function updateFacility(id, payload) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/properties/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: payload.name,
+      address: payload.address,
+      description: payload.description ?? "",
+      status: payload.status ?? "ACTIVE",
+    }),
+  });
+
+  return normalizeFacility(data);
+}
+
+export async function updateFacilityStatus(id, status) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/properties/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  return normalizeFacility(data);
 }

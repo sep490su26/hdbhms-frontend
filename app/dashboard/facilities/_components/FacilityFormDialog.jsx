@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { LoaderCircle, MapPin, X } from "lucide-react";
 import {
@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { facilityStatusOptions } from "../_data/mockFacilities";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 function FieldError({ id, message }) {
   if (!message) return null;
@@ -132,8 +132,8 @@ export function FacilityFormDialog({
                 Trạng thái <span className="text-rose-600">*</span>
               </span>
               <select
-                value={formState.values.status || "ACTIVE"}
-                onChange={(event) => onChange("status", event.target.value)}
+                value={formState.values.status || "ACTIVE"} 
+                onChange={(event) => onChange("status", event.target.value)} 
                 className="h-12 w-full rounded-lg border border-[#cbd3df] bg-white px-4 text-sm font-medium text-[#091426] outline-none transition focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
               >
                 {facilityStatusOptions.map((option) => (
@@ -186,3 +186,4 @@ export function FacilityFormDialog({
     </Dialog>
   );
 }
+

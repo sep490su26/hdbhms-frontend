@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
@@ -19,20 +19,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom, floorPlans, ROOM_PLACEHOLDER_IMAGE } from "../../services/roomsService";
+import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom, ROOM_PLACEHOLDER_IMAGE } from "../../services/roomsService";
 
 const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
 
-const ROOM_LAYOUT_BY_CODE = new Map();
-floorPlans.forEach((plan, floorIndex) => {
-  [...plan.left, ...plan.right].forEach((roomCode, roomIndex) => {
-    ROOM_LAYOUT_BY_CODE.set(roomCode, {
-      floor: plan.floor,
-      order: floorIndex * 100 + roomIndex,
-      position: roomIndex < plan.left.length ? "left" : "right",
-    });
-  });
-});
 
 function guestStatusCopy(status) {
   const copy = {
@@ -41,8 +31,8 @@ function guestStatusCopy(status) {
     onHold: "Đang đặt cọc",
     deposited: "Đã đặt cọc",
     soonVacant: "Sắp trống",
-    maintenance: "Bảo trì",
-    expired: "Hết hạn",
+    // maintenance: "Bảo trì",   // tạm ẩn
+    // expired: "Hết hạn",       // tạm ẩn
   };
 
   return copy[status] || "Đã thuê";
@@ -140,6 +130,27 @@ const FLOOR_PLAN_STATUS_META = {
     stroke: "#f97316",
     text: "text-orange-600",
   },
+  SOON_VACANT: {
+    label: "Sắp trống",
+    dot: "bg-purple-500",
+    fill: "#faf5ff",
+    stroke: "#a855f7",
+    text: "text-purple-600",
+  },
+  // MAINTENANCE: {
+  //   label: "Bảo trì",
+  //   dot: "bg-red-500",
+  //   fill: "#fff1f2",
+  //   stroke: "#ef4444",
+  //   text: "text-red-600",
+  // },
+  // EXPIRED: {
+  //   label: "Hết hạn",
+  //   dot: "bg-slate-400",
+  //   fill: "#f8fafc",
+  //   stroke: "#94a3b8",
+  //   text: "text-slate-500",
+  // },
   OCCUPIED: {
     label: "Đã thuê",
     dot: "bg-blue-500",
@@ -153,6 +164,9 @@ function getFloorPlanStatus(room) {
   if (room.status === "available") return "VACANT";
   if (room.status === "onHold") return "HOLDING";
   if (room.status === "deposited") return "RESERVED";
+  if (room.status === "soonVacant") return "SOON_VACANT";
+  // if (room.status === "maintenance") return "MAINTENANCE";   // tạm ẩn
+  // if (room.status === "expired") return "EXPIRED";           // tạm ẩn
   return "OCCUPIED";
 }
 
@@ -166,41 +180,22 @@ function getRoomSuffix(room) {
   return Number(digits.slice(-2)) || Number(digits) || 0;
 }
 
-function resolveRoomLayout(room) {
-  return ROOM_LAYOUT_BY_CODE.get(getRoomCode(room)) ?? null;
-}
-
 function sortRoomsByCode(left, right) {
-  const leftLayout = resolveRoomLayout(left);
-  const rightLayout = resolveRoomLayout(right);
-  const leftOrder = leftLayout?.order ?? getRoomSuffix(left);
-  const rightOrder = rightLayout?.order ?? getRoomSuffix(right);
-  return leftOrder - rightOrder || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
+  const leftFloor = Number(left.floorNumber) || 0;
+  const rightFloor = Number(right.floorNumber) || 0;
+  const leftOrder = Number(left.sortOrder ?? left.displayOrder ?? left.order ?? getRoomSuffix(left));
+  const rightOrder = Number(right.sortOrder ?? right.displayOrder ?? right.order ?? getRoomSuffix(right));
+
+  return leftFloor - rightFloor || leftOrder - rightOrder || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
 }
 
-function buildFloorLayoutRooms(rooms) {
+function autoLayoutRooms(rooms) {
   const sortedRooms = [...rooms].sort(sortRoomsByCode);
-  const floorName = rooms[0]?.floor ?? "";
-  const floorPlan = floorPlans.find((plan) => plan.floor === floorName) ?? null;
-
-  if (floorPlan) {
-    const roomMap = new Map(sortedRooms.map((room) => [getRoomCode(room), room]));
-    const leftRooms = floorPlan.left.map((roomCode) => roomMap.get(roomCode)).filter(Boolean);
-    const rightRooms = floorPlan.right.map((roomCode) => roomMap.get(roomCode)).filter(Boolean);
-
-    return {
-      leftRooms,
-      rightRooms,
-    };
-  }
-
-  const fallbackLeft = sortedRooms.slice(0, Math.min(2, sortedRooms.length));
-  const leftCodes = new Set(fallbackLeft.map(getRoomCode));
-  const rightRooms = sortedRooms.filter((room) => !leftCodes.has(getRoomCode(room)));
+  const splitIndex = Math.min(2, Math.ceil(sortedRooms.length / 3));
 
   return {
-    leftRooms: [...fallbackLeft].sort((a, b) => sortRoomsByCode(b, a)),
-    rightRooms,
+    leftRooms: sortedRooms.slice(0, splitIndex).reverse(),
+    rightRooms: sortedRooms.slice(splitIndex),
   };
 }
 
@@ -311,7 +306,7 @@ function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFirstRo
 }
 
 function FloorBlueprint({ rooms, onSelect }) {
-  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
+  const { leftRooms, rightRooms } = useMemo(() => autoLayoutRooms(rooms), [rooms]);
 
   if (rooms.length === 0) {
     return (
@@ -569,7 +564,7 @@ function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFir
 }
 
 function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
-  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
+  const { leftRooms, rightRooms } = useMemo(() => autoLayoutRooms(rooms), [rooms]);
   const RIGHT_ROOM_H = 58;
   const RIGHT_GAP = 5;
   const LEFT_GAP = 5;
@@ -674,6 +669,14 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
 }
 
 function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
+  const colClass = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+  }[Math.min(floors.length, 6)] ?? "grid-cols-5";
   const roomsByFloor = useMemo(() => {
     const grouped = new Map();
     for (const floor of floors) grouped.set(floor, []);
@@ -695,7 +698,7 @@ function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
 
   return (
     <div className="overflow-x-auto rounded-[2rem] bg-[#e9e9e9] px-4 py-6 ring-1 ring-slate-200 xl:overflow-x-visible">
-      <div className="mx-auto grid min-w-[1048px] max-w-[1048px] grid-cols-5 items-start gap-3">
+      <div className={`mx-auto grid min-w-max max-w-full ${colClass} items-start gap-3`}>
         {floors.map((floor) => (
           <MiniFloorOverview
             key={floor}
@@ -1194,8 +1197,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     floors={floorsForPlan}
                     selectedFloor={activeFloorPlan}
                     rooms={currentFloorRooms}
-                    allRooms={visibleRooms}
-                    onSelectFloor={setActiveFloorPlan}
+                    allRooms={visibleRooms}                    onSelectFloor={setActiveFloorPlan}
                     onSelectRoom={openRoom}
                   />
                 )}
@@ -1242,3 +1244,5 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     </div>
   );
 }
+
+

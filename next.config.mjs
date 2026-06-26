@@ -55,6 +55,7 @@ if (configuredApiBaseUrl) {
 const nextConfig = {
   /* config options here */
   allowedDevOrigins: ['10.0.2.2'],
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
   images: {
     remotePatterns,

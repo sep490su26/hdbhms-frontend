@@ -25,27 +25,4 @@ export async function fetchFloorPlanDesignerData(propertyId) {
   };
 }
 
-export function saveRoomLayouts(rooms) {
-  // TODO: Backend endpoint PATCH /api/v1/rooms/layout not yet confirmed.
-  // Saving layout will silently fail until backend implements this.
-  return authenticatedFetch(`${API_BASE_URL}/rooms/layout`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      rooms: rooms.map((room) => ({
-        room_id: room.id,
-        position_x: Math.round(room.x),
-        position_y: Math.round(room.y),
-        type: "ROOM",
-        width: Math.round(room.width ?? room.w ?? 0),
-        height: Math.round(room.height ?? room.h ?? 0),
-        orientation: room.orientation ?? "north",
-        area_sqm: Number(room.areaSqm ?? room.areaM2 ?? room.area_m2 ?? 0),
-        doors: Array.isArray(room.doors) ? room.doors : [],
-        windows: Array.isArray(room.windows) ? room.windows : [],
-      })),
-    }),
-  });
-}
-
 

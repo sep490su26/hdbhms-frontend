@@ -340,32 +340,31 @@ export default function ContractHandoverSection({
           }
           return {
             id: asset.id ?? undefined,
-            asset_name: asset.assetName.trim(),
-            asset_category: asset.assetCategory.trim(),
+            assetName: asset.assetName.trim(),
+            assetCategory: asset.assetCategory.trim(),
             quantity: Number(asset.quantity),
-            current_condition:
+            currentCondition:
               ASSET_CONDITION_VALUES[asset.currentCondition] ?? asset.currentCondition ?? "GOOD",
             description: asset.description?.trim() ?? "",
-            file_image_id: assetImageId,
+            fileImageId: assetImageId,
           };
         }),
       );
 
       // 3. Single atomic submit: readings + assets + confirm
-      //    Backend uses SNAKE_CASE naming strategy for Lombok @Data classes
       await submitHandover(contractId, {
-        handover_type: "MOVE_IN",
-        handover_date: handoverDate || new Date().toISOString().split("T")[0],
+        handoverType: "MOVE_IN",
+        handoverDate: handoverDate || new Date().toISOString().split("T")[0],
         note: note.trim(),
         electricity: {
-          current_value: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
-          photo_file_id: electricPhotoId,
-          reading_date: electricReadingDate || undefined,
+          currentValue: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
+          photoFileId: electricPhotoId,
+          readingDate: electricReadingDate || undefined,
         },
         water: {
-          current_value: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
-          photo_file_id: waterPhotoId,
-          reading_date: waterReadingDate || undefined,
+          currentValue: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
+          photoFileId: waterPhotoId,
+          readingDate: waterReadingDate || undefined,
         },
         assets: assetPayloads,
       });

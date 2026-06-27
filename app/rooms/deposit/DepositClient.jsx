@@ -195,38 +195,23 @@ const REQUIRED_DEPOSIT_MESSAGES = {
 
 const BACKEND_DEPOSIT_FIELD_MAP = {
   roomId: "roomId",
-  room_id: "roomId",
   fullName: "fullName",
-  full_name: "fullName",
-  dob: "birthDate",
   birthDate: "birthDate",
   phone: "phone",
   email: "email",
-  idNumber: "citizenId",
-  id_number: "citizenId",
   citizenId: "citizenId",
   idIssueDate: "idIssueDate",
-  id_issue_date: "idIssueDate",
   idIssuePlace: "idIssuePlace",
-  id_issue_place: "idIssuePlace",
   permanentAddress: "permanentAddress",
-  permanent_address: "permanentAddress",
   paymentCycleMonths: "paymentCycleMonths",
-  payment_cycle_months: "paymentCycleMonths",
-  expectedLeaseSignDate: "contractDate",
-  expected_lease_sign_date: "contractDate",
-  expectedMoveInDate: "moveInDate",
-  expected_move_in_date: "moveInDate",
-  id_front_file: "citizenIdFront",
-  id_back_file: "citizenIdBack",
-  portrait_file: "portraitImage",
+  contractDate: "contractDate",
+  moveInDate: "moveInDate",
+  citizenIdFront: "citizenIdFront",
+  citizenIdBack: "citizenIdBack",
+  portraitImage: "portraitImage",
   occupantCount: "occupantCount",
-  occupant_count: "occupantCount",
   coOccupants: "coOccupants",
-  co_occupants: "coOccupants",
-  coOccupantInformationValid: "occupantCount",
-  co_occupant_information_valid: "occupantCount",
-  metadata: "terms",
+  terms: "terms",
 };
 
 const API_ERROR_HINTS = [
@@ -549,27 +534,27 @@ const validateOccupancyData = (data) => {
 };
 
 const buildDepositMetadata = (room, data) => ({
-  room_id: room.roomId || "",
-  full_name: String(data.fullName || "").trim(),
+  roomId: room.roomId || "",
+  fullName: String(data.fullName || "").trim(),
   dob: data.birthDate || null,
   phone: String(data.phone || "").trim(),
   email: String(data.email || "").trim(),
-  id_number: String(data.citizenId || "").trim(),
-  id_issue_date: data.idIssueDate || null,
-  id_issue_place: String(data.idIssuePlace || "").trim(),
-  permanent_address: String(data.permanentAddress || "").trim(),
-  deposit_months: 1,
-  payment_cycle_months: Number(data.paymentCycleMonths || 1),
-  occupant_count: Number(data.occupantCount || 1),
-  co_occupants: [1, 2]
+  idNumber: String(data.citizenId || "").trim(),
+  idIssueDate: data.idIssueDate || null,
+  idIssuePlace: String(data.idIssuePlace || "").trim(),
+  permanentAddress: String(data.permanentAddress || "").trim(),
+  depositMonths: 1,
+  paymentCycleMonths: Number(data.paymentCycleMonths || 1),
+  occupantCount: Number(data.occupantCount || 1),
+  coOccupants: [1, 2]
     .filter((displayOrder) => Number(data.occupantCount || 1) > displayOrder)
     .map((displayOrder) => ({
-      full_name: String(data[`coOccupant${displayOrder}FullName`] || "").trim(),
+      fullName: String(data[`coOccupant${displayOrder}FullName`] || "").trim(),
       phone: normalizePhoneValue(data[`coOccupant${displayOrder}Phone`] || ""),
-      display_order: displayOrder,
+      displayOrder,
     })),
-  expected_lease_sign_date: data.contractDate || null,
-  expected_move_in_date: data.moveInDate || null,
+  expectedLeaseSignDate: data.contractDate || null,
+  expectedMoveInDate: data.moveInDate || null,
 });
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
@@ -1067,11 +1052,10 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     const formData = new FormData();
     const metadata = buildDepositMetadata(room, data);
 
-    // Chuẩn bị payload chuẩn theo backend yêu cầu
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-    if (selectedFiles.citizenIdFront) formData.append("id_front_file", selectedFiles.citizenIdFront);
-    if (selectedFiles.citizenIdBack) formData.append("id_back_file", selectedFiles.citizenIdBack);
-    if (selectedFiles.portraitImage) formData.append("portrait_file", selectedFiles.portraitImage);
+    if (selectedFiles.citizenIdFront) formData.append("idFrontFile", selectedFiles.citizenIdFront);
+    if (selectedFiles.citizenIdBack) formData.append("idBackFile", selectedFiles.citizenIdBack);
+    if (selectedFiles.portraitImage) formData.append("portraitFile", selectedFiles.portraitImage);
 
     onSubmit(formData, metadata);
   };

@@ -42,14 +42,14 @@ export async function getRoomTransferByCode(requestCode) {
     const data = await request(`/occupant-transfer-requests/code/${requestCode}`);
     return {
         id: data.id,
-        requestCode: data.requestCode || data.request_code,
-        requesterId: data.requesterId || data.requester_id,
-        oldContractId: data.oldContractId || data.old_contract_id,
-        oldRoomId: data.oldRoomId || data.old_room_id,
-        oldRoomName: data.oldRoomName || data.old_room_name,
-        targetRoomId: data.targetRoomId || data.target_room_id,
-        targetRoomName: data.targetRoomName || data.target_room_name,
-        requestedTransferDate: data.requestedTransferDate || data.requested_transfer_date,
+        requestCode: data.requestCode,
+        requesterId: data.requesterId,
+        oldContractId: data.oldContractId,
+        oldRoomId: data.oldRoomId,
+        oldRoomName: data.oldRoomName,
+        targetRoomId: data.targetRoomId,
+        targetRoomName: data.targetRoomName,
+        requestedTransferDate: data.requestedTransferDate,
         status: data.status,
         reason: data.reason,
     };

@@ -250,15 +250,15 @@ export function mapApiRoomStatus(currentStatus) {
 
 export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
-  const roomCode = apiRoom.room_code ?? apiRoom.roomCode ?? apiRoom.code ?? apiRoom.name ?? "";
+  const roomCode = apiRoom.roomCode ?? apiRoom.code ?? apiRoom.name ?? "";
 
-  const listedPrice = apiRoom.listed_price ?? apiRoom.listedPrice ?? apiRoom.price ?? 0;
+  const listedPrice = apiRoom.listedPrice ?? apiRoom.price ?? 0;
 
 
 
   // Extract floor and building info from nested response
 
-  let floorName = apiRoom.floor?.name ?? apiRoom.floor_name ?? apiRoom.floorName ?? "Tầng 1";
+  let floorName = apiRoom.floor?.name ?? apiRoom.floorName ?? "Tầng 1";
 
   // Nếu floorName chỉ là con số (ví dụ: "1"), chuyển thành "Tầng 1" để khớp với logic FE
 
@@ -268,7 +268,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
   }
 
-  const floorOrder = apiRoom.floor?.sort_order ?? apiRoom.floor?.sortOrder ?? apiRoom.floor_sort_order ?? apiRoom.floorSortOrder;
+  const floorOrder = apiRoom.floor?.sortOrder ?? apiRoom.floorSortOrder;
 
   const floorNumber = floorOrder ?? parseInt(floorName?.replace(/\D/g, "") || "1", 10);
 
@@ -280,7 +280,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
   const imageUrls = [
 
-    apiRoom.first_image_url,
+    apiRoom.firstImageUrl,
 
     apiRoom.firstImageUrl,
 
@@ -294,7 +294,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
   const uniqueImages = [...new Set(imageUrls)];
 
-  const status = mapApiRoomStatus(apiRoom.current_status ?? apiRoom.currentStatus);
+  const status = mapApiRoomStatus(apiRoom.currentStatus);
 
 
 
@@ -306,21 +306,21 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
     roomCode: roomCode,
 
-    floorId: apiRoom.floor?.id ?? apiRoom.floor_id ?? apiRoom.floorId ?? null,
+    floorId: apiRoom.floor?.id ?? apiRoom.floorId ?? null,
 
-    floorCode: apiRoom.floor?.floor_code ?? apiRoom.floor?.floorCode ?? apiRoom.floor_code ?? apiRoom.floorCode ?? null,
+    floorCode: apiRoom.floor?.floorCode ?? apiRoom.floorCode ?? null,
 
-    buildingId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
+    buildingId: apiRoom.floor?.property?.id ?? apiRoom.propertyId ?? null,
 
-    propertyId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
+    propertyId: apiRoom.floor?.property?.id ?? apiRoom.propertyId ?? null,
 
-    buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? "Hải Đăng House",
+    buildingName: apiRoom.floor?.property?.name ?? apiRoom.propertyName ?? "Hải Đăng House",
 
     name: apiRoom.name ?? roomCode,
 
     status,
 
-    expectedVacantDate: apiRoom.expected_vacant_date ?? apiRoom.expectedVacantDate ?? null,
+    expectedVacantDate: apiRoom.expectedVacantDate ?? null,
 
     type: apiRoom.type ?? "standard",
 
@@ -342,13 +342,13 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 
     depositLabel: listedPrice ? (listedPrice / 1000000).toLocaleString("vi-VN") + "M" : "Liên hệ",
 
-    area: apiRoom.area_m2 ?? apiRoom.areaM2 ?? apiRoom.area ?? 0,
+    area: apiRoom.areaM2 ?? apiRoom.area ?? 0,
 
-    feature: apiRoom.public_note ?? apiRoom.publicNote ?? "Tiện nghi",
+    feature: apiRoom.publicNote ?? "Tiện nghi",
 
-    description: apiRoom.description ?? apiRoom.public_note ?? apiRoom.publicNote ?? "Không có mô tả",
+    description: apiRoom.description ?? apiRoom.publicNote ?? "Không có mô tả",
 
-    maxPeople: apiRoom.max_occupants ?? apiRoom.maxOccupants ?? 3,
+    maxPeople: apiRoom.maxOccupants ?? 3,
 
     ownerName: "Hải Đăng House",
 
@@ -444,15 +444,15 @@ function sameText(left, right) {
 
 function enrichRoomWithFloor(room, floors, property) {
 
-  const floor = floors.find((item) => sameText(item.name, room.floor_name ?? room.floorName))
+  const floor = floors.find((item) => sameText(item.name, room.floorName))
 
-    ?? floors.find((item) => sameText(item.floor_code ?? item.floorCode, room.floor_code ?? room.floorCode))
+    ?? floors.find((item) => sameText(item.floorCode, room.floorCode))
 
     ?? floors.find((item) => {
 
-      const roomCode = String(room.room_code ?? room.roomCode ?? "");
+      const roomCode = String(room.roomCode ?? "");
 
-      return roomCode.startsWith(String(item.sort_order ?? item.sortOrder ?? ""));
+      return roomCode.startsWith(String(item.sortOrder ?? ""));
 
     })
 
@@ -464,29 +464,17 @@ function enrichRoomWithFloor(room, floors, property) {
 
     ...room,
 
-    property_id: property?.id ?? room.property_id ?? room.propertyId ?? null,
+    propertyId: property?.id ?? room.propertyId ?? null,
 
-    propertyId: property?.id ?? room.property_id ?? room.propertyId ?? null,
+    propertyName: property?.name ?? room.propertyName ?? "",
 
-    property_name: property?.name ?? room.property_name ?? room.propertyName ?? "",
+    floorId: floor?.id ?? room.floorId ?? null,
 
-    propertyName: property?.name ?? room.property_name ?? room.propertyName ?? "",
+    floorCode: floor?.floorCode ?? room.floorCode ?? null,
 
-    floor_id: floor?.id ?? room.floor_id ?? room.floorId ?? null,
+    floorName: floor?.name ?? room.floorName ?? "",
 
-    floorId: floor?.id ?? room.floor_id ?? room.floorId ?? null,
-
-    floor_code: floor?.floor_code ?? floor?.floorCode ?? room.floor_code ?? room.floorCode ?? null,
-
-    floorCode: floor?.floor_code ?? floor?.floorCode ?? room.floor_code ?? room.floorCode ?? null,
-
-    floor_name: floor?.name ?? room.floor_name ?? room.floorName ?? "",
-
-    floorName: floor?.name ?? room.floor_name ?? room.floorName ?? "",
-
-    floor_sort_order: floor?.sort_order ?? floor?.sortOrder ?? room.floor_sort_order ?? room.floorSortOrder ?? null,
-
-    floorSortOrder: floor?.sort_order ?? floor?.sortOrder ?? room.floor_sort_order ?? room.floorSortOrder ?? null,
+    floorSortOrder: floor?.sortOrder ?? room.floorSortOrder ?? null,
 
   };
 
@@ -526,9 +514,9 @@ export async function fetchPublicRoomCatalog({ propertyId } = {}) {
 
   const sortedFloors = [...floorsData].sort((a, b) => {
 
-    const left = a.sort_order ?? a.sortOrder ?? 0;
+    const left = a.sortOrder ?? 0;
 
-    const right = b.sort_order ?? b.sortOrder ?? 0;
+    const right = b.sortOrder ?? 0;
 
     return left - right;
 
@@ -540,7 +528,7 @@ export async function fetchPublicRoomCatalog({ propertyId } = {}) {
 
     ...floor,
 
-    rooms: roomsWithFloor.filter((room) => String(room.floor_id ?? room.floorId) === String(floor.id)),
+    rooms: roomsWithFloor.filter((room) => String(room.floorId) === String(floor.id)),
 
   }));
 
@@ -594,9 +582,9 @@ export async function fetchPublicRoomById(roomIdentifier) {
 
   return catalog.rooms.find((room) => {
 
-    const id = room.id ?? room.room_id ?? room.roomId;
+    const id = room.id ?? room.roomId;
 
-    const code = room.room_code ?? room.roomCode;
+    const code = room.roomCode;
 
     return String(id) === String(normalizedIdentifier) || String(code) === String(normalizedIdentifier) ||
            String(id) === String(roomIdentifier) || String(code) === String(roomIdentifier);

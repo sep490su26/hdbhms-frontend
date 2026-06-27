@@ -17,8 +17,8 @@ export const STATUS_OPTIONS = [
 ];
 
 
-function readField(item, camelKey, snakeKey = camelKey) {
-    return item?.[camelKey] ?? item?.[snakeKey];
+function readField(item, camelKey) {
+    return item?.[camelKey];
 }
 
 function toQuery(params) {
@@ -127,26 +127,26 @@ export function getViewingCustomerErrorMessage(error, fallback = "Không thể t
  * Details response: id, property { id, name }, room { id, roomCode, name }, + all list fields
  */
 export function mapVisitRequest(item) {
-    const preferredStart = readField(item, "preferredStart", "preferred_start");
-    const createdAt = readField(item, "createdAt", "created_at");
-    const deletedAt = readField(item, "deletedAt", "deleted_at");
+    const preferredStart = readField(item, "preferredStart");
+    const createdAt = readField(item, "createdAt");
+    const deletedAt = readField(item, "deletedAt");
     const property = readField(item, "property") || {};
     const room = readField(item, "room") || {};
 
 
     return {
         id: readField(item, "id"),
-        fullName: readField(item, "visitorName", "visitor_name") || "",
-        phone: readField(item, "visitorPhone", "visitor_phone") || "",
-        email: readField(item, "visitorEmail", "visitor_email") || "",
-        propertyId: readField(item, "propertyId", "property_id") ?? readField(property, "id"),
-        propertyName: readField(item, "propertyName", "property_name") || readField(property, "name") || "—",
-        interestedRoomId: readField(item, "roomId", "room_id") ?? readField(room, "id"),
-        interestedRoomName: readField(item, "roomName", "room_name") || readField(room, "name") || "",
+        fullName: readField(item, "visitorName") || "",
+        phone: readField(item, "visitorPhone") || "",
+        email: readField(item, "visitorEmail") || "",
+        propertyId: readField(item, "propertyId") ?? readField(property, "id"),
+        propertyName: readField(item, "propertyName") || readField(property, "name") || "—",
+        interestedRoomId: readField(item, "roomId") ?? readField(room, "id"),
+        interestedRoomName: readField(item, "roomName") || readField(room, "name") || "",
         appointmentAt: preferredStart,
         appointmentLabel: formatAppointment(preferredStart),
         status: normalizeVisitStatus(readField(item, "status")),
-        note: readField(item, "notes") ?? readField(item, "note") ?? "",
+        note: readField(item, "note") ?? "",
         createdAt,
         createdLabel: createdAt ? formatAppointment(createdAt) : "",
         deletedAt,
@@ -174,10 +174,10 @@ export async function fetchViewingCustomers({filters, page, size}) {
 
     return {
         items: (data.data || []).map(mapVisitRequest),
-        total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 0,
-        size: readField(data, "pageSize", "page_size") || size,
-        totalPages: readField(data, "totalPages", "total_pages") || 0,
+        total: readField(data, "totalElements") || 0,
+        page: readField(data, "currentPage") || 0,
+        size: readField(data, "pageSize") || size,
+        totalPages: readField(data, "totalPages") || 0,
     };
 }
 
@@ -219,10 +219,10 @@ export async function fetchViewingCustomerTrash({page, size}) {
     })}`);
     return {
         items: (data.data || []).map(mapVisitRequest),
-        total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 1,
-        size: readField(data, "pageSize", "page_size") || size,
-        totalPages: readField(data, "totalPages", "total_pages") || 0,
+        total: readField(data, "totalElements") || 0,
+        page: readField(data, "currentPage") || 1,
+        size: readField(data, "pageSize") || size,
+        totalPages: readField(data, "totalPages") || 0,
     };
 }
 
@@ -241,13 +241,12 @@ export async function publicCreateViewingCustomer(payload) {
         method: "POST",
         headers: {"Content-Type": "application/json", "X-Client-Type": "web"},
         body: JSON.stringify({
-            visitor_name: payload.fullName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
-            notes: payload.note,
+            customerName: payload.fullName,
+            phone: payload.phone,
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            appointmentAt: payload.appointmentAt,
+            note: payload.note,
         }),
     });
     const data = await parseEnvelope(response);
@@ -262,13 +261,12 @@ export async function createViewingCustomer(payload) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            visitor_name: payload.customerName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
-            notes: payload.note,
+            customerName: payload.customerName,
+            phone: payload.phone,
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            appointmentAt: payload.appointmentAt,
+            note: payload.note,
         }),
     });
     return mapVisitRequest(data);
@@ -331,7 +329,7 @@ export async function fetchViewingProperties() {
         return propertiesArray.map((property) => ({
             id: property.id,
             name: property.name,
-            propertyCode: property.propertyCode ?? property.property_code,
+            propertyCode: property.propertyCode,
         }));
     } catch {
         // Fallback only if the API truly fails (network error)
@@ -349,10 +347,10 @@ export async function fetchViewingRooms(propertyId) {
         const propertiesArray = Array.isArray(envelope) ? envelope : (envelope?.data?.data ?? envelope?.data ?? []);
         return propertiesArray.map((room) => ({
             id: room.id,
-            propertyId: room.propertyId ?? room.property_id ?? room.property?.id ?? propertyId,
-            roomCode: room.roomCode ?? room.room_code,
-            name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
-            status: room.currentStatus ?? room.current_status,
+            propertyId: room.propertyId ?? room.property?.id ?? propertyId,
+            roomCode: room.roomCode,
+            name: room.name || `Phòng ${room.roomCode}`,
+            status: room.currentStatus,
         }));
     } catch {
         return [];

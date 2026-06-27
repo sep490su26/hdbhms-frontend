@@ -55,38 +55,37 @@ export async function fetchChangeRequests(filters = {}) {
     const data = await request(`/change-requests?${params.toString()}`);
     const rawItems = Array.isArray(data.data || data.content) ? (data.data || data.content) : [];
     
-    // Normalize snake_case → camelCase for consistent frontend usage
-    const requests = rawItems.map(r => ({
+    const requests = rawItems.map((r) => ({
         id: r.id,
-        requestCode: r.requestCode || r.request_code,
-        requestType: r.requestType || r.request_type,
+        requestCode: r.requestCode,
+        requestType: r.requestType,
         title: r.title,
         description: r.description,
         status: r.status,
-        requesterId: r.requesterId || r.requester_id,
-        resolutionNote: r.resolutionNote || r.resolution_note,
-        resolvedAt: r.resolvedAt || r.resolved_at,
-        createdAt: r.createdAt || r.created_at,
-        requestPayload: r.requestPayload || r.request_payload,
+        requesterId: r.requesterId,
+        resolutionNote: r.resolutionNote,
+        resolvedAt: r.resolvedAt,
+        createdAt: r.createdAt,
+        requestPayload: r.requestPayload,
     }));
     
     return {
         requests,
-        total: data.totalElements ?? data.total_elements ?? 0,
-        currentPage: data.currentPage ?? data.current_page ?? 1,
-        totalPages: data.totalPages ?? data.total_pages ?? 1,
+        total: data.totalElements ?? 0,
+        currentPage: data.currentPage ?? 1,
+        totalPages: data.totalPages ?? 1,
     };
 }
 
 export async function fetchChangeRequestStats() {
     const data = await request('/change-requests/stats');
     return {
-        pendingCount: data.pendingApproval ?? data.pending_approval ?? 0,
-        approvedCount: data.approvedToday ?? data.approved_today ?? 0,
-        rejectedCount: data.rejectedToday ?? data.rejected_today ?? 0,
-        totalCount: data.thisMonthTotal ?? data.this_month_total ?? 0,
-        breakdown: data.requestTypeBreakdown ?? data.request_type_breakdown
-            ? Object.entries(data.requestTypeBreakdown || data.request_type_breakdown).map(([type, count]) => ({ type, count }))
+        pendingCount: data.pendingApproval ?? 0,
+        approvedCount: data.approvedToday ?? 0,
+        rejectedCount: data.rejectedToday ?? 0,
+        totalCount: data.thisMonthTotal ?? 0,
+        breakdown: data.requestTypeBreakdown
+            ? Object.entries(data.requestTypeBreakdown).map(([type, count]) => ({ type, count }))
             : [],
     };
 }

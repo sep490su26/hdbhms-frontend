@@ -297,8 +297,8 @@ export default function MeterReadings() {
 
         try {
             await saveProgressiveRoomReading(batchId, room.roomId, {
-                electricity_value: room.elecCurr,
-                water_value: room.waterCurr,
+                electricityValue: room.elecCurr,
+                waterValue: room.waterCurr,
                 electricityPhotoId: null,
                 waterPhotoId: null
             });

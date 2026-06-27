@@ -48,111 +48,90 @@ async function parseEnvelope(response, fallbackMessage) {
 }
 
 export function normalizeLeaseContractItem(item = {}) {
-  const contractId = item.contractId ?? item.contract_id ?? item.leaseContractId ?? item.lease_contract_id ?? null;
-  const depositCode = item.depositCode ?? item.deposit_code ?? null;
-  const contractCode = item.contractCode ?? item.contract_code ?? null;
+  const contractId = item.contractId ?? item.leaseContractId ?? null;
+  const depositCode = item.depositCode ?? null;
+  const contractCode = item.contractCode ?? null;
   const legacyContractCode = contractId
-    ? item.displayCode ?? item.display_code ?? item.code ?? null
+    ? item.displayCode ?? item.code ?? null
     : null;
   const displayedContractCode = contractCode ?? legacyContractCode ?? "";
 
   return {
     ...item,
-    sourceType: item.sourceType ?? item.source_type ?? null,
+    sourceType: item.sourceType ?? null,
     contractId,
-    leaseContractId: item.leaseContractId ?? item.lease_contract_id ?? contractId,
-    depositAgreementId: item.depositAgreementId ?? item.deposit_agreement_id ?? null,
+    leaseContractId: item.leaseContractId ?? contractId,
+    depositAgreementId: item.depositAgreementId ?? null,
     code: displayedContractCode,
     displayCode: displayedContractCode,
     depositCode,
     contractCode,
-    propertyId: item.propertyId ?? item.property_id ?? null,
-    propertyName: item.propertyName ?? item.property_name ?? null,
-    propertyAddress: item.propertyAddress ?? item.property_address ?? null,
-    tenantId: item.tenantId ?? item.tenant_id ?? null,
-    roomId: item.roomId ?? item.room_id ?? null,
-    roomCode: item.roomCode ?? item.room_code ?? null,
-    roomStatus: item.roomStatus ?? item.room_status ?? null,
-    primaryTenantProfileId: item.primaryTenantProfileId ?? item.primary_tenant_profile_id ?? null,
-    customerName: item.customerName ?? item.customer_name ?? item.primaryTenantName ?? item.primary_tenant_name ?? null,
-    primaryTenantName: item.primaryTenantName ?? item.primary_tenant_name ?? item.customerName ?? item.customer_name ?? null,
-    phone: item.phone ?? item.primaryTenantPhone ?? item.primary_tenant_phone ?? null,
-    email: item.email ?? item.primaryTenantEmail ?? item.primary_tenant_email ?? null,
-    expectedLeaseSignDate: item.expectedLeaseSignDate ?? item.expected_lease_sign_date ?? null,
-    expectedMoveInDate: item.expectedMoveInDate ?? item.expected_move_in_date ?? null,
-    startDate: item.startDate ?? item.start_date ?? null,
-    endDate: item.endDate ?? item.end_date ?? null,
-    rentStartDate: item.rentStartDate ?? item.rent_start_date ?? null,
-    monthlyRent: item.monthlyRent ?? item.monthly_rent ?? null,
-    paymentCycleMonths: item.paymentCycleMonths ?? item.payment_cycle_months ?? null,
-    depositAmount: item.depositAmount ?? item.deposit_amount ?? null,
-    contractStatus: item.contractStatus ?? item.contract_status ?? item.status ?? null,
-    status: item.status ?? item.contractStatus ?? item.contract_status ?? null,
-    depositStatus: item.depositStatus ?? item.deposit_status ?? null,
-    workflowStatus: item.workflowStatus ?? item.workflow_status ?? null,
+    propertyId: item.propertyId ?? null,
+    propertyName: item.propertyName ?? null,
+    propertyAddress: item.propertyAddress ?? null,
+    tenantId: item.tenantId ?? null,
+    roomId: item.roomId ?? null,
+    roomCode: item.roomCode ?? null,
+    roomStatus: item.roomStatus ?? null,
+    primaryTenantProfileId: item.primaryTenantProfileId ?? null,
+    customerName: item.customerName ?? item.primaryTenantName ?? null,
+    primaryTenantName: item.primaryTenantName ?? item.customerName ?? null,
+    phone: item.phone ?? item.primaryTenantPhone ?? null,
+    email: item.email ?? item.primaryTenantEmail ?? null,
+    expectedLeaseSignDate: item.expectedLeaseSignDate ?? null,
+    expectedMoveInDate: item.expectedMoveInDate ?? null,
+    startDate: item.startDate ?? null,
+    endDate: item.endDate ?? null,
+    rentStartDate: item.rentStartDate ?? null,
+    monthlyRent: item.monthlyRent ?? null,
+    paymentCycleMonths: item.paymentCycleMonths ?? null,
+    depositAmount: item.depositAmount ?? null,
+    contractStatus: item.contractStatus ?? item.status ?? null,
+    status: item.status ?? item.contractStatus ?? null,
+    depositStatus: item.depositStatus ?? null,
+    workflowStatus: item.workflowStatus ?? null,
     occupantsCount:
       item.occupantsCount ??
-      item.occupants_count ??
       item.occupantCount ??
-      item.occupant_count ??
       item.peopleCount ??
-      item.people_count ??
       item.roomOccupantCount ??
-      item.room_occupant_count ??
       (Array.isArray(item.occupants) ? item.occupants.length : null),
     contractFileId:
       item.contractFileId ??
-      item.contract_file_id ??
       item.fileId ??
-      item.file_id ??
       item.contractFile?.id ??
-      item.contract_file?.id ??
       item.contractFile?.fileId ??
-      item.contract_file?.file_id ??
       null,
     contractFileName:
       item.contractFileName ??
-      item.contract_file_name ??
       item.fileName ??
-      item.file_name ??
       item.contractFile?.fileName ??
-      item.contract_file?.file_name ??
       null,
     contractFileUploadedAt:
       item.contractFileUploadedAt ??
-      item.contract_file_uploaded_at ??
       item.uploadedAt ??
-      item.uploaded_at ??
       item.contractFile?.uploadedAt ??
-      item.contract_file?.uploaded_at ??
       null,
-    depositSignedFileId:
-      item.depositSignedFileId ??
-      item.deposit_signed_file_id ??
-      null,
-    signedAt: item.signedAt ?? item.signed_at ?? null,
-    createdAt: item.createdAt ?? item.created_at ?? null,
-    accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
-    emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
-    previousContractId: item.previousContractId ?? item.previous_contract_id ?? null,
-    previousContractCode: item.previousContractCode ?? item.previous_contract_code ?? null,
-    renewedContractId: item.renewedContractId ?? item.renewed_contract_id ?? item.nextContractId ?? item.next_contract_id ?? null,
+    depositSignedFileId: item.depositSignedFileId ?? null,
+    signedAt: item.signedAt ?? null,
+    createdAt: item.createdAt ?? null,
+    accountProvisioned: item.accountProvisioned ?? false,
+    emailAvailable: item.emailAvailable ?? Boolean(item.email),
+    previousContractId: item.previousContractId ?? null,
+    previousContractCode: item.previousContractCode ?? null,
+    renewedContractId: item.renewedContractId ?? item.nextContractId ?? null,
     renewedContractCode:
       item.renewedContractCode ??
-      item.renewed_contract_code ??
       item.nextContractCode ??
-      item.next_contract_code ??
       null,
-    tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
-    expectedVacantDate: item.expectedVacantDate ?? item.expected_vacant_date ?? null,
-    intentionRecordedAt: item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
+    tenantIntention: item.tenantIntention ?? null,
+    expectedVacantDate: item.expectedVacantDate ?? null,
+    intentionRecordedAt: item.intentionRecordedAt ?? null,
     intentionNote:
       item.intentionNote ??
-      item.intention_note ??
       item.tenantIntentionNote ??
-      item.tenant_intention_note ??
       null,
-    intentionSource: item.intentionSource ?? item.intention_source ?? null,
+    intentionSource: item.intentionSource ?? null,
   };
 }
 
@@ -226,11 +205,11 @@ export async function updateLeaseContractTerms(leaseContractId, payload) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        start_date: payload.startDate,
-        end_date: payload.endDate,
-        payment_cycle_months: payload.paymentCycleMonths,
-        monthly_rent: payload.monthlyRent,
-        deposit_amount: payload.depositAmount,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        paymentCycleMonths: payload.paymentCycleMonths,
+        monthlyRent: payload.monthlyRent,
+        depositAmount: payload.depositAmount,
       }),
     },
   );
@@ -259,11 +238,11 @@ export async function renewLeaseContract(leaseContractId, payload) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        new_start_date: payload.newStartDate,
-        new_end_date: payload.newEndDate,
-        monthly_rent: payload.monthlyRent,
-        payment_cycle_months: payload.paymentCycleMonths,
-        deposit_amount: payload.depositAmount,
+        newStartDate: payload.newStartDate,
+        newEndDate: payload.newEndDate,
+        monthlyRent: payload.monthlyRent,
+        paymentCycleMonths: payload.paymentCycleMonths,
+        depositAmount: payload.depositAmount,
         note: payload.note,
       }),
     },
@@ -281,7 +260,7 @@ export async function recordLeaseContractTenantIntention(leaseContractId, payloa
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         intention: payload.intention,
-        expected_move_out_date: payload.expectedMoveOutDate || null,
+        expectedMoveOutDate: payload.expectedMoveOutDate || null,
         note: payload.note,
       }),
     },
@@ -366,129 +345,101 @@ export async function downloadLeaseContractDraftPdf(contractId) {
 
 function normalizeLeaseContractDetails(details = {}) {
   if (!details || typeof details !== "object") return null;
-  const rawContractFile = details.contractFile ?? details.contract_file ?? null;
+  const rawContractFile = details.contractFile ?? null;
   const rawOccupants =
     details.occupants ??
     details.contractOccupants ??
-    details.contract_occupants ??
     details.occupantInfos ??
-    details.occupant_infos ??
     details.residents ??
     [];
   const contractFile = rawContractFile
     ? {
         ...rawContractFile,
-        id: rawContractFile.id ?? rawContractFile.fileId ?? rawContractFile.file_id ?? null,
-        fileName: rawContractFile.fileName ?? rawContractFile.file_name ?? rawContractFile.name ?? null,
-        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
+        id: rawContractFile.id ?? rawContractFile.fileId ?? null,
+        fileName: rawContractFile.fileName ?? rawContractFile.name ?? null,
+        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.createdAt ?? null,
       }
     : null;
-  const rawPrimaryTenant = details.primaryTenant ?? details.primary_tenant ?? {};
+  const rawPrimaryTenant = details.primaryTenant ?? {};
   const primaryTenant = rawPrimaryTenant
     ? {
         ...rawPrimaryTenant,
-        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? rawPrimaryTenant.tenant_profile_id ?? null,
-        fullName: rawPrimaryTenant.fullName ?? rawPrimaryTenant.full_name ?? "",
+        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? null,
+        fullName: rawPrimaryTenant.fullName ?? "",
         phone: rawPrimaryTenant.phone ?? "",
         email: rawPrimaryTenant.email ?? "",
         dob:
           rawPrimaryTenant.dob ??
           rawPrimaryTenant.dateOfBirth ??
-          rawPrimaryTenant.date_of_birth ??
           rawPrimaryTenant.birthDate ??
-          rawPrimaryTenant.birth_date ??
           null,
         dateOfBirth:
           rawPrimaryTenant.dateOfBirth ??
-          rawPrimaryTenant.date_of_birth ??
           rawPrimaryTenant.dob ??
           rawPrimaryTenant.birthDate ??
-          rawPrimaryTenant.birth_date ??
           null,
-        permanentAddress: rawPrimaryTenant.permanentAddress ?? rawPrimaryTenant.permanent_address ?? "",
+        permanentAddress: rawPrimaryTenant.permanentAddress ?? "",
         citizenId:
           rawPrimaryTenant.citizenId ??
-          rawPrimaryTenant.citizen_id ??
           rawPrimaryTenant.identityNumber ??
-          rawPrimaryTenant.identity_number ??
           rawPrimaryTenant.idNumber ??
-          rawPrimaryTenant.id_number ??
           rawPrimaryTenant.docNumber ??
-          rawPrimaryTenant.doc_number ??
           null,
         identityIssuedDate:
           rawPrimaryTenant.identityIssuedDate ??
-          rawPrimaryTenant.identity_issued_date ??
           rawPrimaryTenant.issuedDate ??
-          rawPrimaryTenant.issued_date ??
           rawPrimaryTenant.issueDate ??
-          rawPrimaryTenant.issue_date ??
           null,
         identityIssuedPlace:
           rawPrimaryTenant.identityIssuedPlace ??
-          rawPrimaryTenant.identity_issued_place ??
           rawPrimaryTenant.issuedPlace ??
-          rawPrimaryTenant.issued_place ??
           rawPrimaryTenant.issuePlace ??
-          rawPrimaryTenant.issue_place ??
           "",
       }
     : {};
   return {
     ...details,
-    contractId: details.contractId ?? details.contract_id ?? null,
-    contractCode: details.contractCode ?? details.contract_code ?? "",
-    depositAgreementId: details.depositAgreementId ?? details.deposit_agreement_id ?? null,
-    depositSignedFileId: details.depositSignedFileId ?? details.deposit_signed_file_id ?? null,
-    tenantId: details.tenantId ?? details.tenant_id ?? null,
-    startDate: details.startDate ?? details.start_date ?? null,
-    endDate: details.endDate ?? details.end_date ?? null,
-    rentStartDate: details.rentStartDate ?? details.rent_start_date ?? null,
-    monthlyRent: details.monthlyRent ?? details.monthly_rent ?? null,
-    paymentCycleMonths: details.paymentCycleMonths ?? details.payment_cycle_months ?? null,
-    depositAmount: details.depositAmount ?? details.deposit_amount ?? null,
+    contractId: details.contractId ?? null,
+    contractCode: details.contractCode ?? "",
+    depositAgreementId: details.depositAgreementId ?? null,
+    depositSignedFileId: details.depositSignedFileId ?? null,
+    tenantId: details.tenantId ?? null,
+    startDate: details.startDate ?? null,
+    endDate: details.endDate ?? null,
+    rentStartDate: details.rentStartDate ?? null,
+    monthlyRent: details.monthlyRent ?? null,
+    paymentCycleMonths: details.paymentCycleMonths ?? null,
+    depositAmount: details.depositAmount ?? null,
     occupantsCount:
       details.occupantsCount ??
-      details.occupants_count ??
       details.occupantCount ??
-      details.occupant_count ??
       (Array.isArray(rawOccupants) ? rawOccupants.length : null),
     status: details.status ?? null,
-    signedAt: details.signedAt ?? details.signed_at ?? null,
-    previousContractId: details.previousContractId ?? details.previous_contract_id ?? null,
-    previousContractCode: details.previousContractCode ?? details.previous_contract_code ?? null,
+    signedAt: details.signedAt ?? null,
+    previousContractId: details.previousContractId ?? null,
+    previousContractCode: details.previousContractCode ?? null,
     renewedContractId:
       details.renewedContractId ??
-      details.renewed_contract_id ??
       details.nextContractId ??
-      details.next_contract_id ??
       null,
     renewedContractCode:
       details.renewedContractCode ??
-      details.renewed_contract_code ??
       details.nextContractCode ??
-      details.next_contract_code ??
       null,
-    tenantIntention: details.tenantIntention ?? details.tenant_intention ?? null,
-    expectedVacantDate: details.expectedVacantDate ?? details.expected_vacant_date ?? null,
-    intentionRecordedAt: details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
+    tenantIntention: details.tenantIntention ?? null,
+    expectedVacantDate: details.expectedVacantDate ?? null,
+    intentionRecordedAt: details.intentionRecordedAt ?? null,
     intentionNote:
       details.intentionNote ??
-      details.intention_note ??
       details.tenantIntentionNote ??
-      details.tenant_intention_note ??
       null,
-    intentionSource: details.intentionSource ?? details.intention_source ?? null,
-    canRenew: details.canRenew ?? details.can_renew ?? false,
-    canRenewBlockedReason:
-      details.canRenewBlockedReason ??
-      details.can_renew_blocked_reason ??
-      "",
-    canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
-    canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
+    intentionSource: details.intentionSource ?? null,
+    canRenew: details.canRenew ?? false,
+    canRenewBlockedReason: details.canRenewBlockedReason ?? "",
+    canLiquidate: details.canLiquidate ?? false,
+    canSendAccount: details.canSendAccount ?? false,
     accountProvisioningStatus:
       details.accountProvisioningStatus ??
-      details.account_provisioning_status ??
       "NOT_PROVISIONED",
     room: details.room ?? {},
     property: details.property ?? {},
@@ -497,66 +448,47 @@ function normalizeLeaseContractDetails(details = {}) {
     occupants: Array.isArray(rawOccupants)
       ? rawOccupants.map((occupant) => ({
           ...occupant,
-          tenantProfileId: occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
-          fullName: occupant.fullName ?? occupant.full_name ?? "",
+          tenantProfileId: occupant.tenantProfileId ?? null,
+          fullName: occupant.fullName ?? "",
           phone: occupant.phone ?? "",
           email: occupant.email ?? "",
           dob:
             occupant.dob ??
             occupant.dateOfBirth ??
-            occupant.date_of_birth ??
             occupant.birthDate ??
-            occupant.birth_date ??
             null,
           dateOfBirth:
             occupant.dateOfBirth ??
-            occupant.date_of_birth ??
             occupant.dob ??
             occupant.birthDate ??
-            occupant.birth_date ??
             null,
-          permanentAddress: occupant.permanentAddress ?? occupant.permanent_address ?? "",
+          permanentAddress: occupant.permanentAddress ?? "",
           citizenId:
             occupant.citizenId ??
-            occupant.citizen_id ??
             occupant.cccd ??
-            occupant.citizen_id ??
             occupant.identityNumber ??
-            occupant.identity_number ??
             occupant.idNumber ??
-            occupant.id_number ??
             occupant.docNumber ??
-            occupant.doc_number ??
             null,
           identityIssuedDate:
             occupant.identityIssuedDate ??
-            occupant.identity_issued_date ??
             occupant.issuedDate ??
-            occupant.issued_date ??
             occupant.issueDate ??
-            occupant.issue_date ??
             null,
           identityIssuedPlace:
             occupant.identityIssuedPlace ??
-            occupant.identity_issued_place ??
             occupant.issuedPlace ??
-            occupant.issued_place ??
             occupant.issuePlace ??
-            occupant.issue_place ??
             "",
-          occupantRole: occupant.occupantRole ?? occupant.occupant_role ?? null,
-          moveInDate: occupant.moveInDate ?? occupant.move_in_date ?? null,
-          moveOutDate: occupant.moveOutDate ?? occupant.move_out_date ?? null,
+          occupantRole: occupant.occupantRole ?? null,
+          moveInDate: occupant.moveInDate ?? null,
+          moveOutDate: occupant.moveOutDate ?? null,
           status: occupant.status ?? null,
-          accountStatus:
-            occupant.accountStatus ??
-            occupant.account_status ??
-            "NOT_PROVISIONED",
-          accountSentAt: occupant.accountSentAt ?? occupant.account_sent_at ?? null,
-          lastLoginAt: occupant.lastLoginAt ?? occupant.last_login_at ?? null,
+          accountStatus: occupant.accountStatus ?? "NOT_PROVISIONED",
+          accountSentAt: occupant.accountSentAt ?? null,
+          lastLoginAt: occupant.lastLoginAt ?? null,
           mustChangePassword:
             occupant.mustChangePassword ??
-            occupant.must_change_password ??
             null,
         }))
       : [],
@@ -564,9 +496,9 @@ function normalizeLeaseContractDetails(details = {}) {
       ? details.events.map((event) => ({
           ...event,
           id: event.id ?? null,
-          eventType: event.eventType ?? event.event_type ?? "",
-          eventData: event.eventData ?? event.event_data ?? "",
-          createdAt: event.createdAt ?? event.created_at ?? null,
+          eventType: event.eventType ?? "",
+          eventData: event.eventData ?? "",
+          createdAt: event.createdAt ?? null,
         }))
       : [],
   };
@@ -574,9 +506,9 @@ function normalizeLeaseContractDetails(details = {}) {
 
 function normalizeRentalHistory(data = {}) {
   return {
-    roomId: data.roomId ?? data.room_id ?? null,
-    roomCode: data.roomCode ?? data.room_code ?? "",
-    roomName: data.roomName ?? data.room_name ?? "",
+    roomId: data.roomId ?? null,
+    roomCode: data.roomCode ?? "",
+    roomName: data.roomName ?? "",
     contracts: Array.isArray(data.contracts)
       ? data.contracts.map(normalizeLeaseContractDetails).filter(Boolean)
       : [],
@@ -586,11 +518,11 @@ function normalizeRentalHistory(data = {}) {
 function buildContractQueryParams(filters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.set("status", filters.status);
-  if (filters.roomId) params.set("room_id", String(filters.roomId));
-  if (filters.propertyId) params.set("property_id", String(filters.propertyId));
-  if (filters.tenantProfileId) params.set("tenant_profile_id", String(filters.tenantProfileId));
-  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
-  if (filters.dateTo) params.set("date_to", filters.dateTo);
+  if (filters.roomId) params.set("roomId", String(filters.roomId));
+  if (filters.propertyId) params.set("propertyId", String(filters.propertyId));
+  if (filters.tenantProfileId) params.set("tenantProfileId", String(filters.tenantProfileId));
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
   if (filters.keyword?.trim()) params.set("keyword", filters.keyword.trim());
   return params.toString();
 }

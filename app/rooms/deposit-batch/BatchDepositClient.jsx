@@ -218,18 +218,18 @@ function CopyRow({ label, value }) {
 
 function buildContractPreviewMetadata(room, form) {
   return {
-    room_id: room.roomId,
-    full_name: String(form.fullName || "").trim(),
+    roomId: room.roomId,
+    fullName: String(form.fullName || "").trim(),
     dob: form.dob || null,
     phone: normalizePhone(form.phone),
     email: String(form.email || "").trim(),
-    id_number: String(form.idNumber || "").trim(),
-    id_issue_date: form.idIssueDate || null,
-    id_issue_place: String(form.idIssuePlace || "").trim(),
-    permanent_address: String(form.permanentAddress || "").trim(),
-    expected_move_in_date: form.expectedMoveInDate || null,
-    expected_lease_sign_date: form.expectedLeaseSignDate || null,
-    payment_cycle_months: Number(form.paymentCycleMonths || 1),
+    idNumber: String(form.idNumber || "").trim(),
+    idIssueDate: form.idIssueDate || null,
+    idIssuePlace: String(form.idIssuePlace || "").trim(),
+    permanentAddress: String(form.permanentAddress || "").trim(),
+    expectedMoveInDate: form.expectedMoveInDate || null,
+    expectedLeaseSignDate: form.expectedLeaseSignDate || null,
+    paymentCycleMonths: Number(form.paymentCycleMonths || 1),
   };
 }
 

@@ -60,6 +60,18 @@ export async function createFloor({ propertyId, floorCode, name, sortOrder }) {
   }).then(normalizeFloor);
 }
 
+export async function deleteFloor(floorId) {
+  return authenticatedFetch(`${API_BASE_URL}/floors/${encodeURIComponent(floorId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteRoom(roomId) {
+  return authenticatedFetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchRooms(propertyId, floorId) {
   const params = new URLSearchParams({ propertyId: String(propertyId), size: "500" });
   if (floorId) params.set("floorId", String(floorId));

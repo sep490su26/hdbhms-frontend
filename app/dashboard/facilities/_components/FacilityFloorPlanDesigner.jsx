@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,22 +12,25 @@ import {
   nextOrientationFor,
   normalizeOrientation,
 } from "./FloorPlanItem";
-import { createRoom } from "@/services/floorRoomService";
+import { createFloor, createRoom, deleteFloor as deleteFloorRequest, deleteRoom as deleteRoomRequest } from "@/services/floorRoomService";
 import { fetchFloorPlanDesignerData } from "@/services/floorPlanDesignerService";
 import { fetchAdminFloorPlan, saveAdminFloorPlan } from "@/services/floorPlanService";
 
 const GRID = 20;
-const LEFT_COL_X = 40;
+const LEFT_COL_X = 240;
 const LEFT_ROOM_W = 100;
 const LEFT_ROOM_H = 120;
 const LEFT_GAP = 8;
-const CORRIDOR_X = 160;
+const CORRIDOR_X = 360;
 const CORRIDOR_W = 50;
-const RIGHT_COL_X = 230;
+const RIGHT_COL_X = 430;
 const RIGHT_ROOM_W = 150;
 const RIGHT_ROOM_H = 80;
 const RIGHT_GAP = 8;
-const START_Y = 40;
+const START_Y = 60;
+const CENTERED_LAYOUT_MIN_X = LEFT_COL_X;
+const CENTERED_LAYOUT_TOLERANCE_X = 20;
+const CENTERED_LAYOUT_TOLERANCE_Y = GRID;
 const DEFAULT_ROOM_AREA_SQM = 25;
 const AREA_SCALE = Math.sqrt((RIGHT_ROOM_W * RIGHT_ROOM_H) / DEFAULT_ROOM_AREA_SQM);
 const MIN_ROOM_SIZE = 60;
@@ -224,10 +227,22 @@ function floorNumber(floor) {
 }
 
 function nextRoomCode(floor, rooms) {
-  const existingNumbers = rooms.map((room) => numberFromCode(room.roomCode ?? room.room_code ?? room.name));
-  const maxExisting = Math.max(0, ...existingNumbers);
-  if (maxExisting > 0) return String(maxExisting + 1);
-  return `${floorNumber(floor)}01`;
+  const existingNumbers = new Set(
+    rooms
+      .map((room) => numberFromCode(room.roomCode ?? room.room_code ?? room.name))
+      .filter((value) => value > 0),
+  );
+  const baseNumber = floorNumber(floor) * 100;
+  let candidate = baseNumber + 1;
+  while (existingNumbers.has(candidate)) candidate += 1;
+  return String(candidate);
+}
+
+function nextFloorNumber(floors) {
+  const existingNumbers = new Set((floors ?? []).map(floorNumber).filter((value) => value > 0));
+  let candidate = 1;
+  while (existingNumbers.has(candidate)) candidate += 1;
+  return candidate;
 }
 
 function nextRoomPosition(rooms) {
@@ -241,6 +256,34 @@ function nextRoomPosition(rooms) {
   return {
     x: RIGHT_COL_X,
     y: Math.ceil((maxBottom + RIGHT_GAP) / GRID) * GRID,
+  };
+}
+
+function normalizeLayoutPosition(rooms, blocks) {
+  const items = [...rooms, ...blocks];
+  if (!items.length) return { rooms, blocks };
+
+  const minX = Math.min(...items.map((item) => Number(item.x ?? 0)).filter(Number.isFinite));
+  const minY = Math.min(...items.map((item) => Number(item.y ?? 0)).filter(Number.isFinite));
+  const deltaX = Number.isFinite(minX) && minX < CENTERED_LAYOUT_MIN_X - CENTERED_LAYOUT_TOLERANCE_X
+    ? CENTERED_LAYOUT_MIN_X - minX
+    : 0;
+  const deltaY = Number.isFinite(minY) && minY < START_Y - CENTERED_LAYOUT_TOLERANCE_Y
+    ? START_Y - minY
+    : 0;
+
+  if (!deltaX && !deltaY) {
+    return { rooms, blocks };
+  }
+
+  const shift = (item) => ({
+    ...item,
+    x: Math.round((Number(item.x ?? 0) + deltaX) / GRID) * GRID,
+    y: Math.round((Number(item.y ?? 0) + deltaY) / GRID) * GRID,
+  });
+  return {
+    rooms: rooms.map(shift),
+    blocks: blocks.map(shift),
   };
 }
 
@@ -413,6 +456,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const [blocksByFloor, setBlocksByFloor] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [addingFloor, setAddingFloor] = useState(false);
+  const [deletingFloor, setDeletingFloor] = useState(false);
   const [addingRoom, setAddingRoom] = useState(false);
   const [resettingLayout, setResettingLayout] = useState(false);
   const [error, setError] = useState("");
@@ -424,6 +469,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const [placementTargetId, setPlacementTargetId] = useState(null);
   const [areaInputValue, setAreaInputValue] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [floorDeleteConfirmOpen, setFloorDeleteConfirmOpen] = useState(false);
 
   const applyLayout = (rooms, floorId, { forceDefault = false } = {}) => {
     const sorted = sortRoomsByOrder(rooms);
@@ -472,8 +518,9 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     if (!floor || !IS_HAI_DANG_1) return;
     setNotice("");
     setError("");
-    const nextRooms = applyLayout(floor.rooms, selectedFloorId, { forceDefault: true });
-    const nextBlocks = defaultBlocksFor(nextRooms, selectedFloorId);
+    const defaultRooms = applyLayout(floor.rooms, selectedFloorId, { forceDefault: true });
+    const defaultBlocks = defaultBlocksFor(defaultRooms, selectedFloorId);
+    const { rooms: nextRooms, blocks: nextBlocks } = normalizeLayoutPosition(defaultRooms, defaultBlocks);
     setLayouts((current) => ({ ...current, [selectedFloorId]: nextRooms }));
     setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: nextBlocks }));
     setSelectedItemId("");
@@ -484,7 +531,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setHasUnsavedChanges(true);
     try {
       const response = await saveAdminFloorPlan(propertyId, selectedFloorId, floorPlanItemsFromState(nextRooms, nextBlocks));
-      const savedLayout = layoutFromSavedItems(floor, response.items ?? response?.data?.items ?? []);
+      const rawSavedLayout = layoutFromSavedItems(floor, response.items ?? response?.data?.items ?? []);
+      const savedLayout = normalizeLayoutPosition(rawSavedLayout.rooms, rawSavedLayout.blocks);
       setLayouts((current) => ({ ...current, [selectedFloorId]: savedLayout.rooms.length ? savedLayout.rooms : nextRooms }));
       setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: savedLayout.blocks.length ? savedLayout.blocks : nextBlocks }));
       setHasUnsavedChanges(false);
@@ -506,11 +554,14 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           const floorPlan = await fetchAdminFloorPlan(propertyId, floorId);
           const savedItems = floorPlan.items ?? [];
           if (savedItems.length) {
-            const savedLayout = layoutFromSavedItems(floor, savedItems);
+            const rawSavedLayout = layoutFromSavedItems(floor, savedItems);
+            const savedLayout = normalizeLayoutPosition(rawSavedLayout.rooms, rawSavedLayout.blocks);
             return [floorId, savedLayout.rooms, savedLayout.blocks];
           }
-          const rooms = applyLayout(floor.rooms, floorId);
-          return [floorId, rooms, defaultBlocksFor(rooms, floorId)];
+          const defaultRooms = applyLayout(floor.rooms, floorId);
+          const defaultBlocks = defaultBlocksFor(defaultRooms, floorId);
+          const { rooms, blocks } = normalizeLayoutPosition(defaultRooms, defaultBlocks);
+          return [floorId, rooms, blocks];
         }));
         if (!active) return;
         setData(result);
@@ -528,6 +579,10 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
 
   const currentRooms = useMemo(() => layouts[selectedFloorId] || [], [layouts, selectedFloorId]);
   const currentBlocks = useMemo(() => blocksByFloor[selectedFloorId] || [], [blocksByFloor, selectedFloorId]);
+  const selectedFloor = useMemo(
+    () => data?.floors?.find((floor) => String(floor.id) === String(selectedFloorId)) ?? null,
+    [data?.floors, selectedFloorId],
+  );
   const selectedRoom = useMemo(
     () => currentRooms.find((room) => String(room.id) === String(selectedItemId)) ?? null,
     [currentRooms, selectedItemId],
@@ -562,12 +617,110 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     }
   };
 
+  const clearSelection = () => {
+    setSelectedItemId("");
+    setPlacementMode(null);
+    setPlacementTargetId(null);
+    setAreaInputValue("");
+  };
+
   const changeFloor = (floorId) => {
     setSelectedFloorId(floorId);
     setSelectedItemId("");
     setPlacementMode(null);
     setPlacementTargetId(null);
     setAreaInputValue("");
+    setFloorDeleteConfirmOpen(false);
+  };
+
+  const addFloor = async () => {
+    const floors = data?.floors ?? [];
+    const nextOrder = nextFloorNumber(floors);
+    const floorCode = `F${nextOrder}`;
+    const floorName = `Tầng ${nextOrder}`;
+
+    setAddingFloor(true);
+    setError("");
+    setNotice("");
+    try {
+      const createdFloor = await createFloor({
+        propertyId,
+        floorCode,
+        name: floorName,
+        sortOrder: nextOrder,
+      });
+      const nextFloor = { ...createdFloor, rooms: [] };
+      const nextFloorId = String(createdFloor.id);
+
+      setData((current) => ({
+        ...current,
+        floors: [...(current?.floors ?? []), nextFloor].sort((left, right) => floorNumber(left) - floorNumber(right)),
+      }));
+      setLayouts((current) => ({ ...current, [nextFloorId]: [] }));
+      setBlocksByFloor((current) => ({ ...current, [nextFloorId]: defaultBlocksFor([], nextFloorId) }));
+      setSelectedFloorId(nextFloorId);
+      setSelectedItemId("");
+      setPlacementMode(null);
+      setPlacementTargetId(null);
+      setAreaInputValue("");
+      setHasUnsavedChanges(false);
+      setNotice(`Đã thêm ${nextFloor.name ?? floorName}.`);
+    } catch (createError) {
+      setError(createError?.message || "Không thể thêm tầng mới.");
+    } finally {
+      setAddingFloor(false);
+    }
+  };
+
+  const requestDeleteCurrentFloor = () => {
+    if (!selectedFloor) return;
+    setNotice("");
+    setError("");
+    if ((data?.floors ?? []).length <= 1) {
+      setError("Cần giữ lại ít nhất một tầng cho cơ sở này.");
+      return;
+    }
+    setFloorDeleteConfirmOpen(true);
+  };
+
+  const deleteCurrentFloor = async () => {
+    if (!selectedFloor) return;
+    const floors = data?.floors ?? [];
+    const currentIndex = floors.findIndex((floor) => String(floor.id) === String(selectedFloorId));
+    const fallbackFloor = floors[currentIndex + 1] ?? floors[currentIndex - 1] ?? null;
+
+    setDeletingFloor(true);
+    setNotice("");
+    setError("");
+    try {
+      await deleteFloorRequest(selectedFloorId);
+      setData((current) => ({
+        ...current,
+        floors: (current?.floors ?? []).filter((floor) => String(floor.id) !== String(selectedFloorId)),
+      }));
+      setLayouts((current) => {
+        const next = { ...current };
+        delete next[selectedFloorId];
+        return next;
+      });
+      setBlocksByFloor((current) => {
+        const next = { ...current };
+        delete next[selectedFloorId];
+        return next;
+      });
+      setSelectedFloorId(fallbackFloor ? String(fallbackFloor.id) : "");
+      setSelectedItemId("");
+      setPlacementMode(null);
+      setPlacementTargetId(null);
+      setAreaInputValue("");
+      setHasUnsavedChanges(false);
+      setFloorDeleteConfirmOpen(false);
+      setNotice(`Đã xóa ${selectedFloor.name}.`);
+    } catch (deleteError) {
+      setError(deleteError?.message || "Không thể xóa tầng.");
+    } finally {
+      setDeletingFloor(false);
+    }
   };
 
   const updateBlock = (blockId, patch) => {
@@ -650,16 +803,32 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setAreaInputValue(actualArea);
   };
 
-  const removeSelectedItem = () => {
+  const removeSelectedItem = async () => {
     if (selectedRoom) {
-      setLayouts((current) => ({
-        ...current,
-        [selectedFloorId]: (current[selectedFloorId] ?? []).filter((room) => String(room.id) !== String(selectedRoom.id)),
-      }));
-      setHasUnsavedChanges(true);
-      setSelectedItemId("");
-      setPlacementMode(null);
-      setPlacementTargetId(null);
+      setError("");
+      setNotice("");
+      try {
+        await deleteRoomRequest(selectedRoom.id);
+        setData((current) => ({
+          ...current,
+          floors: (current?.floors ?? []).map((floor) =>
+            String(floor.id) === String(selectedFloorId)
+              ? { ...floor, rooms: (floor.rooms ?? []).filter((room) => String(room.id) !== String(selectedRoom.id)) }
+              : floor
+          ),
+        }));
+        setLayouts((current) => ({
+          ...current,
+          [selectedFloorId]: (current[selectedFloorId] ?? []).filter((room) => String(room.id) !== String(selectedRoom.id)),
+        }));
+        setHasUnsavedChanges(true);
+        setSelectedItemId("");
+        setPlacementMode(null);
+        setPlacementTargetId(null);
+        setNotice(`Đã xóa phòng ${selectedRoom.roomCode ?? selectedRoom.room_code ?? selectedRoom.name}.`);
+      } catch (deleteError) {
+        setError(deleteError?.message || "Không thể xóa phòng.");
+      }
       return;
     }
     if (selectedBlock) removeBlock(selectedBlock.id);
@@ -719,7 +888,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setHasUnsavedChanges(true);
       setSelectedItemId(createdRoom.id);
       setAreaInputValue(areaFromSize(placedRoom.width, placedRoom.height));
-      setNotice(`Đã thêm phòng ${roomCode}.`);
+      setNotice(`Đã thêm phòng ${placedRoom.roomCode ?? placedRoom.room_code ?? roomCode}.`);
     } catch (createError) {
       setError(createError?.message || "Không thể thêm phòng mới.");
     } finally {
@@ -731,7 +900,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     const meta = BLOCK_TYPES[type];
     const count = Object.values(blocksByFloor).flat().filter((block) => block.type === type).length + 1;
     const id = `${type.toLowerCase()}-${count}`;
-    setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: [...currentBlocks, { id, type, x: 40, y: 40, width: meta.width, height: meta.height, orientation: "north" }] }));
+    setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: [...currentBlocks, { id, type, x: LEFT_COL_X, y: START_Y, width: meta.width, height: meta.height, orientation: "north" }] }));
     setHasUnsavedChanges(true);
   };
 
@@ -753,7 +922,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         selectedFloorId,
         floorPlanItemsFromState(currentRooms, currentBlocks),
       );
-      const savedLayout = layoutFromSavedItems(floor, response.items ?? []);
+      const rawSavedLayout = layoutFromSavedItems(floor, response.items ?? []);
+      const savedLayout = normalizeLayoutPosition(rawSavedLayout.rooms, rawSavedLayout.blocks);
       if (savedLayout.rooms.length || savedLayout.blocks.length) {
         setLayouts((current) => ({ ...current, [selectedFloorId]: savedLayout.rooms }));
         setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: savedLayout.blocks }));
@@ -795,7 +965,15 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase text-slate-500">Chọn tầng thiết kế</span>
-              <button type="button" onClick={() => router.push(`/dashboard/rooms?propertyId=${propertyId}`)} className="text-xs font-bold text-blue-700">+ Thêm tầng</button>
+              <button
+                type="button"
+                onClick={addFloor}
+                disabled={addingFloor}
+                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 disabled:opacity-50"
+              >
+                {addingFloor && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                + Thêm tầng
+              </button>
             </div>
             {data?.floors?.length ? (
               <div className="relative mt-2">
@@ -803,6 +981,20 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
                 <select value={selectedFloorId} onChange={(event) => changeFloor(event.target.value)} className="h-10 w-full rounded-lg border bg-white pl-9 pr-3 text-sm font-bold">
                   {data.floors.map((floor) => <option key={floor.id} value={floor.id}>{floor.name}</option>)}
                 </select>
+                <button
+                  type="button"
+                  onClick={requestDeleteCurrentFloor}
+                  disabled={deletingFloor || !selectedFloorId}
+                  className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingFloor ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Xóa tầng hiện tại
+                </button>
+                {(data?.floors?.length ?? 0) <= 1 && (
+                  <p className="mt-1 text-[11px] font-semibold leading-4 text-slate-400">
+                    Cần giữ lại ít nhất một tầng.
+                  </p>
+                )}
                 {IS_HAI_DANG_1 && (
                   <button
                     type="button"
@@ -845,7 +1037,9 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           className="relative flex-1 overflow-auto bg-[#f1f5f9] p-8"
           style={{ backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: `${GRID}px ${GRID}px` }}
           onClick={(event) => {
-            if (event.target === event.currentTarget && placementActive) finishPlacement();
+            if (event.target !== event.currentTarget) return;
+            if (placementActive) finishPlacement();
+            clearSelection();
           }}
         >
           <FloorPlanSvgDefs />
@@ -919,6 +1113,46 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           {!currentRooms.length && !currentBlocks.length && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-500">Tầng này chưa có phòng.</div>}
         </main>
       </div>
+
+      {floorDeleteConfirmOpen && selectedFloor && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-50 text-rose-600">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-base font-black text-slate-950">Bạn có muốn xóa tầng hiện tại không?</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {selectedFloor.name} sẽ được xóa khỏi sơ đồ. Các phòng thuộc tầng này cũng sẽ không còn hiển thị trong danh sách phòng.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+              Hành động này không ảnh hưởng đến các tầng khác.
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setFloorDeleteConfirmOpen(false)}
+                disabled={deletingFloor}
+                className="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Không
+              </button>
+              <button
+                type="button"
+                onClick={deleteCurrentFloor}
+                disabled={deletingFloor}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {deletingFloor && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                Có
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

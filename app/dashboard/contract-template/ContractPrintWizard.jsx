@@ -4,6 +4,7 @@ import {useState, useEffect} from "react";
 import {CalendarDays, Download, FileText, Gauge, Home, Printer, Users, X, Loader2} from "lucide-react";
 import {createHandoverReadings} from "@/services/contractHandoverService";
 import {fetchRoomAssets, createRoomAsset, updateRoomAsset} from "@/services/roomAssetsService";
+import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
 const OWNER_INFO = {
     fullName: "ĐẶNG VĂN NHUẬN",
@@ -52,10 +53,7 @@ function toDateInput(value) {
 }
 
 function formatDate(value) {
-    if (!value) return "..........";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat("vi-VN").format(date);
+    return formatDisplayDate(value, value ? String(value) : "..........");
 }
 
 function formatMoney(value) {

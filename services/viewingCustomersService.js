@@ -3,6 +3,7 @@ import {
     authenticatedFetch,
     parseEnvelope,
 } from "./identityAccessService";
+import { formatDate } from "@/lib/dateFormat";
 
 export const VIEWING_STATUSES = {
     NOT_VIEWED: "Chờ xem",
@@ -83,7 +84,7 @@ export function formatAppointment(value) {
     const time = date.toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"});
 
     if (sameDay) return `Hôm nay ${time}`;
-    return `${date.toLocaleDateString("vi-VN")} ${time}`;
+    return `${formatDate(date, "")} ${time}`;
 }
 
 export function normalizePhone(value) {
@@ -241,12 +242,12 @@ export async function publicCreateViewingCustomer(payload) {
         method: "POST",
         headers: {"Content-Type": "application/json", "X-Client-Type": "web"},
         body: JSON.stringify({
-            visitor_name: payload.fullName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
+            visitorName: payload.fullName,
+            visitorPhone: payload.phone,
+            visitorEmail: payload.email || "",
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            preferredStart: payload.appointmentAt,
             notes: payload.note,
         }),
     });
@@ -262,12 +263,12 @@ export async function createViewingCustomer(payload) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            visitor_name: payload.customerName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
+            visitorName: payload.customerName,
+            visitorPhone: payload.phone,
+            visitorEmail: payload.email || "",
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            preferredStart: payload.appointmentAt,
             notes: payload.note,
         }),
     });

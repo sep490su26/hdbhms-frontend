@@ -153,6 +153,8 @@ const toBlockingStatusFromMessage = (message) => {
 const DATE_IN_PAST_ERROR_MESSAGE = "Ngày chọn không được là ngày trong quá khứ.";
 const DATE_TOO_FAR_ERROR_MESSAGE = "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
+const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
 
 const toLocalDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -263,8 +265,11 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
   expected_lease_sign_date: "contractDate",
   expectedMoveInDate: "moveInDate",
   expected_move_in_date: "moveInDate",
+  idFrontFile: "citizenIdFront",
   id_front_file: "citizenIdFront",
+  idBackFile: "citizenIdBack",
   id_back_file: "citizenIdBack",
+  portraitFile: "portraitImage",
   portrait_file: "portraitImage",
   occupantCount: "occupantCount",
   occupant_count: "occupantCount",
@@ -272,7 +277,8 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
   co_occupants: "coOccupants",
   coOccupantInformationValid: "occupantCount",
   co_occupant_information_valid: "occupantCount",
-  metadata: "terms",
+  metadata: "_form",
+  files: "_form",
 };
 
 const API_ERROR_HINTS = [
@@ -287,10 +293,10 @@ const API_ERROR_HINTS = [
   { pattern: /payment\s*cycle|paymentCycleMonths|payment_cycle_months|chu\s*kỳ\s*thanh\s*toán/i, field: "paymentCycleMonths" },
   { pattern: /lease\s*sign|expectedLeaseSignDate|expected_lease_sign_date|ký\s*hợp\s*đồng/i, field: "contractDate" },
   { pattern: /move\s*in|expectedMoveInDate|expected_move_in_date|vào\s*ở/i, field: "moveInDate" },
-  { pattern: /id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
-  { pattern: /id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
-  { pattern: /portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
-  { pattern: /occupant|co_occupants|người\s*ở/i, field: "occupantCount" },
+  { pattern: /idFrontFile|id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
+  { pattern: /idBackFile|id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
+  { pattern: /portraitFile|portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
+  { pattern: /occupant|coOccupants|co_occupants|người\s*ở/i, field: "occupantCount" },
 ];
 
 const DEPOSIT_FIELD_LABELS = {
@@ -338,9 +344,25 @@ const collectErrorText = (value) => {
   return String(value);
 };
 
+const getCheckoutErrorMessage = (error) => {
+  const payload = error?.payload || {};
+  const message = [payload.details, payload.message, error?.message]
+    .map(collectErrorText)
+    .map((value) => value.trim())
+    .find((value) => value && value.toLowerCase() !== "undefined");
+
+  return message || "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại.";
+};
+
 const extractDepositApiFieldErrors = (error) => {
   const payload = error?.payload || {};
-  const candidates = [payload.errors, payload.fieldErrors, payload.violations, payload.data?.errors].filter(Boolean);
+  const candidates = [
+    payload.errors,
+    payload.fieldErrors,
+    payload.violations,
+    payload.data?.errors,
+    payload.data?.fieldErrors,
+  ].filter(Boolean);
   const nextErrors = {};
 
   candidates.forEach((candidate) => {
@@ -373,7 +395,8 @@ const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
+const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhmsDepositFormDraft";
+const LEGACY_DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
 const DEPOSIT_DRAFT_MAX_AGE_SECONDS = 30 * 60;
 const DEPOSIT_DRAFT_FIELDS = [
   "fullName",
@@ -410,7 +433,7 @@ const readCookie = (name) => {
 };
 
 const readDepositDraftCookie = () => {
-  const rawValue = readCookie(DEPOSIT_DRAFT_COOKIE_NAME);
+  const rawValue = readCookie(DEPOSIT_DRAFT_COOKIE_NAME) || readCookie(LEGACY_DEPOSIT_DRAFT_COOKIE_NAME);
   if (!rawValue) return {};
 
   try {
@@ -604,27 +627,27 @@ const validateOccupancyData = (data) => {
 };
 
 const buildDepositMetadata = (room, data) => ({
-  room_id: room.roomId || "",
-  full_name: String(data.fullName || "").trim(),
+  roomId: room.roomId || "",
+  fullName: String(data.fullName || "").trim(),
   dob: data.birthDate || null,
   phone: String(data.phone || "").trim(),
   email: String(data.email || "").trim(),
-  id_number: String(data.citizenId || "").trim(),
-  id_issue_date: data.idIssueDate || null,
-  id_issue_place: String(data.idIssuePlace || "").trim(),
-  permanent_address: String(data.permanentAddress || "").trim(),
-  deposit_months: 1,
-  payment_cycle_months: Number(data.paymentCycleMonths || 1),
-  occupant_count: Number(data.occupantCount || 1),
-  co_occupants: [1, 2]
+  idNumber: String(data.citizenId || "").trim(),
+  idIssueDate: data.idIssueDate || null,
+  idIssuePlace: String(data.idIssuePlace || "").trim(),
+  permanentAddress: String(data.permanentAddress || "").trim(),
+  depositMonths: 1,
+  paymentCycleMonths: Number(data.paymentCycleMonths || 1),
+  occupantCount: Number(data.occupantCount || 1),
+  coOccupants: [1, 2]
     .filter((displayOrder) => Number(data.occupantCount || 1) > displayOrder)
     .map((displayOrder) => ({
-      full_name: String(data[`coOccupant${displayOrder}FullName`] || "").trim(),
+      fullName: String(data[`coOccupant${displayOrder}FullName`] || "").trim(),
       phone: normalizePhoneValue(data[`coOccupant${displayOrder}Phone`] || ""),
-      display_order: displayOrder,
+      displayOrder,
     })),
-  expected_lease_sign_date: data.contractDate || null,
-  expected_move_in_date: data.moveInDate || null,
+  expectedLeaseSignDate: data.contractDate || null,
+  expectedMoveInDate: data.moveInDate || null,
 });
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
@@ -1037,9 +1060,41 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       return;
     }
 
+    if (file.size > MAX_DEPOSIT_UPLOAD_FILE_BYTES) {
+      event.target.value = "";
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        [name]: "Ảnh tải lên không được vượt quá 10MB.",
+      }));
+      return;
+    }
+
+    const nextSelectedFiles = {
+      ...selectedFiles,
+      [name]: file,
+    };
+    const nextTotalSize = Object.values(nextSelectedFiles)
+      .filter(Boolean)
+      .reduce((totalSize, selectedFile) => totalSize + selectedFile.size, 0);
+
+    if (nextTotalSize > MAX_DEPOSIT_UPLOAD_TOTAL_BYTES) {
+      event.target.value = "";
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
+        [name]: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+      }));
+      return;
+    }
+
     setSelectedFiles((prev) => ({ ...prev, [name]: file }));
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
+      _form: "",
       [name]: "",
     }));
 
@@ -1145,9 +1200,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
     // Chuẩn bị payload chuẩn theo backend yêu cầu
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-    if (selectedFiles.citizenIdFront) formData.append("id_front_file", selectedFiles.citizenIdFront);
-    if (selectedFiles.citizenIdBack) formData.append("id_back_file", selectedFiles.citizenIdBack);
-    if (selectedFiles.portraitImage) formData.append("portrait_file", selectedFiles.portraitImage);
+    if (selectedFiles.citizenIdFront) formData.append("idFrontFile", selectedFiles.citizenIdFront);
+    if (selectedFiles.citizenIdBack) formData.append("idBackFile", selectedFiles.citizenIdBack);
+    if (selectedFiles.portraitImage) formData.append("portraitFile", selectedFiles.portraitImage);
 
     onSubmit(formData, metadata);
   };
@@ -1171,11 +1226,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
           <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
+          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
           <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
           <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
           <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.idIssueDate} />
+          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
           <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
           <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -1282,7 +1337,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             label="Ngày hẹn ký hợp đồng"
             name="contractDate"
             type="date"
-            placeholder="mm/dd/yyyy"
+            placeholder="dd/MM/yyyy"
             min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.contractDate}
@@ -1295,7 +1350,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             label="Ngày dự kiến vào ở"
             name="moveInDate"
             type="date"
-            placeholder="mm/dd/yyyy"
+            placeholder="dd/MM/yyyy"
             min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.moveInDate}
@@ -1401,7 +1456,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
           {Object.values(fieldErrors).some(Boolean) && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 sm:col-span-2">
-              Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục.
+              {fieldErrors._form || "Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục."}
             </div>
           )}
 
@@ -1890,8 +1945,8 @@ export function DepositClient({ room }) {
         customerName: metadata.fullName,
         phone: metadata.phone,
         email: metadata.email,
-        moveInDate: metadata.moveInDate,
-        contractDate: metadata.contractDate,
+        moveInDate: metadata.expectedMoveInDate,
+        contractDate: metadata.expectedLeaseSignDate,
         expiresAt: holdExpiresAt,
       });
 
@@ -1915,7 +1970,7 @@ export function DepositClient({ room }) {
         return;
       }
 
-      setDepositApiFieldErrors({ terms: "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại." });
+      setDepositApiFieldErrors({ _form: getCheckoutErrorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }

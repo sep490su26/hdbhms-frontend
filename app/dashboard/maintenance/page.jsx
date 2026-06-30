@@ -482,17 +482,17 @@ export default function MaintenancePage() {
       const uploaded = await Promise.all(violationForm.images.map((file) => uploadMaintenanceImage(file)));
       const attachmentIds = uploaded.map((file) => file.fileId).filter(Boolean);
       const result = await createMaintenanceViolation({
-        property_id: propertyId,
-        room_id: roomId,
-        occupant_id: violationForm.occupantId ? Number(violationForm.occupantId) : null,
-        violation_type: violationForm.violationType,
+        propertyId,
+        roomId,
+        occupantId: violationForm.occupantId ? Number(violationForm.occupantId) : null,
+        violationType: violationForm.violationType,
         amount,
         description: violationForm.description.trim(),
-        collection_method: violationForm.collectionMethod,
-        billing_period: violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? violationForm.billingPeriod : null,
-        include_in_monthly_invoice: violationForm.collectionMethod === "MONTHLY_SCHEDULED",
-        occurred_at: violationForm.occurredAt || new Date().toISOString().slice(0, 10),
-        attachment_ids: attachmentIds,
+        collectionMethod: violationForm.collectionMethod,
+        billingPeriod: violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? violationForm.billingPeriod : null,
+        includeInMonthlyInvoice: violationForm.collectionMethod === "MONTHLY_SCHEDULED",
+        occurredAt: violationForm.occurredAt || new Date().toISOString().slice(0, 10),
+        attachmentIds,
       });
       setViolationSuccess(
         violationForm.collectionMethod === "MONTHLY_SCHEDULED"

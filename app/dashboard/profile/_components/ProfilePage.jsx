@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import {useProfile} from "../_hooks/useProfile";
+import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
 function getInitials(name) {
   return String(name || "User")
@@ -27,14 +28,7 @@ function getInitials(name) {
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  return formatDisplayDate(value, value || "Chưa cập nhật");
 }
 
 function CompletionBadge() {

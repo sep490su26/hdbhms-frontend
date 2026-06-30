@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Rnd } from "react-rnd";
-import { ArrowLeft, Check, DoorOpen, Eye, Layers3, LoaderCircle, Plus, RotateCw, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, DoorOpen, Eye, Layers3, LoaderCircle, Plus, RotateCw, Save, Trash2, WandSparkles, X } from "lucide-react";
 import {
   BLUEPRINT_RESIZE_ENABLE,
   BLUEPRINT_RESIZE_HANDLE_STYLES,
@@ -12,6 +12,7 @@ import {
   nextOrientationFor,
   normalizeOrientation,
 } from "./FloorPlanItem";
+import { alignRoomItems } from "./floorPlanAlign";
 import { createFloor, createRoom, deleteFloor as deleteFloorRequest, deleteRoom as deleteRoomRequest } from "@/services/floorRoomService";
 import { fetchFloorPlanDesignerData } from "@/services/floorPlanDesignerService";
 import { fetchAdminFloorPlan, saveAdminFloorPlan } from "@/services/floorPlanService";
@@ -78,19 +79,19 @@ function featurePosition(feature, room) {
 
 function sortRoomsByOrder(rooms) {
   return [...rooms].sort((a, b) =>
-    (a.sortOrder ?? a.sort_order ?? 999) - (b.sortOrder ?? b.sort_order ?? 999)
+    (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
   );
 }
 
 function roomBox(room, index) {
-  const area = Number(room.areaM2 ?? room.area_m2 ?? 0);
+  const area = Number(room.areaM2 ?? 0);
   const width = Math.max(120, Math.min(220, Math.round(Math.sqrt(Math.max(area, 12)) * 22)));
   const height = Math.max(90, Math.round((Math.max(area, 12) * 400) / width));
   const orientation = normalizeOrientation(room.orientation, width, height);
   return {
     ...room,
-    x: Number(room.positionX ?? room.position_x ?? 30 + (index % 5) * 180),
-    y: Number(room.positionY ?? room.position_y ?? 30 + Math.floor(index / 5) * 150),
+    x: Number(room.positionX ?? 30 + (index % 5) * 180),
+    y: Number(room.positionY ?? 30 + Math.floor(index / 5) * 150),
     width,
     height,
     orientation,
@@ -125,12 +126,12 @@ function valueOf(source, ...keys) {
 }
 
 function metadataOf(item) {
-  const metadata = valueOf(item, "metadata", "metadata_json", "metadataJson");
+  const metadata = valueOf(item, "metadata", "metadataJson");
   return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {};
 }
 
 function blockIdFromSavedItem(item, index) {
-  return `block-${valueOf(item, "id") ?? valueOf(item, "itemType", "item_type") ?? index}`;
+  return `block-${valueOf(item, "id") ?? valueOf(item, "type", "itemType") ?? index}`;
 }
 
 function layoutFromSavedItems(floor, savedItems) {
@@ -139,28 +140,28 @@ function layoutFromSavedItems(floor, savedItems) {
   const blocks = [];
 
   savedItems.forEach((item, index) => {
-    const itemType = String(valueOf(item, "itemType", "item_type") ?? "").toUpperCase();
+    const itemType = String(valueOf(item, "type", "itemType") ?? "").toUpperCase();
     const metadata = metadataOf(item);
     const width = Number(valueOf(item, "width")) || RIGHT_ROOM_W;
     const height = Number(valueOf(item, "height")) || RIGHT_ROOM_H;
     const base = {
-      x: Number(valueOf(item, "x")) || 0,
-      y: Number(valueOf(item, "y")) || 0,
+      x: Number(valueOf(item, "positionX", "x")) || 0,
+      y: Number(valueOf(item, "positionY", "y")) || 0,
       width,
       height,
       orientation: normalizeOrientation(metadata.orientation, width, height),
-      sortOrder: Number(valueOf(item, "sortOrder", "sort_order") ?? index),
+      sortOrder: Number(metadata.sortOrder ?? valueOf(item, "sortOrder") ?? index),
     };
 
     if (itemType === "ROOM") {
-      const room = roomById.get(String(valueOf(item, "roomId", "room_id")));
+      const room = roomById.get(String(valueOf(item, "roomId")));
       if (!room) return;
       rooms.push({
         ...room,
         ...base,
         doors: Array.isArray(metadata.doors) ? metadata.doors : [],
         windows: Array.isArray(metadata.windows) ? metadata.windows : [],
-        areaSqm: Number(metadata.areaSqm ?? metadata.area_sqm ?? valueOf(item, "area")) || areaFromSize(width, height),
+        areaSqm: Number(metadata.areaSqm ?? valueOf(item, "area")) || areaFromSize(width, height),
       });
       return;
     }
@@ -170,7 +171,7 @@ function layoutFromSavedItems(floor, savedItems) {
       id: blockIdFromSavedItem(item, index),
       persistedId: valueOf(item, "id"),
       type: itemType || "UTILITY",
-      label: valueOf(item, "label") ?? BLOCK_TYPES[itemType]?.label ?? itemType,
+      label: metadata.label ?? valueOf(item, "label") ?? BLOCK_TYPES[itemType]?.label ?? itemType,
     });
   });
 
@@ -179,16 +180,16 @@ function layoutFromSavedItems(floor, savedItems) {
 
 function floorPlanItemsFromState(rooms, blocks) {
   const roomItems = rooms.map((room, index) => ({
-    item_type: "ROOM",
-    room_id: room.id,
-    label: room.roomCode ?? room.room_code ?? room.name ?? "",
-    x: Number(room.x) || 0,
-    y: Number(room.y) || 0,
-    width: Number(room.width) || RIGHT_ROOM_W,
-    height: Number(room.height) || RIGHT_ROOM_H,
-    rotation: 0,
-    sort_order: index,
+    type: "ROOM",
+    roomId: room.id,
+    positionX: Math.round(Number(room.x) || 0),
+    positionY: Math.round(Number(room.y) || 0),
+    width: Math.round(Number(room.width) || RIGHT_ROOM_W),
+    height: Math.round(Number(room.height) || RIGHT_ROOM_H),
     metadata: {
+      label: room.roomCode ?? room.name ?? "",
+      rotation: 0,
+      sortOrder: index,
       orientation: normalizeOrientation(room.orientation, room.width, room.height),
       areaSqm: areaFromSize(room.width, room.height),
       doors: Array.isArray(room.doors) ? room.doors : [],
@@ -197,15 +198,15 @@ function floorPlanItemsFromState(rooms, blocks) {
   }));
 
   const blockItems = blocks.map((block, index) => ({
-    item_type: block.type,
-    label: block.label ?? BLOCK_TYPES[block.type]?.label ?? block.type,
-    x: Number(block.x) || 0,
-    y: Number(block.y) || 0,
-    width: Number(block.width) || BLOCK_TYPES[block.type]?.width || 80,
-    height: Number(block.height) || BLOCK_TYPES[block.type]?.height || 80,
-    rotation: 0,
-    sort_order: roomItems.length + index,
+    type: block.type,
+    positionX: Math.round(Number(block.x) || 0),
+    positionY: Math.round(Number(block.y) || 0),
+    width: Math.round(Number(block.width) || BLOCK_TYPES[block.type]?.width || 80),
+    height: Math.round(Number(block.height) || BLOCK_TYPES[block.type]?.height || 80),
     metadata: {
+      label: block.label ?? BLOCK_TYPES[block.type]?.label ?? block.type,
+      rotation: 0,
+      sortOrder: roomItems.length + index,
       orientation: normalizeOrientation(block.orientation, block.width, block.height),
     },
   }));
@@ -220,7 +221,7 @@ function numberFromCode(code) {
 }
 
 function floorNumber(floor) {
-  const explicit = Number(floor?.sortOrder ?? floor?.sort_order);
+  const explicit = Number(floor?.sortOrder);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
   const fromName = numberFromCode(floor?.name);
   return fromName || 1;
@@ -229,7 +230,7 @@ function floorNumber(floor) {
 function nextRoomCode(floor, rooms) {
   const existingNumbers = new Set(
     rooms
-      .map((room) => numberFromCode(room.roomCode ?? room.room_code ?? room.name))
+      .map((room) => numberFromCode(room.roomCode ?? room.name))
       .filter((value) => value > 0),
   );
   const baseNumber = floorNumber(floor) * 100;
@@ -473,7 +474,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
 
   const applyLayout = (rooms, floorId, { forceDefault = false } = {}) => {
     const sorted = sortRoomsByOrder(rooms);
-    const hasSavedPositions = !forceDefault && sorted.some((room) => Number(room.positionX ?? room.position_x ?? 0) > 0);
+    const hasSavedPositions = !forceDefault && sorted.some((room) => Number(room.positionX ?? 0) > 0);
     if (hasSavedPositions || !IS_HAI_DANG_1) {
       return sorted.map((room, index) => {
         const boxed = roomBox(room, index);
@@ -482,8 +483,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
             ...boxed,
             ...haiDangDefaultRoomSize(index),
             areaM2: DEFAULT_ROOM_AREA_SQM,
-            area_m2: DEFAULT_ROOM_AREA_SQM,
-            areaSqm: DEFAULT_ROOM_AREA_SQM,
+                       areaSqm: DEFAULT_ROOM_AREA_SQM,
           }
           : boxed;
         return sized;
@@ -504,8 +504,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         doors: Array.isArray(room.doors) ? room.doors : [],
         windows: Array.isArray(room.windows) ? room.windows : [],
         areaM2: DEFAULT_ROOM_AREA_SQM,
-        area_m2: DEFAULT_ROOM_AREA_SQM,
-        areaSqm: DEFAULT_ROOM_AREA_SQM,
+               areaSqm: DEFAULT_ROOM_AREA_SQM,
       };
       return normalized;
     });
@@ -799,7 +798,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       selectedRoom.height,
     );
     const actualArea = areaFromSize(nextSize.width, nextSize.height);
-    updateRoom(selectedRoom.id, { ...nextSize, areaSqm: actualArea, areaM2: actualArea, area_m2: actualArea });
+    updateRoom(selectedRoom.id, { ...nextSize, areaSqm: actualArea, areaM2: actualArea });
     setAreaInputValue(actualArea);
   };
 
@@ -843,7 +842,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
 
     const roomCode = nextRoomCode(floor, currentRooms);
     const position = nextRoomPosition(currentRooms);
-    const sortOrder = Math.max(0, ...currentRooms.map((room) => Number(room.sortOrder ?? room.sort_order ?? 0))) + 1;
+    const sortOrder = Math.max(0, ...currentRooms.map((room) => Number(room.sortOrder ?? 0))) + 1;
 
     setAddingRoom(true);
     setError("");
@@ -869,8 +868,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         doors: [],
         windows: [],
         areaM2: DEFAULT_ROOM_AREA_SQM,
-        area_m2: DEFAULT_ROOM_AREA_SQM,
-        areaSqm: DEFAULT_ROOM_AREA_SQM,
+               areaSqm: DEFAULT_ROOM_AREA_SQM,
       };
 
       setData((current) => ({
@@ -907,6 +905,19 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const removeBlock = (blockId) => {
     setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: currentBlocks.filter((block) => block.id !== blockId) }));
     setSelectedItemId((current) => current === blockId ? "" : current);
+    setHasUnsavedChanges(true);
+  };
+
+  const alignCurrentRooms = () => {
+    if (!selectedFloorId || !currentRooms.length) return;
+    const alignedRooms = alignRoomItems(currentRooms, { gridSize: GRID, assumeAllRooms: true });
+    setLayouts((current) => ({ ...current, [selectedFloorId]: alignedRooms }));
+    setSelectedItemId("");
+    setPlacementMode(null);
+    setPlacementTargetId(null);
+    setAreaInputValue("");
+    setError("");
+    setNotice("Đã căn thẳng các phòng. Bấm Lưu sơ đồ để lưu thay đổi.");
     setHasUnsavedChanges(true);
   };
 
@@ -954,6 +965,16 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && <span className="text-xs font-bold text-amber-600">Có thay đổi chưa lưu</span>}
           <button type="button" onClick={() => setPreviewOpen((value) => !value)} className="inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-bold"><Eye className="h-4 w-4" />Xem trước sơ đồ</button>
+          <button
+            type="button"
+            onClick={alignCurrentRooms}
+            disabled={!selectedFloorId || !currentRooms.length || Boolean(placementActive)}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Căn thẳng phòng"
+          >
+            <WandSparkles className="h-4 w-4" />
+            Căn thẳng phòng
+          </button>
           <button type="button" onClick={save} disabled={saving || !selectedFloorId || (!currentRooms.length && !currentBlocks.length)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Lưu sơ đồ</button>
         </div>
       </header>
@@ -1028,7 +1049,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <p className="mb-3 text-xs font-bold uppercase text-slate-500">Danh sách phòng ({currentRooms.length})</p>
             <div className="grid gap-2">
-              {currentRooms.map((room) => <div key={room.id} className="rounded-lg border bg-slate-50 p-3"><p className="text-sm font-bold">{room.roomCode ?? room.room_code ?? room.name}</p><p className="text-xs text-slate-500">{areaFromSize(room.width, room.height)} m²</p></div>)}
+              {currentRooms.map((room) => <div key={room.id} className="rounded-lg border bg-slate-50 p-3"><p className="text-sm font-bold">{room.roomCode ?? room.name}</p><p className="text-xs text-slate-500">{areaFromSize(room.width, room.height)} m²</p></div>)}
             </div>
           </div>
         </aside>

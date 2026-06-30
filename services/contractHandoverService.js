@@ -1,10 +1,43 @@
-import { API_BASE_URL, ApiError, authenticatedFetch } from "@/services/identityAccessService";
+import { API_BASE_URL, ApiError, authenticatedFetch, refreshTokenApi } from "@/services/identityAccessService";
 
 const BASE = API_BASE_URL;
 
 function getAuthToken() {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem("token") || "";
+}
+
+function authHeaders(extraHeaders = {}) {
+  const token = getAuthToken();
+  return {
+    "X-Client-Type": "web",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extraHeaders,
+  };
+}
+
+async function fetchWithAuth(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: authHeaders(options.headers),
+  });
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  await refreshTokenApi();
+  return fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: authHeaders(options.headers),
+  });
+}
+
+async function readErrorMessage(response, fallbackMessage) {
+  const payload = await response.json().catch(() => ({}));
+  return payload.message || payload.details || fallbackMessage;
 }
 
 /**
@@ -59,6 +92,69 @@ export async function fetchContractHandover(contractId, handoverType = "MOVE_IN"
     { method: "GET" }
   );
 }
+
+export async function submitHandover(contractId, payload) {
+  if (!contractId) throw new Error("Missing contractId");
+
+  return authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/submit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function uploadHandoverDocument(contractId, file, handoverType = "MOVE_IN") {
+  if (!contractId) throw new Error("Missing contractId");
+  if (!file) throw new Error("Missing handover document file");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return authenticatedFetch(
+    `${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/document?type=${encodeURIComponent(handoverType)}`,
+    {
+      method: "PATCH",
+      body: formData,
+    },
+  );
+}
+
+export const uploadHandoverSignedDocument = uploadHandoverDocument;
+
+export async function fetchHandoverDraftPdfBlob(contractId, handoverType = "MOVE_IN") {
+  if (!contractId) throw new Error("Missing contractId");
+
+  const response = await fetchWithAuth(
+    `${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/draft-pdf?type=${encodeURIComponent(handoverType)}`,
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Unable to download handover draft PDF."));
+  }
+
+  return response.blob();
+}
+
+export async function downloadHandoverDraftPdf(
+  contractId,
+  handoverType = "MOVE_IN",
+  filename = "bien-ban-ban-giao.pdf",
+) {
+  const blob = await fetchHandoverDraftPdfBlob(contractId, handoverType);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * Confirm handover
  * PATCH /api/v1/lease-contracts/{contractId}/handover/confirm

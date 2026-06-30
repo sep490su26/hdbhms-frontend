@@ -26,6 +26,7 @@ import {
   fetchTenantProfiles,
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 
 const MOCK_TENANT_PROFILES = [
   {
@@ -170,12 +171,6 @@ const MOCK_TENANT_PROFILES = [
   },
 ];
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
 const moneyFormatter = new Intl.NumberFormat("vi-VN");
 
 const valueOf = (item, ...keys) => {
@@ -194,9 +189,7 @@ const normalizeText = (value) =>
     .replace(/[\u0300-\u036f]/g, "");
 
 const formatDate = (value) => {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Chưa cập nhật" : dateFormatter.format(date);
+  return formatDisplayDate(value);
 };
 
 const formatYear = (value) => {

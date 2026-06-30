@@ -32,6 +32,7 @@ import {
   publicCreateViewingCustomer,
 } from "../../../../services/viewingCustomersService";
 import { formatHoldMinutes, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+import { formatDate } from "../../../../lib/dateFormat";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -56,10 +57,7 @@ const getTomorrowDateString = () => {
 };
 
 const formatShortDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  return formatDate(value, "");
 };
 
 const VIEWING_DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";

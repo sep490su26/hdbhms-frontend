@@ -43,6 +43,7 @@ function normalizeFacility(facility = {}) {
     id: facility.id ?? null,
     code: facility.code ?? facility.propertyCode ?? facility.property_code ?? "",
     name: facility.name ?? "",
+    propertyType: facility.propertyType ?? facility.property_type ?? "BOARDING_HOUSE",
     address: facility.address ?? facility.addressLine ?? facility.address_line ?? "",
     description: facility.description ?? "",
     status: facility.status ?? "ACTIVE",
@@ -96,7 +97,8 @@ export async function createFacility(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: payload.name,
-      address: payload.address,
+      propertyType: payload.propertyType ?? "BOARDING_HOUSE",
+      addressLine: payload.address,
       description: payload.description ?? "",
       status: payload.status ?? "ACTIVE",
     }),
@@ -111,7 +113,8 @@ export async function updateFacility(id, payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: payload.name,
-      address: payload.address,
+      propertyType: payload.propertyType ?? "BOARDING_HOUSE",
+      addressLine: payload.address,
       description: payload.description ?? "",
       status: payload.status ?? "ACTIVE",
     }),

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Building2, CircleDollarSign, Loader2, Wrench } from "lucide-react";
 import { fetchInternalMaintenanceCosts } from "@/services/maintenanceService";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -101,7 +102,7 @@ export default function FinancePage() {
                 <tr key={`${item.ticketId}-${item.recordedAt}`} className="border-t border-[#e2e8f0]">
                   <td className="px-5 py-4"><Link href={`/dashboard/maintenance/${item.ticketId}`} className="font-black text-[#3156b6]">{item.ticketCode}</Link><p className="mt-1 text-xs text-[#64748b]">Bảo trì nội bộ</p></td>
                   <td className="px-5 py-4 font-semibold">{item.propertyName || "Chưa cập nhật"}<p className="mt-1 text-xs text-[#64748b]">{item.roomCode ? `Phòng ${item.roomCode}` : "Khu vực chung"}</p></td>
-                  <td className="px-5 py-4">{item.recordedAt ? new Date(item.recordedAt).toLocaleDateString("vi-VN") : "Chưa cập nhật"}</td>
+                  <td className="px-5 py-4">{formatDisplayDate(item.recordedAt)}</td>
                   <td className="px-5 py-4"><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700">Chủ trọ</span></td>
                   <td className="px-5 py-4 text-right font-black">{formatMoney(item.amount)}</td>
                 </tr>

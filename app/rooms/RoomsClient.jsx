@@ -809,8 +809,8 @@ function SavedMiniWindowOpening({ opening, x, y, width, height }) {
 function SavedMiniFloorOverview({ floor, floorLayout, roomsById, onSelectRoom, onSelectFloor }) {
   const items = floorPlanItems(floorLayout);
   const bounds = items.reduce((acc, item) => {
-    const x = Number(planValue(item, "x")) || 0;
-    const y = Number(planValue(item, "y")) || 0;
+    const x = Number(planValue(item, "positionX", "position_x", "x")) || 0;
+    const y = Number(planValue(item, "positionY", "position_y", "y")) || 0;
     const width = Number(planValue(item, "width")) || 80;
     const height = Number(planValue(item, "height")) || 80;
     return {
@@ -844,13 +844,13 @@ function SavedMiniFloorOverview({ floor, floorLayout, roomsById, onSelectRoom, o
         style={{ height: svgHeight }}
       >
         {items.map((item, index) => {
-          const itemType = String(planValue(item, "itemType", "item_type") ?? "").toUpperCase();
-          const x = Number(planValue(item, "x")) || 0;
-          const y = Number(planValue(item, "y")) || 0;
+          const itemType = String(planValue(item, "type", "itemType", "item_type") ?? "").toUpperCase();
+          const x = Number(planValue(item, "positionX", "position_x", "x")) || 0;
+          const y = Number(planValue(item, "positionY", "position_y", "y")) || 0;
           const width = Number(planValue(item, "width")) || 80;
           const height = Number(planValue(item, "height")) || 80;
-          const label = planValue(item, "label") ?? itemType;
           const metadata = planMetadata(item);
+          const label = metadata.label ?? planValue(item, "label") ?? itemType;
 
           if (itemType === "ROOM") {
             const room = roomsById.get(String(planValue(item, "roomId", "room_id")));

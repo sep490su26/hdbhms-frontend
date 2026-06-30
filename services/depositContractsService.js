@@ -57,6 +57,23 @@ async function readEnvelope(response, fallbackMessage) {
   return payload.data ?? null;
 }
 
+function normalizeDepositContractPreviewMetadata(metadata = {}) {
+  return {
+    roomId: metadata?.roomId ?? null,
+    fullName: metadata?.fullName ?? null,
+    dob: metadata?.dob ?? null,
+    phone: metadata?.phone ?? null,
+    email: metadata?.email ?? null,
+    idNumber: metadata?.idNumber ?? null,
+    idIssueDate: metadata?.idIssueDate ?? null,
+    idIssuePlace: metadata?.idIssuePlace ?? null,
+    permanentAddress: metadata?.permanentAddress ?? null,
+    expectedMoveInDate: metadata?.expectedMoveInDate ?? null,
+    expectedLeaseSignDate: metadata?.expectedLeaseSignDate ?? null,
+    paymentCycleMonths: metadata?.paymentCycleMonths ?? null,
+  };
+}
+
 export function toApiAssetUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
@@ -85,18 +102,21 @@ export async function previewDepositContract(metadata) {
       "Content-Type": "application/json",
       "X-Client-Type": "web",
     },
-    body: JSON.stringify(metadata),
+    body: JSON.stringify(normalizeDepositContractPreviewMetadata(metadata)),
   });
 
   return readEnvelope(response, "Không thể tạo bản xem trước hợp đồng đặt cọc.");
 }
 
-export async function fetchDepositAgreements({ page = 0, size = 50, status } = {}) {
+export async function fetchDepositAgreements({ page = 0, size = 10, status, statuses } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
   if (status) params.set("status", status);
+  if (Array.isArray(statuses)) {
+    statuses.filter(Boolean).forEach((nextStatus) => params.append("statuses", nextStatus));
+  }
 
   const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements?${params.toString()}`, {
     method: "GET",

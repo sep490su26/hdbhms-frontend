@@ -208,6 +208,7 @@ export async function activateLeaseContract(leaseContractId) {
   }
   const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activate`, {
     method: "POST",
+    headers: { Accept: "application/json" },
   });
   return normalizeLeaseContractItem(data);
 }
@@ -222,11 +223,11 @@ export async function updateLeaseContractTerms(leaseContractId, payload) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        start_date: payload.startDate,
-        end_date: payload.endDate,
-        payment_cycle_months: payload.paymentCycleMonths,
-        monthly_rent: payload.monthlyRent,
-        deposit_amount: payload.depositAmount,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        paymentCycleMonths: payload.paymentCycleMonths,
+        monthlyRent: payload.monthlyRent,
+        depositAmount: payload.depositAmount,
       }),
     },
   );
@@ -255,11 +256,11 @@ export async function renewLeaseContract(leaseContractId, payload) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        new_start_date: payload.newStartDate,
-        new_end_date: payload.newEndDate,
-        monthly_rent: payload.monthlyRent,
-        payment_cycle_months: payload.paymentCycleMonths,
-        deposit_amount: payload.depositAmount,
+        newStartDate: payload.newStartDate,
+        newEndDate: payload.newEndDate,
+        monthlyRent: payload.monthlyRent,
+        paymentCycleMonths: payload.paymentCycleMonths,
+        depositAmount: payload.depositAmount,
         note: payload.note,
       }),
     },
@@ -277,7 +278,7 @@ export async function recordLeaseContractTenantIntention(leaseContractId, payloa
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         intention: payload.intention,
-        expected_move_out_date: payload.expectedMoveOutDate || null,
+        expectedMoveOutDate: payload.expectedMoveOutDate || null,
         note: payload.note,
       }),
     },
@@ -296,6 +297,34 @@ async function fetchPrivateFileBlob(fileId) {
     throw new Error("Không thể tải file hợp đồng.");
   }
   return response.blob();
+}
+
+export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
+  if (!leaseContractId) {
+    throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c há»£p Ä‘á»“ng cáº§n táº£i.");
+  }
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("KhÃ´ng thá»ƒ táº£i PDF há»£p Ä‘á»“ng.");
+  }
+
+  return response.blob();
+}
+
+export async function downloadLeaseContractDraftPdf(leaseContractId, filename = "hop-dong-thue.pdf") {
+  const blob = await fetchLeaseContractDraftPdfBlob(leaseContractId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function openLeaseContractFile(fileId) {
@@ -552,11 +581,11 @@ function normalizeRentalHistory(data = {}) {
 function buildContractQueryParams(filters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.set("status", filters.status);
-  if (filters.roomId) params.set("room_id", String(filters.roomId));
-  if (filters.propertyId) params.set("property_id", String(filters.propertyId));
-  if (filters.tenantProfileId) params.set("tenant_profile_id", String(filters.tenantProfileId));
-  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
-  if (filters.dateTo) params.set("date_to", filters.dateTo);
+  if (filters.roomId) params.set("roomId", String(filters.roomId));
+  if (filters.propertyId) params.set("propertyId", String(filters.propertyId));
+  if (filters.tenantProfileId) params.set("tenantProfileId", String(filters.tenantProfileId));
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
   if (filters.keyword?.trim()) params.set("keyword", filters.keyword.trim());
   return params.toString();
 }

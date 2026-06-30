@@ -153,8 +153,8 @@ export async function createStaffAccount({ phone, email, fullName, role }) {
         body: JSON.stringify({
             phone,
             email,
-            full_name: fullName,
-            initial_role: role,
+            fullName,
+            initialRole: role,
         }),
     });
 }

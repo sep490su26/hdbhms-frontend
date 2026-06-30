@@ -108,6 +108,7 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
       editingId: facility.id,
       values: {
         name: facility.name,
+        propertyType: facility.propertyType || "BOARDING_HOUSE",
         address: facility.address,
         description: facility.description || "",
         status: facility.status || FACILITY_STATUS.ACTIVE,
@@ -145,6 +146,7 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
 
     const payload = {
       name: formState.values.name.trim(),
+      propertyType: formState.values.propertyType || "BOARDING_HOUSE",
       address: formState.values.address.trim(),
       description: formState.values.description.trim(),
       status: formState.values.status || FACILITY_STATUS.ACTIVE,

@@ -19,6 +19,7 @@ import {
   fetchTenantAccountCandidates,
   sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 
 const ALL_VALUE = "Tất cả";
 
@@ -133,10 +134,7 @@ function getInitials(name) {
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return new Intl.DateTimeFormat("vi-VN").format(date);
+  return formatDisplayDate(value);
 }
 
 function roleLabel(role) {

@@ -40,6 +40,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 
 const translateType = (type) => {
     const map = {
@@ -237,7 +238,7 @@ export default function ApprovalCenter() {
                                                     --
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4 text-gray-600">
-                                                    {new Date(req.createdAt).toLocaleDateString()}
+                                                    {formatDisplayDate(req.createdAt)}
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4">
                                                     <p className="text-gray-700 font-medium">{new Date(req.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>

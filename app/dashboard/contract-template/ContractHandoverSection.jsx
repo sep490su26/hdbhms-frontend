@@ -5,14 +5,11 @@ import { Camera, Gauge, Loader2, RefreshCw, Save } from "lucide-react";
 import Image from "next/image";
 import {
   ASSET_CONDITION_VALUES,
-  createRoomAsset,
   fetchRoomAssets,
   normalizeAsset,
-  updateRoomAsset,
 } from "@/services/roomAssetsService";
 import {
-  confirmHandover,
-  createHandoverReadings,
+  submitHandover,
   fetchLatestReadings,
   uploadFile,
 } from "@/services/contractHandoverService";
@@ -109,6 +106,7 @@ export default function ContractHandoverSection({
   roomId,
   roomCode,
   readonly = false,
+  onSaved,
 }) {
   /* meter readings -------------------------------------------------- */
   const [handoverDate, setHandoverDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -306,14 +304,10 @@ export default function ContractHandoverSection({
     Number.isFinite(Number(waterReading)) && Number(waterReading) >= 0 &&
     assets.every((a) => a.assetName.trim() && a.assetCategory.trim() && Number(a.quantity) > 0);
 
-  /* Save ------------------------------------------------------------ */
+  /* Save — single atomic call via /handover/submit ----------------- */
   async function handleSave() {
     if (!isValid) {
       window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
-      return;
-    }
-    if (!roomId) {
-      window.alert("Không xác định được phòng để lưu thiết bị.");
       return;
     }
 
@@ -322,7 +316,7 @@ export default function ContractHandoverSection({
     setSaveSuccess(false);
 
     try {
-      // 1. Upload ảnh đồng hồ
+      // 1. Upload meter photos
       let electricPhotoId = null;
       let waterPhotoId = null;
       if (electricImageFile) {
@@ -334,67 +328,51 @@ export default function ContractHandoverSection({
         waterPhotoId = res?.id;
       }
 
-      // 2. Lưu chỉ số điện/nước
-      await createHandoverReadings(contractId, {
-        electricity: {
-          currentValue: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
-          current_value: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
-          photoFileId: electricPhotoId,
-          photo_file_id: electricPhotoId,
-          readingDate: electricReadingDate || undefined,
-          reading_date: electricReadingDate || undefined,
-        },
-        water: {
-          currentValue: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
-          current_value: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
-          photoFileId: waterPhotoId,
-          photo_file_id: waterPhotoId,
-          readingDate: waterReadingDate || undefined,
-          reading_date: waterReadingDate || undefined,
-        },
-      });
-
-      // 3. Lưu hiện trạng thiết bị
-      const savedAssets = await Promise.all(
+      // 2. Upload new asset images
+      const assetPayloads = await Promise.all(
         assets.map(async (asset) => {
           let assetImageId = null;
-          // Nếu có file ảnh mới, upload trước
           if (asset.imageFile) {
             const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
             assetImageId = res?.id;
           } else if (asset.imageUrl && asset.fileImageId) {
-            // Giữ nguyên ID ảnh cũ nếu không đổi
             assetImageId = asset.fileImageId;
           }
-          const body = {
-            asset_name: asset.assetName.trim(),
-            asset_category: asset.assetCategory.trim(),
+          return {
+            id: asset.id ?? undefined,
+            assetName: asset.assetName.trim(),
+            assetCategory: asset.assetCategory.trim(),
             quantity: Number(asset.quantity),
-            current_condition:
+            currentCondition:
               ASSET_CONDITION_VALUES[asset.currentCondition] ?? asset.currentCondition ?? "GOOD",
             description: asset.description?.trim() ?? "",
-            file_image_id: assetImageId,
+            fileImageId: assetImageId,
           };
-          return asset.id
-            ? updateRoomAsset(roomId, asset.id, body)
-            : createRoomAsset(roomId, body);
         }),
       );
 
-      setAssets((prev) =>
-        prev.map((a, i) =>
-          a.id ? a : { ...a, id: savedAssets[i]?.id ?? null },
-        ),
-      );
-      setFromApi(true);
-
-      // 4. Xác nhận bàn giao
-      await confirmHandover(contractId, {
-        handover_type: "MOVE_IN",
+      // 3. Single atomic submit: readings + assets + confirm
+      await submitHandover(contractId, {
+        handoverType: "MOVE_IN",
+        handoverDate: handoverDate || new Date().toISOString().split("T")[0],
         note: note.trim(),
+        electricity: {
+          currentValue: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
+          photoFileId: electricPhotoId,
+          readingDate: electricReadingDate || undefined,
+        },
+        water: {
+          currentValue: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
+          photoFileId: waterPhotoId,
+          readingDate: waterReadingDate || undefined,
+        },
+        assets: assetPayloads,
       });
 
+      // Update local asset IDs from response
+      setFromApi(true);
       setSaveSuccess(true);
+      onSaved?.();
     } catch (err) {
       setSaveError(err?.message ?? "Lưu thông tin thất bại.");
     } finally {
@@ -406,7 +384,7 @@ export default function ContractHandoverSection({
   /*  Render                                                            */
   /* ----------------------------------------------------------------- */
   return (
-    <section className="rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 lg:col-span-2 xl:p-5">
+    <section id="handover-entry-section" className="rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 lg:col-span-2 xl:p-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>

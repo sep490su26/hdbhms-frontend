@@ -8,28 +8,28 @@ function numberValue(value) {
 function normalizeFloor(raw = {}) {
   return {
     id: raw.id ?? null,
-    propertyId: raw.propertyId ?? raw.property_id ?? raw.property?.id ?? null,
-    floorCode: raw.floorCode ?? raw.floor_code ?? "",
+    propertyId: raw.propertyId ?? raw.property?.id ?? null,
+    floorCode: raw.floorCode ?? "",
     name: raw.name ?? "",
-    sortOrder: numberValue(raw.sortOrder ?? raw.sort_order),
+    sortOrder: numberValue(raw.sortOrder),
     status: raw.status ?? "ACTIVE",
-    createdAt: raw.createdAt ?? raw.created_at ?? null,
-    updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
+    createdAt: raw.createdAt ?? null,
+    updatedAt: raw.updatedAt ?? null,
   };
 }
 
 function normalizeRoom(raw = {}) {
   return {
     id: raw.id ?? null,
-    floorId: raw.floorId ?? raw.floor_id ?? raw.floor?.id ?? null,
-    propertyId: raw.propertyId ?? raw.property_id ?? raw.property?.id ?? null,
-    roomCode: raw.roomCode ?? raw.room_code ?? "",
+    floorId: raw.floorId ?? raw.floor?.id ?? null,
+    propertyId: raw.propertyId ?? raw.property?.id ?? raw.floor?.property?.id ?? null,
+    roomCode: raw.roomCode ?? "",
     name: raw.name ?? "",
-    areaM2: numberValue(raw.areaM2 ?? raw.area_m2),
-    listedPrice: numberValue(raw.listedPrice ?? raw.listed_price),
-    maxOccupants: numberValue(raw.maxOccupants ?? raw.max_occupants),
-    sortOrder: numberValue(raw.sortOrder ?? raw.sort_order),
-    currentStatus: raw.currentStatus ?? raw.current_status ?? raw.status ?? "VACANT",
+    areaM2: numberValue(raw.areaM2),
+    listedPrice: numberValue(raw.listedPrice),
+    maxOccupants: numberValue(raw.maxOccupants),
+    sortOrder: numberValue(raw.sortOrder),
+    currentStatus: raw.currentStatus ?? raw.status ?? "VACANT",
   };
 }
 
@@ -52,10 +52,10 @@ export async function createFloor({ propertyId, floorCode, name, sortOrder }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      property_id: propertyId,
-      floor_code: floorCode,
+      propertyId,
+      floorCode,
       name,
-      sort_order: sortOrder,
+      sortOrder,
     }),
   }).then(normalizeFloor);
 }
@@ -87,14 +87,14 @@ export async function createRoom({ propertyId, floorId, roomCode, name, areaM2, 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      property_id: propertyId,
-      floor_id: floorId,
-      room_code: roomCode,
+      propertyId,
+      floorId,
+      roomCode,
       name,
-      area_m2: areaM2,
-      listed_price: listedPrice,
-      max_occupants: maxOccupants,
-      sort_order: sortOrder,
+      areaM2,
+      listedPrice,
+      maxOccupants,
+      sortOrder,
     }),
   }).then(normalizeRoom);
 }

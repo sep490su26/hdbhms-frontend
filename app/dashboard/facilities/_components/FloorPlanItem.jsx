@@ -90,7 +90,7 @@ function clampOffset(value) {
 }
 
 function roomLabel(item) {
-  const rawCode = String(item.code ?? item.roomCode ?? item.room_code ?? item.name ?? "").trim();
+  const rawCode = String(item.code ?? item.roomCode ?? item.name ?? "").trim();
   if (!rawCode) return "P";
   return rawCode.toUpperCase().startsWith("P") ? rawCode : `P${rawCode}`;
 }

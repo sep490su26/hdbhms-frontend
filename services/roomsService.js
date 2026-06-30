@@ -66,8 +66,8 @@ function normalizeRoomImageValue(image) {
 
 export function normalizeRoomImages(apiRoom) {
   const rawImages = [
-    apiRoom?.firstImageUrl,
     apiRoom?.first_image_url,
+    apiRoom?.firstImageUrl,
     apiRoom?.imageUrl,
     apiRoom?.image_url,
     ...(Array.isArray(apiRoom?.imageUrls) ? apiRoom.imageUrls : []),
@@ -103,7 +103,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     floorCode: apiRoom.floor?.floor_code ?? apiRoom.floor?.floorCode ?? apiRoom.floor_code ?? apiRoom.floorCode ?? null,
     buildingId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
     propertyId: apiRoom.floor?.property?.id ?? apiRoom.property_id ?? apiRoom.propertyId ?? null,
-    buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? "Hải Đăng House",
+    buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? apiRoom.propertyName ?? "Hải Đăng House",
     name: apiRoom.name ?? roomCode,
     status,
     expectedVacantDate: apiRoom.expected_vacant_date ?? apiRoom.expectedVacantDate ?? null,
@@ -252,14 +252,41 @@ export async function fetchPublicRoomById(roomIdentifier) {
 
 export async function checkoutDeposit(formData) {
   // Use the global API base rather than PUBLIC_ROOMS_API_URL which ends in /rooms
-  const response = await fetch(`${API_BASE_URL}/deposit/checkout`, {
+  const checkoutUrl = `${API_BASE_URL}/deposit/checkout`;
+  const fallbackCheckoutUrl = checkoutUrl.replace("http://localhost:", "http://127.0.0.1:");
+  const createRequestOptions = () => ({
     method: "POST",
     headers: {
-      "X-Client-Type": "web",
+      Accept: "application/json",
     },
     // Chú ý: Không set Content-Type, trình duyệt tự sinh boundary cho FormData multipart
     body: formData,
   });
+
+  let response;
+  try {
+    response = await fetch(checkoutUrl, createRequestOptions());
+  } catch {
+    if (fallbackCheckoutUrl !== checkoutUrl) {
+      try {
+        response = await fetch(fallbackCheckoutUrl, createRequestOptions());
+      } catch {
+        throw new Error(
+          `Không kết nối được tới API đặt cọc (${checkoutUrl} hoặc ${fallbackCheckoutUrl}). Vui lòng kiểm tra backend đang chạy và cấu hình NEXT_PUBLIC_API_BASE_URL.`
+        );
+      }
+    } else {
+      throw new Error(
+        `Không kết nối được tới API đặt cọc (${checkoutUrl}). Vui lòng kiểm tra backend đang chạy và cấu hình NEXT_PUBLIC_API_BASE_URL.`
+      );
+    }
+  }
+
+  if (!response) {
+    throw new Error(
+      `Không kết nối được tới API đặt cọc (${checkoutUrl}). Vui lòng kiểm tra backend đang chạy và cấu hình NEXT_PUBLIC_API_BASE_URL.`
+    );
+  }
 
   const payload = await response.json().catch(() => ({}));
 
@@ -401,29 +428,6 @@ export async function cancelDepositPayment(paymentIntentId) {
 
   if (!response.ok || payload.code !== 0) {
     throw new Error(payload.message || payload.details || "Không thể hủy phiên giữ chỗ.");
-  }
-
-  return payload.data ?? null;
-}
-
-export async function confirmMockPayment(paymentIntentId) {
-  if (!paymentIntentId) {
-    throw new Error("Thiếu mã phiên thanh toán. Vui lòng tạo lại yêu cầu đặt cọc.");
-  }
-
-  const response = await fetch(`${API_BASE_URL}/mock/payments/${encodeURIComponent(paymentIntentId)}/success`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Client-Type": "web",
-    },
-    body: JSON.stringify({}),
-  });
-
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok || payload.code !== 0) {
-    throw new Error(payload.message || payload.details || "Không thể xác nhận thanh toán.");
   }
 
   return payload.data ?? null;

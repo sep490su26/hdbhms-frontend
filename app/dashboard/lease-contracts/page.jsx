@@ -26,6 +26,7 @@ import {
   updateDepositAgreementStatus,
   uploadSignedDepositContractFile,
 } from "@/services/depositContractsService";
+import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -53,10 +54,7 @@ function formatMoney(value) {
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleDateString("vi-VN");
+  return formatDisplayDate(value);
 }
 
 function toInputDate(value) {
@@ -68,16 +66,7 @@ function toInputDate(value) {
 }
 
 function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value);
 }
 
 function getAgreementItems(response) {

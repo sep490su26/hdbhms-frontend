@@ -120,7 +120,9 @@ const MOCK_TENANT_ACCOUNT_CANDIDATES = [
 ];
 
 function normalize(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function getInitials(name) {
@@ -149,11 +151,16 @@ function roleClass(role) {
 }
 
 function resolveAccountState(item) {
-  if (item.occupantStatus === "DISABLED" || item.provisioningStatus === "DISABLED") {
+  if (
+    item.occupantStatus === "DISABLED" ||
+    item.provisioningStatus === "DISABLED"
+  ) {
     return {
       key: "DISABLED",
       label: "Đã vô hiệu hóa",
-      hint: item.disabledReason ? `Lý do: ${item.disabledReason}` : "Tenant không còn quyền truy cập phòng/hợp đồng này.",
+      hint: item.disabledReason
+        ? `Lý do: ${item.disabledReason}`
+        : "Tenant không còn quyền truy cập phòng/hợp đồng này.",
       className: "border-slate-300 bg-slate-100 text-slate-700",
     };
   }
@@ -222,12 +229,18 @@ function MetricCard({ icon: Icon, label, value, tone }) {
 
   return (
     <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
+      <span
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+      >
         <Icon className="h-5 w-5" />
       </span>
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">{label}</p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33]">{value}</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33]">
+          {value}
+        </p>
       </div>
     </article>
   );
@@ -255,7 +268,9 @@ function SelectFilter({ value, options, onChange, label }) {
 function StatusBadge({ item }) {
   const state = resolveAccountState(item);
   return (
-    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${state.className}`}>
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${state.className}`}
+    >
       {state.label}
     </span>
   );
@@ -271,7 +286,8 @@ function contractGroupKey(item, index) {
 function rowKey(item, index) {
   if (item.profileId) return `profile-${item.profileId}`;
   if (item.userId) return `user-${item.userId}`;
-  if (item.phone) return `${item.contractId || item.contractCode || "contract"}-${item.phone}`;
+  if (item.phone)
+    return `${item.contractId || item.contractCode || "contract"}-${item.phone}`;
   return `row-${index}`;
 }
 
@@ -311,25 +327,55 @@ export default function AccountsPage() {
   }, [page, size]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadData]);
+    let active = true;
+    const loadInitialData = async () => {
+      try {
+        const data = await fetchTenantAccountCandidates();
+        if (active) setItems(data);
+      } catch (loadError) {
+        if (active)
+          setError(
+            loadError?.message || "Không tải được danh sách cấp tài khoản.",
+          );
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadInitialData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const propertyOptions = useMemo(
-    () => [ALL_VALUE, ...Array.from(new Set(items.map((item) => item.propertyName).filter(Boolean)))],
+    () => [
+      ALL_VALUE,
+      ...Array.from(
+        new Set(items.map((item) => item.propertyName).filter(Boolean)),
+      ),
+    ],
     [items],
   );
 
   const metrics = useMemo(() => {
-    const contractIds = new Set(items.map((item) => item.contractId).filter(Boolean));
+    const contractIds = new Set(
+      items.map((item) => item.contractId).filter(Boolean),
+    );
     return {
       contracts: contractIds.size,
-      notSent: items.filter((item) => resolveAccountState(item).key === "NOT_SENT").length,
-      sent: items.filter((item) => resolveAccountState(item).key === "SENT").length,
-      activated: items.filter((item) => resolveAccountState(item).key === "ACTIVATED").length,
-      missingEmail: items.filter((item) => resolveAccountState(item).key === "MISSING_EMAIL").length,
+      notSent: items.filter(
+        (item) => resolveAccountState(item).key === "NOT_SENT",
+      ).length,
+      sent: items.filter((item) => resolveAccountState(item).key === "SENT")
+        .length,
+      activated: items.filter(
+        (item) => resolveAccountState(item).key === "ACTIVATED",
+      ).length,
+      missingEmail: items.filter(
+        (item) => resolveAccountState(item).key === "MISSING_EMAIL",
+      ).length,
     };
   }, [items]);
 
@@ -345,9 +391,12 @@ export default function AccountsPage() {
         normalize(item.recipientEmail).includes(keyword) ||
         normalize(item.roomCode).includes(keyword) ||
         normalize(item.contractCode).includes(keyword);
-      const matchesProperty = propertyFilter === ALL_VALUE || item.propertyName === propertyFilter;
-      const matchesState = stateFilter === ALL_VALUE || state.label === stateFilter;
-      const matchesRole = roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
+      const matchesProperty =
+        propertyFilter === ALL_VALUE || item.propertyName === propertyFilter;
+      const matchesState =
+        stateFilter === ALL_VALUE || state.label === stateFilter;
+      const matchesRole =
+        roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
       return matchesQuery && matchesProperty && matchesState && matchesRole;
     });
   }, [items, propertyFilter, query, roleFilter, stateFilter]);
@@ -355,7 +404,10 @@ export default function AccountsPage() {
   const groupedContracts = useMemo(() => {
     const groups = new Map();
     for (const item of filteredItems) {
-      const key = item.contractId || item.contractCode || `${item.roomCode}-${item.phone}`;
+      const key =
+        item.contractId ||
+        item.contractCode ||
+        `${item.roomCode}-${item.phone}`;
       if (!groups.has(key)) {
         groups.set(key, {
           key,
@@ -381,7 +433,9 @@ export default function AccountsPage() {
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
     const contractRows = items.filter((item) => item.contractId === contractId);
-    const retry = contractRows.some((item) => ["FAILED", "SENT"].includes(resolveAccountState(item).key));
+    const retry = contractRows.some((item) =>
+      ["FAILED", "SENT"].includes(resolveAccountState(item).key),
+    );
     const confirmed = window.confirm(
       retry
         ? "Hệ thống sẽ gửi lại tài khoản cho người thuê chưa kích hoạt. Tài khoản đã kích hoạt sẽ được bỏ qua."
@@ -404,7 +458,9 @@ export default function AccountsPage() {
 
   const handleDisable = async (item) => {
     if (!item?.contractId || !item?.profileId || disablingKey) return;
-    const reason = window.prompt("Nhập lý do vô hiệu hóa quyền truy cập tenant này");
+    const reason = window.prompt(
+      "Nhập lý do vô hiệu hóa quyền truy cập tenant này",
+    );
     if (reason === null) return;
     const trimmedReason = reason.trim();
     if (!trimmedReason) {
@@ -417,11 +473,22 @@ export default function AccountsPage() {
     setMessage("");
     setError("");
     try {
-      const result = await disableTenantAccountAccess(item.contractId, item.profileId, { reason: trimmedReason });
-      setMessage(result?.message === "TENANT_CONTEXT_DISABLED" ? "Đã vô hiệu hóa quyền truy cập tenant." : (result?.message || "Đã vô hiệu hóa quyền truy cập tenant."));
+      const result = await disableTenantAccountAccess(
+        item.contractId,
+        item.profileId,
+        { reason: trimmedReason },
+      );
+      setMessage(
+        result?.message === "TENANT_CONTEXT_DISABLED"
+          ? "Đã vô hiệu hóa quyền truy cập tenant."
+          : result?.message || "Đã vô hiệu hóa quyền truy cập tenant.",
+      );
       await loadData();
     } catch (disableError) {
-      setError(disableError?.message || "Không vô hiệu hóa được quyền truy cập tenant.");
+      setError(
+        disableError?.message ||
+          "Không vô hiệu hóa được quyền truy cập tenant.",
+      );
     } finally {
       setDisablingKey(null);
     }
@@ -436,7 +503,8 @@ export default function AccountsPage() {
             Quản lý tài khoản khách thuê
           </h1>
           <p className="mt-2 text-sm text-[#526179]">
-            Cấp tài khoản mobile cho tất cả người trong hợp đồng sau khi hợp đồng thuê đã ACTIVE.
+            Cấp tài khoản mobile cho tất cả người trong hợp đồng sau khi hợp
+            đồng thuê đã ACTIVE.
           </p>
         </div>
         <button
@@ -451,11 +519,36 @@ export default function AccountsPage() {
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
-        <MetricCard icon={Home} label="Hợp đồng hiệu lực" value={metrics.contracts} tone="slate" />
-        <MetricCard icon={KeyRound} label="Chưa cấp" value={metrics.notSent} tone="amber" />
-        <MetricCard icon={Mail} label="Đã gửi" value={metrics.sent} tone="blue" />
-        <MetricCard icon={ShieldCheck} label="Đã kích hoạt" value={metrics.activated} tone="emerald" />
-        <MetricCard icon={AlertCircle} label="Thiếu email" value={metrics.missingEmail} tone="rose" />
+        <MetricCard
+          icon={Home}
+          label="Hợp đồng hiệu lực"
+          value={metrics.contracts}
+          tone="slate"
+        />
+        <MetricCard
+          icon={KeyRound}
+          label="Chưa cấp"
+          value={metrics.notSent}
+          tone="amber"
+        />
+        <MetricCard
+          icon={Mail}
+          label="Đã gửi"
+          value={metrics.sent}
+          tone="blue"
+        />
+        <MetricCard
+          icon={ShieldCheck}
+          label="Đã kích hoạt"
+          value={metrics.activated}
+          tone="emerald"
+        />
+        <MetricCard
+          icon={AlertCircle}
+          label="Thiếu email"
+          value={metrics.missingEmail}
+          tone="rose"
+        />
       </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
@@ -469,7 +562,12 @@ export default function AccountsPage() {
               className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
             />
           </label>
-          <SelectFilter label="Cơ sở" value={propertyFilter} options={propertyOptions} onChange={setPropertyFilter} />
+          <SelectFilter
+            label="Cơ sở"
+            value={propertyFilter}
+            options={propertyOptions}
+            onChange={setPropertyFilter}
+          />
           <SelectFilter
             label="Trạng thái"
             value={stateFilter}
@@ -509,9 +607,12 @@ export default function AccountsPage() {
 
       <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
         <div className="border-b border-[#d4dbe8] px-5 py-4">
-          <h2 className="text-lg font-extrabold text-[#0f1d33]">Danh sách cấp tài khoản</h2>
+          <h2 className="text-lg font-extrabold text-[#0f1d33]">
+            Danh sách cấp tài khoản
+          </h2>
           <p className="mt-1 text-sm text-[#526179]">
-            Dữ liệu lấy từ hợp đồng thuê ACTIVE trong database. Một lần gửi sẽ cấp tài khoản cho người ký chính và người ở cùng.
+            Dữ liệu lấy từ hợp đồng thuê ACTIVE trong database. Một lần gửi sẽ
+            cấp tài khoản cho người ký chính và người ở cùng.
           </p>
         </div>
 
@@ -523,20 +624,31 @@ export default function AccountsPage() {
         ) : groupedContracts.length === 0 ? (
           <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
             <UsersRound className="h-10 w-10 text-[#9aa3b2]" />
-            <p className="text-sm font-semibold text-[#526179]">Không có hợp đồng ACTIVE phù hợp.</p>
+            <p className="text-sm font-semibold text-[#526179]">
+              Không có hợp đồng ACTIVE phù hợp.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-[#d4dbe8]">
             {groupedContracts.map((group) => {
-              const groupStates = group.rows.map((row) => resolveAccountState(row).key);
-              const canSend = groupStates.some((state) => ["NOT_SENT", "FAILED", "SENT"].includes(state));
+              const groupStates = group.rows.map(
+                (row) => resolveAccountState(row).key,
+              );
+              const canSend = groupStates.some((state) =>
+                ["NOT_SENT", "FAILED", "SENT"].includes(state),
+              );
               const hasFailed = groupStates.includes("FAILED");
               const hasSent = groupStates.includes("SENT");
-              const allActivated = groupStates.every((state) => state === "ACTIVATED");
+              const allActivated = groupStates.every(
+                (state) => state === "ACTIVATED",
+              );
               const isSending = sendingContractId === group.contractId;
               const contractCanSend = group.contractStatus === "ACTIVE";
               const sendDisabled =
-                !contractCanSend || !group.recipientEmail || !canSend || isSending;
+                !contractCanSend ||
+                !group.recipientEmail ||
+                !canSend ||
+                isSending;
 
               return (
                 <article key={group.safeKey} className="bg-white">
@@ -555,10 +667,12 @@ export default function AccountsPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold text-[#526179]">
-                        {group.propertyName || "Chưa có cơ sở"} · Hợp đồng {group.contractCode || "#"}
+                        {group.propertyName || "Chưa có cơ sở"} · Hợp đồng{" "}
+                        {group.contractCode || "#"}
                       </p>
                       <p className="mt-1 text-xs font-semibold text-[#687184]">
-                        Email nhận thông tin: {group.recipientEmail || "Chưa có email người ký chính"}
+                        Email nhận thông tin:{" "}
+                        {group.recipientEmail || "Chưa có email người ký chính"}
                       </p>
                     </div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -582,10 +696,10 @@ export default function AccountsPage() {
                               : hasSent
                                 ? "Gửi bổ sung"
                                 : allActivated
-                                ? "Đã hoàn tất"
-                                : canSend
-                                  ? "Gửi tài khoản"
-                                  : "Đã gửi tài khoản"}
+                                  ? "Đã hoàn tất"
+                                  : canSend
+                                    ? "Gửi tài khoản"
+                                    : "Đã gửi tài khoản"}
                       </button>
                     </div>
                   </div>
@@ -607,8 +721,13 @@ export default function AccountsPage() {
                         {group.rows.map((item, index) => {
                           const state = resolveAccountState(item);
                           const isDisabled = state.key === "DISABLED";
-                          const isDisabling = disablingKey === tenantContextKey(item);
-                          const disableActionDisabled = isDisabled || isDisabling || !item.contractId || !item.profileId;
+                          const isDisabling =
+                            disablingKey === tenantContextKey(item);
+                          const disableActionDisabled =
+                            isDisabled ||
+                            isDisabling ||
+                            !item.contractId ||
+                            !item.profileId;
                           return (
                             <tr key={rowKey(item, index)}>
                               <td data-label="Khách thuê" className="px-5 py-4">
@@ -627,17 +746,36 @@ export default function AccountsPage() {
                                 </div>
                               </td>
                               <td data-label="Vai trò" className="px-5 py-4">
-                                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}>
+                                <span
+                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}
+                                >
                                   {roleLabel(item.roomRole)}
                                 </span>
                               </td>
-                              <td data-label="SĐT" className="px-5 py-4 font-semibold text-[#0f1d33]">{item.phone || "Chưa có"}</td>
-                              <td data-label="Email cá nhân" className="break-words px-5 py-4 font-semibold text-[#0f1d33]">{item.email || "Không có"}</td>
-                              <td data-label="Ngày ký" className="px-5 py-4 font-semibold text-[#0f1d33]">{formatDate(item.signedAt)}</td>
+                              <td
+                                data-label="SĐT"
+                                className="px-5 py-4 font-semibold text-[#0f1d33]"
+                              >
+                                {item.phone || "Chưa có"}
+                              </td>
+                              <td
+                                data-label="Email cá nhân"
+                                className="break-words px-5 py-4 font-semibold text-[#0f1d33]"
+                              >
+                                {item.email || "Không có"}
+                              </td>
+                              <td
+                                data-label="Ngày ký"
+                                className="px-5 py-4 font-semibold text-[#0f1d33]"
+                              >
+                                {formatDate(item.signedAt)}
+                              </td>
                               <td data-label="Trạng thái" className="px-5 py-4">
                                 <div className="grid gap-1">
                                   <StatusBadge item={item} />
-                                  <span className="text-xs text-[#687184]">{state.hint}</span>
+                                  <span className="text-xs text-[#687184]">
+                                    {state.hint}
+                                  </span>
                                 </div>
                               </td>
                               <td data-label="Thao tác" className="px-5 py-4">
@@ -649,7 +787,11 @@ export default function AccountsPage() {
                                     className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
                                   >
                                     <Ban className="h-4 w-4" />
-                                    {isDisabled ? "Đã vô hiệu hóa" : isDisabling ? "Đang xử lý..." : "Vô hiệu hóa"}
+                                    {isDisabled
+                                      ? "Đã vô hiệu hóa"
+                                      : isDisabling
+                                        ? "Đang xử lý..."
+                                        : "Vô hiệu hóa"}
                                   </button>
                                 </div>
                               </td>

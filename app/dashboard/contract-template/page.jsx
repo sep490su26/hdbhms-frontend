@@ -1196,7 +1196,7 @@ export default function ContractTemplatePage() {
   );
 
   return (
-    <div className="grid gap-5 text-[#091426] text-[13px] xl:gap-6 xl:text-sm">
+    <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
       <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileSelected} />
 
       <section className="flex flex-col gap-2">
@@ -1217,7 +1217,7 @@ export default function ContractTemplatePage() {
       </section>
 
       <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_auto]">
+        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           <label className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
@@ -1243,7 +1243,7 @@ export default function ContractTemplatePage() {
             type="button"
             onClick={loadContracts}
             disabled={loading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Làm mới

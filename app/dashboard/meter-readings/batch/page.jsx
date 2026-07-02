@@ -331,7 +331,7 @@ export default function MeterReadings() {
     const pageButtons = [1, 2, 3, 4, 5, "...", 10];
 
     return (
-        <div className="font-sans">
+        <div className="w-full min-w-0 overflow-x-hidden font-sans">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
@@ -452,7 +452,7 @@ export default function MeterReadings() {
             </div>
 
             {/* Tabs + search */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+            <div className="flex w-full min-w-0 flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
                 <div
                     className="flex flex-wrap items-center gap-1 md:gap-0 w-full md:w-auto pb-1 md:pb-0 border-b md:border-none border-gray-100">
                     {tabs.map((tab) => (
@@ -465,11 +465,11 @@ export default function MeterReadings() {
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative w-full md:w-auto">
+                <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
+                    <div className="relative w-full min-w-0 md:w-auto">
                         <LucideSearch className={"absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"} />
                         <input
-                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 w-full md:w-64"
+                            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64"
                             placeholder="Tìm phòng..."
                             value={search}
                             onChange={(e) => {

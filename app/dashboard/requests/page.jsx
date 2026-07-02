@@ -123,18 +123,18 @@ export default function ApprovalCenter() {
     }, [search, typeFilter, statusFilter, page]);
 
     return (
-        <div className="font-sans">
+        <div className="w-full min-w-0 flex flex-col gap-6 font-sans">
             <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">Trung tâm phê duyệt</h1>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê và khách vãng lai.</p>
                 </div>
             </section>
-            <div className="flex gap-5 items-start">
+            <div className="grid w-full grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
                 {/* LEFT: main content */}
                 <div className="flex-1 min-w-0 space-y-5">
                     {/* Stat cards */}
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {[
                             { label: "Pending Approval", value: stats.pendingCount, sub: "Requests waiting for you", iconBg: "bg-blue-50", icon: <FileCheck2 className="w-7 h-7 text-blue-500" /> },
                             { label: "Approved Today", value: stats.approvedCount, sub: "Requests approved", iconBg: "bg-green-50", icon: <CalendarCheck className="w-7 h-7 text-green-500" /> },
@@ -153,18 +153,18 @@ export default function ApprovalCenter() {
                     </div>
 
                     {/* Search and Filters */}
-                    <div className="flex items-center gap-3">
+                    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <Input
-                                className="pl-11 rounded-xl bg-white"
+                                className="w-full pl-11 rounded-xl bg-white"
                                 placeholder="Search tenant, room, request code, contract code..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
                         <select
-                            className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700 font-medium h-10"
+                            className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
                             value={typeFilter}
                             onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
                         >
@@ -172,7 +172,7 @@ export default function ApprovalCenter() {
                             {Object.keys(TYPE_CONFIG).map(t => <option key={t} value={t}>{translateType(t)}</option>)}
                         </select>
                         <select
-                            className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-gray-700 font-medium h-10"
+                            className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
@@ -183,7 +183,7 @@ export default function ApprovalCenter() {
                         </select>
                         <Button
                             variant="outline"
-                            className="rounded-xl bg-white text-gray-500 hover:text-gray-700 h-10 px-4"
+                            className="h-10 w-full rounded-xl bg-white px-4 text-gray-500 hover:text-gray-700"
                             onClick={() => { setTypeFilter("All Types"); setStatusFilter("Pending"); setSearch(""); }}
                         >
                             Reset

@@ -27,7 +27,10 @@ import {
   fetchMaintenanceTickets,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
-import { fetchViewingProperties, fetchViewingRooms } from "@/services/viewingCustomersService";
+import {
+  fetchViewingProperties,
+  fetchViewingRooms,
+} from "@/services/viewingCustomersService";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_OPTIONS = [
@@ -44,18 +47,33 @@ const STATUS_META = {
   PENDING: ["Chờ tiếp nhận", "bg-amber-50 text-amber-800 ring-amber-200"],
   ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-800 ring-blue-200"],
   IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
-  WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
+  WAITING_CONFIRMATION: [
+    "Chờ xác nhận",
+    "bg-violet-50 text-violet-800 ring-violet-200",
+  ],
+  COMPLETED: [
+    "Hoàn tất xử lý",
+    "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  ],
   REJECTED: ["Từ chối", "bg-rose-50 text-rose-800 ring-rose-200"],
   CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
 const BILLING_META = {
   NO_CHARGE: ["Không thu khách", "bg-slate-100 text-slate-700 ring-slate-200"],
-  NOT_INVOICED: ["Chưa tạo hóa đơn", "bg-amber-50 text-amber-800 ring-amber-200"],
+  NOT_INVOICED: [
+    "Chưa tạo hóa đơn",
+    "bg-amber-50 text-amber-800 ring-amber-200",
+  ],
   DRAFT: ["Chờ phát hành", "bg-blue-50 text-blue-800 ring-blue-200"],
-  PENDING_PAYMENT: ["Chờ thanh toán", "bg-orange-50 text-orange-800 ring-orange-200"],
-  PARTIALLY_PAID: ["Thanh toán một phần", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
+  PENDING_PAYMENT: [
+    "Chờ thanh toán",
+    "bg-orange-50 text-orange-800 ring-orange-200",
+  ],
+  PARTIALLY_PAID: [
+    "Thanh toán một phần",
+    "bg-indigo-50 text-indigo-800 ring-indigo-200",
+  ],
   PAID: ["Đã thanh toán", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
   OVERDUE: ["Quá hạn", "bg-rose-50 text-rose-800 ring-rose-200"],
   VOIDED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
@@ -124,22 +142,32 @@ function formatMoneyInput(value) {
 }
 
 function statusMeta(status) {
-  return STATUS_META[status] || [status || "Không rõ", "bg-slate-100 text-slate-700 ring-slate-200"];
+  return (
+    STATUS_META[status] || [
+      status || "Không rõ",
+      "bg-slate-100 text-slate-700 ring-slate-200",
+    ]
+  );
 }
 
 function StatusBadge({ status }) {
   const [label, className] = statusMeta(status);
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}
+    >
       {label}
     </span>
   );
 }
 
 function BillingBadge({ status, label }) {
-  const [fallbackLabel, className] = BILLING_META[status] || BILLING_META.NO_CHARGE;
+  const [fallbackLabel, className] =
+    BILLING_META[status] || BILLING_META.NO_CHARGE;
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}>
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}
+    >
       {label || fallbackLabel}
     </span>
   );
@@ -147,8 +175,14 @@ function BillingBadge({ status, label }) {
 
 function shouldShowBillingStatus(ticket) {
   if (ticket?.ticketScope === "PROPERTY_OPERATION") return true;
-  const ticketStatus = String(ticket?.ticketStatus || ticket?.status || "").toUpperCase();
-  if (ticketStatus === "PENDING" || ticketStatus === "PENDING_ACCEPTANCE" || ticketStatus === "ACCEPTED") {
+  const ticketStatus = String(
+    ticket?.ticketStatus || ticket?.status || "",
+  ).toUpperCase();
+  if (
+    ticketStatus === "PENDING" ||
+    ticketStatus === "PENDING_ACCEPTANCE" ||
+    ticketStatus === "ACCEPTED"
+  ) {
     return false;
   }
   return Boolean(ticket?.billingStatus);
@@ -156,7 +190,9 @@ function shouldShowBillingStatus(ticket) {
 
 function Field({ label, children, className = "" }) {
   return (
-    <label className={`grid gap-1.5 text-sm font-bold text-[#091426] ${className}`}>
+    <label
+      className={`grid gap-1.5 text-sm font-bold text-[#091426] ${className}`}
+    >
       <span>{label}</span>
       {children}
     </label>
@@ -176,12 +212,15 @@ function textareaClassName() {
 }
 
 function InlineNotice({ type = "info", children }) {
-  const tone = type === "error"
-    ? "border-rose-200 bg-rose-50 text-rose-800"
-    : "border-amber-200 bg-amber-50 text-amber-900";
+  const tone =
+    type === "error"
+      ? "border-rose-200 bg-rose-50 text-rose-800"
+      : "border-amber-200 bg-amber-50 text-amber-900";
   const Icon = type === "error" ? ShieldAlert : AlertCircle;
   return (
-    <div className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${tone}`}>
+    <div
+      className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${tone}`}
+    >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{children}</span>
     </div>
@@ -193,11 +232,15 @@ function Metric({ label, value, icon: Icon, tone }) {
     <article className="min-h-28 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
       <div className="flex items-start justify-between gap-4">
         <p className="text-xs font-black uppercase text-[#64748b]">{label}</p>
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}
+        >
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-4 truncate text-2xl font-black text-[#091426]">{value}</p>
+      <p className="mt-4 truncate text-2xl font-black text-[#091426]">
+        {value}
+      </p>
     </article>
   );
 }
@@ -229,7 +272,8 @@ function buildDefaultViolationForm(propertyId = "") {
     occupantId: "",
     violationType: "RESET_WIFI_PASSWORD",
     amount: formatMoneyInput("200000"),
-    description: "Khách tự ý reset mật khẩu modem/wifi, vi phạm nội quy phòng trọ.",
+    description:
+      "Khách tự ý reset mật khẩu modem/wifi, vi phạm nội quy phòng trọ.",
     collectionMethod: "MONTHLY_SCHEDULED",
     billingPeriod: nextBillingPeriod(),
     occurredAt: new Date().toISOString().slice(0, 10),
@@ -261,7 +305,9 @@ export default function MaintenancePage() {
   const [internalSuccess, setInternalSuccess] = useState("");
   const [isCreatingInternal, setIsCreatingInternal] = useState(false);
   const [isViolationOpen, setIsViolationOpen] = useState(false);
-  const [violationForm, setViolationForm] = useState(buildDefaultViolationForm());
+  const [violationForm, setViolationForm] = useState(
+    buildDefaultViolationForm(),
+  );
   const [violationError, setViolationError] = useState("");
   const [violationSuccess, setViolationSuccess] = useState("");
   const [isCreatingViolation, setIsCreatingViolation] = useState(false);
@@ -273,7 +319,10 @@ export default function MaintenancePage() {
   const propertyOptions = useMemo(() => {
     return properties
       .filter((property) => property?.id)
-      .map((property) => ({ id: String(property.id), name: property.name || `Cơ sở ${property.id}` }));
+      .map((property) => ({
+        id: String(property.id),
+        name: property.name || `Cơ sở ${property.id}`,
+      }));
   }, [properties]);
 
   const roomOptions = useMemo(() => {
@@ -282,23 +331,61 @@ export default function MaintenancePage() {
       .map((room) => ({
         id: String(room.id),
         label: room.roomCode || room.name || `Phòng ${room.id}`,
-        status: String(room.status || room.currentStatus || room.current_status || "").toUpperCase(),
+        status: String(
+          room.status || room.currentStatus || room.current_status || "",
+        ).toUpperCase(),
       }));
   }, [rooms]);
-  const selectedViolationPropertyId = String(violationForm.propertyId || filters.propertyId || propertyOptions[0]?.id || "");
+  const selectedViolationPropertyId = String(
+    violationForm.propertyId ||
+      filters.propertyId ||
+      propertyOptions[0]?.id ||
+      "",
+  );
 
   const metrics = useMemo(() => {
-    const count = (statuses) => tickets.filter((ticket) => statuses.includes(ticket.status)).length;
-    const totalCost = tickets.reduce((sum, ticket) => sum + Number(ticket.costAmount || 0), 0);
+    const count = (statuses) =>
+      tickets.filter((ticket) => statuses.includes(ticket.status)).length;
+    const totalCost = tickets.reduce(
+      (sum, ticket) => sum + Number(ticket.costAmount || 0),
+      0,
+    );
     const landlordCost = tickets
-      .filter((ticket) => String(ticket.payer || "").toUpperCase() === "LANDLORD")
+      .filter(
+        (ticket) => String(ticket.payer || "").toUpperCase() === "LANDLORD",
+      )
       .reduce((sum, ticket) => sum + Number(ticket.costAmount || 0), 0);
     return [
-      { label: "Chờ tiếp nhận", value: count(["PENDING"]), icon: Clock3, tone: "bg-amber-50 text-amber-700" },
-      { label: "Đang xử lý", value: count(["ACCEPTED", "IN_PROGRESS"]), icon: Wrench, tone: "bg-blue-50 text-blue-700" },
-      { label: "Chờ xác nhận", value: count(["WAITING_CONFIRMATION"]), icon: TimerReset, tone: "bg-violet-50 text-violet-700" },
-      { label: "Chi phí ghi nhận", value: formatMoney(totalCost), icon: Check, tone: "bg-emerald-50 text-emerald-700" },
-      { label: "Chi phí chủ trọ chịu", value: formatMoney(landlordCost), icon: Wrench, tone: "bg-slate-100 text-slate-700" },
+      {
+        label: "Chờ tiếp nhận",
+        value: count(["PENDING"]),
+        icon: Clock3,
+        tone: "bg-amber-50 text-amber-700",
+      },
+      {
+        label: "Đang xử lý",
+        value: count(["ACCEPTED", "IN_PROGRESS"]),
+        icon: Wrench,
+        tone: "bg-blue-50 text-blue-700",
+      },
+      {
+        label: "Chờ xác nhận",
+        value: count(["WAITING_CONFIRMATION"]),
+        icon: TimerReset,
+        tone: "bg-violet-50 text-violet-700",
+      },
+      {
+        label: "Chi phí ghi nhận",
+        value: formatMoney(totalCost),
+        icon: Check,
+        tone: "bg-emerald-50 text-emerald-700",
+      },
+      {
+        label: "Chi phí chủ trọ chịu",
+        value: formatMoney(landlordCost),
+        icon: Wrench,
+        tone: "bg-slate-100 text-slate-700",
+      },
     ];
   }, [tickets]);
 
@@ -314,7 +401,12 @@ export default function MaintenancePage() {
     setError("");
     try {
       const keyword = filters.keyword || query || "";
-      const result = await fetchMaintenanceTickets({ ...filters, keyword, page: page - 1, size });
+      const result = await fetchMaintenanceTickets({
+        ...filters,
+        keyword,
+        page: page - 1,
+        size,
+      });
       setTickets(result.tickets);
       setTotalElements(result.total);
       setTotalPages(result.totalPages);
@@ -335,9 +427,21 @@ export default function MaintenancePage() {
       setProperties(data);
       const firstPropertyId = data[0]?.id ? String(data[0].id) : "";
       if (firstPropertyId) {
-        setFilters((current) => current.propertyId ? current : { ...current, propertyId: firstPropertyId });
-        setInternalForm((current) => current.propertyId ? current : buildDefaultInternalForm(firstPropertyId));
-        setViolationForm((current) => current.propertyId ? current : buildDefaultViolationForm(firstPropertyId));
+        setFilters((current) =>
+          current.propertyId
+            ? current
+            : { ...current, propertyId: firstPropertyId },
+        );
+        setInternalForm((current) =>
+          current.propertyId
+            ? current
+            : buildDefaultInternalForm(firstPropertyId),
+        );
+        setViolationForm((current) =>
+          current.propertyId
+            ? current
+            : buildDefaultViolationForm(firstPropertyId),
+        );
       }
     }
 
@@ -376,8 +480,16 @@ export default function MaintenancePage() {
       ...(name === "propertyId" ? { roomId: "" } : {}),
     }));
     if (name === "propertyId") {
-      setInternalForm((current) => ({ ...current, propertyId: value, roomId: "" }));
-      setViolationForm((current) => ({ ...current, propertyId: value, roomId: "" }));
+      setInternalForm((current) => ({
+        ...current,
+        propertyId: value,
+        roomId: "",
+      }));
+      setViolationForm((current) => ({
+        ...current,
+        propertyId: value,
+        roomId: "",
+      }));
     }
   }
 
@@ -385,7 +497,10 @@ export default function MaintenancePage() {
     setInternalForm((current) => ({
       ...current,
       [name]: value,
-      ...(name === "propertyId" || (name === "locationScope" && value === "COMMON_AREA") ? { roomId: "" } : {}),
+      ...(name === "propertyId" ||
+      (name === "locationScope" && value === "COMMON_AREA")
+        ? { roomId: "" }
+        : {}),
     }));
     if (name === "propertyId") updateFilter("propertyId", value);
   }
@@ -396,7 +511,9 @@ export default function MaintenancePage() {
       ...current,
       [name]: nextValue,
       ...(name === "propertyId" ? { roomId: "" } : {}),
-      ...(name === "violationType" && value === "RESET_WIFI_PASSWORD" ? { amount: formatMoneyInput("200000") } : {}),
+      ...(name === "violationType" && value === "RESET_WIFI_PASSWORD"
+        ? { amount: formatMoneyInput("200000") }
+        : {}),
     }));
     if (name === "propertyId") {
       updateFilter("propertyId", value);
@@ -412,8 +529,13 @@ export default function MaintenancePage() {
   }
 
   function handleInternalImageChange(event) {
-    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
-    setInternalForm((current) => ({ ...current, images: [...current.images, ...files].slice(0, 3) }));
+    const files = Array.from(event.target.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    setInternalForm((current) => ({
+      ...current,
+      images: [...current.images, ...files].slice(0, 3),
+    }));
     event.target.value = "";
   }
 
@@ -422,12 +544,18 @@ export default function MaintenancePage() {
     setInternalError("");
     setInternalSuccess("");
     const propertyId = Number(internalForm.propertyId || filters.propertyId);
-    const roomId = internalForm.locationScope === "ROOM" ? Number(internalForm.roomId) : null;
+    const roomId =
+      internalForm.locationScope === "ROOM"
+        ? Number(internalForm.roomId)
+        : null;
     if (!Number.isFinite(propertyId) || propertyId <= 0) {
       setInternalError("Vui lòng chọn cơ sở.");
       return;
     }
-    if (internalForm.locationScope === "ROOM" && (!Number.isFinite(roomId) || roomId <= 0)) {
+    if (
+      internalForm.locationScope === "ROOM" &&
+      (!Number.isFinite(roomId) || roomId <= 0)
+    ) {
       setInternalError("Vui lòng chọn phòng.");
       return;
     }
@@ -437,26 +565,34 @@ export default function MaintenancePage() {
     }
     setIsCreatingInternal(true);
     try {
-      const uploaded = await Promise.all(internalForm.images.map((file) => uploadMaintenanceImage(file)));
+      const uploaded = await Promise.all(
+        internalForm.images.map((file) => uploadMaintenanceImage(file)),
+      );
       await createInternalMaintenanceTicket({
         propertyId,
         roomId,
         ticketScope: "PROPERTY_OPERATION",
         category: internalForm.category,
         priority: internalForm.priority,
-        title: internalForm.title.trim() || `Bảo trì nội bộ - ${CATEGORY_LABELS[internalForm.category] || "Khác"}`,
+        title:
+          internalForm.title.trim() ||
+          `Bảo trì nội bộ - ${CATEGORY_LABELS[internalForm.category] || "Khác"}`,
         description: internalForm.description.trim(),
         actualCost: 0,
         accountingNote: internalForm.accountingNote.trim(),
         costType: "COMMON_OPERATING",
         attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
       });
-      setInternalSuccess("Đã tạo phiếu bảo trì nội bộ. Chi phí được ghi nhận là chủ trọ chịu và không tạo hóa đơn khách thuê.");
+      setInternalSuccess(
+        "Đã tạo phiếu bảo trì nội bộ. Chi phí được ghi nhận là chủ trọ chịu và không tạo hóa đơn khách thuê.",
+      );
       setInternalForm(buildDefaultInternalForm(String(propertyId)));
       setIsInternalOpen(false);
       await loadTickets();
     } catch (createError) {
-      setInternalError(createError?.message || "Không tạo được phiếu bảo trì nội bộ.");
+      setInternalError(
+        createError?.message || "Không tạo được phiếu bảo trì nội bộ.",
+      );
     } finally {
       setIsCreatingInternal(false);
     }
@@ -489,31 +625,43 @@ export default function MaintenancePage() {
 
     setIsCreatingViolation(true);
     try {
-      const uploaded = await Promise.all(violationForm.images.map((file) => uploadMaintenanceImage(file)));
+      const uploaded = await Promise.all(
+        violationForm.images.map((file) => uploadMaintenanceImage(file)),
+      );
       const attachmentIds = uploaded.map((file) => file.fileId).filter(Boolean);
       const result = await createMaintenanceViolation({
         propertyId,
         roomId,
-        occupantId: violationForm.occupantId ? Number(violationForm.occupantId) : null,
+        occupantId: violationForm.occupantId
+          ? Number(violationForm.occupantId)
+          : null,
         violationType: violationForm.violationType,
         amount,
         description: violationForm.description.trim(),
         collectionMethod: violationForm.collectionMethod,
-        billingPeriod: violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? violationForm.billingPeriod : null,
-        includeInMonthlyInvoice: violationForm.collectionMethod === "MONTHLY_SCHEDULED",
-        occurredAt: violationForm.occurredAt || new Date().toISOString().slice(0, 10),
+        billingPeriod:
+          violationForm.collectionMethod === "MONTHLY_SCHEDULED"
+            ? violationForm.billingPeriod
+            : null,
+        includeInMonthlyInvoice:
+          violationForm.collectionMethod === "MONTHLY_SCHEDULED",
+        occurredAt:
+          violationForm.occurredAt || new Date().toISOString().slice(0, 10),
         attachmentIds,
       });
       setViolationSuccess(
         violationForm.collectionMethod === "MONTHLY_SCHEDULED"
           ? `Đã lên lịch gộp vào hóa đơn đầu tháng kỳ ${violationForm.billingPeriod}.`
-          : result?.message || "Đã tạo hóa đơn nháp. Khách thuê chỉ thấy sau khi phát hành."
+          : result?.message ||
+              "Đã tạo hóa đơn nháp. Khách thuê chỉ thấy sau khi phát hành.",
       );
       setViolationForm(buildDefaultViolationForm(String(propertyId)));
       setIsViolationOpen(false);
       await loadTickets();
     } catch (createViolationError) {
-      setViolationError(createViolationError?.message || "Không ghi nhận được vi phạm nội quy.");
+      setViolationError(
+        createViolationError?.message || "Không ghi nhận được vi phạm nội quy.",
+      );
     } finally {
       setIsCreatingViolation(false);
     }
@@ -551,9 +699,12 @@ export default function MaintenancePage() {
     <section className="grid gap-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e]">Báo sự cố & Bảo trì</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e]">
+            Báo sự cố & Bảo trì
+          </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
-            Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất.
+            Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn
+            tất.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -562,20 +713,33 @@ export default function MaintenancePage() {
             onClick={loadTickets}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-[#091426] hover:bg-[#f8fafc]"
           >
-            <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCcw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
             Làm mới
           </button>
           {canManage && (
             <button
               type="button"
               onClick={() => {
-                setInternalForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
+                setInternalForm((current) => ({
+                  ...current,
+                  propertyId:
+                    current.propertyId ||
+                    filters.propertyId ||
+                    propertyOptions[0]?.id ||
+                    "",
+                }));
                 setIsViolationOpen(false);
                 setIsInternalOpen((value) => !value);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
             >
-              {isInternalOpen ? <X className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+              {isInternalOpen ? (
+                <X className="h-4 w-4" />
+              ) : (
+                <Wrench className="h-4 w-4" />
+              )}
               {isInternalOpen ? "Đóng phiếu nội bộ" : "Tạo phiếu nội bộ"}
             </button>
           )}
@@ -583,13 +747,24 @@ export default function MaintenancePage() {
             <button
               type="button"
               onClick={() => {
-                setViolationForm((current) => ({ ...current, propertyId: current.propertyId || filters.propertyId || propertyOptions[0]?.id || "" }));
+                setViolationForm((current) => ({
+                  ...current,
+                  propertyId:
+                    current.propertyId ||
+                    filters.propertyId ||
+                    propertyOptions[0]?.id ||
+                    "",
+                }));
                 setIsInternalOpen(false);
                 setIsViolationOpen((value) => !value);
               }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-4 text-sm font-bold text-white hover:bg-[#971b12]"
             >
-              {isViolationOpen ? <X className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+              {isViolationOpen ? (
+                <X className="h-4 w-4" />
+              ) : (
+                <ShieldAlert className="h-4 w-4" />
+              )}
               {isViolationOpen ? "Đóng vi phạm" : "Ghi nhận vi phạm"}
             </button>
           )}
@@ -602,7 +777,9 @@ export default function MaintenancePage() {
         ))}
       </div>
       <p className="text-xs font-semibold text-[#64748b]">
-        Chi phí ghi nhận là tổng chi phí/phạt đã ghi nhận, không đồng nghĩa đã thanh toán. Xem badge thanh toán trên từng phiếu để biết trạng thái thu tiền.
+        Chi phí ghi nhận là tổng chi phí/phạt đã ghi nhận, không đồng nghĩa đã
+        thanh toán. Xem badge thanh toán trên từng phiếu để biết trạng thái thu
+        tiền.
       </p>
 
       {violationSuccess && <InlineNotice>{violationSuccess}</InlineNotice>}
@@ -615,36 +792,66 @@ export default function MaintenancePage() {
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">Tạo phiếu bảo trì nội bộ</h2>
+              <h2 className="text-lg font-black text-[#091426]">
+                Tạo phiếu bảo trì nội bộ
+              </h2>
               <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và không phát sinh hóa đơn tenant.
+                Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và
+                không phát sinh hóa đơn tenant.
               </p>
             </div>
             <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
               Chi phí nội bộ
             </span>
           </div>
-          {internalError && <InlineNotice type="error">{internalError}</InlineNotice>}
-          <div className={`grid gap-5 ${internalForm.locationScope === "ROOM" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+          {internalError && (
+            <InlineNotice type="error">{internalError}</InlineNotice>
+          )}
+          <div
+            className={`grid gap-5 ${internalForm.locationScope === "ROOM" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          >
             <Field label="Phạm vi *">
-              <select value={internalForm.locationScope} onChange={(event) => updateInternalForm("locationScope", event.target.value)} className={selectClassName()}>
+              <select
+                value={internalForm.locationScope}
+                onChange={(event) =>
+                  updateInternalForm("locationScope", event.target.value)
+                }
+                className={selectClassName()}
+              >
                 <option value="ROOM">Phòng cụ thể</option>
                 <option value="COMMON_AREA">Tài sản/khu vực chung</option>
               </select>
             </Field>
             <Field label="Cơ sở *">
-              <select value={internalForm.propertyId} onChange={(event) => updateInternalForm("propertyId", event.target.value)} className={selectClassName()}>
+              <select
+                value={internalForm.propertyId}
+                onChange={(event) =>
+                  updateInternalForm("propertyId", event.target.value)
+                }
+                className={selectClassName()}
+              >
                 <option value="">Chọn cơ sở</option>
-                {propertyOptions.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
+                {propertyOptions.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.name}
+                  </option>
+                ))}
               </select>
             </Field>
             {internalForm.locationScope === "ROOM" && (
               <Field label="Phòng *">
-                <select value={internalForm.roomId} onChange={(event) => updateInternalForm("roomId", event.target.value)} className={selectClassName()}>
+                <select
+                  value={internalForm.roomId}
+                  onChange={(event) =>
+                    updateInternalForm("roomId", event.target.value)
+                  }
+                  className={selectClassName()}
+                >
                   <option value="">Chọn phòng</option>
                   {roomOptions.map((room) => (
                     <option key={room.id} value={room.id}>
-                      {room.label}{room.status ? ` · ${room.status}` : ""}
+                      {room.label}
+                      {room.status ? ` · ${room.status}` : ""}
                     </option>
                   ))}
                 </select>
@@ -653,35 +860,91 @@ export default function MaintenancePage() {
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             <Field label="Hạng mục *">
-              <select value={internalForm.category} onChange={(event) => updateInternalForm("category", event.target.value)} className={selectClassName()}>
-                {CATEGORY_OPTIONS.slice(1).filter(([value]) => value !== "RULE_VIOLATION").map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
+              <select
+                value={internalForm.category}
+                onChange={(event) =>
+                  updateInternalForm("category", event.target.value)
+                }
+                className={selectClassName()}
+              >
+                {CATEGORY_OPTIONS.slice(1)
+                  .filter(([value]) => value !== "RULE_VIOLATION")
+                  .map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
               </select>
             </Field>
             <Field label="Mức độ">
-              <select value={internalForm.priority} onChange={(event) => updateInternalForm("priority", event.target.value)} className={selectClassName()}>
-                {PRIORITY_OPTIONS.slice(1).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              <select
+                value={internalForm.priority}
+                onChange={(event) =>
+                  updateInternalForm("priority", event.target.value)
+                }
+                className={selectClassName()}
+              >
+                {PRIORITY_OPTIONS.slice(1).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Tiêu đề">
-              <input value={internalForm.title} onChange={(event) => updateInternalForm("title", event.target.value)} className={inputClassName()} placeholder="VD: Sửa điều hòa trước khi cho thuê" />
+              <input
+                value={internalForm.title}
+                onChange={(event) =>
+                  updateInternalForm("title", event.target.value)
+                }
+                className={inputClassName()}
+                placeholder="VD: Sửa điều hòa trước khi cho thuê"
+              />
             </Field>
           </div>
           <div className="grid gap-5 lg:grid-cols-2">
             <Field label="Mô tả sự cố/công việc *">
-              <textarea value={internalForm.description} onChange={(event) => updateInternalForm("description", event.target.value)} className={textareaClassName()} placeholder="Mô tả hiện trạng và công việc cần xử lý" />
+              <textarea
+                value={internalForm.description}
+                onChange={(event) =>
+                  updateInternalForm("description", event.target.value)
+                }
+                className={textareaClassName()}
+                placeholder="Mô tả hiện trạng và công việc cần xử lý"
+              />
             </Field>
             <Field label="Ghi chú kế toán">
-              <textarea value={internalForm.accountingNote} onChange={(event) => updateInternalForm("accountingNote", event.target.value)} className={textareaClassName()} placeholder="Nội dung chi phí, nhà cung cấp hoặc ghi chú chứng từ" />
+              <textarea
+                value={internalForm.accountingNote}
+                onChange={(event) =>
+                  updateInternalForm("accountingNote", event.target.value)
+                }
+                className={textareaClassName()}
+                placeholder="Nội dung chi phí, nhà cung cấp hoặc ghi chú chứng từ"
+              />
             </Field>
           </div>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap gap-3">
               {internalForm.images.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]">
+                <div
+                  key={`${file.name}-${index}`}
+                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]"
+                >
                   <span className="line-clamp-2">{file.name}</span>
-                  <button type="button" onClick={() => setInternalForm((current) => ({ ...current, images: current.images.filter((_, itemIndex) => itemIndex !== index) }))} className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white" aria-label="Xóa ảnh">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setInternalForm((current) => ({
+                        ...current,
+                        images: current.images.filter(
+                          (_, itemIndex) => itemIndex !== index,
+                        ),
+                      }))
+                    }
+                    className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white"
+                    aria-label="Xóa ảnh"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -690,12 +953,26 @@ export default function MaintenancePage() {
                 <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569]">
                   <ImagePlus className="h-5 w-5" />
                   Ảnh/chứng từ
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleInternalImageChange} className="sr-only" />
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handleInternalImageChange}
+                    className="sr-only"
+                  />
                 </label>
               )}
             </div>
-            <button type="submit" disabled={isCreatingInternal} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-5 text-sm font-bold text-white hover:bg-[#115e59] disabled:opacity-60">
-              {isCreatingInternal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            <button
+              type="submit"
+              disabled={isCreatingInternal}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-5 text-sm font-bold text-white hover:bg-[#115e59] disabled:opacity-60"
+            >
+              {isCreatingInternal ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
               Tạo phiếu nội bộ
             </button>
           </div>
@@ -709,39 +986,54 @@ export default function MaintenancePage() {
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">Ghi nhận vi phạm nội quy</h2>
+              <h2 className="text-lg font-black text-[#091426]">
+                Ghi nhận vi phạm nội quy
+              </h2>
               <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là khoản phạt vi phạm nội quy.
+                Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là
+                khoản phạt vi phạm nội quy.
               </p>
             </div>
             <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200">
               Phạt vi phạm nội quy
             </span>
           </div>
-          {violationError && <InlineNotice type="error">{violationError}</InlineNotice>}
+          {violationError && (
+            <InlineNotice type="error">{violationError}</InlineNotice>
+          )}
           <div className="grid gap-4 lg:grid-cols-4">
             <Field label="Cơ sở *">
               <select
                 value={selectedViolationPropertyId}
-                onChange={(event) => updateViolationForm("propertyId", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("propertyId", event.target.value)
+                }
                 className={selectClassName()}
               >
                 <option value="">Chọn cơ sở</option>
                 {propertyOptions.map((property) => (
-                  <option key={property.id} value={property.id}>{property.name}</option>
+                  <option key={property.id} value={property.id}>
+                    {property.name}
+                  </option>
                 ))}
               </select>
             </Field>
             <Field label="Phòng *">
               <select
                 value={violationForm.roomId}
-                onChange={(event) => updateViolationForm("roomId", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("roomId", event.target.value)
+                }
                 disabled={!selectedViolationPropertyId}
                 className={selectClassName()}
               >
-                <option value="">{roomOptions.length > 0 ? "Chọn phòng" : "Chọn cơ sở trước"}</option>
+                <option value="">
+                  {roomOptions.length > 0 ? "Chọn phòng" : "Chọn cơ sở trước"}
+                </option>
                 {roomOptions.map((room) => (
-                  <option key={room.id} value={room.id}>{room.label}</option>
+                  <option key={room.id} value={room.id}>
+                    {room.label}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -756,7 +1048,9 @@ export default function MaintenancePage() {
               <input
                 type="date"
                 value={violationForm.occurredAt}
-                onChange={(event) => updateViolationForm("occurredAt", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("occurredAt", event.target.value)
+                }
                 className={inputClassName()}
               />
             </Field>
@@ -765,16 +1059,22 @@ export default function MaintenancePage() {
             <Field label="Loại vi phạm *">
               <select
                 value={violationForm.violationType}
-                onChange={(event) => updateViolationForm("violationType", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("violationType", event.target.value)
+                }
                 className={selectClassName()}
               >
-                <option value="RESET_WIFI_PASSWORD">Tự ý reset mật khẩu modem/wifi</option>
+                <option value="RESET_WIFI_PASSWORD">
+                  Tự ý reset mật khẩu modem/wifi
+                </option>
               </select>
             </Field>
             <Field label="Số tiền phạt *">
               <input
                 value={violationForm.amount}
-                onChange={(event) => updateViolationForm("amount", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("amount", event.target.value)
+                }
                 className={inputClassName()}
                 inputMode="numeric"
                 placeholder="200000"
@@ -783,11 +1083,15 @@ export default function MaintenancePage() {
             <Field label="Cách thu tiền *">
               <select
                 value={violationForm.collectionMethod}
-                onChange={(event) => updateViolationForm("collectionMethod", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("collectionMethod", event.target.value)
+                }
                 className={selectClassName()}
               >
                 <option value="BILL_NOW">Thanh toán hóa đơn luôn</option>
-                <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
+                <option value="MONTHLY_SCHEDULED">
+                  Gộp vào hóa đơn đầu tháng
+                </option>
               </select>
             </Field>
           </div>
@@ -796,24 +1100,30 @@ export default function MaintenancePage() {
               <input
                 type="month"
                 value={violationForm.billingPeriod}
-                onChange={(event) => updateViolationForm("billingPeriod", event.target.value)}
+                onChange={(event) =>
+                  updateViolationForm("billingPeriod", event.target.value)
+                }
                 className={inputClassName()}
               />
             </Field>
           )}
           {violationForm.collectionMethod === "MONTHLY_SCHEDULED" ? (
             <InlineNotice>
-              Khoản phạt sẽ được lưu chờ gộp vào hóa đơn đầu tháng. Khách thuê chưa thấy khoản này cho đến khi hóa đơn nháp được phát hành.
+              Khoản phạt sẽ được lưu chờ gộp vào hóa đơn đầu tháng. Khách thuê
+              chưa thấy khoản này cho đến khi hóa đơn nháp được phát hành.
             </InlineNotice>
           ) : (
             <InlineNotice>
-              Hóa đơn nháp sẽ được tạo ngay. Khách thuê chỉ thấy hóa đơn và QR sau khi bạn phát hành.
+              Hóa đơn nháp sẽ được tạo ngay. Khách thuê chỉ thấy hóa đơn và QR
+              sau khi bạn phát hành.
             </InlineNotice>
           )}
           <Field label="Mô tả/ghi chú *">
             <textarea
               value={violationForm.description}
-              onChange={(event) => updateViolationForm("description", event.target.value)}
+              onChange={(event) =>
+                updateViolationForm("description", event.target.value)
+              }
               className={textareaClassName()}
               placeholder="Ví dụ: Khách tự ý reset modem wifi trong phòng, làm thay đổi mật khẩu hệ thống."
             />
@@ -821,11 +1131,21 @@ export default function MaintenancePage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap gap-3">
               {violationForm.images.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]">
+                <div
+                  key={`${file.name}-${index}`}
+                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]"
+                >
                   <span className="line-clamp-2">{file.name}</span>
                   <button
                     type="button"
-                    onClick={() => setViolationForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}
+                    onClick={() =>
+                      setViolationForm((current) => ({
+                        ...current,
+                        images: current.images.filter(
+                          (_, fileIndex) => fileIndex !== index,
+                        ),
+                      }))
+                    }
                     className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white"
                     aria-label="Xóa ảnh"
                   >
@@ -837,7 +1157,13 @@ export default function MaintenancePage() {
                 <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569] hover:border-[#091426]">
                   <ImagePlus className="h-5 w-5" />
                   Thêm bằng chứng
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleViolationImageChange} className="sr-only" />
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={handleViolationImageChange}
+                    className="sr-only"
+                  />
                 </label>
               )}
             </div>
@@ -846,7 +1172,11 @@ export default function MaintenancePage() {
               disabled={isCreatingViolation}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-5 text-sm font-bold text-white hover:bg-[#971b12] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isCreatingViolation ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+              {isCreatingViolation ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="h-4 w-4" />
+              )}
               Ghi nhận vi phạm
             </button>
           </div>
@@ -876,35 +1206,69 @@ export default function MaintenancePage() {
           >
             <option value="">Chọn cơ sở</option>
             {propertyOptions.map((property) => (
-              <option key={property.id} value={property.id}>{property.name}</option>
+              <option key={property.id} value={property.id}>
+                {property.name}
+              </option>
             ))}
           </select>
-          <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)} className={selectClassName()}>
+          <select
+            value={filters.status}
+            onChange={(event) => updateFilter("status", event.target.value)}
+            className={selectClassName()}
+          >
             {STATUS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
-          <select value={filters.category} onChange={(event) => updateFilter("category", event.target.value)} className={selectClassName()}>
+          <select
+            value={filters.category}
+            onChange={(event) => updateFilter("category", event.target.value)}
+            className={selectClassName()}
+          >
             {CATEGORY_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
-          <select value={filters.severity} onChange={(event) => updateFilter("severity", event.target.value)} className={selectClassName()}>
+          <select
+            value={filters.severity}
+            onChange={(event) => updateFilter("severity", event.target.value)}
+            className={selectClassName()}
+          >
             {PRIORITY_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
-          <select value={filters.scope} onChange={(event) => updateFilter("scope", event.target.value)} className={selectClassName()}>
+          <select
+            value={filters.scope}
+            onChange={(event) => updateFilter("scope", event.target.value)}
+            className={selectClassName()}
+          >
             {SCOPE_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
         </div>
         {filters.propertyId && (
-          <select value={filters.roomId} onChange={(event) => updateFilter("roomId", event.target.value)} className={`${selectClassName()} max-w-xs`}>
-            <option value="">{roomOptions.length > 0 ? "Tất cả phòng" : "Chưa có phòng"}</option>
+          <select
+            value={filters.roomId}
+            onChange={(event) => updateFilter("roomId", event.target.value)}
+            className={`${selectClassName()} max-w-xs`}
+          >
+            <option value="">
+              {roomOptions.length > 0 ? "Tất cả phòng" : "Chưa có phòng"}
+            </option>
             {roomOptions.map((room) => (
-              <option key={room.id} value={room.id}>{room.label}</option>
+              <option key={room.id} value={room.id}>
+                {room.label}
+              </option>
             ))}
           </select>
         )}
@@ -929,7 +1293,10 @@ export default function MaintenancePage() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-sm font-bold text-[#64748b]">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-sm font-bold text-[#64748b]"
+                  >
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Đang tải danh sách phiếu...
@@ -937,100 +1304,160 @@ export default function MaintenancePage() {
                   </td>
                 </tr>
               )}
-              {!isLoading && tickets.map((ticket) => (
-                <tr key={ticket.id} className="border-t border-[#e2e8f0] align-top">
-                  <td data-label="Phiếu" className="px-5 py-4">
-                    <div className="min-w-0">
-                      <Link href={`/dashboard/maintenance/${ticket.id}`} className="font-black text-[#091426] hover:text-[#3156b6]">
-                        {ticket.ticketCode}
-                      </Link>
-                      <p className="mt-1 max-w-72 truncate text-sm font-semibold text-[#475569]">{ticket.title || ticket.description}</p>
-                    </div>
-                  </td>
-                  <td data-label="Vị trí" className="px-5 py-4 text-sm font-semibold text-[#334155]">
-                    <p>{ticket.roomCode || ticket.roomName || SCOPE_LABELS[ticket.ticketScope] || ticket.ticketScope}</p>
-                    <p className="mt-1 text-xs text-[#64748b]">{ticket.propertyName || "Chưa có cơ sở"}</p>
-                  </td>
-                  <td data-label="Hạng mục" className="px-5 py-4 text-sm font-bold text-[#334155]">
-                    {ticket.ticketScope === "PROPERTY_OPERATION" ? (
-                      <span className="inline-flex flex-col gap-1">
-                        <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
-                          Bảo trì nội bộ
+              {!isLoading &&
+                tickets.map((ticket) => (
+                  <tr
+                    key={ticket.id}
+                    className="border-t border-[#e2e8f0] align-top"
+                  >
+                    <td data-label="Phiếu" className="px-5 py-4">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/dashboard/maintenance/${ticket.id}`}
+                          className="font-black text-[#091426] hover:text-[#3156b6]"
+                        >
+                          {ticket.ticketCode}
+                        </Link>
+                        <p className="mt-1 max-w-72 truncate text-sm font-semibold text-[#475569]">
+                          {ticket.title || ticket.description}
+                        </p>
+                      </div>
+                    </td>
+                    <td
+                      data-label="Vị trí"
+                      className="px-5 py-4 text-sm font-semibold text-[#334155]"
+                    >
+                      <p>
+                        {ticket.roomCode ||
+                          ticket.roomName ||
+                          SCOPE_LABELS[ticket.ticketScope] ||
+                          ticket.ticketScope}
+                      </p>
+                      <p className="mt-1 text-xs text-[#64748b]">
+                        {ticket.propertyName || "Chưa có cơ sở"}
+                      </p>
+                    </td>
+                    <td
+                      data-label="Hạng mục"
+                      className="px-5 py-4 text-sm font-bold text-[#334155]"
+                    >
+                      {ticket.ticketScope === "PROPERTY_OPERATION" ? (
+                        <span className="inline-flex flex-col gap-1">
+                          <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
+                            Bảo trì nội bộ
+                          </span>
+                          <span className="text-xs font-bold text-[#64748b]">
+                            {CATEGORY_LABELS[ticket.category] ||
+                              ticket.category ||
+                              "Khác"}
+                          </span>
                         </span>
-                        <span className="text-xs font-bold text-[#64748b]">{CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"}</span>
-                      </span>
-                    ) : ticket.category === "RULE_VIOLATION" ? (
-                      <span className="inline-flex flex-col gap-1">
-                        <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
-                          Vi phạm nội quy
+                      ) : ticket.category === "RULE_VIOLATION" ? (
+                        <span className="inline-flex flex-col gap-1">
+                          <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
+                            Vi phạm nội quy
+                          </span>
+                          <span className="text-xs font-black text-[#64748b]">
+                            Reset wifi · Phạt vi phạm nội quy
+                          </span>
                         </span>
-                        <span className="text-xs font-black text-[#64748b]">Reset wifi · Phạt vi phạm nội quy</span>
-                      </span>
-                    ) : (
-                      CATEGORY_LABELS[ticket.category] || ticket.category || "Khác"
-                    )}
-                  </td>
-                  <td data-label="Mức độ" className="px-5 py-4 text-sm font-bold text-[#334155]">
-                    {PRIORITY_LABELS[ticket.priority] || ticket.priority || "Trung bình"}
-                  </td>
-                  <td data-label="Trạng thái" className="px-5 py-4">
-                    <div className="flex flex-col items-start gap-1.5">
-                      <StatusBadge status={ticket.ticketStatus || ticket.status} />
-                      {shouldShowBillingStatus(ticket) && (
-                        <BillingBadge status={ticket.billingStatus} label={ticket.billingStatusLabel} />
+                      ) : (
+                        CATEGORY_LABELS[ticket.category] ||
+                        ticket.category ||
+                        "Khác"
                       )}
-                      {ticket.ticketScope === "PROPERTY_OPERATION" && (
-                        <>
-                          <span className="text-xs font-black text-teal-700">Chi phí nội bộ · Chủ trọ chịu</span>
-                          <span className="text-xs font-bold text-[#475569]">{formatMoney(ticket.costAmount)}</span>
-                        </>
-                      )}
-                      {ticket.invoiceCode && (
-                        <span className="text-xs font-bold text-[#64748b]">{ticket.invoiceCode}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td data-label="Cập nhật" className="px-5 py-4 text-sm font-semibold text-[#475569]">
-                    {formatDateTime(ticket.updatedAt || ticket.createdAt)}
-                  </td>
-                  <td data-label="Thao tác" className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/dashboard/maintenance/${ticket.id}`}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-[#475569] hover:border-[#091426] hover:text-[#091426]"
-                        aria-label={`Xem ${ticket.ticketCode}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                      {canManage && ticket.status === "PENDING" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleApprove(ticket.id)}
-                            disabled={Boolean(actionLoading)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
-                            aria-label="Tiếp nhận"
-                          >
-                            {actionLoading === `approve-${ticket.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDecline(ticket.id)}
-                            disabled={Boolean(actionLoading)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-                            aria-label="Từ chối"
-                          >
-                            {actionLoading === `decline-${ticket.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td
+                      data-label="Mức độ"
+                      className="px-5 py-4 text-sm font-bold text-[#334155]"
+                    >
+                      {PRIORITY_LABELS[ticket.priority] ||
+                        ticket.priority ||
+                        "Trung bình"}
+                    </td>
+                    <td data-label="Trạng thái" className="px-5 py-4">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <StatusBadge
+                          status={ticket.ticketStatus || ticket.status}
+                        />
+                        {shouldShowBillingStatus(ticket) && (
+                          <BillingBadge
+                            status={ticket.billingStatus}
+                            label={ticket.billingStatusLabel}
+                          />
+                        )}
+                        {ticket.ticketScope === "PROPERTY_OPERATION" && (
+                          <>
+                            <span className="text-xs font-black text-teal-700">
+                              Chi phí nội bộ · Chủ trọ chịu
+                            </span>
+                            <span className="text-xs font-bold text-[#475569]">
+                              {formatMoney(ticket.costAmount)}
+                            </span>
+                          </>
+                        )}
+                        {ticket.invoiceCode && (
+                          <span className="text-xs font-bold text-[#64748b]">
+                            {ticket.invoiceCode}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td
+                      data-label="Cập nhật"
+                      className="px-5 py-4 text-sm font-semibold text-[#475569]"
+                    >
+                      {formatDateTime(ticket.updatedAt || ticket.createdAt)}
+                    </td>
+                    <td data-label="Thao tác" className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <Link
+                          href={`/dashboard/maintenance/${ticket.id}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-[#475569] hover:border-[#091426] hover:text-[#091426]"
+                          aria-label={`Xem ${ticket.ticketCode}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                        {canManage && ticket.status === "PENDING" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleApprove(ticket.id)}
+                              disabled={Boolean(actionLoading)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                              aria-label="Tiếp nhận"
+                            >
+                              {actionLoading === `approve-${ticket.id}` ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDecline(ticket.id)}
+                              disabled={Boolean(actionLoading)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                              aria-label="Từ chối"
+                            >
+                              {actionLoading === `decline-${ticket.id}` ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               {!isLoading && tickets.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-sm font-bold text-[#64748b]">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-sm font-bold text-[#64748b]"
+                  >
                     Không có phiếu bảo trì phù hợp.
                   </td>
                 </tr>

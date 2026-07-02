@@ -586,7 +586,7 @@ export default function DepositsPage() {
 
   return (
     <>
-      <section className="grid gap-6">
+      <section className="w-full min-w-0 flex flex-col gap-6">
         <header>
           <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sÃ¡ch há»£p Ä‘á»“ng Ä‘áº·t cá»c</h1>
           <p className="mt-2 text-sm font-semibold text-[#6b7280]">
@@ -612,7 +612,7 @@ export default function DepositsPage() {
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-          <div className="grid gap-4 xl:grid-cols-3 xl:items-end">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <label className="grid gap-2">
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">TÃªn khÃ¡ch hÃ ng</span>
               <span className="relative">
@@ -630,7 +630,7 @@ export default function DepositsPage() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
                 {STATUS_OPTIONS.map((status) => (
@@ -643,7 +643,7 @@ export default function DepositsPage() {
               <select
                 value={floorFilter}
                 onChange={(event) => setFloorFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Táº¥t cáº£ táº§ng</option>
                 {floorOptions.map((floor) => (

@@ -185,7 +185,7 @@ export default function UtilityManagement() {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-gray-50 items-center justify-center">
+            <div className="flex min-h-[320px] w-full items-center justify-center bg-gray-50">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
         );
@@ -207,12 +207,8 @@ export default function UtilityManagement() {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
-            {/* Main */}
-            <div className="flex-1 flex flex-col">
-
-                {/* Content */}
-                <main className="flex-1">
+        <div className="w-full min-w-0 overflow-x-hidden bg-gray-50 font-sans">
+            <div className="flex w-full min-w-0 flex-col gap-6">
                     {/* Page header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <div>
@@ -610,7 +606,6 @@ export default function UtilityManagement() {
                             </div>
                         </div>
                     </div>
-                </main>
             </div>
         </div>
     );

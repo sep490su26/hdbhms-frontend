@@ -1,18 +1,20 @@
 import { API_BASE_URL, authenticatedFetch, getAuthToken } from "@/services/identityAccessService";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
-const toArray = (value) => {
-  if (Array.isArray(value)) return value;
-  if (Array.isArray(value?.content)) return value.content;
-  if (Array.isArray(value?.items)) return value.items;
-  return [];
-};
-
-export async function fetchTenantProfiles() {
-  const data = await authenticatedFetch(`${API_BASE_URL}/tenant-profiles`, {
+export async function fetchTenantProfiles({ page = 0, size = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  });
+  const data = await authenticatedFetch(`${API_BASE_URL}/tenant-profiles?${params.toString()}`, {
     method: "GET",
   });
 
-  return toArray(data);
+  const items = readPageItems(data);
+  return {
+    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    items,
+  };
 }
 
 export async function fetchMyTenantProfile() {

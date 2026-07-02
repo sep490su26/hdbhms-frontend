@@ -28,6 +28,7 @@ import {
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import { fetchViewingProperties, fetchViewingRooms } from "@/services/viewingCustomersService";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_OPTIONS = [
   ["all", "Tất cả trạng thái"],
@@ -264,6 +265,10 @@ export default function MaintenancePage() {
   const [violationError, setViolationError] = useState("");
   const [violationSuccess, setViolationSuccess] = useState("");
   const [isCreatingViolation, setIsCreatingViolation] = useState(false);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const propertyOptions = useMemo(() => {
     return properties
@@ -300,6 +305,8 @@ export default function MaintenancePage() {
   const loadTickets = useCallback(async () => {
     if (!filters.propertyId) {
       setTickets([]);
+      setTotalElements(0);
+      setTotalPages(1);
       setIsLoading(false);
       return;
     }
@@ -307,15 +314,17 @@ export default function MaintenancePage() {
     setError("");
     try {
       const keyword = filters.keyword || query || "";
-      const result = await fetchMaintenanceTickets({ ...filters, keyword });
+      const result = await fetchMaintenanceTickets({ ...filters, keyword, page: page - 1, size });
       setTickets(result.tickets);
+      setTotalElements(result.total);
+      setTotalPages(result.totalPages);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách phiếu bảo trì.");
       setTickets([]);
     } finally {
       setIsLoading(false);
     }
-  }, [filters, query]);
+  }, [filters, page, query, size]);
 
   useEffect(() => {
     let isMounted = true;
@@ -360,6 +369,7 @@ export default function MaintenancePage() {
   }, [loadTickets]);
 
   function updateFilter(name, value) {
+    setPage(1);
     setFilters((current) => ({
       ...current,
       [name]: value,
@@ -1028,6 +1038,18 @@ export default function MaintenancePage() {
             </tbody>
           </table>
         </div>
+        <DashboardPagination
+          page={page}
+          size={size}
+          totalElements={totalElements}
+          totalPages={totalPages}
+          itemLabel="phiếu"
+          onPageChange={setPage}
+          onSizeChange={(nextSize) => {
+            setSize(nextSize);
+            setPage(1);
+          }}
+        />
       </section>
     </section>
   );

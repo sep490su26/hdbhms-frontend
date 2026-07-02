@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 export { API_BASE_URL };
 
@@ -253,14 +254,22 @@ function normalizeTenantAccountCandidate(item = {}) {
 }
 
 function normalizeTenantAccountCandidates(data) {
-    return Array.isArray(data) ? data.map(normalizeTenantAccountCandidate) : [];
+    return readPageItems(data).map(normalizeTenantAccountCandidate);
 }
 
-export async function fetchTenantAccountCandidates() {
-    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
+export async function fetchTenantAccountCandidates({ page = 0, size = 10 } = {}) {
+    const params = new URLSearchParams({
+        page: String(page),
+        size: String(size),
+    });
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates?${params.toString()}`, {
         method: "GET",
     });
-    return normalizeTenantAccountCandidates(data);
+    const items = normalizeTenantAccountCandidates(data);
+    return {
+        ...normalizePageResponse(data, { page: page + 1, size, items }),
+        items,
+    };
 }
 
 export async function sendTenantAccountCredentials(contractId, { retry = false } = {}) {

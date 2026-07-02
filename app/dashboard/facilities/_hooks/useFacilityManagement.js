@@ -40,7 +40,7 @@ function validateFacility(values, facilities, editingId) {
   return errors;
 }
 
-export function useFacilityManagement({ keyword = "", status = "" } = {}) {
+export function useFacilityManagement({ keyword = "", status = "", page = 1, size = 10 } = {}) {
   const [facilities, setFacilities] = useState([]);
   const [summary, setSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,6 +56,12 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
   const [statusFlow, setStatusFlow] = useState(null);
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [pagination, setPagination] = useState({
+    page,
+    size,
+    totalElements: 0,
+    totalPages: 1,
+  });
 
   const pushToast = useCallback((message, tone = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -74,9 +80,15 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
     setIsLoading(true);
     setError("");
     try {
-      const data = await getFacilitiesDashboard({ keyword, status });
+      const data = await getFacilitiesDashboard({ keyword, status, page: page - 1, size });
       setFacilities(data.facilities);
       setSummary(data.summary);
+      setPagination({
+        page: data.pagination?.page ?? page,
+        size: data.pagination?.size ?? size,
+        totalElements: data.pagination?.totalElements ?? data.facilities.length,
+        totalPages: data.pagination?.totalPages ?? 1,
+      });
     } catch (err) {
       setFacilities([]);
       setSummary(null);
@@ -84,7 +96,7 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, status]);
+  }, [keyword, page, size, status]);
 
   useEffect(() => {
     void Promise.resolve().then(retry);
@@ -258,6 +270,7 @@ export function useFacilityManagement({ keyword = "", status = "" } = {}) {
 
   return {
     facilities,
+    pagination,
     stats,
     isLoading,
     error,

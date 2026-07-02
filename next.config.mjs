@@ -55,6 +55,8 @@ if (configuredApiBaseUrl) {
 const nextConfig = {
   /* config options here */
   allowedDevOrigins: ['10.0.2.2'],
+  // scripts/dev.mjs sets .next-dev to isolate Webpack dev output from the default .next build cache.
+  // Direct Next.js commands keep the documented .next default. Bundler selection is done via --webpack.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   reactCompiler: true,
   images: {

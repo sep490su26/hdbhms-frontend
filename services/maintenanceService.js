@@ -1,5 +1,6 @@
 import { ApiError, getAuthToken } from "@/services/identityAccessService";
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 
@@ -247,9 +248,15 @@ export async function createInternalMaintenanceTicket(payload) {
   }));
 }
 
-export async function fetchInternalMaintenanceCosts() {
-  const rows = await request("/maintenance/tickets/internal-costs");
-  return (Array.isArray(rows) ? rows : []).map((item) => ({
+export async function fetchInternalMaintenanceCosts({ page = 0, size = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
+  const data = await request(`/maintenance/tickets/internal-costs?${params.toString()}`);
+  const rows = readPageItems(data);
+  const items = rows.map((item) => ({
     ticketId: readField(item, "ticketId", "ticket_id"),
     ticketCode: readField(item, "ticketCode", "ticket_code") || "",
     propertyId: readField(item, "propertyId", "property_id"),
@@ -264,6 +271,10 @@ export async function fetchInternalMaintenanceCosts() {
     accountingNote: readField(item, "accountingNote", "accounting_note") || "",
     recordedAt: readField(item, "recordedAt", "recorded_at"),
   }));
+  return {
+    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    items,
+  };
 }
 
 export async function createMaintenanceViolation(payload) {

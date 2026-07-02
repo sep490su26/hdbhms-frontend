@@ -5,6 +5,7 @@ import {
   getAuthToken,
   refreshTokenApi,
 } from "@/services/identityAccessService";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 function authHeaders(extraHeaders = {}) {
   const token = getAuthToken();
@@ -13,6 +14,62 @@ function authHeaders(extraHeaders = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extraHeaders,
   };
+}
+
+function toDatePart(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function formatHdtFilenameDate(value) {
+  const datePart = toDatePart(value);
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "Chua-Ro-Ngay";
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
+function withRoomPrefix(roomCode) {
+  if (roomCode.startsWith("Phong")) return roomCode;
+  if (/^p/i.test(roomCode)) return `P${roomCode.slice(1)}`;
+  return `P${roomCode}`;
+}
+
+export function buildLeaseContractDocumentFilename(item = {}) {
+  const roomCode = withRoomPrefix(sanitizeFilenamePart(
+    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
+    "Phong-X",
+  ));
+  const date = formatHdtFilenameDate(
+    item.startDate ?? item.start_date ?? item.expectedLeaseSignDate ?? item.expected_lease_sign_date,
+  );
+
+  return `HDT_${roomCode}_${date}.pdf`;
+}
+
+const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME = buildLeaseContractDocumentFilename();
+
+function extractFilenameFromContentDisposition(headerValue) {
+  if (!headerValue) return "";
+
+  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (filenameStarMatch?.[1]) {
+    const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  const filenameMatch = headerValue.match(/filename\s*=\s*("[^"]+"|[^;]+)/i);
+  if (!filenameMatch?.[1]) return "";
+  return filenameMatch[1].trim().replace(/^"|"$/g, "");
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -126,6 +183,24 @@ export function normalizeLeaseContractItem(item = {}) {
       item.contractFile?.uploadedAt ??
       item.contract_file?.uploaded_at ??
       null,
+    signedFileId:
+      item.signedFileId ??
+      item.signed_file_id ??
+      item.signedFile?.id ??
+      item.signed_file?.id ??
+      null,
+    signedFileName:
+      item.signedFileName ??
+      item.signed_file_name ??
+      item.signedFile?.fileName ??
+      item.signed_file?.file_name ??
+      null,
+    signedFileUploadedAt:
+      item.signedFileUploadedAt ??
+      item.signed_file_uploaded_at ??
+      item.signedFile?.uploadedAt ??
+      item.signed_file?.uploaded_at ??
+      null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
     accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
@@ -153,14 +228,23 @@ export function normalizeLeaseContractItem(item = {}) {
 }
 
 function normalizeLeaseContractList(data) {
-  return Array.isArray(data) ? data.map(normalizeLeaseContractItem) : [];
+  return readPageItems(data).map(normalizeLeaseContractItem);
 }
 
-export async function fetchLeaseContractManagementList() {
-  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management`, {
+export async function fetchLeaseContractManagementList({ page = 0, size = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "signedAt,desc",
+  });
+  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management?${params.toString()}`, {
     method: "GET",
   });
-  return normalizeLeaseContractList(data);
+  const items = normalizeLeaseContractList(data);
+  return {
+    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    items,
+  };
 }
 
 export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
@@ -174,7 +258,7 @@ export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
   return normalizeLeaseContractItem(data);
 }
 
-export async function uploadSignedLeaseContractFile(contract, file) {
+export async function uploadSignedLeaseContractFile(contract, file, options = {}) {
   if (!contract) {
     throw new Error("Vui lòng chọn hợp đồng cần upload.");
   }
@@ -183,16 +267,19 @@ export async function uploadSignedLeaseContractFile(contract, file) {
   }
 
   const target = normalizeLeaseContractItem(contract);
-  if (!target.leaseContractId && !target.depositAgreementId) {
-    throw new Error("Không xác định được mã cọc hoặc mã hợp đồng để upload file.");
+  if (!target.leaseContractId) {
+    throw new Error("Hợp đồng thuê chưa được tạo. Vui lòng tạo hợp đồng thuê trước khi upload file đã ký.");
   }
 
   const formData = new FormData();
   formData.append("file", file);
 
-  const endpoint = target.leaseContractId
-    ? `${API_BASE_URL}/lease-contracts/${encodeURIComponent(target.leaseContractId)}/signed-file`
-    : `${API_BASE_URL}/lease-contracts/management/deposits/${encodeURIComponent(target.depositAgreementId)}/signed-file`;
+  const replace = options.replace ?? Boolean(target.signedFileId);
+  const params = new URLSearchParams();
+  if (replace) params.set("replace", "true");
+
+  const query = params.toString();
+  const endpoint = `${API_BASE_URL}/lease-contracts/${encodeURIComponent(target.leaseContractId)}/signed-file${query ? `?${query}` : ""}`;
 
   const response = await fetchWithAuth(endpoint, {
     method: "POST",
@@ -299,7 +386,7 @@ async function fetchPrivateFileBlob(fileId) {
   return response.blob();
 }
 
-export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
+export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
   if (!leaseContractId) {
     throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c há»£p Ä‘á»“ng cáº§n táº£i.");
   }
@@ -312,15 +399,69 @@ export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
     throw new Error("KhÃ´ng thá»ƒ táº£i PDF há»£p Ä‘á»“ng.");
   }
 
-  return response.blob();
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
 }
 
-export async function downloadLeaseContractDraftPdf(leaseContractId, filename = "hop-dong-thue.pdf") {
-  const blob = await fetchLeaseContractDraftPdfBlob(leaseContractId);
+export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
+  const file = await fetchLeaseContractDraftPdfFile(leaseContractId);
+  return file.blob;
+}
+
+export async function downloadLeaseContractDraftPdf(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
+  const { blob, filename: serverFilename } = await fetchLeaseContractDraftPdfFile(leaseContractId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = serverFilename || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function fetchLeaseContractSignedFile(leaseContractId) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng thuê cần tải.");
+  }
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/signed-file`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("Không thể tải hợp đồng thuê đã ký.");
+  }
+
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchLeaseContractSignedFileBlob(leaseContractId) {
+  const file = await fetchLeaseContractSignedFile(leaseContractId);
+  return file.blob;
+}
+
+export async function downloadLeaseContractSignedFile(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
+  const { blob, filename: serverFilename } = await fetchLeaseContractSignedFile(leaseContractId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = serverFilename || filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -349,7 +490,7 @@ export async function openLeaseContractFile(fileId) {
   }
 }
 
-export async function downloadLeaseContractFile(fileId, filename = "hop-dong-thue.pdf") {
+export async function downloadLeaseContractFile(fileId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
   const blob = await fetchPrivateFileBlob(fileId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -378,6 +519,15 @@ function normalizeLeaseContractDetails(details = {}) {
         id: rawContractFile.id ?? rawContractFile.fileId ?? rawContractFile.file_id ?? null,
         fileName: rawContractFile.fileName ?? rawContractFile.file_name ?? rawContractFile.name ?? null,
         uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
+      }
+    : null;
+  const rawSignedFile = details.signedFile ?? details.signed_file ?? null;
+  const signedFile = rawSignedFile
+    ? {
+        ...rawSignedFile,
+        id: rawSignedFile.id ?? rawSignedFile.fileId ?? rawSignedFile.file_id ?? null,
+        fileName: rawSignedFile.fileName ?? rawSignedFile.file_name ?? rawSignedFile.name ?? null,
+        uploadedAt: rawSignedFile.uploadedAt ?? rawSignedFile.uploaded_at ?? rawSignedFile.createdAt ?? rawSignedFile.created_at ?? null,
       }
     : null;
   const rawPrimaryTenant = details.primaryTenant ?? details.primary_tenant ?? {};
@@ -449,6 +599,21 @@ function normalizeLeaseContractDetails(details = {}) {
       details.occupant_count ??
       (Array.isArray(rawOccupants) ? rawOccupants.length : null),
     status: details.status ?? null,
+    signedFileId:
+      details.signedFileId ??
+      details.signed_file_id ??
+      signedFile?.id ??
+      null,
+    signedFileName:
+      details.signedFileName ??
+      details.signed_file_name ??
+      signedFile?.fileName ??
+      null,
+    signedFileUploadedAt:
+      details.signedFileUploadedAt ??
+      details.signed_file_uploaded_at ??
+      signedFile?.uploadedAt ??
+      null,
     signedAt: details.signedAt ?? details.signed_at ?? null,
     previousContractId: details.previousContractId ?? details.previous_contract_id ?? null,
     previousContractCode: details.previousContractCode ?? details.previous_contract_code ?? null,
@@ -489,6 +654,7 @@ function normalizeLeaseContractDetails(details = {}) {
     property: details.property ?? {},
     primaryTenant,
     contractFile,
+    signedFile,
     occupants: Array.isArray(rawOccupants)
       ? rawOccupants.map((occupant) => ({
           ...occupant,

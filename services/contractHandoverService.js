@@ -40,6 +40,67 @@ async function readErrorMessage(response, fallbackMessage) {
   return payload.message || payload.details || fallbackMessage;
 }
 
+function extractFilenameFromContentDisposition(headerValue) {
+  if (!headerValue) return "";
+
+  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (filenameStarMatch?.[1]) {
+    const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  const filenameMatch = headerValue.match(/filename\s*=\s*("[^"]+"|[^;]+)/i);
+  if (!filenameMatch?.[1]) return "";
+  return filenameMatch[1].trim().replace(/^"|"$/g, "");
+}
+
+function toDatePart(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function formatBbbgFilenameDate(value) {
+  const datePart = toDatePart(value);
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "Chua-Ro-Ngay";
+  return `${match[3]}_${match[2]}_${match[1]}`;
+}
+
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
+function withRoomPrefix(roomCode) {
+  if (roomCode.startsWith("Phong")) return roomCode;
+  if (/^p/i.test(roomCode)) return `P${roomCode.slice(1)}`;
+  return `P${roomCode}`;
+}
+
+export function buildHandoverDocumentFilename(item = {}) {
+  const roomCode = withRoomPrefix(sanitizeFilenamePart(
+    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
+    "Phong-X",
+  ));
+  const date = formatBbbgFilenameDate(
+    item.handoverDate ??
+      item.handover_date ??
+      item.startDate ??
+      item.start_date ??
+      item.expectedMoveInDate ??
+      item.expected_move_in_date,
+  );
+
+  return `${roomCode}_BBBG_${date}.pdf`;
+}
+
+const DEFAULT_HANDOVER_DOCUMENT_FILENAME = buildHandoverDocumentFilename();
+
 /**
  * Uploads a file to the generic file endpoint and returns the file metadata
  */
@@ -124,7 +185,7 @@ export async function uploadHandoverDocument(contractId, file, handoverType = "M
 
 export const uploadHandoverSignedDocument = uploadHandoverDocument;
 
-export async function fetchHandoverDraftPdfBlob(contractId, handoverType = "MOVE_IN") {
+export async function fetchHandoverDraftPdfFile(contractId, handoverType = "MOVE_IN") {
   if (!contractId) throw new Error("Missing contractId");
 
   const response = await fetchWithAuth(
@@ -136,19 +197,76 @@ export async function fetchHandoverDraftPdfBlob(contractId, handoverType = "MOVE
     throw new Error(await readErrorMessage(response, "Unable to download handover draft PDF."));
   }
 
-  return response.blob();
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchHandoverDraftPdfBlob(contractId, handoverType = "MOVE_IN") {
+  const file = await fetchHandoverDraftPdfFile(contractId, handoverType);
+  return file.blob;
 }
 
 export async function downloadHandoverDraftPdf(
   contractId,
   handoverType = "MOVE_IN",
-  filename = "bien-ban-ban-giao.pdf",
+  filename = DEFAULT_HANDOVER_DOCUMENT_FILENAME,
 ) {
-  const blob = await fetchHandoverDraftPdfBlob(contractId, handoverType);
+  const { blob, filename: serverFilename } = await fetchHandoverDraftPdfFile(contractId, handoverType);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = serverFilename || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function fetchHandoverSignedPdfFile(contractId, handoverType = "MOVE_IN") {
+  if (!contractId) throw new Error("Missing contractId");
+
+  const response = await fetchWithAuth(
+    `${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/signed-pdf?type=${encodeURIComponent(handoverType)}`,
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Unable to download signed handover PDF."));
+  }
+
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchHandoverSignedPdfBlob(contractId, handoverType = "MOVE_IN") {
+  const file = await fetchHandoverSignedPdfFile(contractId, handoverType);
+  return file.blob;
+}
+
+export async function downloadHandoverSignedPdf(
+  contractId,
+  handoverType = "MOVE_IN",
+  filename = DEFAULT_HANDOVER_DOCUMENT_FILENAME,
+) {
+  const { blob, filename: serverFilename } = await fetchHandoverSignedPdfFile(contractId, handoverType);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = serverFilename || filename;
   document.body.appendChild(link);
   link.click();
   link.remove();

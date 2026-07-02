@@ -20,6 +20,7 @@ import {
   sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const ALL_VALUE = "Tất cả";
 
@@ -289,39 +290,32 @@ export default function AccountsPage() {
   const [sendingContractId, setSendingContractId] = useState(null);
   const [disablingKey, setDisablingKey] = useState(null);
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchTenantAccountCandidates();
-      setItems(data);
+      const data = await fetchTenantAccountCandidates({ page: page - 1, size });
+      setItems(data.items);
+      setTotalElements(data.totalElements);
+      setTotalPages(data.totalPages);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, size]);
 
   useEffect(() => {
-    let active = true;
-    const loadInitialData = async () => {
-      try {
-        const data = await fetchTenantAccountCandidates();
-        if (active) setItems(data);
-      } catch (loadError) {
-        if (active) setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void loadInitialData();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadData]);
 
   const propertyOptions = useMemo(
     () => [ALL_VALUE, ...Array.from(new Set(items.map((item) => item.propertyName).filter(Boolean)))],
@@ -670,6 +664,18 @@ export default function AccountsPage() {
             })}
           </div>
         )}
+        <DashboardPagination
+          page={page}
+          size={size}
+          totalElements={totalElements}
+          totalPages={totalPages}
+          itemLabel="khách thuê"
+          onPageChange={setPage}
+          onSizeChange={(nextSize) => {
+            setSize(nextSize);
+            setPage(1);
+          }}
+        />
       </section>
     </div>
   );

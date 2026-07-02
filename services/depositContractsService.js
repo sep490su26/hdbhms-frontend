@@ -57,6 +57,65 @@ async function readEnvelope(response, fallbackMessage) {
   return payload.data ?? null;
 }
 
+function extractFilenameFromContentDisposition(headerValue) {
+  if (!headerValue) return "";
+
+  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (filenameStarMatch?.[1]) {
+    const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  const filenameMatch = headerValue.match(/filename\s*=\s*("[^"]+"|[^;]+)/i);
+  if (!filenameMatch?.[1]) return "";
+  return filenameMatch[1].trim().replace(/^"|"$/g, "");
+}
+
+function toDatePart(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function formatHdcFilenameDate(value) {
+  const datePart = toDatePart(value);
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "Chua-Ro-Ngay";
+  return `${match[3]}_${match[2]}_${match[1]}`;
+}
+
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
+function withRoomPrefix(roomCode) {
+  if (roomCode.startsWith("Phong")) return roomCode;
+  if (/^p/i.test(roomCode)) return `P${roomCode.slice(1)}`;
+  return `P${roomCode}`;
+}
+
+export function buildDepositContractDocumentFilename(item = {}) {
+  const roomCode = withRoomPrefix(sanitizeFilenamePart(
+    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
+    "Phong-X",
+  ));
+  const date = formatHdcFilenameDate(
+    item.expectedMoveInDate ??
+      item.expected_move_in_date ??
+      item.startDate ??
+      item.start_date ??
+      item.expectedLeaseSignDate ??
+      item.expected_lease_sign_date,
+  );
+
+  return `${roomCode}_HDC_${date}.pdf`;
+}
+
 function normalizeDepositContractPreviewMetadata(metadata = {}) {
   return {
     roomId: metadata?.roomId ?? null,
@@ -172,7 +231,7 @@ export async function updateDepositAgreementManagementInfo(depositAgreementId, p
   return readEnvelope(response, "Không thể cập nhật thông tin hợp đồng cọc.");
 }
 
-export async function fetchDepositContractBlob(depositAgreementId) {
+export async function fetchDepositContractFile(depositAgreementId) {
   if (!depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
@@ -191,7 +250,20 @@ export async function fetchDepositContractBlob(depositAgreementId) {
     throw new Error("Không thể tải hợp đồng đặt cọc.");
   }
 
-  return response.blob();
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchDepositContractBlob(depositAgreementId) {
+  const file = await fetchDepositContractFile(depositAgreementId);
+  return file.blob;
 }
 
 export async function fetchSignedDepositContractBlob(depositAgreementId) {
@@ -307,11 +379,11 @@ export async function openDepositContractByPaymentPdf(paymentIntentId, paymentCo
 }
 
 export async function downloadDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc.pdf") {
-  const blob = await fetchDepositContractBlob(depositAgreementId);
+  const { blob, filename: serverFilename } = await fetchDepositContractFile(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = serverFilename || filename;
   document.body.appendChild(link);
   link.click();
   link.remove();

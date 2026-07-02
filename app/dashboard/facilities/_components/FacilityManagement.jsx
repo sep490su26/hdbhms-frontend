@@ -18,6 +18,7 @@ import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { facilityStatusOptions } from "@/services/facilityService";
 
 const statCards = [
@@ -123,7 +124,19 @@ function FacilityErrorState({ message, onRetry }) {
 export function FacilityManagement() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const facility = useFacilityManagement({ keyword: query, status: statusFilter });
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const facility = useFacilityManagement({ keyword: query, status: statusFilter, page, size });
+
+  function updateQuery(value) {
+    setQuery(value);
+    setPage(1);
+  }
+
+  function updateStatus(value) {
+    setStatusFilter(value);
+    setPage(1);
+  }
 
   return (
     <>
@@ -183,14 +196,14 @@ export function FacilityManagement() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8490a3]" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => updateQuery(event.target.value)}
               placeholder="Tìm theo tên, mã hoặc địa chỉ cơ sở..."
               className="h-10 w-full rounded-lg border border-[#cbd3df] bg-[#f8fafc] pl-10 pr-4 text-sm font-medium text-[#091426] outline-none transition focus:border-[#091426] focus:bg-white focus:ring-2 focus:ring-[#091426]/10"
             />
           </label>
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(event) => updateStatus(event.target.value)}
             className="h-10 rounded-lg border border-[#cbd3df] bg-white px-3 text-sm font-bold text-[#243047] outline-none focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
             aria-label="Lọc trạng thái cơ sở"
           >
@@ -210,6 +223,18 @@ export function FacilityManagement() {
         facilities={facility.facilities}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
+      />
+      <DashboardPagination
+        page={page}
+        size={size}
+        totalElements={facility.pagination.totalElements}
+        totalPages={facility.pagination.totalPages}
+        itemLabel="cơ sở"
+        onPageChange={setPage}
+        onSizeChange={(nextSize) => {
+          setSize(nextSize);
+          setPage(1);
+        }}
       />
       <FacilityFormDialog
         formState={facility.formState}

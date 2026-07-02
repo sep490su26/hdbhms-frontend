@@ -3,6 +3,7 @@
 import {useState, useEffect} from "react";
 import {CalendarDays, Download, FileText, Gauge, Home, Printer, Users, X, Loader2} from "lucide-react";
 import {createHandoverReadings} from "@/services/contractHandoverService";
+import {buildLeaseContractDocumentFilename} from "@/services/leaseContractsService";
 import {fetchRoomAssets, createRoomAsset, updateRoomAsset} from "@/services/roomAssetsService";
 import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
@@ -200,6 +201,10 @@ function PrintLine({label, value}) {
 
 function buildPrintableHtml({form, handover, assets}) {
     const e = escapeHtml;
+    const documentTitle = buildLeaseContractDocumentFilename({
+        roomCode: form.roomCode,
+        startDate: form.startDate,
+    });
     const assetRows = assets
         .map(
             (asset, index) => `
@@ -234,7 +239,7 @@ function buildPrintableHtml({form, handover, assets}) {
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>${e(form.contractCode || "hop-dong-thue")}</title>
+  <title>${e(documentTitle)}</title>
   <style>
     body { margin: 0; background: #eef0f4; color: #111; font-family: "Times New Roman", Times, serif; font-size: 13pt; line-height: 1.24; }
     .toolbar { position: sticky; top: 0; z-index: 5; padding: 12px 18px; background: #111827; color: #fff; font-family: Arial, sans-serif; }

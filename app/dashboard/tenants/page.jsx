@@ -27,151 +27,7 @@ import {
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
-
-const MOCK_TENANT_PROFILES = [
-  {
-    id: 1001,
-    fullName: "Nguyen Minh Anh",
-    dob: "1998-04-12",
-    gender: "FEMALE",
-    phone: "0901234567",
-    email: "minh.anh@example.com",
-    permanentAddress: "12 Nguyen Trai, Thanh Xuan, Ha Noi",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    roomRole: "PRIMARY",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    residenceStatus: "RENTING",
-    moveInDate: "2026-01-05",
-    profileStatus: "COMPLETED",
-    appStatus: "ACTIVE",
-    portraitFileId: 8101,
-    portraitUrl: "",
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    contractStartDate: "2026-01-05",
-    contractEndDate: "2026-12-31",
-    monthlyRent: 4500000,
-    identityDocument: {
-      docNumber: "001298012345",
-      issuedDate: "2021-08-20",
-      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
-      frontFileId: 7101,
-      backFileId: 7102,
-      frontFileUrl: "",
-      backFileUrl: "",
-    },
-    vehicles: [{ id: 6101, vehicleType: "MOTORBIKE", licensePlate: "29X1-123.45" }],
-    emergencyContacts: [
-      { id: 6201, fullName: "Nguyen Van Nam", relationship: "Bo", phone: "0912345678" },
-    ],
-    roommates: [
-      {
-        id: 1002,
-        fullName: "Tran Thu Ha",
-        dob: "2000-09-18",
-        phone: "0987654321",
-        roomRole: "CO_OCCUPANT",
-      },
-    ],
-  },
-  {
-    id: 1002,
-    fullName: "Tran Thu Ha",
-    dob: "2000-09-18",
-    gender: "FEMALE",
-    phone: "0987654321",
-    email: "thu.ha@example.com",
-    permanentAddress: "Hai Chau, Da Nang",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    roomRole: "CO_OCCUPANT",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    residenceStatus: "RENTING",
-    moveInDate: "2026-02-01",
-    profileStatus: "MISSING_PORTRAIT",
-    appStatus: "PENDING",
-    portraitFileId: null,
-    portraitUrl: "",
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    contractStartDate: "2026-01-05",
-    contractEndDate: "2026-12-31",
-    monthlyRent: 4500000,
-    identityDocument: {
-      docNumber: "048300123456",
-      issuedDate: "2022-03-14",
-      issuedPlace: "Cuc Canh sat QLHC ve TTXH",
-      frontFileId: 7103,
-      backFileId: 7104,
-      frontFileUrl: "",
-      backFileUrl: "",
-    },
-    vehicles: [],
-    emergencyContacts: [
-      { id: 6202, fullName: "Tran Van Hai", relationship: "Anh trai", phone: "0934567890" },
-    ],
-    roommates: [
-      {
-        id: 1001,
-        fullName: "Nguyen Minh Anh",
-        dob: "1998-04-12",
-        phone: "0901234567",
-        roomRole: "PRIMARY",
-      },
-    ],
-  },
-  {
-    id: 1003,
-    fullName: "Le Quang Huy",
-    dob: "1996-11-03",
-    gender: "MALE",
-    phone: "0978123456",
-    email: "quang.huy@example.com",
-    permanentAddress: "Ninh Kieu, Can Tho",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 205,
-    roomCode: "B205",
-    roomRole: "PRIMARY",
-    roomOccupantCount: 1,
-    roomMaxOccupants: 2,
-    residenceStatus: "RENTING",
-    moveInDate: "2025-08-15",
-    profileStatus: "MISSING_CCCD",
-    appStatus: "INACTIVE",
-    portraitFileId: 8103,
-    portraitUrl: "",
-    contractId: 5002,
-    contractCode: "HD-2025-118",
-    contractStatus: "EXPIRING_SOON",
-    contractStartDate: "2025-08-15",
-    contractEndDate: "2026-07-31",
-    monthlyRent: 6200000,
-    identityDocument: {
-      docNumber: "",
-      issuedDate: "",
-      issuedPlace: "",
-      frontFileId: null,
-      backFileId: null,
-      frontFileUrl: "",
-      backFileUrl: "",
-    },
-    vehicles: [{ id: 6103, vehicleType: "CAR", licensePlate: "30K-678.90" }],
-    emergencyContacts: [],
-    roommates: [],
-  },
-];
-
-const moneyFormatter = new Intl.NumberFormat("vi-VN");
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const valueOf = (item, ...keys) => {
   for (const key of keys) {
@@ -182,11 +38,16 @@ const valueOf = (item, ...keys) => {
   return "";
 };
 
+
+
+const moneyFormatter = new Intl.NumberFormat("vi-VN");
+
 const normalizeText = (value) =>
   String(value || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+
 
 const formatDate = (value) => {
   return formatDisplayDate(value);
@@ -834,6 +695,10 @@ export default function TenantsPage() {
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [profileStatusFilter, setProfileStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const openContractDetails = async (profile) => {
     const contractId = getProfileContractId(profile);
@@ -873,8 +738,10 @@ export default function TenantsPage() {
     try {
       setIsLoading(true);
       setError("");
-      const data = await fetchTenantProfiles();
-      setProfiles(data);
+      const data = await fetchTenantProfiles({ page: page - 1, size });
+      setProfiles(data.items);
+      setTotalElements(data.totalElements);
+      setTotalPages(data.totalPages);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
@@ -885,10 +752,12 @@ export default function TenantsPage() {
   useEffect(() => {
     let isActive = true;
 
-    fetchTenantProfiles()
+    fetchTenantProfiles({ page: page - 1, size })
       .then((data) => {
         if (!isActive) return;
-        setProfiles(data);
+        setProfiles(data.items);
+        setTotalElements(data.totalElements);
+        setTotalPages(data.totalPages);
         setError("");
       })
       .catch((loadError) => {
@@ -902,7 +771,7 @@ export default function TenantsPage() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [page, size]);
 
   const roomOptions = useMemo(() => {
     const rooms = [...new Set(profiles.map((profile) => valueOf(profile, "roomCode", "room_code")).filter(Boolean))];
@@ -1105,6 +974,21 @@ export default function TenantsPage() {
             );
           })}
         </section>
+      )}
+
+      {!isLoading && !error && (
+        <DashboardPagination
+          page={page}
+          size={size}
+          totalElements={totalElements}
+          totalPages={totalPages}
+          itemLabel="hồ sơ"
+          onPageChange={setPage}
+          onSizeChange={(nextSize) => {
+            setSize(nextSize);
+            setPage(1);
+          }}
+        />
       )}
 
       {selectedProfile && (

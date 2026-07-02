@@ -1,5 +1,7 @@
 ﻿import { API_BASE_URL, authenticatedFetch } from "@/services/identityAccessService";
 
+import { normalizePageResponse } from "@/lib/pageResponse";
+
 export const FACILITY_STATUS = {
   ACTIVE: "ACTIVE",
   TEMPORARILY_CLOSED: "TEMP_CLOSED",
@@ -66,16 +68,25 @@ function dashboardItems(data) {
   return [];
 }
 
-export async function getFacilitiesDashboard({ keyword = "", status = "" } = {}) {
+export async function getFacilitiesDashboard({ keyword = "", status = "", page = 0, size = 10 } = {}) {
   const params = new URLSearchParams();
   if (keyword.trim()) params.set("keyword", keyword.trim());
   if (status && status !== "ALL") params.set("status", status);
+  params.set("page", String(page));
+  params.set("size", String(size));
 
   const query = params.toString();
   const data = await authenticatedFetch(
     `${API_BASE_URL}/dashboard/facilities${query ? `?${query}` : ""}`,
     { method: "GET" },
   );
+
+  const facilities = dashboardItems(data).map(normalizeFacility);
+  const pagination = normalizePageResponse(data?.page ?? data?.pagination ?? data, {
+    page: page + 1,
+    size,
+    items: facilities,
+  });
 
   return {
     summary: {
@@ -87,7 +98,8 @@ export async function getFacilitiesDashboard({ keyword = "", status = "" } = {})
       vacantRooms: numberValue(data?.summary?.vacantRooms ?? data?.summary?.vacant_rooms),
       vacancyRate: numberValue(data?.summary?.vacancyRate ?? data?.summary?.vacancy_rate),
     },
-    facilities: dashboardItems(data).map(normalizeFacility),
+    facilities,
+    pagination,
   };
 }
 

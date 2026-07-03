@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import Image from "next/image";
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import {useProfile} from "../_hooks/useProfile";
+import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
 function getInitials(name) {
   return String(name || "User")
@@ -27,14 +28,7 @@ function getInitials(name) {
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  return formatDisplayDate(value, value || "Chưa cập nhật");
 }
 
 function CompletionBadge() {
@@ -47,11 +41,8 @@ function CompletionBadge() {
 }
 
 function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [src]);
+  const [failedSrc, setFailedSrc] = useState(null);
+  const imageFailed = Boolean(src && failedSrc === src);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -64,7 +55,7 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
             sizes="128px"
             className="object-cover"
             unoptimized
-            onError={() => setImageFailed(true)}
+            onError={() => setFailedSrc(src)}
           />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-[#091426]">

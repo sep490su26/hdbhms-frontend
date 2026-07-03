@@ -656,8 +656,8 @@ export default function ViewingCustomersClient() {
 
     return (
         <>
-            <div>
-                <div className="mx-auto max-w-[1440px]">
+            <div className="w-full min-w-0 flex flex-col gap-6">
+                <div className="w-full min-w-0">
                     {errorMessage && (
                         <div
                             className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -704,14 +704,14 @@ export default function ViewingCustomersClient() {
                     <section
                         className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)]">
                         <div
-                            className="flex flex-wrap items-center gap-3 border-b border-[#d9dde5] px-4 py-3 text-xs text-[#4b5563]">
+                             className="flex flex-wrap items-center gap-3 border-b border-[#d9dde5] px-4 py-3 text-xs text-[#4b5563]">
                             <div className="flex w-full sm:w-auto items-center">
                                 <input
                                     type="text"
                                     placeholder="Tìm tên, SĐT, Email..."
                                     value={filters.keyword}
                                     onChange={(event) => updateFilter("keyword", event.target.value)}
-                                    className="h-9 w-full sm:w-64 rounded border border-[#cfd5de] px-3 text-xs focus:border-[#091426] focus:outline-none"
+                                    className="h-9 w-full rounded border border-[#cfd5de] px-3 text-xs focus:border-[#091426] focus:outline-none"
                                 />
                             </div>
                             {/*<span className="font-semibold text-[#111827]">Lọc theo:</span>*/}
@@ -746,7 +746,7 @@ export default function ViewingCustomersClient() {
                                    onChange={(event) => updateFilter("toDate", event.target.value)}
                                    className="h-9 rounded border border-[#cfd5de] px-3 text-xs"/>
                             <button type="button" onClick={openTrash}
-                                    className="ml-auto inline-flex h-9 items-center gap-2 rounded px-2 text-xs font-semibold text-[#334155] hover:bg-[#f1f3f5]">
+                                      className="ml-auto inline-flex h-9 items-center gap-2 rounded px-2 text-xs font-semibold text-[#334155] hover:bg-[#f1f3f5]">
                                 <Trash2 className="h-4 w-4"/>
                                 Thùng rác
                             </button>

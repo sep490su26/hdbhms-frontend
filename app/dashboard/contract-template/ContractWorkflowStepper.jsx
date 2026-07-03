@@ -13,7 +13,11 @@ import {
 import { downloadLeaseContractDraftPdf, uploadSignedLeaseContractFile } from "@/services/leaseContractsService";
 import { downloadHandoverDraftPdf, uploadHandoverSignedDocument, fetchContractHandover } from "@/services/contractHandoverService";
 import { downloadDepositContractPdf, uploadSignedDepositContractFile, openDepositContractPdf } from "@/services/depositContractsService";
+import { buildLeaseContractDocumentFilename, downloadLeaseContractDraftPdf, uploadSignedLeaseContractFile } from "@/services/leaseContractsService";
+import { buildHandoverDocumentFilename, downloadHandoverDraftPdf, uploadHandoverSignedDocument, fetchContractHandover } from "@/services/contractHandoverService";
+import { buildDepositContractDocumentFilename, downloadDepositContractPdf, uploadSignedDepositContractFile } from "@/services/depositContractsService";
 import { toast } from "sonner";
+import { isLeaseSignedUploadDisabled } from "./contractWorkflowState";
 
 function unwrapHandoverResponse(response) {
   return response?.data || response || null;
@@ -27,6 +31,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   const fileInputRef0 = useRef(null);
   const fileInputRef1 = useRef(null);
   const fileInputRef2 = useRef(null);
+  const leaseUploadInFlightRef = useRef(false);
   const [loadingStep, setLoadingStep] = useState(null);
   const [handoverData, setHandoverData] = useState(null);
   const [handoverLoading, setHandoverLoading] = useState(true);
@@ -46,11 +51,11 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
 
   const contractId = contractDetails?.contractId || contractDetails?.leaseContractId;
   const depositAgreementId = contractDetails?.depositAgreementId;
-  const currentFileId = contractDetails?.contractFileId ?? null;
+  const leaseSignedFileId = contractDetails?.signedFileId ?? contractDetails?.signed_file_id ?? null;
   const depositSignedFileId = contractDetails?.depositSignedFileId ?? contractDetails?.deposit_signed_file_id ?? null;
   const step0Done = !!depositSignedFileId;
   const step1Done = !!depositSignedFileId;
-  const step2Done = !!currentFileId;
+  const step2Done = !!leaseSignedFileId;
   const step3Done = Boolean(handoverData?.electricity && handoverData?.water) && confirmedLeaseVersion === leaseVersion;
   const step5Done = hasSignedHandoverDocument(handoverData) && confirmedLeaseVersion === leaseVersion;
 
@@ -113,7 +118,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
     }
     loadHandover();
     return () => { ignore = true; };
-  }, [contractId, refreshKey, currentFileId, leaseVersion]);
+  }, [contractId, refreshKey, leaseSignedFileId, leaseVersion]);
 
   const handlePrintDeposit = async () => {
     console.log("[ContractWorkflowStepper] handlePrintDeposit called", { depositAgreementId, contractDetails });
@@ -122,13 +127,13 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
       console.error("[ContractWorkflowStepper] depositAgreementId is missing for Step 0");
       return;
     }
-    console.log("[ContractWorkflowStepper] Opening deposit contract PDF from backend:", depositAgreementId);
+    console.log("[ContractWorkflowStepper] Downloading deposit contract PDF from backend:", depositAgreementId);
     try {
       setLoadingStep(0);
-      await openDepositContractPdf(depositAgreementId);
-      toast.success("Đã mở PDF hợp đồng đặt cọc. Vui lòng in và ký.");
+      await downloadDepositContractPdf(depositAgreementId, buildDepositContractDocumentFilename(contractDetails));
+      toast.success("Đã tải PDF hợp đồng đặt cọc. Vui lòng in và ký.");
     } catch (err) {
-      console.error("[ContractWorkflowStepper] Open deposit PDF error:", err);
+      console.error("[ContractWorkflowStepper] Download deposit PDF error:", err);
       toast.error(err.message || "Lỗi tải PDF hợp đồng đặt cọc");
     } finally {
       setLoadingStep(null);
@@ -161,7 +166,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   const handlePrintLease = async () => {
     try {
       setLoadingStep(2);
-      await downloadLeaseContractDraftPdf(contractId);
+      await downloadLeaseContractDraftPdf(contractId, buildLeaseContractDocumentFilename(contractDetails));
       toast.success("Tải xuống PDF hợp đồng thuê thành công. Vui lòng in và ký.");
     } catch (err) {
       toast.error(err.message || "Lỗi tải PDF hợp đồng");
@@ -173,14 +178,25 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   const handleUploadLease = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (leaseUploadInFlightRef.current) {
+      if (fileInputRef1.current) fileInputRef1.current.value = "";
+      return;
+    }
+    if (!contractId) {
+      toast.error("Tạo hợp đồng thuê trước khi upload file đã ký.");
+      if (fileInputRef1.current) fileInputRef1.current.value = "";
+      return;
+    }
+    leaseUploadInFlightRef.current = true;
     try {
       setLoadingStep(3);
-      await uploadSignedLeaseContractFile(contractDetails, file);
+      await uploadSignedLeaseContractFile(contractDetails, file, { replace: Boolean(leaseSignedFileId) });
       toast.success("Upload hợp đồng thuê đã ký thành công.");
       onContractUpdated();
     } catch (err) {
       toast.error(err.message || "Lỗi upload file hợp đồng");
     } finally {
+      leaseUploadInFlightRef.current = false;
       setLoadingStep(null);
       if (fileInputRef1.current) fileInputRef1.current.value = "";
     }
@@ -189,7 +205,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   const handlePrintHandover = async () => {
     try {
       setLoadingStep(4);
-      await downloadHandoverDraftPdf(contractId, "MOVE_IN");
+      await downloadHandoverDraftPdf(contractId, "MOVE_IN", buildHandoverDocumentFilename(contractDetails));
       toast.success("Tải xuống PDF biên bản bàn giao thành công. Vui lòng in và ký.");
     } catch (err) {
       toast.error(err.message || "Lỗi tải PDF bàn giao. Có thể bạn chưa hoàn thành nhập chỉ số điện nước.");
@@ -220,6 +236,13 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   // Static step metadata — no refs or handlers, safe to define outside render.
   // Phase 1 (Steps 0-1) only shows if depositAgreementId exists
   const hasDeposit = !!depositAgreementId;
+  const leaseSignedUploadDisabled = isLeaseSignedUploadDisabled({
+    contractId,
+    leaseContractId: contractDetails?.leaseContractId,
+    depositSignedFileId,
+    hasDeposit,
+    loadingStep,
+  });
   const STEP_META = hasDeposit ? [
     { num: 0, phase: "deposit", title: "Cấp HĐ đặt cọc", desc: "Tải file PDF hợp đồng đặt cọc nháp để in và ký", accent: "amber" },
     { num: 1, phase: "deposit", title: "Ký HĐ đặt cọc", desc: "Upload bản scan hợp đồng đặt cọc có chữ ký", accent: "amber" },
@@ -241,7 +264,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
       case 0: return { done: step0Done, disabled: loadingStep != null, loading: loadingStep === 0, actionLabel: "Tải HĐ cọc", icon: <Download className="w-4 h-4" /> };
       case 1: return { done: step1Done, disabled: loadingStep != null, loading: loadingStep === 1, actionLabel: step1Done ? "Upload lại HĐ cọc" : "Upload HĐ cọc ký", icon: <Upload className="w-4 h-4" /> };
       case 2: return { done: step2Done, disabled: !step1Done, loading: loadingStep === 2, actionLabel: "Tải HĐ thuê", icon: <Download className="w-4 h-4" /> };
-      case 3: return { done: step2Done, disabled: !step1Done || loadingStep != null, loading: loadingStep === 3, actionLabel: step2Done ? "Upload lại HĐ thuê" : "Upload HĐ thuê ký", icon: <Upload className="w-4 h-4" /> };
+      case 3: return { done: step2Done, disabled: leaseSignedUploadDisabled, loading: loadingStep === 3, actionLabel: step2Done ? "Upload lại HĐ thuê" : "Upload HĐ thuê ký", icon: <Upload className="w-4 h-4" /> };
       case 4: return { done: step3Done, disabled: !step2Done, loading: false, actionLabel: step3Done ? "Sửa thông tin" : "Nhập thông tin", icon: <ClipboardEdit className="w-4 h-4" /> };
       case 5: return { done: step5Done, disabled: loadingStep != null || !step3Done, loading: loadingStep === 4, actionLabel: "Tải bàn giao", icon: <Download className="w-4 h-4" /> };
       case 6: return { done: step5Done, disabled: loadingStep != null || !step3Done, loading: loadingStep === 5, actionLabel: step5Done ? "Upload lại BB" : "Upload BB ký", icon: <Upload className="w-4 h-4" /> };

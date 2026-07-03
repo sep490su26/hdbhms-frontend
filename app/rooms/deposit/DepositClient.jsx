@@ -153,6 +153,8 @@ const toBlockingStatusFromMessage = (message) => {
 const DATE_IN_PAST_ERROR_MESSAGE = "Ngày chọn không được là ngày trong quá khứ.";
 const DATE_TOO_FAR_ERROR_MESSAGE = "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
+const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
 
 const toLocalDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -170,6 +172,52 @@ const getDateStringWithOffset = (days) => {
 
 const getTodayDateString = () => getDateStringWithOffset(0);
 const getMaxDepositScheduleDateString = () => getDateStringWithOffset(MAX_DEPOSIT_SCHEDULE_DAYS);
+
+const normalizeDateInputString = (value) => {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+};
+
+const addDaysToDateString = (value, days) => {
+  const normalizedValue = normalizeDateInputString(value);
+  if (!normalizedValue) return "";
+
+  const [year, month, day] = normalizedValue.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return toLocalDateInputValue(date);
+};
+
+const formatDateForMessage = (value) => {
+  const normalizedValue = normalizeDateInputString(value);
+  if (!normalizedValue) return "";
+
+  const [year, month, day] = normalizedValue.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+const buildDepositScheduleWindow = (room) => {
+  const todayDate = getTodayDateString();
+  const defaultMaxDate = getMaxDepositScheduleDateString();
+  const isSoonVacant = room?.status === "soonVacant";
+  const expectedVacantDate = normalizeDateInputString(room?.expectedVacantDate);
+
+  if (!isSoonVacant || !expectedVacantDate) {
+    return {
+      isSoonVacant: false,
+      expectedVacantDate: "",
+      minDate: todayDate,
+      maxDate: defaultMaxDate,
+    };
+  }
+
+  return {
+    isSoonVacant: true,
+    expectedVacantDate,
+    minDate: addDaysToDateString(expectedVacantDate, 1),
+    maxDate: addDaysToDateString(expectedVacantDate, MAX_DEPOSIT_SCHEDULE_DAYS),
+  };
+};
 
 const REQUIRED_DEPOSIT_MESSAGES = {
   fullName: "Vui lòng nhập họ và tên.",
@@ -195,23 +243,42 @@ const REQUIRED_DEPOSIT_MESSAGES = {
 
 const BACKEND_DEPOSIT_FIELD_MAP = {
   roomId: "roomId",
+  room_id: "roomId",
   fullName: "fullName",
+  full_name: "fullName",
+  dob: "birthDate",
   birthDate: "birthDate",
   phone: "phone",
   email: "email",
+  idNumber: "citizenId",
+  id_number: "citizenId",
   citizenId: "citizenId",
   idIssueDate: "idIssueDate",
+  id_issue_date: "idIssueDate",
   idIssuePlace: "idIssuePlace",
+  id_issue_place: "idIssuePlace",
   permanentAddress: "permanentAddress",
+  permanent_address: "permanentAddress",
   paymentCycleMonths: "paymentCycleMonths",
-  contractDate: "contractDate",
-  moveInDate: "moveInDate",
-  citizenIdFront: "citizenIdFront",
-  citizenIdBack: "citizenIdBack",
-  portraitImage: "portraitImage",
+  payment_cycle_months: "paymentCycleMonths",
+  expectedLeaseSignDate: "contractDate",
+  expected_lease_sign_date: "contractDate",
+  expectedMoveInDate: "moveInDate",
+  expected_move_in_date: "moveInDate",
+  idFrontFile: "citizenIdFront",
+  id_front_file: "citizenIdFront",
+  idBackFile: "citizenIdBack",
+  id_back_file: "citizenIdBack",
+  portraitFile: "portraitImage",
+  portrait_file: "portraitImage",
   occupantCount: "occupantCount",
+  occupant_count: "occupantCount",
   coOccupants: "coOccupants",
-  terms: "terms",
+  co_occupants: "coOccupants",
+  coOccupantInformationValid: "occupantCount",
+  co_occupant_information_valid: "occupantCount",
+  metadata: "_form",
+  files: "_form",
 };
 
 const API_ERROR_HINTS = [
@@ -226,10 +293,10 @@ const API_ERROR_HINTS = [
   { pattern: /payment\s*cycle|paymentCycleMonths|payment_cycle_months|chu\s*kỳ\s*thanh\s*toán/i, field: "paymentCycleMonths" },
   { pattern: /lease\s*sign|expectedLeaseSignDate|expected_lease_sign_date|ký\s*hợp\s*đồng/i, field: "contractDate" },
   { pattern: /move\s*in|expectedMoveInDate|expected_move_in_date|vào\s*ở/i, field: "moveInDate" },
-  { pattern: /id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
-  { pattern: /id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
-  { pattern: /portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
-  { pattern: /occupant|co_occupants|người\s*ở/i, field: "occupantCount" },
+  { pattern: /idFrontFile|id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
+  { pattern: /idBackFile|id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
+  { pattern: /portraitFile|portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
+  { pattern: /occupant|coOccupants|co_occupants|người\s*ở/i, field: "occupantCount" },
 ];
 
 const DEPOSIT_FIELD_LABELS = {
@@ -277,9 +344,25 @@ const collectErrorText = (value) => {
   return String(value);
 };
 
+const getCheckoutErrorMessage = (error) => {
+  const payload = error?.payload || {};
+  const message = [payload.details, payload.message, error?.message]
+    .map(collectErrorText)
+    .map((value) => value.trim())
+    .find((value) => value && value.toLowerCase() !== "undefined");
+
+  return message || "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại.";
+};
+
 const extractDepositApiFieldErrors = (error) => {
   const payload = error?.payload || {};
-  const candidates = [payload.errors, payload.fieldErrors, payload.violations, payload.data?.errors].filter(Boolean);
+  const candidates = [
+    payload.errors,
+    payload.fieldErrors,
+    payload.violations,
+    payload.data?.errors,
+    payload.data?.fieldErrors,
+  ].filter(Boolean);
   const nextErrors = {};
 
   candidates.forEach((candidate) => {
@@ -312,7 +395,8 @@ const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
+const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhmsDepositFormDraft";
+const LEGACY_DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
 const DEPOSIT_DRAFT_MAX_AGE_SECONDS = 30 * 60;
 const DEPOSIT_DRAFT_FIELDS = [
   "fullName",
@@ -349,7 +433,7 @@ const readCookie = (name) => {
 };
 
 const readDepositDraftCookie = () => {
-  const rawValue = readCookie(DEPOSIT_DRAFT_COOKIE_NAME);
+  const rawValue = readCookie(DEPOSIT_DRAFT_COOKIE_NAME) || readCookie(LEGACY_DEPOSIT_DRAFT_COOKIE_NAME);
   if (!rawValue) return {};
 
   try {
@@ -429,10 +513,13 @@ const normalizePhoneValue = (value) => {
   return String(value || "").replace(/[\s.\-()]/g, "");
 };
 
-const validateDepositValue = (name, value) => {
+const validateDepositValue = (name, value, scheduleWindow = null) => {
   const normalizedValue = String(value || "").trim();
   const todayDate = getTodayDateString();
-  const maxScheduleDate = getMaxDepositScheduleDateString();
+  const maxScheduleDate = scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
+  const minScheduleDate = scheduleWindow?.minDate || todayDate;
+  const isSoonVacantSchedule = Boolean(scheduleWindow?.isSoonVacant && scheduleWindow?.expectedVacantDate);
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow?.expectedVacantDate);
 
   if (name !== "email" && !normalizedValue) {
     return REQUIRED_DEPOSIT_MESSAGES[name] || "";
@@ -474,11 +561,17 @@ const validateDepositValue = (name, value) => {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
   }
 
-  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < todayDate) {
+  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < minScheduleDate) {
+    if (isSoonVacantSchedule) {
+      return `${DATE_FIELD_LABELS[name]} phải sau ngày khách cũ trả phòng (${expectedVacantDateLabel}).`;
+    }
     return DATE_IN_PAST_ERROR_MESSAGE;
   }
 
   if ((name === "contractDate" || name === "moveInDate") && normalizedValue > maxScheduleDate) {
+    if (isSoonVacantSchedule) {
+      return `${DATE_FIELD_LABELS[name]} chỉ được tối đa 14 ngày kể từ ngày khách cũ trả phòng.`;
+    }
     return DATE_TOO_FAR_ERROR_MESSAGE;
   }
 
@@ -559,20 +652,20 @@ const buildDepositMetadata = (room, data) => ({
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
 
-function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "" }) {
+function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "", validateValue = validateDepositValue }) {
   const { errors: formErrors, setError } = useContext(DepositFormErrorContext);
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
 
   const handleChange = (event) => {
-    const message = validateDepositValue(name, event.target.value);
+    const message = validateValue(name, event.target.value);
     setLocalError(message);
     setError(name, message);
     onChange?.(event);
   };
 
   const handleBlur = (event) => {
-    const message = validateDepositValue(name, event.target.value);
+    const message = validateValue(name, event.target.value);
     setLocalError(message);
     setError(name, message);
     onBlur?.(event);
@@ -712,14 +805,20 @@ function SummaryLine({ icon: Icon, children }) {
 }
 
 function RoomSummary({ room }) {
+  const scheduleWindow = buildDepositScheduleWindow(room);
+  const isSoonVacant = room?.status === "soonVacant";
+  const statusCopy = isSoonVacant ? "Sắp trống" : "Còn trống";
+  const statusClassName = isSoonVacant ? "bg-[#5b6472]" : "bg-[#006c49]";
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
+
   return (
     <aside
       className="overflow-hidden rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
       <div className="relative h-48 overflow-hidden">
         <Image src={room.image} alt={`Phòng ${room.id}`} fill sizes="352px" className="object-cover" priority />
         <div
-          className="absolute right-4 top-4 rounded-full bg-[#006c49] px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow">
-          Còn trống
+          className={`absolute right-4 top-4 rounded-full px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow ${statusClassName}`}>
+          {statusCopy}
         </div>
       </div>
 
@@ -733,6 +832,11 @@ function RoomSummary({ room }) {
         </div>
 
         <p className="mt-3 text-sm leading-6 text-[#45474c]">{room.description}</p>
+        {isSoonVacant && expectedVacantDateLabel && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
+            Sắp trống từ {expectedVacantDateLabel}. Chỉ đặt cọc với ngày ký/vào ở sau ngày này và trong vòng 14 ngày.
+          </div>
+        )}
 
         <div className="mt-7 border-t border-[#c5c6cd] pt-6">
           <div className="grid gap-4">
@@ -755,8 +859,11 @@ function RoomSummary({ room }) {
 }
 
 function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFieldErrors }) {
+  const scheduleWindow = buildDepositScheduleWindow(room);
   const todayDate = getTodayDateString();
-  const maxScheduleDate = getMaxDepositScheduleDateString();
+  const minScheduleDate = scheduleWindow.minDate;
+  const maxScheduleDate = scheduleWindow.maxDate;
+  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
   const formRef = useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [savedDraft, setSavedDraft] = useState({});
@@ -886,7 +993,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   };
 
   const validateDepositField = (name, value) => {
-    return validateDepositValue(name, value);
+    return validateDepositValue(name, value, scheduleWindow);
   };
 
   const validateAndSetDepositField = (name, value) => {
@@ -953,9 +1060,41 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       return;
     }
 
+    if (file.size > MAX_DEPOSIT_UPLOAD_FILE_BYTES) {
+      event.target.value = "";
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        [name]: "Ảnh tải lên không được vượt quá 10MB.",
+      }));
+      return;
+    }
+
+    const nextSelectedFiles = {
+      ...selectedFiles,
+      [name]: file,
+    };
+    const nextTotalSize = Object.values(nextSelectedFiles)
+      .filter(Boolean)
+      .reduce((totalSize, selectedFile) => totalSize + selectedFile.size, 0);
+
+    if (nextTotalSize > MAX_DEPOSIT_UPLOAD_TOTAL_BYTES) {
+      event.target.value = "";
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
+        [name]: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+      }));
+      return;
+    }
+
     setSelectedFiles((prev) => ({ ...prev, [name]: file }));
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
+      _form: "",
       [name]: "",
     }));
 
@@ -986,6 +1125,13 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       const message = validateDepositField(fieldName, data[fieldName]);
       if (message) nextErrors[fieldName] = message;
     });
+
+    // Validate CCCD issue date must be after birth date
+    const birthDate = data.birthDate;
+    const idIssueDate = data.idIssueDate;
+    if (birthDate && idIssueDate && idIssueDate <= birthDate) {
+      nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
+    }
 
     Object.assign(nextErrors, validateOccupancyData(data));
 
@@ -1052,6 +1198,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     const formData = new FormData();
     const metadata = buildDepositMetadata(room, data);
 
+    // Chuẩn bị payload chuẩn theo backend yêu cầu
     formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
     if (selectedFiles.citizenIdFront) formData.append("idFrontFile", selectedFiles.citizenIdFront);
     if (selectedFiles.citizenIdBack) formData.append("idBackFile", selectedFiles.citizenIdBack);
@@ -1079,11 +1226,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
           <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="mm/dd/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
+          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
           <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
           <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
           <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="mm/dd/yyyy" defaultValue={savedDraft.idIssueDate} />
+          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
           <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
           <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -1190,10 +1337,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             label="Ngày hẹn ký hợp đồng"
             name="contractDate"
             type="date"
-            placeholder="mm/dd/yyyy"
-            min={todayDate}
+            placeholder="dd/MM/yyyy"
+            min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.contractDate}
+            validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
             defaultValue={savedDraft.contractDate}
@@ -1202,14 +1350,20 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             label="Ngày dự kiến vào ở"
             name="moveInDate"
             type="date"
-            placeholder="mm/dd/yyyy"
-            min={todayDate}
+            placeholder="dd/MM/yyyy"
+            min={minScheduleDate}
             max={maxScheduleDate}
             error={fieldErrors.moveInDate}
+            validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
             defaultValue={savedDraft.moveInDate}
           />
+          {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
+              Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong vòng 14 ngày.
+            </div>
+          )}
 
           <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
             <FileUploadZone
@@ -1302,7 +1456,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
           {Object.values(fieldErrors).some(Boolean) && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 sm:col-span-2">
-              Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục.
+              {fieldErrors._form || "Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục."}
             </div>
           )}
 
@@ -1791,8 +1945,8 @@ export function DepositClient({ room }) {
         customerName: metadata.fullName,
         phone: metadata.phone,
         email: metadata.email,
-        moveInDate: metadata.moveInDate,
-        contractDate: metadata.contractDate,
+        moveInDate: metadata.expectedMoveInDate,
+        contractDate: metadata.expectedLeaseSignDate,
         expiresAt: holdExpiresAt,
       });
 
@@ -1816,7 +1970,7 @@ export function DepositClient({ room }) {
         return;
       }
 
-      setDepositApiFieldErrors({ terms: "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại." });
+      setDepositApiFieldErrors({ _form: getCheckoutErrorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }

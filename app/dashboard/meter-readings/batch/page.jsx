@@ -175,7 +175,10 @@ export default function MeterReadings() {
         }
     }
     useEffect(() => {
-        loadData();
+        const timeoutId = window.setTimeout(() => {
+            loadData();
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
     }, [period]);
 
     useEffect(() => {
@@ -357,7 +360,7 @@ export default function MeterReadings() {
     const pageButtons = [1, 2, 3, 4, 5, "...", 10];
 
     return (
-        <div className="font-sans">
+        <div className="w-full min-w-0 overflow-x-hidden font-sans">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
@@ -478,7 +481,7 @@ export default function MeterReadings() {
             </div>
 
             {/* Tabs + search */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+            <div className="flex w-full min-w-0 flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
                 <div
                     className="flex flex-wrap items-center gap-1 md:gap-0 w-full md:w-auto pb-1 md:pb-0 border-b md:border-none border-gray-100">
                     {tabs.map((tab) => (
@@ -491,11 +494,11 @@ export default function MeterReadings() {
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative w-full md:w-auto">
+                <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
+                    <div className="relative w-full min-w-0 md:w-auto">
                         <LucideSearch className={"absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"} />
                         <input
-                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 w-full md:w-64"
+                            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64"
                             placeholder="Tìm phòng..."
                             value={search}
                             onChange={(e) => {
@@ -887,9 +890,9 @@ export default function MeterReadings() {
                                 </DialogHeader>
                                 <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 mb-2" ref={horizontalScrollRef}>
                                     {filtered.map(r => (
-                                        <button 
-                                            key={r.id} 
-                                            onClick={() => setFocusRoomId(r.id)} 
+                                        <button
+                                            key={r.id}
+                                            onClick={() => setFocusRoomId(r.id)}
                                             className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                                         >
                                             {r.id}
@@ -963,7 +966,7 @@ export default function MeterReadings() {
                                         {capturedPhotos[room.id] ? (
                                             <div className="relative rounded-lg overflow-hidden border border-gray-200">
                                                 <img src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-48 object-contain bg-gray-50 bg-black/5" />
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         const newPhotos = {...capturedPhotos};
                                                         delete newPhotos[room.id];
@@ -1001,9 +1004,9 @@ export default function MeterReadings() {
                 </DialogContent>
             </Dialog>
 
-            <CameraCapture 
-                open={cameraOpen} 
-                onClose={() => setCameraOpen(false)} 
+            <CameraCapture
+                open={cameraOpen}
+                onClose={() => setCameraOpen(false)}
                 onCapture={(photoData) => {
                     if (focusRoomId) {
                         setCapturedPhotos(prev => ({
@@ -1011,7 +1014,7 @@ export default function MeterReadings() {
                             [focusRoomId]: photoData
                         }));
                     }
-                }} 
+                }}
             />
         </div>
     );

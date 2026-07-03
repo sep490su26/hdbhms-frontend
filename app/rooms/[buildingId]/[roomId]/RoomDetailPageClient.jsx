@@ -24,12 +24,15 @@ import {
   fetchDepositRoomHoldStatus,
   fetchPublicRoomById,
   normalizeApiRoom,
+  normalizeRoomImages,
+  ROOM_PLACEHOLDER_IMAGE,
 } from "../../../../services/roomsService";
 import {
   combineAppointmentParts,
   publicCreateViewingCustomer,
 } from "../../../../services/viewingCustomersService";
 import { formatHoldMinutes, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+import { formatDate } from "../../../../lib/dateFormat";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -54,10 +57,7 @@ const getTomorrowDateString = () => {
 };
 
 const formatShortDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+  return formatDate(value, "");
 };
 
 const VIEWING_DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
@@ -593,6 +593,8 @@ function BookingCard({ room }) {
 export function RoomDetailPageClient({ roomId }) {
   const [room, setRoom] = useState(null);
   const [activeImage, setActiveImage] = useState("");
+  const galleryImages = useMemo(() => normalizeRoomImages(room ?? {}), [room]);
+  const displayActiveImage = galleryImages.includes(activeImage) ? activeImage : (galleryImages[0] ?? ROOM_PLACEHOLDER_IMAGE);
   const [roomHolds, setRoomHolds] = useState(() => getActiveRoomHolds());
   const [serverHoldStatus, setServerHoldStatus] = useState(null);
   const [nowMs, setNowMs] = useState(0);
@@ -611,7 +613,7 @@ export function RoomDetailPageClient({ roomId }) {
         if (!isMounted) return;
         if (!nextRoom) throw new Error("Room not found");
         setRoom(nextRoom);
-        setActiveImage(nextRoom.images?.[0] ?? nextRoom.image ?? "/assets/rooms/room-101.svg");
+
         setIsError(false);
       } catch {
         if (isMounted) setIsError(true);
@@ -760,7 +762,7 @@ export function RoomDetailPageClient({ roomId }) {
               <section className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm">
                 <div className="relative aspect-[16/10] min-h-[280px] bg-slate-900">
                   <Image
-                    src={activeImage || displayRoom.image || "/assets/rooms/room-101.svg"}
+                    src={displayActiveImage || ROOM_PLACEHOLDER_IMAGE}
                     alt={`Ảnh thực tế phòng ${displayRoom.id}`}
                     fill
                     priority
@@ -778,13 +780,13 @@ export function RoomDetailPageClient({ roomId }) {
                 </div>
 
                 <div className="grid grid-cols-4 gap-3 bg-white p-4 sm:p-5">
-                  {(displayRoom.images?.length ? displayRoom.images : [displayRoom.image || "/assets/rooms/room-101.svg"]).map((image, index) => (
+                  {galleryImages.map((image, index) => (
                     <button
                       key={`${image}-${index}`}
                       type="button"
                       onClick={() => setActiveImage(image)}
                       aria-label={`Xem ảnh phòng ${index + 1}`}
-                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${activeImage === image ? "border-blue-500 ring-2 ring-blue-500/30" : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
+                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${displayActiveImage === image ? "border-blue-500 ring-2 ring-blue-500/30" : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
                         }`}
                     >
                       <Image src={image} alt={`Ảnh ${index + 1} phòng ${displayRoom.id}`} fill sizes="160px" className="object-cover" />

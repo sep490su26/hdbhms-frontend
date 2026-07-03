@@ -24,8 +24,9 @@ import {
 
 import {
   activateLeaseContract,
+  buildLeaseContractDocumentFilename,
   createDraftLeaseContractFromDeposit,
-  downloadLeaseContractFile,
+  downloadLeaseContractSignedFile,
   fetchLeaseContractManagementList,
   fetchManagementLeaseContractDetails,
   openLeaseContractFile,
@@ -42,6 +43,8 @@ import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
 import ContractWorkflowStepper from "./ContractWorkflowStepper";
 import { toast } from "sonner";
+import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_FILTERS = [
   { id: "current", label: "Hợp đồng hiện tại" },
@@ -132,23 +135,11 @@ const TENANT_INTENTION_SOURCE_LABELS = {
 };
 
 function formatDate(value) {
-  if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN").format(date);
+  return formatDisplayDate(value, value || "Chưa có");
 }
 
 function formatDateTime(value) {
-  if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
+  return formatDisplayDateTime(value, value || "Chưa có");
 }
 
 function parseEventData(value) {
@@ -293,6 +284,13 @@ function getNextRenewalContractCode(item = {}) {
   return rootContractCode ? `${rootContractCode}-R${renewalNumber}` : "";
 }
 
+function getContractDisplayName(item = {}) {
+  if (item.leaseContractId || item.contractId) {
+    return buildLeaseContractDocumentFilename(item);
+  }
+  return item.contractCode || item.displayCode || "Chưa tạo HĐ";
+}
+
 function buildRenewForm(item = {}) {
   const newStartDate = addDays(item.endDate, 1);
   return {
@@ -370,9 +368,19 @@ function getWorkflow(item) {
   }
   const status = item?.workflowStatus || item?.depositStatus;
   if (status === "ACTIVE") return "ACTIVE";
-  if (item?.leaseContractId && item?.contractFileId) return "PENDING_ACTIVATION";
-  if (item?.leaseContractId && !item?.contractFileId) return "MISSING_FILE";
+  if (item?.leaseContractId && getLeaseSignedFileId(item)) return "PENDING_ACTIVATION";
+  if (item?.leaseContractId && !getLeaseSignedFileId(item)) return "MISSING_FILE";
   return "PENDING_SIGNATURE";
+}
+
+function getLeaseSignedFileId(item = {}) {
+  return (
+    item?.signedFileId ??
+    item?.signed_file_id ??
+    item?.signedFile?.id ??
+    item?.signed_file?.id ??
+    null
+  );
 }
 
 function needsActivationFlow(item) {
@@ -410,7 +418,7 @@ function getStatusLabel(item) {
 }
 
 function FileBadge({ item }) {
-  const uploaded = Boolean(item?.contractFileId);
+  const uploaded = Boolean(getLeaseSignedFileId(item));
   const Icon = uploaded ? FileCheck2 : FileWarning;
   return (
     <span
@@ -526,14 +534,20 @@ export default function ContractTemplatePage() {
   const [intentionError, setIntentionError] = useState("");
   const [printWizard, setPrintWizard] = useState(null);
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   async function loadContracts() {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchLeaseContractManagementList();
-      setContracts(data);
-      return data;
+      const data = await fetchLeaseContractManagementList({ page: page - 1, size });
+      setContracts(data.items);
+      setTotalElements(data.totalElements);
+      setTotalPages(data.totalPages);
+      return data.items;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
     } finally {
@@ -547,7 +561,7 @@ export default function ContractTemplatePage() {
       loadContracts();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [page, size]);
 
   useEffect(() => {
     let ignore = false;
@@ -583,7 +597,7 @@ export default function ContractTemplatePage() {
         if (workflow === "ACTIVE") acc.active += 1;
         if (workflow === "PENDING_SIGNATURE") acc.pendingSignature += 1;
         if (workflow === "PENDING_ACTIVATION") acc.pendingActivation += 1;
-        if (!item.contractFileId) acc.missingFile += 1;
+        if (!getLeaseSignedFileId(item)) acc.missingFile += 1;
         return acc;
       },
       { total: 0, pendingSignature: 0, pendingActivation: 0, active: 0, missingFile: 0 },
@@ -611,8 +625,8 @@ export default function ContractTemplatePage() {
       const matchesStatus = matchesStatusFilter(item, statusFilter);
       const matchesFile =
         fileFilter === "all" ||
-        (fileFilter === "uploaded" && item.contractFileId) ||
-        (fileFilter === "missing" && !item.contractFileId);
+        (fileFilter === "uploaded" && getLeaseSignedFileId(item)) ||
+        (fileFilter === "missing" && !getLeaseSignedFileId(item));
 
       return matchesSearch && matchesStatus && matchesFile;
     });
@@ -628,6 +642,9 @@ export default function ContractTemplatePage() {
       contractFileId: details.contractFile?.id || selected.contractFileId,
       contractFileName: details.contractFile?.fileName || selected.contractFileName,
       contractFileUploadedAt: details.contractFile?.uploadedAt || selected.contractFileUploadedAt,
+      signedFileId: details.signedFile?.id || details.signedFileId || selected.signedFileId,
+      signedFileName: details.signedFile?.fileName || details.signedFileName || selected.signedFileName,
+      signedFileUploadedAt: details.signedFile?.uploadedAt || details.signedFileUploadedAt || selected.signedFileUploadedAt,
       propertyName: details.property?.name || selected.propertyName,
       tenantId: details.tenantId || selected.tenantId || null,
       roomCode: details.room?.roomCode || selected.roomCode,
@@ -646,6 +663,11 @@ export default function ContractTemplatePage() {
       intentionSource: details.intentionSource ?? selected.intentionSource ?? null,
     };
   }, [details, selected]);
+
+  const selectedLeaseContractFilename = useMemo(() => {
+    if (!mergedSelected?.leaseContractId && !mergedSelected?.contractId) return "";
+    return buildLeaseContractDocumentFilename(mergedSelected);
+  }, [mergedSelected]);
 
   const selectedOccupants = useMemo(() => {
     if (Array.isArray(details?.occupants) && details.occupants.length > 0) return details.occupants;
@@ -819,7 +841,7 @@ export default function ContractTemplatePage() {
   async function handleActivate(item) {
     if (!item?.leaseContractId) return;
 
-    if (!item.contractFileId) {
+    if (!getLeaseSignedFileId(item)) {
       window.alert("Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.");
       return;
     }
@@ -1174,7 +1196,7 @@ export default function ContractTemplatePage() {
   );
 
   return (
-    <div className="grid gap-5 text-[#091426] text-[13px] xl:gap-6 xl:text-sm">
+    <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
       <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileSelected} />
 
       <section className="flex flex-col gap-2">
@@ -1195,7 +1217,7 @@ export default function ContractTemplatePage() {
       </section>
 
       <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_auto]">
+        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           <label className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
@@ -1221,7 +1243,7 @@ export default function ContractTemplatePage() {
             type="button"
             onClick={loadContracts}
             disabled={loading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Làm mới
@@ -1310,7 +1332,7 @@ export default function ContractTemplatePage() {
                   >
                     <td data-label="Mã HĐ" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">
-                        {item.contractCode || item.displayCode || "Chưa tạo HĐ"}
+                        {getContractDisplayName(item)}
                       </p>
                       {!item.leaseContractId && item.depositCode && (
                         <p className="mt-1 text-[11px] font-semibold text-[#607089] xl:text-xs">
@@ -1429,6 +1451,18 @@ export default function ContractTemplatePage() {
             </tbody>
           </table>
         </div>
+        <DashboardPagination
+          page={page}
+          size={size}
+          totalElements={totalElements}
+          totalPages={totalPages}
+          itemLabel="hợp đồng"
+          onPageChange={setPage}
+          onSizeChange={(nextSize) => {
+            setSize(nextSize);
+            setPage(1);
+          }}
+        />
       </section>
 
       {mergedSelected && (
@@ -1450,7 +1484,7 @@ export default function ContractTemplatePage() {
               </button>
               <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">Chi tiết hợp đồng</p>
               <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
-                {mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
+                {getContractDisplayName(mergedSelected)}
               </h2>
               {!mergedSelected.leaseContractId && mergedSelected.depositCode && (
                 <p className="mt-2 text-sm font-semibold text-slate-300">
@@ -1614,7 +1648,7 @@ export default function ContractTemplatePage() {
                     <div className="grid grid-cols-2 gap-3 xl:gap-4">
                       <InfoValue
                         label="Mã hợp đồng"
-                        value={mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
+                        value={getContractDisplayName(mergedSelected)}
                       />
                       <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
                       <label className="grid min-w-0 gap-1.5">
@@ -1691,7 +1725,7 @@ export default function ContractTemplatePage() {
                       />
                       <InfoValue
                         label="File hợp đồng"
-                        value={mergedSelected.contractFileName || "Chưa có"}
+                        value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa có"}
                       />
                     </div>
 
@@ -1735,7 +1769,7 @@ export default function ContractTemplatePage() {
                   <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
                     <InfoValue
                       label="Mã hợp đồng"
-                      value={mergedSelected.contractCode || mergedSelected.displayCode || "Chưa tạo HĐ"}
+                      value={getContractDisplayName(mergedSelected)}
                     />
                     <InfoValue label="Trạng thái" value={getStatusLabel(mergedSelected)} />
                     <InfoValue label="Ngày bắt đầu" value={formatDate(mergedSelected.startDate)} />
@@ -1758,7 +1792,7 @@ export default function ContractTemplatePage() {
                     />
                     <InfoValue
                       label="File hợp đồng"
-                      value={mergedSelected.contractFileName || "Chưa có"}
+                      value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa có"}
                     />
                   </div>
                 )}
@@ -1855,18 +1889,18 @@ export default function ContractTemplatePage() {
               {mergedSelected.leaseContractId && !stepperVisible && (
                 <DetailCard title="File hợp đồng đã ký" icon={FileCheck2} className="lg:col-span-2">
                 <div className="mt-5 rounded-lg bg-white p-4">
-                  {mergedSelected.contractFileId ? (
+                  {getLeaseSignedFileId(mergedSelected) ? (
                     <>
                       <p className="break-words font-extrabold text-[#091426]">
-                        {mergedSelected.contractFileName || "hop-dong-thue.pdf"}
+                        {selectedLeaseContractFilename}
                       </p>
                       <p className="mt-1 text-sm text-[#607089]">
-                        Upload: {formatDate(mergedSelected.contractFileUploadedAt)}
+                        Upload: {formatDate(mergedSelected.signedFileUploadedAt)}
                       </p>
                       <div className="mt-4 grid gap-2 sm:grid-cols-3">
                         <button
                           type="button"
-                          onClick={() => openLeaseContractFile(mergedSelected.contractFileId)}
+                          onClick={() => openLeaseContractFile(getLeaseSignedFileId(mergedSelected))}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-sm font-extrabold hover:bg-[#f8fafc]"
                         >
                           <Eye className="h-4 w-4" />
@@ -1874,7 +1908,7 @@ export default function ContractTemplatePage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => downloadLeaseContractFile(mergedSelected.contractFileId, mergedSelected.contractFileName)}
+                          onClick={() => downloadLeaseContractSignedFile(mergedSelected.leaseContractId, selectedLeaseContractFilename)}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] px-3 text-sm font-extrabold hover:bg-[#f8fafc]"
                         >
                           <Download className="h-4 w-4" />

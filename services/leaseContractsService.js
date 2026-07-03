@@ -5,6 +5,7 @@ import {
   getAuthToken,
   refreshTokenApi,
 } from "@/services/identityAccessService";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 function authHeaders(extraHeaders = {}) {
   const token = getAuthToken();
@@ -13,6 +14,62 @@ function authHeaders(extraHeaders = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extraHeaders,
   };
+}
+
+function toDatePart(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function formatHdtFilenameDate(value) {
+  const datePart = toDatePart(value);
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "Chua-Ro-Ngay";
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
+function withRoomPrefix(roomCode) {
+  if (roomCode.startsWith("Phong")) return roomCode;
+  if (/^p/i.test(roomCode)) return `P${roomCode.slice(1)}`;
+  return `P${roomCode}`;
+}
+
+export function buildLeaseContractDocumentFilename(item = {}) {
+  const roomCode = withRoomPrefix(sanitizeFilenamePart(
+    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
+    "Phong-X",
+  ));
+  const date = formatHdtFilenameDate(
+    item.startDate ?? item.start_date ?? item.expectedLeaseSignDate ?? item.expected_lease_sign_date,
+  );
+
+  return `HDT_${roomCode}_${date}.pdf`;
+}
+
+const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME = buildLeaseContractDocumentFilename();
+
+function extractFilenameFromContentDisposition(headerValue) {
+  if (!headerValue) return "";
+
+  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (filenameStarMatch?.[1]) {
+    const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  const filenameMatch = headerValue.match(/filename\s*=\s*("[^"]+"|[^;]+)/i);
+  if (!filenameMatch?.[1]) return "";
+  return filenameMatch[1].trim().replace(/^"|"$/g, "");
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -48,102 +105,146 @@ async function parseEnvelope(response, fallbackMessage) {
 }
 
 export function normalizeLeaseContractItem(item = {}) {
-  const contractId = item.contractId ?? item.leaseContractId ?? null;
-  const depositCode = item.depositCode ?? null;
-  const contractCode = item.contractCode ?? null;
+  const contractId = item.contractId ?? item.contract_id ?? item.leaseContractId ?? item.lease_contract_id ?? null;
+  const depositCode = item.depositCode ?? item.deposit_code ?? null;
+  const contractCode = item.contractCode ?? item.contract_code ?? null;
   const legacyContractCode = contractId
-    ? item.displayCode ?? item.code ?? null
+    ? item.displayCode ?? item.display_code ?? item.code ?? null
     : null;
   const displayedContractCode = contractCode ?? legacyContractCode ?? "";
 
   return {
     ...item,
-    sourceType: item.sourceType ?? null,
+    sourceType: item.sourceType ?? item.source_type ?? null,
     contractId,
-    leaseContractId: item.leaseContractId ?? contractId,
-    depositAgreementId: item.depositAgreementId ?? null,
+    leaseContractId: item.leaseContractId ?? item.lease_contract_id ?? contractId,
+    depositAgreementId: item.depositAgreementId ?? item.deposit_agreement_id ?? null,
     code: displayedContractCode,
     displayCode: displayedContractCode,
     depositCode,
     contractCode,
-    propertyId: item.propertyId ?? null,
-    propertyName: item.propertyName ?? null,
-    propertyAddress: item.propertyAddress ?? null,
-    tenantId: item.tenantId ?? null,
-    roomId: item.roomId ?? null,
-    roomCode: item.roomCode ?? null,
-    roomStatus: item.roomStatus ?? null,
-    primaryTenantProfileId: item.primaryTenantProfileId ?? null,
-    customerName: item.customerName ?? item.primaryTenantName ?? null,
-    primaryTenantName: item.primaryTenantName ?? item.customerName ?? null,
-    phone: item.phone ?? item.primaryTenantPhone ?? null,
-    email: item.email ?? item.primaryTenantEmail ?? null,
-    expectedLeaseSignDate: item.expectedLeaseSignDate ?? null,
-    expectedMoveInDate: item.expectedMoveInDate ?? null,
-    startDate: item.startDate ?? null,
-    endDate: item.endDate ?? null,
-    rentStartDate: item.rentStartDate ?? null,
-    monthlyRent: item.monthlyRent ?? null,
-    paymentCycleMonths: item.paymentCycleMonths ?? null,
-    depositAmount: item.depositAmount ?? null,
-    contractStatus: item.contractStatus ?? item.status ?? null,
-    status: item.status ?? item.contractStatus ?? null,
-    depositStatus: item.depositStatus ?? null,
-    workflowStatus: item.workflowStatus ?? null,
+    propertyId: item.propertyId ?? item.property_id ?? null,
+    propertyName: item.propertyName ?? item.property_name ?? null,
+    propertyAddress: item.propertyAddress ?? item.property_address ?? null,
+    tenantId: item.tenantId ?? item.tenant_id ?? null,
+    roomId: item.roomId ?? item.room_id ?? null,
+    roomCode: item.roomCode ?? item.room_code ?? null,
+    roomStatus: item.roomStatus ?? item.room_status ?? null,
+    primaryTenantProfileId: item.primaryTenantProfileId ?? item.primary_tenant_profile_id ?? null,
+    customerName: item.customerName ?? item.customer_name ?? item.primaryTenantName ?? item.primary_tenant_name ?? null,
+    primaryTenantName: item.primaryTenantName ?? item.primary_tenant_name ?? item.customerName ?? item.customer_name ?? null,
+    phone: item.phone ?? item.primaryTenantPhone ?? item.primary_tenant_phone ?? null,
+    email: item.email ?? item.primaryTenantEmail ?? item.primary_tenant_email ?? null,
+    expectedLeaseSignDate: item.expectedLeaseSignDate ?? item.expected_lease_sign_date ?? null,
+    expectedMoveInDate: item.expectedMoveInDate ?? item.expected_move_in_date ?? null,
+    startDate: item.startDate ?? item.start_date ?? null,
+    endDate: item.endDate ?? item.end_date ?? null,
+    rentStartDate: item.rentStartDate ?? item.rent_start_date ?? null,
+    monthlyRent: item.monthlyRent ?? item.monthly_rent ?? null,
+    paymentCycleMonths: item.paymentCycleMonths ?? item.payment_cycle_months ?? null,
+    depositAmount: item.depositAmount ?? item.deposit_amount ?? null,
+    contractStatus: item.contractStatus ?? item.contract_status ?? item.status ?? null,
+    status: item.status ?? item.contractStatus ?? item.contract_status ?? null,
+    depositStatus: item.depositStatus ?? item.deposit_status ?? null,
+    workflowStatus: item.workflowStatus ?? item.workflow_status ?? null,
     occupantsCount:
       item.occupantsCount ??
+      item.occupants_count ??
       item.occupantCount ??
+      item.occupant_count ??
       item.peopleCount ??
+      item.people_count ??
       item.roomOccupantCount ??
+      item.room_occupant_count ??
       (Array.isArray(item.occupants) ? item.occupants.length : null),
     contractFileId:
       item.contractFileId ??
+      item.contract_file_id ??
       item.fileId ??
+      item.file_id ??
       item.contractFile?.id ??
+      item.contract_file?.id ??
       item.contractFile?.fileId ??
+      item.contract_file?.file_id ??
       null,
     contractFileName:
       item.contractFileName ??
+      item.contract_file_name ??
       item.fileName ??
+      item.file_name ??
       item.contractFile?.fileName ??
+      item.contract_file?.file_name ??
       null,
     contractFileUploadedAt:
       item.contractFileUploadedAt ??
+      item.contract_file_uploaded_at ??
       item.uploadedAt ??
+      item.uploaded_at ??
       item.contractFile?.uploadedAt ??
+      item.contract_file?.uploaded_at ??
       null,
-    depositSignedFileId: item.depositSignedFileId ?? null,
-    signedAt: item.signedAt ?? null,
-    createdAt: item.createdAt ?? null,
-    accountProvisioned: item.accountProvisioned ?? false,
-    emailAvailable: item.emailAvailable ?? Boolean(item.email),
-    previousContractId: item.previousContractId ?? null,
-    previousContractCode: item.previousContractCode ?? null,
-    renewedContractId: item.renewedContractId ?? item.nextContractId ?? null,
+    signedFileId:
+      item.signedFileId ??
+      item.signed_file_id ??
+      item.signedFile?.id ??
+      item.signed_file?.id ??
+      null,
+    signedFileName:
+      item.signedFileName ??
+      item.signed_file_name ??
+      item.signedFile?.fileName ??
+      item.signed_file?.file_name ??
+      null,
+    signedFileUploadedAt:
+      item.signedFileUploadedAt ??
+      item.signed_file_uploaded_at ??
+      item.signedFile?.uploadedAt ??
+      item.signed_file?.uploaded_at ??
+      null,
+    signedAt: item.signedAt ?? item.signed_at ?? null,
+    createdAt: item.createdAt ?? item.created_at ?? null,
+    accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
+    emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+    previousContractId: item.previousContractId ?? item.previous_contract_id ?? null,
+    previousContractCode: item.previousContractCode ?? item.previous_contract_code ?? null,
+    renewedContractId: item.renewedContractId ?? item.renewed_contract_id ?? item.nextContractId ?? item.next_contract_id ?? null,
     renewedContractCode:
       item.renewedContractCode ??
+      item.renewed_contract_code ??
       item.nextContractCode ??
+      item.next_contract_code ??
       null,
-    tenantIntention: item.tenantIntention ?? null,
-    expectedVacantDate: item.expectedVacantDate ?? null,
-    intentionRecordedAt: item.intentionRecordedAt ?? null,
+    tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
+    expectedVacantDate: item.expectedVacantDate ?? item.expected_vacant_date ?? null,
+    intentionRecordedAt: item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
     intentionNote:
       item.intentionNote ??
+      item.intention_note ??
       item.tenantIntentionNote ??
+      item.tenant_intention_note ??
       null,
-    intentionSource: item.intentionSource ?? null,
+    intentionSource: item.intentionSource ?? item.intention_source ?? null,
   };
 }
 
 function normalizeLeaseContractList(data) {
-  return Array.isArray(data) ? data.map(normalizeLeaseContractItem) : [];
+  return readPageItems(data).map(normalizeLeaseContractItem);
 }
 
-export async function fetchLeaseContractManagementList() {
-  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management`, {
+export async function fetchLeaseContractManagementList({ page = 0, size = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "signedAt,desc",
+  });
+  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management?${params.toString()}`, {
     method: "GET",
   });
-  return normalizeLeaseContractList(data);
+  const items = normalizeLeaseContractList(data);
+  return {
+    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    items,
+  };
 }
 
 export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
@@ -157,7 +258,7 @@ export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
   return normalizeLeaseContractItem(data);
 }
 
-export async function uploadSignedLeaseContractFile(contract, file) {
+export async function uploadSignedLeaseContractFile(contract, file, options = {}) {
   if (!contract) {
     throw new Error("Vui lòng chọn hợp đồng cần upload.");
   }
@@ -166,16 +267,19 @@ export async function uploadSignedLeaseContractFile(contract, file) {
   }
 
   const target = normalizeLeaseContractItem(contract);
-  if (!target.leaseContractId && !target.depositAgreementId) {
-    throw new Error("Không xác định được mã cọc hoặc mã hợp đồng để upload file.");
+  if (!target.leaseContractId) {
+    throw new Error("Hợp đồng thuê chưa được tạo. Vui lòng tạo hợp đồng thuê trước khi upload file đã ký.");
   }
 
   const formData = new FormData();
   formData.append("file", file);
 
-  const endpoint = target.leaseContractId
-    ? `${API_BASE_URL}/lease-contracts/${encodeURIComponent(target.leaseContractId)}/signed-file`
-    : `${API_BASE_URL}/lease-contracts/management/deposits/${encodeURIComponent(target.depositAgreementId)}/signed-file`;
+  const replace = options.replace ?? Boolean(target.signedFileId);
+  const params = new URLSearchParams();
+  if (replace) params.set("replace", "true");
+
+  const query = params.toString();
+  const endpoint = `${API_BASE_URL}/lease-contracts/${encodeURIComponent(target.leaseContractId)}/signed-file${query ? `?${query}` : ""}`;
 
   const response = await fetchWithAuth(endpoint, {
     method: "POST",
@@ -191,6 +295,7 @@ export async function activateLeaseContract(leaseContractId) {
   }
   const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activate`, {
     method: "POST",
+    headers: { Accept: "application/json" },
   });
   return normalizeLeaseContractItem(data);
 }
@@ -281,6 +386,88 @@ async function fetchPrivateFileBlob(fileId) {
   return response.blob();
 }
 
+export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
+  if (!leaseContractId) {
+    throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c há»£p Ä‘á»“ng cáº§n táº£i.");
+  }
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("KhÃ´ng thá»ƒ táº£i PDF há»£p Ä‘á»“ng.");
+  }
+
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
+  const file = await fetchLeaseContractDraftPdfFile(leaseContractId);
+  return file.blob;
+}
+
+export async function downloadLeaseContractDraftPdf(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
+  const { blob, filename: serverFilename } = await fetchLeaseContractDraftPdfFile(leaseContractId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = serverFilename || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function fetchLeaseContractSignedFile(leaseContractId) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng thuê cần tải.");
+  }
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/signed-file`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error("Không thể tải hợp đồng thuê đã ký.");
+  }
+
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function fetchLeaseContractSignedFileBlob(leaseContractId) {
+  const file = await fetchLeaseContractSignedFile(leaseContractId);
+  return file.blob;
+}
+
+export async function downloadLeaseContractSignedFile(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
+  const { blob, filename: serverFilename } = await fetchLeaseContractSignedFile(leaseContractId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = serverFilename || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function openLeaseContractFile(fileId) {
   const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
   if (popup) {
@@ -303,7 +490,7 @@ export async function openLeaseContractFile(fileId) {
   }
 }
 
-export async function downloadLeaseContractFile(fileId, filename = "hop-dong-thue.pdf") {
+export async function downloadLeaseContractFile(fileId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
   const blob = await fetchPrivateFileBlob(fileId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -315,180 +502,222 @@ export async function downloadLeaseContractFile(fileId, filename = "hop-dong-thu
   URL.revokeObjectURL(url);
 }
 
-export async function downloadLeaseContractDraftPdf(contractId) {
-  const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
-  if (popup) {
-    popup.document.write("<!doctype html><title>Đang xử lý PDF</title><p style=\"font-family:Arial,sans-serif;padding:24px\">Đang tải PDF hợp đồng...</p>");
-  }
-
-  try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/draft-pdf`, {
-      method: "GET",
-    });
-    if (!response.ok) {
-      throw new Error("Không thể tải file PDF hợp đồng.");
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    if (popup) {
-      popup.opener = null;
-      popup.location.href = url;
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    popup?.close();
-    throw error;
-  }
-}
-
 function normalizeLeaseContractDetails(details = {}) {
   if (!details || typeof details !== "object") return null;
-  const rawContractFile = details.contractFile ?? null;
+  const rawContractFile = details.contractFile ?? details.contract_file ?? null;
   const rawOccupants =
     details.occupants ??
     details.contractOccupants ??
+    details.contract_occupants ??
     details.occupantInfos ??
+    details.occupant_infos ??
     details.residents ??
     [];
   const contractFile = rawContractFile
     ? {
         ...rawContractFile,
-        id: rawContractFile.id ?? rawContractFile.fileId ?? null,
-        fileName: rawContractFile.fileName ?? rawContractFile.name ?? null,
-        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.createdAt ?? null,
+        id: rawContractFile.id ?? rawContractFile.fileId ?? rawContractFile.file_id ?? null,
+        fileName: rawContractFile.fileName ?? rawContractFile.file_name ?? rawContractFile.name ?? null,
+        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
       }
     : null;
-  const rawPrimaryTenant = details.primaryTenant ?? {};
+  const rawSignedFile = details.signedFile ?? details.signed_file ?? null;
+  const signedFile = rawSignedFile
+    ? {
+        ...rawSignedFile,
+        id: rawSignedFile.id ?? rawSignedFile.fileId ?? rawSignedFile.file_id ?? null,
+        fileName: rawSignedFile.fileName ?? rawSignedFile.file_name ?? rawSignedFile.name ?? null,
+        uploadedAt: rawSignedFile.uploadedAt ?? rawSignedFile.uploaded_at ?? rawSignedFile.createdAt ?? rawSignedFile.created_at ?? null,
+      }
+    : null;
+  const rawPrimaryTenant = details.primaryTenant ?? details.primary_tenant ?? {};
   const primaryTenant = rawPrimaryTenant
     ? {
         ...rawPrimaryTenant,
-        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? null,
-        fullName: rawPrimaryTenant.fullName ?? "",
+        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? rawPrimaryTenant.tenant_profile_id ?? null,
+        fullName: rawPrimaryTenant.fullName ?? rawPrimaryTenant.full_name ?? "",
         phone: rawPrimaryTenant.phone ?? "",
         email: rawPrimaryTenant.email ?? "",
         dob:
           rawPrimaryTenant.dob ??
           rawPrimaryTenant.dateOfBirth ??
+          rawPrimaryTenant.date_of_birth ??
           rawPrimaryTenant.birthDate ??
+          rawPrimaryTenant.birth_date ??
           null,
         dateOfBirth:
           rawPrimaryTenant.dateOfBirth ??
+          rawPrimaryTenant.date_of_birth ??
           rawPrimaryTenant.dob ??
           rawPrimaryTenant.birthDate ??
+          rawPrimaryTenant.birth_date ??
           null,
-        permanentAddress: rawPrimaryTenant.permanentAddress ?? "",
+        permanentAddress: rawPrimaryTenant.permanentAddress ?? rawPrimaryTenant.permanent_address ?? "",
         citizenId:
           rawPrimaryTenant.citizenId ??
+          rawPrimaryTenant.citizen_id ??
           rawPrimaryTenant.identityNumber ??
+          rawPrimaryTenant.identity_number ??
           rawPrimaryTenant.idNumber ??
+          rawPrimaryTenant.id_number ??
           rawPrimaryTenant.docNumber ??
+          rawPrimaryTenant.doc_number ??
           null,
         identityIssuedDate:
           rawPrimaryTenant.identityIssuedDate ??
+          rawPrimaryTenant.identity_issued_date ??
           rawPrimaryTenant.issuedDate ??
+          rawPrimaryTenant.issued_date ??
           rawPrimaryTenant.issueDate ??
+          rawPrimaryTenant.issue_date ??
           null,
         identityIssuedPlace:
           rawPrimaryTenant.identityIssuedPlace ??
+          rawPrimaryTenant.identity_issued_place ??
           rawPrimaryTenant.issuedPlace ??
+          rawPrimaryTenant.issued_place ??
           rawPrimaryTenant.issuePlace ??
+          rawPrimaryTenant.issue_place ??
           "",
       }
     : {};
   return {
     ...details,
-    contractId: details.contractId ?? null,
-    contractCode: details.contractCode ?? "",
-    depositAgreementId: details.depositAgreementId ?? null,
-    depositSignedFileId: details.depositSignedFileId ?? null,
-    tenantId: details.tenantId ?? null,
-    startDate: details.startDate ?? null,
-    endDate: details.endDate ?? null,
-    rentStartDate: details.rentStartDate ?? null,
-    monthlyRent: details.monthlyRent ?? null,
-    paymentCycleMonths: details.paymentCycleMonths ?? null,
-    depositAmount: details.depositAmount ?? null,
+    contractId: details.contractId ?? details.contract_id ?? null,
+    contractCode: details.contractCode ?? details.contract_code ?? "",
+    tenantId: details.tenantId ?? details.tenant_id ?? null,
+    startDate: details.startDate ?? details.start_date ?? null,
+    endDate: details.endDate ?? details.end_date ?? null,
+    rentStartDate: details.rentStartDate ?? details.rent_start_date ?? null,
+    monthlyRent: details.monthlyRent ?? details.monthly_rent ?? null,
+    paymentCycleMonths: details.paymentCycleMonths ?? details.payment_cycle_months ?? null,
+    depositAmount: details.depositAmount ?? details.deposit_amount ?? null,
     occupantsCount:
       details.occupantsCount ??
+      details.occupants_count ??
       details.occupantCount ??
+      details.occupant_count ??
       (Array.isArray(rawOccupants) ? rawOccupants.length : null),
     status: details.status ?? null,
-    signedAt: details.signedAt ?? null,
-    previousContractId: details.previousContractId ?? null,
-    previousContractCode: details.previousContractCode ?? null,
+    signedFileId:
+      details.signedFileId ??
+      details.signed_file_id ??
+      signedFile?.id ??
+      null,
+    signedFileName:
+      details.signedFileName ??
+      details.signed_file_name ??
+      signedFile?.fileName ??
+      null,
+    signedFileUploadedAt:
+      details.signedFileUploadedAt ??
+      details.signed_file_uploaded_at ??
+      signedFile?.uploadedAt ??
+      null,
+    signedAt: details.signedAt ?? details.signed_at ?? null,
+    previousContractId: details.previousContractId ?? details.previous_contract_id ?? null,
+    previousContractCode: details.previousContractCode ?? details.previous_contract_code ?? null,
     renewedContractId:
       details.renewedContractId ??
+      details.renewed_contract_id ??
       details.nextContractId ??
+      details.next_contract_id ??
       null,
     renewedContractCode:
       details.renewedContractCode ??
+      details.renewed_contract_code ??
       details.nextContractCode ??
+      details.next_contract_code ??
       null,
-    tenantIntention: details.tenantIntention ?? null,
-    expectedVacantDate: details.expectedVacantDate ?? null,
-    intentionRecordedAt: details.intentionRecordedAt ?? null,
+    tenantIntention: details.tenantIntention ?? details.tenant_intention ?? null,
+    expectedVacantDate: details.expectedVacantDate ?? details.expected_vacant_date ?? null,
+    intentionRecordedAt: details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
     intentionNote:
       details.intentionNote ??
+      details.intention_note ??
       details.tenantIntentionNote ??
+      details.tenant_intention_note ??
       null,
-    intentionSource: details.intentionSource ?? null,
-    canRenew: details.canRenew ?? false,
-    canRenewBlockedReason: details.canRenewBlockedReason ?? "",
-    canLiquidate: details.canLiquidate ?? false,
-    canSendAccount: details.canSendAccount ?? false,
+    intentionSource: details.intentionSource ?? details.intention_source ?? null,
+    canRenew: details.canRenew ?? details.can_renew ?? false,
+    canRenewBlockedReason:
+      details.canRenewBlockedReason ??
+      details.can_renew_blocked_reason ??
+      "",
+    canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
+    canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
     accountProvisioningStatus:
       details.accountProvisioningStatus ??
+      details.account_provisioning_status ??
       "NOT_PROVISIONED",
     room: details.room ?? {},
     property: details.property ?? {},
     primaryTenant,
     contractFile,
+    signedFile,
     occupants: Array.isArray(rawOccupants)
       ? rawOccupants.map((occupant) => ({
           ...occupant,
-          tenantProfileId: occupant.tenantProfileId ?? null,
-          fullName: occupant.fullName ?? "",
+          tenantProfileId: occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
+          fullName: occupant.fullName ?? occupant.full_name ?? "",
           phone: occupant.phone ?? "",
           email: occupant.email ?? "",
           dob:
             occupant.dob ??
             occupant.dateOfBirth ??
+            occupant.date_of_birth ??
             occupant.birthDate ??
+            occupant.birth_date ??
             null,
           dateOfBirth:
             occupant.dateOfBirth ??
+            occupant.date_of_birth ??
             occupant.dob ??
             occupant.birthDate ??
+            occupant.birth_date ??
             null,
-          permanentAddress: occupant.permanentAddress ?? "",
+          permanentAddress: occupant.permanentAddress ?? occupant.permanent_address ?? "",
           citizenId:
             occupant.citizenId ??
+            occupant.citizen_id ??
             occupant.cccd ??
+            occupant.citizen_id ??
             occupant.identityNumber ??
+            occupant.identity_number ??
             occupant.idNumber ??
+            occupant.id_number ??
             occupant.docNumber ??
+            occupant.doc_number ??
             null,
           identityIssuedDate:
             occupant.identityIssuedDate ??
+            occupant.identity_issued_date ??
             occupant.issuedDate ??
+            occupant.issued_date ??
             occupant.issueDate ??
+            occupant.issue_date ??
             null,
           identityIssuedPlace:
             occupant.identityIssuedPlace ??
+            occupant.identity_issued_place ??
             occupant.issuedPlace ??
+            occupant.issued_place ??
             occupant.issuePlace ??
+            occupant.issue_place ??
             "",
-          occupantRole: occupant.occupantRole ?? null,
-          moveInDate: occupant.moveInDate ?? null,
-          moveOutDate: occupant.moveOutDate ?? null,
+          occupantRole: occupant.occupantRole ?? occupant.occupant_role ?? null,
+          moveInDate: occupant.moveInDate ?? occupant.move_in_date ?? null,
+          moveOutDate: occupant.moveOutDate ?? occupant.move_out_date ?? null,
           status: occupant.status ?? null,
-          accountStatus: occupant.accountStatus ?? "NOT_PROVISIONED",
-          accountSentAt: occupant.accountSentAt ?? null,
-          lastLoginAt: occupant.lastLoginAt ?? null,
+          accountStatus:
+            occupant.accountStatus ??
+            occupant.account_status ??
+            "NOT_PROVISIONED",
+          accountSentAt: occupant.accountSentAt ?? occupant.account_sent_at ?? null,
+          lastLoginAt: occupant.lastLoginAt ?? occupant.last_login_at ?? null,
           mustChangePassword:
             occupant.mustChangePassword ??
+            occupant.must_change_password ??
             null,
         }))
       : [],
@@ -496,9 +725,9 @@ function normalizeLeaseContractDetails(details = {}) {
       ? details.events.map((event) => ({
           ...event,
           id: event.id ?? null,
-          eventType: event.eventType ?? "",
-          eventData: event.eventData ?? "",
-          createdAt: event.createdAt ?? null,
+          eventType: event.eventType ?? event.event_type ?? "",
+          eventData: event.eventData ?? event.event_data ?? "",
+          createdAt: event.createdAt ?? event.created_at ?? null,
         }))
       : [],
   };
@@ -506,9 +735,9 @@ function normalizeLeaseContractDetails(details = {}) {
 
 function normalizeRentalHistory(data = {}) {
   return {
-    roomId: data.roomId ?? null,
-    roomCode: data.roomCode ?? "",
-    roomName: data.roomName ?? "",
+    roomId: data.roomId ?? data.room_id ?? null,
+    roomCode: data.roomCode ?? data.room_code ?? "",
+    roomName: data.roomName ?? data.room_name ?? "",
     contracts: Array.isArray(data.contracts)
       ? data.contracts.map(normalizeLeaseContractDetails).filter(Boolean)
       : [],

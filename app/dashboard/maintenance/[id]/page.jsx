@@ -35,7 +35,7 @@ const STATUS_META = {
   ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-800 ring-blue-200"],
   IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
   WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Hoàn tất", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
+  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
   REJECTED: ["Từ chối", "bg-rose-50 text-rose-800 ring-rose-200"],
 };
 
@@ -352,7 +352,9 @@ function buildCompleteForm(ticket) {
     rootCause: ticket?.rootCause || "",
     repairItems: ticket?.repairItems || "",
     actualCost: ticket?.costAmount ? formatMoneyInput(ticket.costAmount) : "",
-    costResponsibility: ticket?.costResponsibility || "UNDECIDED",
+    costResponsibility: ticket?.ticketScope === "PROPERTY_OPERATION"
+      ? "OWNER"
+      : ticket?.costResponsibility || "UNDECIDED",
     collectionMethod: "MONTHLY_SCHEDULED",
     billingPeriod: nextPeriod.toISOString().slice(0, 7),
     completionNote: "",
@@ -373,7 +375,7 @@ export default function MaintenanceTicketDetailPage() {
 
   const locationText = useMemo(() => {
     if (!ticket) return "";
-    if (ticket.ticketScope === "ROOM") {
+    if (ticket.ticketScope === "ROOM" || ticket.roomCode || ticket.roomName) {
       return [ticket.roomCode || ticket.roomName || "Phòng thuê", ticket.propertyName].filter(Boolean).join(" · ");
     }
     return [SCOPE_LABELS[ticket.ticketScope] || ticket.ticketScope, ticket.propertyName].filter(Boolean).join(" · ");
@@ -407,7 +409,9 @@ export default function MaintenanceTicketDetailPage() {
   function handleAfterImages(event) {
     const files = Array.from(event.target.files || []);
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-    setCompleteForm((current) => ({ ...current, images: [...current.images, ...imageFiles].slice(0, 6) }));
+    const existingCount = ticket?.afterAttachments?.length || 0;
+    const remainingSlots = Math.max(0, 3 - existingCount);
+    setCompleteForm((current) => ({ ...current, images: [...current.images, ...imageFiles].slice(0, remainingSlots) }));
     event.target.value = "";
   }
 
@@ -444,13 +448,25 @@ export default function MaintenanceTicketDetailPage() {
       setError("Vui lòng nhập hạng mục đã sửa.");
       return;
     }
-    if (ticket.afterAttachments.length === 0 && completeForm.images.length === 0) {
+    if (ticket.ticketScope === "PROPERTY_OPERATION" && !completeForm.repairmanName.trim()) {
+      setError("Vui lòng nhập tên thợ sửa hoặc nhân sự xử lý.");
+      return;
+    }
+    if ((ticket.afterAttachments?.length || 0) === 0 && completeForm.images.length === 0) {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
+      return;
+    }
+    if ((ticket.afterAttachments?.length || 0) + completeForm.images.length > 3) {
+      setError("Ảnh sau sửa tối đa 3 ảnh.");
       return;
     }
     const amount = parseMoneyInput(completeForm.actualCost);
     if (!Number.isFinite(amount) || amount < 0) {
       setError("Chi phí thực tế không hợp lệ.");
+      return;
+    }
+    if (ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
+      setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
       return;
     }
 
@@ -584,6 +600,24 @@ export default function MaintenanceTicketDetailPage() {
         <InfoItem label="Ngày tạo" value={formatDateTime(ticket.createdAt)} />
       </div>
 
+      {ticket.ticketScope === "PROPERTY_OPERATION" && (
+        <section className="grid gap-4 rounded-lg border border-teal-200 bg-teal-50/50 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-[#091426]">Chi phí bảo trì nội bộ</h2>
+              <p className="mt-1 text-sm font-semibold text-[#64748b]">Khoản này do chủ trọ chịu, chỉ dùng để thống kê chi phí vận hành.</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">Không thu khách</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <InfoItem label="Người chịu phí" value="Chủ trọ" />
+            <InfoItem label="Chi phí thực tế" value={formatMoney(ticket.costAmount)} />
+            <InfoItem label="Trạng thái thu khách" value="Không thu khách" />
+          </div>
+          {ticket.costDescription && <InfoItem label="Ghi chú kế toán" value={ticket.costDescription} />}
+        </section>
+      )}
+
       <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
         <h2 className="text-lg font-black text-[#091426]">Thông tin sự cố</h2>
         <p className="rounded-lg bg-[#f8fafc] p-4 text-sm font-semibold leading-6 text-[#334155]">{ticket.description}</p>
@@ -629,7 +663,12 @@ export default function MaintenanceTicketDetailPage() {
               </div>
             </Field>
             <Field label="Trách nhiệm chi phí">
-              <select value={completeForm.costResponsibility} onChange={(event) => updateCompleteForm("costResponsibility", event.target.value)} className={inputClassName()}>
+              <select
+                value={ticket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completeForm.costResponsibility}
+                onChange={(event) => updateCompleteForm("costResponsibility", event.target.value)}
+                disabled={ticket.ticketScope === "PROPERTY_OPERATION"}
+                className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
+              >
                 {COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
@@ -687,10 +726,12 @@ export default function MaintenanceTicketDetailPage() {
                   </button>
                 </div>
               ))}
-              <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-[#475569] hover:border-[#091426]">
-                <ImagePlus className="h-6 w-6" />
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
-              </label>
+              {((ticket.afterAttachments?.length || 0) + completeForm.images.length) < 3 && (
+                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-[#475569] hover:border-[#091426]">
+                  <ImagePlus className="h-6 w-6" />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
+                </label>
+              )}
             </div>
             <button
               type="submit"
@@ -698,7 +739,7 @@ export default function MaintenanceTicketDetailPage() {
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
             >
               {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
-              Hoàn tất
+              Xác nhận hoàn tất
             </button>
           </div>
         </form>

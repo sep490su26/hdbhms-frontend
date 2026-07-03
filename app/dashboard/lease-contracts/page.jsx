@@ -26,14 +26,16 @@ import {
   updateDepositAgreementStatus,
   uploadSignedDepositContractFile,
 } from "@/services/depositContractsService";
+import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const money = new Intl.NumberFormat("vi-VN");
 
 const STATUS_OPTIONS = [
-  { value: "PAID", label: "Đã đặt cọc", pill: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
-  { value: "CONVERTED_TO_LEASE", label: "Đã nhận phòng", pill: "bg-blue-100 text-blue-800", dot: "bg-blue-600" },
-  { value: "REFUNDED", label: "Đã hoàn cọc", pill: "bg-emerald-100 text-emerald-800", dot: "bg-emerald-600" },
-  { value: "FORFEITED", label: "Mất cọc", pill: "bg-rose-100 text-rose-800", dot: "bg-rose-600" },
+  { value: "PAID", label: "ÄÃ£ Ä‘áº·t cá»c", pill: "bg-amber-100 text-amber-800", dot: "bg-amber-500" },
+  { value: "CONVERTED_TO_LEASE", label: "ÄÃ£ nháº­n phÃ²ng", pill: "bg-blue-100 text-blue-800", dot: "bg-blue-600" },
+  { value: "REFUNDED", label: "ÄÃ£ hoÃ n cá»c", pill: "bg-emerald-100 text-emerald-800", dot: "bg-emerald-600" },
+  { value: "FORFEITED", label: "Máº¥t cá»c", pill: "bg-rose-100 text-rose-800", dot: "bg-rose-600" },
 ];
 
 const MANAGED_DEPOSIT_STATUSES = new Set(STATUS_OPTIONS.map((status) => status.value));
@@ -45,18 +47,15 @@ const STATUS_LABELS = {
   CONVERTED_TO_LEASE: STATUS_OPTIONS[1],
   REFUNDED: STATUS_OPTIONS[2],
   FORFEITED: STATUS_OPTIONS[3],
-  CANCELLED: { label: "Đã hủy", pill: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
+  CANCELLED: { label: "ÄÃ£ há»§y", pill: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
 };
 
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} đ`;
+  return `${money.format(Number(value || 0))} Ä‘`;
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleDateString("vi-VN");
+  return formatDisplayDate(value);
 }
 
 function toInputDate(value) {
@@ -68,16 +67,7 @@ function toInputDate(value) {
 }
 
 function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value);
 }
 
 function getAgreementItems(response) {
@@ -92,10 +82,10 @@ function normalizeAgreement(item) {
     id: item.id ?? item.depositAgreementId ?? item.deposit_agreement_id,
     depositCode: item.depositCode || item.deposit_code || `DC-${item.id}`,
     roomCode,
-    floorLabel: roomCode ? `Tầng ${String(roomCode).charAt(0)}` : "Chưa rõ tầng",
-    propertyName: item.propertyName || item.property_name || "Nhà trọ Hải Đăng",
-    depositorFullName: item.depositorFullName || item.depositor_full_name || "Khách đặt cọc",
-    depositorPhone: item.depositorPhone || item.depositor_phone || "Chưa có SĐT",
+    floorLabel: roomCode ? `Táº§ng ${String(roomCode).charAt(0)}` : "ChÆ°a rÃµ táº§ng",
+    propertyName: item.propertyName || item.property_name || "NhÃ  trá» Háº£i ÄÄƒng",
+    depositorFullName: item.depositorFullName || item.depositor_full_name || "KhÃ¡ch Ä‘áº·t cá»c",
+    depositorPhone: item.depositorPhone || item.depositor_phone || "ChÆ°a cÃ³ SÄT",
     depositorEmail: item.depositorEmail || item.depositor_email || "",
     depositorPermanentAddress: item.depositorPermanentAddress || item.depositor_permanent_address || item.permanentAddress || item.permanent_address || "",
     amount: Number(item.amount || 0),
@@ -107,7 +97,7 @@ function normalizeAgreement(item) {
     contractFileId: item.contractFileId || item.contract_file_id || null,
     contractDownloadUrl: item.contractDownloadUrl || item.contract_download_url || null,
     signatureStatus: item.signatureStatus || item.signature_status || (item.signedFileId || item.signed_file_id ? "SIGNED" : "PENDING_SIGNATURE"),
-    signatureStatusLabel: item.signatureStatusLabel || item.signature_status_label || (item.signedFileId || item.signed_file_id ? "Đã ký" : "Chờ upload bản đã ký"),
+    signatureStatusLabel: item.signatureStatusLabel || item.signature_status_label || (item.signedFileId || item.signed_file_id ? "ÄÃ£ kÃ½" : "Chá» upload báº£n Ä‘Ã£ kÃ½"),
     signedFileId: item.signedFileId || item.signed_file_id || null,
     signedFileName: item.signedFileName || item.signed_file_name || "",
     signedAt: item.signedAt || item.signed_at || null,
@@ -166,7 +156,7 @@ function DetailField({ label, value }) {
   return (
     <div className="rounded-lg bg-[#f7f9fc] p-4">
       <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">{label}</p>
-      <p className="mt-2 break-words text-sm font-bold text-[#102033]">{value || "Chưa cập nhật"}</p>
+      <p className="mt-2 break-words text-sm font-bold text-[#102033]">{value || "ChÆ°a cáº­p nháº­t"}</p>
     </div>
   );
 }
@@ -186,7 +176,7 @@ function SensitiveImage({ title, url }) {
       ) : (
         <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-[#c7cfdd] bg-[#f7f9fc] text-sm font-semibold text-[#8b909a]">
           <ImageIcon className="mr-2 h-5 w-5" />
-          Chưa có ảnh
+          ChÆ°a cÃ³ áº£nh
         </div>
       )}
     </div>
@@ -240,13 +230,13 @@ function DetailModal({
   };
   const validateForm = () => {
     const phone = activeForm.depositorPhone.replace(/[\s.-]/g, "");
-    if (!/^0\d{9}$/.test(phone)) return "Số điện thoại phải bắt đầu bằng 0 và có đúng 10 chữ số.";
-    if (!activeForm.permanentAddress.trim()) return "Địa chỉ không được để trống.";
-    if (!activeForm.expectedLeaseSignDate) return "Vui lòng chọn ngày ký hợp đồng dự kiến.";
-    if (activeForm.expectedLeaseSignDate < today) return "Ngày ký hợp đồng dự kiến không được là ngày quá khứ.";
-    if (!activeForm.expectedMoveInDate) return "Vui lòng chọn ngày vào ở dự kiến.";
-    if (activeForm.expectedMoveInDate < today) return "Ngày vào ở dự kiến không được là ngày quá khứ.";
-    if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate) return "Ngày vào ở dự kiến không được trước ngày ký hợp đồng dự kiến.";
+    if (!/^0\d{9}$/.test(phone)) return "Sá»‘ Ä‘iá»‡n thoáº¡i pháº£i báº¯t Ä‘áº§u báº±ng 0 vÃ  cÃ³ Ä‘Ãºng 10 chá»¯ sá»‘.";
+    if (!activeForm.permanentAddress.trim()) return "Äá»‹a chá»‰ khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.";
+    if (!activeForm.expectedLeaseSignDate) return "Vui lÃ²ng chá»n ngÃ y kÃ½ há»£p Ä‘á»“ng dá»± kiáº¿n.";
+    if (activeForm.expectedLeaseSignDate < today) return "NgÃ y kÃ½ há»£p Ä‘á»“ng dá»± kiáº¿n khÃ´ng Ä‘Æ°á»£c lÃ  ngÃ y quÃ¡ khá»©.";
+    if (!activeForm.expectedMoveInDate) return "Vui lÃ²ng chá»n ngÃ y vÃ o á»Ÿ dá»± kiáº¿n.";
+    if (activeForm.expectedMoveInDate < today) return "NgÃ y vÃ o á»Ÿ dá»± kiáº¿n khÃ´ng Ä‘Æ°á»£c lÃ  ngÃ y quÃ¡ khá»©.";
+    if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate) return "NgÃ y vÃ o á»Ÿ dá»± kiáº¿n khÃ´ng Ä‘Æ°á»£c trÆ°á»›c ngÃ y kÃ½ há»£p Ä‘á»“ng dá»± kiáº¿n.";
     return "";
   };
   const handleSave = async () => {
@@ -267,7 +257,7 @@ function DetailModal({
       setForm(null);
       setIsEditing(false);
     } catch (error) {
-      setFormError(error.message || "Không thể cập nhật thông tin hợp đồng cọc.");
+      setFormError(error.message || "KhÃ´ng thá»ƒ cáº­p nháº­t thÃ´ng tin há»£p Ä‘á»“ng cá»c.");
     } finally {
       setIsSaving(false);
     }
@@ -278,10 +268,10 @@ function DetailModal({
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-[#d7dde8] px-5 py-4">
           <div>
-            <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#4160ad]">Chi tiết hợp đồng cọc</p>
+            <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#4160ad]">Chi tiáº¿t há»£p Ä‘á»“ng cá»c</p>
             <h2 className="mt-1 text-xl font-extrabold text-[#102033]">{agreement.depositCode}</h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full p-2 text-[#5a6678] hover:bg-[#eef3fb]" aria-label="Đóng">
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-[#5a6678] hover:bg-[#eef3fb]" aria-label="ÄÃ³ng">
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -289,16 +279,16 @@ function DetailModal({
         <div className="overflow-y-auto p-5 custom-scrollbar">
           {loading ? (
             <div className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-10 text-center font-bold text-[#5a6678]">
-              Đang tải chi tiết hợp đồng cọc...
+              Äang táº£i chi tiáº¿t há»£p Ä‘á»“ng cá»c...
             </div>
           ) : (
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <section className="grid gap-5">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <DetailField label="Khách hàng" value={agreement.depositorFullName} />
+                  <DetailField label="KhÃ¡ch hÃ ng" value={agreement.depositorFullName} />
                   {isEditing ? (
                     <label className="rounded-lg bg-[#f7f9fc] p-4">
-                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Số điện thoại</span>
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Sá»‘ Ä‘iá»‡n thoáº¡i</span>
                       <input
                         value={activeForm.depositorPhone}
                         onChange={(event) => updateField("depositorPhone", event.target.value)}
@@ -306,14 +296,14 @@ function DetailModal({
                       />
                     </label>
                   ) : (
-                    <DetailField label="Số điện thoại" value={agreement.depositorPhone} />
+                    <DetailField label="Sá»‘ Ä‘iá»‡n thoáº¡i" value={agreement.depositorPhone} />
                   )}
-                  <DetailField label="Email" value={agreement.depositorEmail || "Không có"} />
-                  <DetailField label="Phòng" value={agreement.roomCode || room.roomCode} />
-                  <DetailField label="Cơ sở" value={agreement.propertyName} />
+                  <DetailField label="Email" value={agreement.depositorEmail || "KhÃ´ng cÃ³"} />
+                  <DetailField label="PhÃ²ng" value={agreement.roomCode || room.roomCode} />
+                  <DetailField label="CÆ¡ sá»Ÿ" value={agreement.propertyName} />
                   {isEditing ? (
                     <label className="rounded-lg bg-[#f7f9fc] p-4">
-                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Địa chỉ</span>
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Äá»‹a chá»‰</span>
                       <input
                         value={activeForm.permanentAddress}
                         onChange={(event) => updateField("permanentAddress", event.target.value)}
@@ -321,14 +311,14 @@ function DetailModal({
                       />
                     </label>
                   ) : (
-                    <DetailField label="Địa chỉ" value={depositorPermanentAddress} />
+                    <DetailField label="Äá»‹a chá»‰" value={depositorPermanentAddress} />
                   )}
-                  <DetailField label="Tiền cọc" value={formatMoney(agreement.amount)} />
-                  <DetailField label="Ngày tạo" value={formatDateTime(agreement.createdAt)} />
-                  <DetailField label="Ngày xác nhận" value={formatDateTime(agreement.confirmedAt)} />
+                  <DetailField label="Tiá»n cá»c" value={formatMoney(agreement.amount)} />
+                  <DetailField label="NgÃ y táº¡o" value={formatDateTime(agreement.createdAt)} />
+                  <DetailField label="NgÃ y xÃ¡c nháº­n" value={formatDateTime(agreement.confirmedAt)} />
                   {isEditing ? (
                     <label className="rounded-lg bg-[#f7f9fc] p-4">
-                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày ký HĐ dự kiến</span>
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">NgÃ y kÃ½ HÄ dá»± kiáº¿n</span>
                       <input
                         type="date"
                         min={today}
@@ -338,11 +328,11 @@ function DetailModal({
                       />
                     </label>
                   ) : (
-                    <DetailField label="Ngày ký HĐ dự kiến" value={formatDate(expectedLeaseSignDate)} />
+                    <DetailField label="NgÃ y kÃ½ HÄ dá»± kiáº¿n" value={formatDate(expectedLeaseSignDate)} />
                   )}
                   {isEditing ? (
                     <label className="rounded-lg bg-[#f7f9fc] p-4">
-                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">Ngày vào ở dự kiến</span>
+                      <span className="text-xs font-bold uppercase tracking-[0.08em] text-[#8b909a]">NgÃ y vÃ o á»Ÿ dá»± kiáº¿n</span>
                       <input
                         type="date"
                         min={today}
@@ -352,9 +342,9 @@ function DetailModal({
                       />
                     </label>
                   ) : (
-                    <DetailField label="Ngày vào ở dự kiến" value={formatDate(expectedMoveInDate)} />
+                    <DetailField label="NgÃ y vÃ o á»Ÿ dá»± kiáº¿n" value={formatDate(expectedMoveInDate)} />
                   )}
-                  <DetailField label="Ghi chú" value={details.note || "Không có ghi chú"} />
+                  <DetailField label="Ghi chÃº" value={details.note || "KhÃ´ng cÃ³ ghi chÃº"} />
                 </div>
 
                 {formError && (
@@ -366,24 +356,24 @@ function DetailModal({
                 <section className="rounded-xl border border-[#d7dde8] bg-[#f7f9fc] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#8b909a]">Ảnh giấy tờ</p>
-                      <h3 className="mt-1 text-lg font-extrabold text-[#102033]">CCCD và ảnh chân dung</h3>
+                      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#8b909a]">áº¢nh giáº¥y tá»</p>
+                      <h3 className="mt-1 text-lg font-extrabold text-[#102033]">CCCD vÃ  áº£nh chÃ¢n dung</h3>
                     </div>
                     <LockKeyhole className="h-5 w-5 text-[#4160ad]" />
                   </div>
                   <p className="mt-2 text-sm font-medium text-[#5a6678]">
-                    Dữ liệu này nhạy cảm, chỉ tài khoản có quyền quản lý mới nên xem.
+                    Dá»¯ liá»‡u nÃ y nháº¡y cáº£m, chá»‰ tÃ i khoáº£n cÃ³ quyá»n quáº£n lÃ½ má»›i nÃªn xem.
                   </p>
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    <SensitiveImage title="Mặt trước CCCD" url={details.idFrontFileUrl} />
-                    <SensitiveImage title="Mặt sau CCCD" url={details.idBackFileUrl} />
-                    <SensitiveImage title="Ảnh chân dung" url={details.portraitFileUrl} />
+                    <SensitiveImage title="Máº·t trÆ°á»›c CCCD" url={details.idFrontFileUrl} />
+                    <SensitiveImage title="Máº·t sau CCCD" url={details.idBackFileUrl} />
+                    <SensitiveImage title="áº¢nh chÃ¢n dung" url={details.portraitFileUrl} />
                   </div>
                 </section>
               </section>
 
               <aside className="h-fit rounded-xl border border-[#d7dde8] bg-white p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
-                <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">Trạng thái hiện tại</p>
+                <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">Tráº¡ng thÃ¡i hiá»‡n táº¡i</p>
                 <div className="mt-4">
                   <StatusBadge status={agreement.status} />
                 </div>
@@ -397,7 +387,7 @@ function DetailModal({
                           disabled={isSaving}
                           className="inline-flex h-12 items-center justify-center rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                          {isSaving ? "Äang lÆ°u..." : "LÆ°u thay Ä‘á»•i"}
                         </button>
                         <button
                           type="button"
@@ -409,7 +399,7 @@ function DetailModal({
                           disabled={isSaving}
                           className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Hủy chỉnh sửa
+                          Há»§y chá»‰nh sá»­a
                         </button>
                       </div>
                     ) : (
@@ -422,7 +412,7 @@ function DetailModal({
                         }}
                         className="inline-flex h-12 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
                       >
-                        Chỉnh sửa thông tin
+                        Chá»‰nh sá»­a thÃ´ng tin
                       </button>
                     )
                   )}
@@ -432,7 +422,7 @@ function DetailModal({
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a]"
                   >
                     <FileText className="h-4 w-4" />
-                    Xem hợp đồng cọc
+                    Xem há»£p Ä‘á»“ng cá»c
                   </button>
                   <button
                     type="button"
@@ -440,11 +430,11 @@ function DetailModal({
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-[#102033] hover:bg-[#f4f7fb]"
                   >
                     <Download className="h-4 w-4" />
-                    Tải PDF
+                    Táº£i PDF
                   </button>
                   {!canEditManagementInfo && (
                     <p className="rounded-lg bg-[#f7f9fc] p-3 text-sm font-semibold text-[#5a6678]">
-                      Thông tin cọc đã khóa vì trạng thái hiện tại không còn trong giai đoạn chờ ký.
+                      ThÃ´ng tin cá»c Ä‘Ã£ khÃ³a vÃ¬ tráº¡ng thÃ¡i hiá»‡n táº¡i khÃ´ng cÃ²n trong giai Ä‘oáº¡n chá» kÃ½.
                     </p>
                   )}
                 </div>
@@ -467,19 +457,29 @@ export default function DepositsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const loadAgreements = useCallback(async () => {
     try {
       setLoadError("");
-      const response = await fetchDepositAgreements({ size: 200 });
+      const response = await fetchDepositAgreements({
+        page: page - 1,
+        size,
+        statuses: [...MANAGED_DEPOSIT_STATUSES],
+      });
       const nextAgreements = getAgreementItems(response)
         .map(normalizeAgreement)
         .filter((agreement) => MANAGED_DEPOSIT_STATUSES.has(agreement.status));
       setAgreements(nextAgreements);
+      setTotalElements(response?.totalElements ?? nextAgreements.length);
+      setTotalPages(response?.totalPages ?? 1);
     } catch (error) {
-      setLoadError(error.message || "Không tải được danh sách hợp đồng cọc từ backend.");
+      setLoadError(error.message || "KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch há»£p Ä‘á»“ng cá»c tá»« backend.");
     }
-  }, []);
+  }, [page, size]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -522,7 +522,7 @@ export default function DepositsPage() {
       setSelectedAgreement(merged);
       setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
     } catch (error) {
-      setNotice(error.message || "Không tải được chi tiết hợp đồng cọc.");
+      setNotice(error.message || "KhÃ´ng táº£i Ä‘Æ°á»£c chi tiáº¿t há»£p Ä‘á»“ng cá»c.");
     } finally {
       setDetailLoading(false);
     }
@@ -539,9 +539,9 @@ export default function DepositsPage() {
       if (selectedAgreement?.id === agreement.id) {
         setSelectedAgreement(merged);
       }
-      setNotice("Đã cập nhật trạng thái cọc và trạng thái phòng.");
+      setNotice("ÄÃ£ cáº­p nháº­t tráº¡ng thÃ¡i cá»c vÃ  tráº¡ng thÃ¡i phÃ²ng.");
     } catch (error) {
-      setNotice(error.message || "Không cập nhật được trạng thái cọc.");
+      setNotice(error.message || "KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c tráº¡ng thÃ¡i cá»c.");
     } finally {
       setUpdatingId(null);
     }
@@ -549,48 +549,48 @@ export default function DepositsPage() {
 
   const handleSaveManagementInfo = async (agreement, payload) => {
     if (!agreement?.id) {
-      throw new Error("Chưa có mã hợp đồng đặt cọc để cập nhật.");
+      throw new Error("ChÆ°a cÃ³ mÃ£ há»£p Ä‘á»“ng Ä‘áº·t cá»c Ä‘á»ƒ cáº­p nháº­t.");
     }
     setNotice("");
     const details = await updateDepositAgreementManagementInfo(agreement.id, payload);
     const merged = mergeAgreement(agreement, details);
     setAgreements((current) => current.map((item) => (item.id === agreement.id ? merged : item)));
     setSelectedAgreement(merged);
-    setNotice("Đã cập nhật thông tin hợp đồng cọc và tạo lại file PDF.");
+    setNotice("ÄÃ£ cáº­p nháº­t thÃ´ng tin há»£p Ä‘á»“ng cá»c vÃ  táº¡o láº¡i file PDF.");
     return merged;
   };
 
   const handleOpenContract = async (agreement) => {
     if (!agreement?.id) {
-      setNotice("Chưa có mã hợp đồng đặt cọc để mở.");
+      setNotice("ChÆ°a cÃ³ mÃ£ há»£p Ä‘á»“ng Ä‘áº·t cá»c Ä‘á»ƒ má»Ÿ.");
       return;
     }
     try {
       await openDepositContractPdf(agreement.id);
     } catch (error) {
-      setNotice(error.message || "Không thể mở hợp đồng đặt cọc.");
+      setNotice(error.message || "KhÃ´ng thá»ƒ má»Ÿ há»£p Ä‘á»“ng Ä‘áº·t cá»c.");
     }
   };
 
   const handleDownloadContract = async (agreement) => {
     if (!agreement?.id) {
-      setNotice("Chưa có mã hợp đồng đặt cọc để tải.");
+      setNotice("ChÆ°a cÃ³ mÃ£ há»£p Ä‘á»“ng Ä‘áº·t cá»c Ä‘á»ƒ táº£i.");
       return;
     }
     try {
       await downloadDepositContractPdf(agreement.id, `hop-dong-dat-coc-${agreement.roomCode || agreement.depositCode}.pdf`);
     } catch (error) {
-      setNotice(error.message || "Không thể tải hợp đồng đặt cọc.");
+      setNotice(error.message || "KhÃ´ng thá»ƒ táº£i há»£p Ä‘á»“ng Ä‘áº·t cá»c.");
     }
   };
 
   return (
     <>
-      <section className="grid gap-6">
+      <section className="w-full min-w-0 flex flex-col gap-6">
         <header>
-          <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sách hợp đồng đặt cọc</h1>
+          <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sÃ¡ch há»£p Ä‘á»“ng Ä‘áº·t cá»c</h1>
           <p className="mt-2 text-sm font-semibold text-[#6b7280]">
-            Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng.
+            Quáº£n lÃ½ vÃ  theo dÃµi cÃ¡c khoáº£n Ä‘áº·t cá»c giá»¯ chá»— cá»§a khÃ¡ch hÃ ng.
           </p>
         </header>
 
@@ -606,46 +606,46 @@ export default function DepositsPage() {
         )}
 
         <section className="grid gap-5 xl:grid-cols-3">
-          <KpiCard icon={WalletCards} title="Tổng số tiền cọc" value={formatMoney(totalAmount)} note="Tổng tiền cọc đã ghi nhận" />
-          <KpiCard icon={LockKeyhole} title="Đang giữ cọc" value={paidAgreements.length} note="Khoản thu khả dụng" tone="amber" />
-          <KpiCard icon={ClipboardCheck} title="Đã nhận phòng" value={convertedAgreements.length} note="Đã chính thức nhận phòng" tone="emerald" />
+          <KpiCard icon={WalletCards} title="Tá»•ng sá»‘ tiá»n cá»c" value={formatMoney(totalAmount)} note="Tá»•ng tiá»n cá»c Ä‘Ã£ ghi nháº­n" />
+          <KpiCard icon={LockKeyhole} title="Äang giá»¯ cá»c" value={paidAgreements.length} note="Khoáº£n thu kháº£ dá»¥ng" tone="amber" />
+          <KpiCard icon={ClipboardCheck} title="ÄÃ£ nháº­n phÃ²ng" value={convertedAgreements.length} note="ÄÃ£ chÃ­nh thá»©c nháº­n phÃ²ng" tone="emerald" />
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-          <div className="grid gap-4 xl:grid-cols-3 xl:items-end">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <label className="grid gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tên khách hàng</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">TÃªn khÃ¡ch hÃ ng</span>
               <span className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b909a]" />
                 <input
                   value={customerFilter}
                   onChange={(event) => setCustomerFilter(event.target.value)}
-                  placeholder="Nhập tên khách, SĐT, mã cọc..."
+                  placeholder="Nháº­p tÃªn khÃ¡ch, SÄT, mÃ£ cá»c..."
                   className="h-11 w-full rounded-lg border border-[#c4cad6] pl-10 pr-3 text-sm font-semibold text-[#102033] outline-none placeholder:text-[#8b909a] focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
                 />
               </span>
             </label>
             <label className="grid gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Trạng thái</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tráº¡ng thÃ¡i</span>
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
-                <option value="all">Tất cả trạng thái</option>
+                <option value="all">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
                 {STATUS_OPTIONS.map((status) => (
                   <option key={status.value} value={status.value}>{status.label}</option>
                 ))}
               </select>
             </label>
             <label className="grid gap-2">
-              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tầng</span>
+              <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Táº§ng</span>
               <select
                 value={floorFilter}
                 onChange={(event) => setFloorFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
-                <option value="all">Tất cả tầng</option>
+                <option value="all">Táº¥t cáº£ táº§ng</option>
                 {floorOptions.map((floor) => (
                   <option key={floor} value={floor}>{floor}</option>
                 ))}
@@ -659,29 +659,29 @@ export default function DepositsPage() {
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-xs font-extrabold uppercase tracking-[0.08em] text-[#4b5563]">
-                  <th className="px-5 py-4">Phòng</th>
-                  <th className="px-5 py-4">Tên khách hàng</th>
-                  <th className="px-5 py-4">Số tiền cọc</th>
-                  <th className="px-5 py-4">Ngày tạo</th>
-                  <th className="px-5 py-4">Ngày hẹn ký HĐ</th>
-                  <th className="px-5 py-4">Trạng thái</th>
-                  <th className="px-5 py-4 text-center">Hành động</th>
+                  <th className="px-5 py-4">PhÃ²ng</th>
+                  <th className="px-5 py-4">TÃªn khÃ¡ch hÃ ng</th>
+                  <th className="px-5 py-4">Sá»‘ tiá»n cá»c</th>
+                  <th className="px-5 py-4">NgÃ y táº¡o</th>
+                  <th className="px-5 py-4">NgÃ y háº¹n kÃ½ HÄ</th>
+                  <th className="px-5 py-4">Tráº¡ng thÃ¡i</th>
+                  <th className="px-5 py-4 text-center">HÃ nh Ä‘á»™ng</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAgreements.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-sm font-bold text-[#6b7280]">
-                      Không có hợp đồng đặt cọc phù hợp.
+                      KhÃ´ng cÃ³ há»£p Ä‘á»“ng Ä‘áº·t cá»c phÃ¹ há»£p.
                     </td>
                   </tr>
                 ) : (
                   filteredAgreements.map((agreement) => (
                     <tr key={agreement.id} className="border-b border-[#edf0f5] last:border-0">
-                      <td data-label="Phòng" className="px-5 py-4 text-base font-extrabold text-[#111827]">
-                        {agreement.roomCode ? `P.${agreement.roomCode}` : "Chưa rõ"}
+                      <td data-label="PhÃ²ng" className="px-5 py-4 text-base font-extrabold text-[#111827]">
+                        {agreement.roomCode ? `P.${agreement.roomCode}` : "ChÆ°a rÃµ"}
                       </td>
-                      <td data-label="Tên khách hàng" className="px-5 py-4">
+                      <td data-label="TÃªn khÃ¡ch hÃ ng" className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8f0ff] text-[#4160ad]">
                             <UserRound className="h-4 w-4" />
@@ -692,10 +692,10 @@ export default function DepositsPage() {
                           </span>
                         </div>
                       </td>
-                      <td data-label="Số tiền cọc" className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
-                      <td data-label="Ngày tạo" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
-                      <td data-label="Ngày hẹn ký HĐ" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
-                      <td data-label="Trạng thái" className="px-5 py-4">
+                      <td data-label="Sá»‘ tiá»n cá»c" className="px-5 py-4 text-sm font-extrabold text-[#4160ad]">{formatMoney(agreement.amount)}</td>
+                      <td data-label="NgÃ y táº¡o" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.createdAt)}</td>
+                      <td data-label="NgÃ y háº¹n kÃ½ HÄ" className="px-5 py-4 text-sm font-semibold text-[#4b5563]">{formatDate(agreement.expectedLeaseSignDate)}</td>
+                      <td data-label="Tráº¡ng thÃ¡i" className="px-5 py-4">
                         <select
                           value={STATUS_OPTIONS.some((status) => status.value === agreement.status) ? agreement.status : ""}
                           onChange={(event) => handleStatusChange(agreement, event.target.value)}
@@ -703,20 +703,20 @@ export default function DepositsPage() {
                           className="h-9 rounded-full border border-[#c4cad6] bg-white px-3 text-xs font-extrabold text-[#102033] outline-none focus:border-[#4160ad] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {!STATUS_OPTIONS.some((status) => status.value === agreement.status) && (
-                            <option value="">{STATUS_LABELS[agreement.status]?.label || "Chưa cập nhật"}</option>
+                            <option value="">{STATUS_LABELS[agreement.status]?.label || "ChÆ°a cáº­p nháº­t"}</option>
                           )}
                           {STATUS_OPTIONS.map((status) => (
                             <option key={status.value} value={status.value}>{status.label}</option>
                           ))}
                         </select>
                       </td>
-                      <td data-label="Hành động" className="px-5 py-4">
+                      <td data-label="HÃ nh Ä‘á»™ng" className="px-5 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
                             onClick={() => openDetails(agreement)}
                             className="rounded-full p-2 text-[#4160ad] hover:bg-[#eef4ff]"
-                            aria-label={`Xem chi tiết ${agreement.depositCode}`}
+                            aria-label={`Xem chi tiáº¿t ${agreement.depositCode}`}
                           >
                             <Eye className="h-5 w-5" />
                           </button>
@@ -724,7 +724,7 @@ export default function DepositsPage() {
                             type="button"
                             onClick={() => handleOpenContract(agreement)}
                             className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
-                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
+                            aria-label={`Xem há»£p Ä‘á»“ng cá»c ${agreement.depositCode}`}
                           >
                             <FileText className="h-5 w-5" />
                           </button>
@@ -732,7 +732,7 @@ export default function DepositsPage() {
                             type="button"
                             onClick={() => handleDownloadContract(agreement)}
                             className="rounded-full p-2 text-[#102033] hover:bg-[#eef4ff]"
-                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
+                            aria-label={`Táº£i há»£p Ä‘á»“ng cá»c ${agreement.depositCode}`}
                           >
                             <Download className="h-5 w-5" />
                           </button>
@@ -744,11 +744,19 @@ export default function DepositsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex flex-col gap-3 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-[#5a6678] sm:flex-row sm:items-center sm:justify-between">
-            <span>Hiển thị {filteredAgreements.length} trong tổng số {agreements.length} hợp đồng</span>
-            <span className="rounded-md bg-[#4160ad] px-4 py-2 font-extrabold text-white">1</span>
-          </footer>
-        </section>
+          <DashboardPagination
+            page={page}
+            size={size}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            itemLabel="h?p d?ng"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+            className="bg-[#eef4ff]"
+          />        </section>
       </section>
 
       <DetailModal

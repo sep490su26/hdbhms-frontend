@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
@@ -19,9 +19,11 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom } from "../../services/roomsService";
+import { fetchPublicRoomCatalog, getRoomDetailHref, normalizeApiRoom, ROOM_PLACEHOLDER_IMAGE } from "../../services/roomsService";
+import { fetchPublicPropertyFloorPlan } from "../../services/floorPlanService";
 
 const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
+
 
 function guestStatusCopy(status) {
   const copy = {
@@ -30,8 +32,8 @@ function guestStatusCopy(status) {
     onHold: "Đang đặt cọc",
     deposited: "Đã đặt cọc",
     soonVacant: "Sắp trống",
-    maintenance: "Bảo trì",
-    expired: "Hết hạn",
+    // maintenance: "Bảo trì",   // tạm ẩn
+    // expired: "Hết hạn",       // tạm ẩn
   };
 
   return copy[status] || "Đã thuê";
@@ -129,6 +131,27 @@ const FLOOR_PLAN_STATUS_META = {
     stroke: "#f97316",
     text: "text-orange-600",
   },
+  SOON_VACANT: {
+    label: "Sắp trống",
+    dot: "bg-purple-500",
+    fill: "#faf5ff",
+    stroke: "#a855f7",
+    text: "text-purple-600",
+  },
+  // MAINTENANCE: {
+  //   label: "Bảo trì",
+  //   dot: "bg-red-500",
+  //   fill: "#fff1f2",
+  //   stroke: "#ef4444",
+  //   text: "text-red-600",
+  // },
+  // EXPIRED: {
+  //   label: "Hết hạn",
+  //   dot: "bg-slate-400",
+  //   fill: "#f8fafc",
+  //   stroke: "#94a3b8",
+  //   text: "text-slate-500",
+  // },
   OCCUPIED: {
     label: "Đã thuê",
     dot: "bg-blue-500",
@@ -142,6 +165,9 @@ function getFloorPlanStatus(room) {
   if (room.status === "available") return "VACANT";
   if (room.status === "onHold") return "HOLDING";
   if (room.status === "deposited") return "RESERVED";
+  if (room.status === "soonVacant") return "SOON_VACANT";
+  // if (room.status === "maintenance") return "MAINTENANCE";   // tạm ẩn
+  // if (room.status === "expired") return "EXPIRED";           // tạm ẩn
   return "OCCUPIED";
 }
 
@@ -156,22 +182,21 @@ function getRoomSuffix(room) {
 }
 
 function sortRoomsByCode(left, right) {
-  return getRoomSuffix(left) - getRoomSuffix(right) || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
+  const leftFloor = Number(left.floorNumber) || 0;
+  const rightFloor = Number(right.floorNumber) || 0;
+  const leftOrder = Number(left.sortOrder ?? left.displayOrder ?? left.order ?? getRoomSuffix(left));
+  const rightOrder = Number(right.sortOrder ?? right.displayOrder ?? right.order ?? getRoomSuffix(right));
+
+  return leftFloor - rightFloor || leftOrder - rightOrder || getRoomCode(left).localeCompare(getRoomCode(right), "vi");
 }
 
-function buildFloorLayoutRooms(rooms) {
+function autoLayoutRooms(rooms) {
   const sortedRooms = [...rooms].sort(sortRoomsByCode);
-  const leftCandidates = sortedRooms.filter((room) => {
-    const suffix = getRoomSuffix(room);
-    return suffix === 1 || suffix === 2;
-  });
-  const fallbackLeft = leftCandidates.length > 0 ? leftCandidates : sortedRooms.slice(0, 2);
-  const leftCodes = new Set(fallbackLeft.map(getRoomCode));
-  const rightRooms = sortedRooms.filter((room) => !leftCodes.has(getRoomCode(room)));
+  const splitIndex = Math.min(2, Math.ceil(sortedRooms.length / 3));
 
   return {
-    leftRooms: [...fallbackLeft].sort((a, b) => sortRoomsByCode(b, a)),
-    rightRooms,
+    leftRooms: sortedRooms.slice(0, splitIndex).reverse(),
+    rightRooms: sortedRooms.slice(splitIndex),
   };
 }
 
@@ -223,11 +248,10 @@ function Stair({ x, y }) {
   );
 }
 
-function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFirstRoom, isLastRoom }) {
   const statusKey = getFloorPlanStatus(room);
   const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
   const isVertical = orientation === "vertical";
-  const suffix = getRoomSuffix(room);
   const roomCode = getRoomCode(room);
 
   const handleKeyDown = (event) => {
@@ -262,15 +286,15 @@ function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRig
       {isVertical ? (
         <>
           <Door x={x + w} y={y + h - 42} side="right" radius={24} />
-          {suffix === 2 && <WindowLine x={x + 18} y={y + 4} width={w - 36} />}
-          {suffix === 1 && <VerticalWindowLine x={x + 4} y={y + h - 62} height={48} />}
+          {isFirstRoom && <WindowLine x={x + 18} y={y + 4} width={w - 36} />}
+          {isLastRoom && <VerticalWindowLine x={x + 4} y={y + h - 62} height={48} />}
         </>
       ) : (
         <>
           <Door x={x} y={y + h * 0.42} side="left" radius={22} />
           <VerticalWindowLine x={x + w - 4} y={y + h / 2 - 23} height={46} />
-          {suffix === 3 && <WindowLine x={x + w / 2 - 26} y={y + 4} width={52} />}
-          {isLastRightRoom && <WindowLine x={x + w / 2 - 26} y={y + h - 4} width={52} />}
+          {isFirstRoom && <WindowLine x={x + w / 2 - 26} y={y + 4} width={52} />}
+          {isLastRoom && <WindowLine x={x + w / 2 - 26} y={y + h - 4} width={52} />}
         </>
       )}
 
@@ -283,7 +307,7 @@ function BlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRig
 }
 
 function FloorBlueprint({ rooms, onSelect }) {
-  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
+  const { leftRooms, rightRooms } = useMemo(() => autoLayoutRooms(rooms), [rooms]);
 
   if (rooms.length === 0) {
     return (
@@ -358,6 +382,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={LEFT_ROOM_H}
               orientation="vertical"
               onSelect={onSelect}
+              isFirstRoom={index === 0}
+              isLastRoom={index === leftRooms.length - 1}
             />
           ))}
 
@@ -373,7 +399,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelect}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={index === 0}
+              isLastRoom={index === rightRooms.length - 1}
             />
           ))}
 
@@ -387,7 +414,8 @@ function FloorBlueprint({ rooms, onSelect }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelect}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={false}
+              isLastRoom={index === rightRooms.slice(3).length - 1}
             />
           ))}
         </svg>
@@ -479,11 +507,10 @@ function MiniStair({ x, y }) {
   );
 }
 
-function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLastRightRoom }) {
+function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isFirstRoom, isLastRoom }) {
   const statusKey = getFloorPlanStatus(room);
   const meta = FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
   const isVertical = orientation === "vertical";
-  const suffix = getRoomSuffix(room);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -517,19 +544,19 @@ function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLas
       {isVertical ? (
         <>
           <MiniDoor x={x + w} y={y + h - 28} side="right" radius={14} />
-          {suffix === 2 && <MiniWindowLine x={x + 12} y={y + 3} width={w - 24} />}
-          {suffix === 1 && <MiniVerticalWindowLine x={x + 3} y={y + h - 38} height={30} />}
+          {isFirstRoom && <MiniWindowLine x={x + 12} y={y + 3} width={w - 24} />}
+          {isLastRoom && <MiniVerticalWindowLine x={x + 3} y={y + h - 38} height={30} />}
         </>
       ) : (
         <>
           <MiniDoor x={x} y={y + h * 0.42} side="left" radius={13} />
           <MiniVerticalWindowLine x={x + w - 3} y={y + h / 2 - 14} height={28} />
-          {suffix === 3 && <MiniWindowLine x={x + w / 2 - 17} y={y + 3} width={34} />}
-          {isLastRightRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + h - 3} width={34} />}
+          {isFirstRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + 3} width={34} />}
+          {isLastRoom && <MiniWindowLine x={x + w / 2 - 17} y={y + h - 3} width={34} />}
         </>
       )}
 
-      <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#111827">
+      <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize={Math.max(11, Math.min(18, w * 0.18))} fontWeight="900" fill="#111827">
         {getMiniRoomLabel(room)}
       </text>
       <circle cx={x + w - 8} cy={y + 8} r="4.5" fill={meta.stroke} />
@@ -538,23 +565,23 @@ function MiniBlueprintRoomShape({ room, x, y, w, h, orientation, onSelect, isLas
 }
 
 function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
-  const { leftRooms, rightRooms } = useMemo(() => buildFloorLayoutRooms(rooms), [rooms]);
-  const RIGHT_ROOM_H = 58;
-  const RIGHT_GAP = 5;
-  const LEFT_GAP = 5;
-  const LEFT_ROOM_W = 58;
-  const LEFT_ROOM_H = (RIGHT_ROOM_H * 3 + RIGHT_GAP * 2 - LEFT_GAP) / 2;
+  const { leftRooms, rightRooms } = useMemo(() => autoLayoutRooms(rooms), [rooms]);
+  const RIGHT_ROOM_H = 80;
+  const RIGHT_GAP = 8;
+  const LEFT_GAP = 8;
+  const LEFT_ROOM_W = 100;
+  const LEFT_ROOM_H = 120;
   const TOTAL_LEFT_HEIGHT = LEFT_ROOM_H * Math.max(leftRooms.length, 2) + LEFT_GAP * Math.max(leftRooms.length - 1, 1);
-  const RIGHT_ROOM_W = 86;
-  const START_Y = 44;
-  const LEFT_X = 8;
-  const HALL_X = 78;
-  const RIGHT_X = 118;
+  const RIGHT_ROOM_W = 150;
+  const START_Y = 40;
+  const LEFT_X = 40;
+  const HALL_X = 160;
+  const RIGHT_X = 230;
   const rightColumnHeight = rightRooms.length > 0
     ? RIGHT_ROOM_H * rightRooms.length + RIGHT_GAP * Math.max(0, rightRooms.length - 1)
     : 0;
   const contentHeight = Math.max(TOTAL_LEFT_HEIGHT, rightColumnHeight);
-  const svgHeight = Math.max(242, START_Y + contentHeight + 84);
+  const svgHeight = Math.max(260, START_Y + contentHeight + 84);
   const hallTop = START_Y;
   const hallBottom = START_Y + contentHeight;
   const hallHeight = hallBottom - hallTop;
@@ -563,7 +590,7 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
   const hallShadowId = `miniHallShadow-${safeFloorId}`;
 
   return (
-    <article className="w-[200px] min-w-[200px]">
+    <article className="w-full min-w-0">
       <button
         type="button"
         onClick={() => onSelectFloor(floor)}
@@ -573,11 +600,11 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
       </button>
 
       {rooms.length === 0 ? (
-        <div className="flex min-h-[242px] items-center justify-center rounded-2xl bg-slate-100 px-3 text-center text-xs font-bold text-slate-400">
+        <div className="flex min-h-[260px] items-center justify-center rounded-2xl bg-slate-100 px-3 text-center text-xs font-bold text-slate-400">
           Chưa có dữ liệu phòng
         </div>
       ) : (
-        <svg viewBox={`0 0 210 ${svgHeight}`} className="mx-auto block h-auto w-full">
+        <svg viewBox={`0 0 420 ${svgHeight}`} preserveAspectRatio="xMidYMid meet" className="mx-auto block h-auto w-full">
           <defs>
             <linearGradient id={hallGradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#f7fbff" />
@@ -588,11 +615,11 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
             </filter>
           </defs>
 
-          <rect x={HALL_X} y={hallTop} width="28" height={hallHeight} rx="12" fill={`url(#${hallGradientId})`} stroke="#cbd5e1" strokeWidth="1.3" filter={`url(#${hallShadowId})`} />
-          <line x1={HALL_X + 14} y1={hallTop + 8} x2={HALL_X + 14} y2={hallTop + hallHeight / 2 - 34} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
-          <line x1={HALL_X + 14} y1={hallTop + hallHeight / 2 + 34} x2={HALL_X + 14} y2={hallBottom - 8} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
+          <rect x={HALL_X} y={hallTop} width="50" height={hallHeight} rx="12" fill={`url(#${hallGradientId})`} stroke="#cbd5e1" strokeWidth="1.3" filter={`url(#${hallShadowId})`} />
+          <line x1={HALL_X + 25} y1={hallTop + 8} x2={HALL_X + 25} y2={hallTop + hallHeight / 2 - 34} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
+          <line x1={HALL_X + 25} y1={hallTop + hallHeight / 2 + 34} x2={HALL_X + 25} y2={hallBottom - 8} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 8" opacity="0.72" />
           <text
-            x={HALL_X + 14}
+            x={HALL_X + 25}
             y={hallTop + hallHeight / 2}
             textAnchor="middle"
             dominantBaseline="middle"
@@ -600,7 +627,7 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
             fontWeight="900"
             fill="#64748b"
             letterSpacing="2"
-            transform={`rotate(-90 ${HALL_X + 14} ${hallTop + hallHeight / 2})`}
+            transform={`rotate(-90 ${HALL_X + 25} ${hallTop + hallHeight / 2})`}
           >
             HÀNH LANG
           </text>
@@ -615,10 +642,12 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
               h={LEFT_ROOM_H}
               orientation="vertical"
               onSelect={onSelectRoom}
+              isFirstRoom={index === 0}
+              isLastRoom={index === leftRooms.length - 1}
             />
           ))}
 
-          <MiniStair x={LEFT_X - 2} y={START_Y + TOTAL_LEFT_HEIGHT + 16} />
+          <MiniStair x={LEFT_X} y={START_Y + TOTAL_LEFT_HEIGHT + 16} />
 
           {rightRooms.map((room, index) => (
             <MiniBlueprintRoomShape
@@ -630,7 +659,8 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
               h={RIGHT_ROOM_H}
               orientation="horizontal"
               onSelect={onSelectRoom}
-              isLastRightRoom={getRoomCode(room) === getRoomCode(rightRooms[rightRooms.length - 1])}
+              isFirstRoom={index === 0}
+              isLastRoom={index === rightRooms.length - 1}
             />
           ))}
         </svg>
@@ -639,7 +669,243 @@ function MiniFloorOverview({ floor, rooms, onSelectRoom, onSelectFloor }) {
   );
 }
 
-function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
+function planValue(item, ...keys) {
+  for (const key of keys) {
+    if (item?.[key] !== undefined && item?.[key] !== null) return item[key];
+  }
+  return undefined;
+}
+
+function planMetadata(item) {
+  const metadata = planValue(item, "metadata", "metadata_json", "metadataJson");
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) return metadata;
+  if (typeof metadata === "string" && metadata.trim()) {
+    try {
+      const parsed = JSON.parse(metadata);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function floorPlanItems(floorLayout) {
+  return Array.isArray(planValue(floorLayout, "items")) ? floorLayout.items : [];
+}
+
+function normalizeOpeningWall(value) {
+  const wall = String(value ?? "").trim().toLowerCase();
+  return ["top", "right", "bottom", "left"].includes(wall) ? wall : "top";
+}
+
+function normalizeOpeningOffset(value) {
+  const offset = Number(value);
+  if (!Number.isFinite(offset)) return 0.5;
+  return Math.min(0.96, Math.max(0.04, offset));
+}
+
+function normalizeSavedOpenings(item, metadata, key) {
+  const singularKey = key === "doors" ? "door" : "window";
+  const openings = planValue(metadata, key, singularKey, `${key}_json`, `${singularKey}_json`)
+    ?? planValue(item, key, singularKey, `${key}_json`, `${singularKey}_json`);
+  const parsedOpenings = typeof openings === "string" && openings.trim().startsWith("[")
+    ? (() => {
+      try {
+        return JSON.parse(openings);
+      } catch {
+        return openings;
+      }
+    })()
+    : openings;
+  if (Array.isArray(parsedOpenings)) {
+    return parsedOpenings.map((opening, index) => (
+      typeof opening === "string"
+        ? { id: `${key}-${index}`, wall: normalizeOpeningWall(opening), offset: 0.5 }
+        : {
+          id: opening?.id ?? `${key}-${index}`,
+          wall: normalizeOpeningWall(opening?.wall),
+          offset: normalizeOpeningOffset(planValue(opening, "offset", "position", "percent")),
+        }
+    ));
+  }
+  if (parsedOpenings && typeof parsedOpenings === "object") {
+    return [{
+      id: parsedOpenings.id ?? singularKey,
+      wall: normalizeOpeningWall(parsedOpenings.wall),
+      offset: normalizeOpeningOffset(planValue(parsedOpenings, "offset", "position", "percent")),
+    }];
+  }
+  if (typeof parsedOpenings === "string") {
+    return [{ id: singularKey, wall: normalizeOpeningWall(parsedOpenings), offset: 0.5 }];
+  }
+  return [];
+}
+
+function SavedMiniDoorOpening({ opening, x, y, width, height }) {
+  const wall = normalizeOpeningWall(opening.wall);
+  const offset = normalizeOpeningOffset(opening.offset);
+  const radius = Math.min(20, Math.max(12, Math.min(width, height) * 0.24));
+  const strokeProps = { stroke: "#cbd5e1", strokeWidth: "2.2", fill: "none" };
+
+  if (wall === "bottom") {
+    const px = x + offset * width;
+    const py = y + height;
+    return (
+      <>
+        <line x1={px} y1={py} x2={px - radius} y2={py} {...strokeProps} />
+        <path d={`M ${px - radius} ${py} A ${radius} ${radius} 0 0 1 ${px} ${py - radius}`} {...strokeProps} />
+      </>
+    );
+  }
+  if (wall === "right") {
+    const px = x + width;
+    const py = y + offset * height;
+    return (
+      <>
+        <line x1={px} y1={py} x2={px} y2={py + radius} {...strokeProps} />
+        <path d={`M ${px} ${py + radius} A ${radius} ${radius} 0 0 0 ${px - radius} ${py}`} {...strokeProps} />
+      </>
+    );
+  }
+  if (wall === "left") {
+    const px = x;
+    const py = y + offset * height;
+    return (
+      <>
+        <line x1={px} y1={py} x2={px} y2={py + radius} {...strokeProps} />
+        <path d={`M ${px} ${py + radius} A ${radius} ${radius} 0 0 1 ${px + radius} ${py}`} {...strokeProps} />
+      </>
+    );
+  }
+
+  const px = x + offset * width;
+  const py = y;
+  return (
+    <>
+      <line x1={px} y1={py} x2={px - radius} y2={py} {...strokeProps} />
+      <path d={`M ${px - radius} ${py} A ${radius} ${radius} 0 0 0 ${px} ${py + radius}`} {...strokeProps} />
+    </>
+  );
+}
+
+function SavedMiniWindowOpening({ opening, x, y, width, height }) {
+  const wall = normalizeOpeningWall(opening.wall);
+  const offset = normalizeOpeningOffset(opening.offset);
+  const length = Math.min(34, Math.max(20, (wall === "top" || wall === "bottom" ? width : height) * 0.32));
+  const strokeProps = { stroke: "#94a3b8", strokeWidth: "2.5", strokeLinecap: "round" };
+
+  if (wall === "left" || wall === "right") {
+    const px = wall === "left" ? x + 4 : x + width - 4;
+    const py = y + offset * height;
+    return <line x1={px} y1={py - length / 2} x2={px} y2={py + length / 2} {...strokeProps} />;
+  }
+
+  const px = x + offset * width;
+  const py = wall === "bottom" ? y + height - 4 : y + 4;
+  return <line x1={px - length / 2} y1={py} x2={px + length / 2} y2={py} {...strokeProps} />;
+}
+
+function SavedMiniFloorOverview({ floor, floorLayout, roomsById, onSelectRoom, onSelectFloor }) {
+  const items = floorPlanItems(floorLayout);
+  const bounds = items.reduce((acc, item) => {
+    const x = Number(planValue(item, "positionX", "position_x", "x")) || 0;
+    const y = Number(planValue(item, "positionY", "position_y", "y")) || 0;
+    const width = Number(planValue(item, "width")) || 80;
+    const height = Number(planValue(item, "height")) || 80;
+    return {
+      minX: Math.min(acc.minX, x),
+      minY: Math.min(acc.minY, y),
+      maxX: Math.max(acc.maxX, x + width),
+      maxY: Math.max(acc.maxY, y + height),
+    };
+  }, { minX: Infinity, minY: Infinity, maxX: 0, maxY: 0 });
+  const pad = 24;
+  const viewX = Number.isFinite(bounds.minX) ? bounds.minX - pad : 0;
+  const viewY = Number.isFinite(bounds.minY) ? bounds.minY - pad : 0;
+  const viewW = Math.max(180, bounds.maxX - viewX + pad);
+  const viewH = Math.max(242, bounds.maxY - viewY + pad);
+  const viewRatio = viewW / viewH;
+  const svgHeight = Math.max(260, Math.round(200 / viewRatio));
+
+  return (
+    <article className="w-full min-w-0">
+      <button
+        type="button"
+        onClick={() => onSelectFloor(floor)}
+        className="mb-4 block w-full rounded-xl text-center transition hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <span className="text-2xl font-black tracking-tight text-black md:text-3xl">{floor}</span>
+      </button>
+      <svg
+        viewBox={`${viewX} ${viewY} ${viewW} ${viewH}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="mx-auto block w-full"
+        style={{ height: svgHeight }}
+      >
+        {items.map((item, index) => {
+          const itemType = String(planValue(item, "type", "itemType", "item_type") ?? "").toUpperCase();
+          const x = Number(planValue(item, "positionX", "position_x", "x")) || 0;
+          const y = Number(planValue(item, "positionY", "position_y", "y")) || 0;
+          const width = Number(planValue(item, "width")) || 80;
+          const height = Number(planValue(item, "height")) || 80;
+          const metadata = planMetadata(item);
+          const label = metadata.label ?? planValue(item, "label") ?? itemType;
+
+          if (itemType === "ROOM") {
+            const room = roomsById.get(String(planValue(item, "roomId", "room_id")));
+            const meta = FLOOR_PLAN_STATUS_META[getFloorPlanStatus(room ?? {})] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
+            const code = room ? getMiniRoomLabel(room) : (planValue(item, "roomCode", "room_code") ?? label);
+            const doors = normalizeSavedOpenings(item, metadata, "doors");
+            const windows = normalizeSavedOpenings(item, metadata, "windows");
+            return (
+              <g
+                key={`${itemType}-${planValue(item, "id") ?? index}`}
+                role={room ? "button" : undefined}
+                tabIndex={room ? 0 : undefined}
+                onClick={() => room && onSelectRoom(room)}
+                className={room ? "cursor-pointer transition hover:drop-shadow-lg" : ""}
+              >
+                <rect x={x} y={y} width={width} height={height} fill={meta.fill} stroke="#111827" strokeWidth="2.2" />
+                <rect x={x + 8} y={y + 8} width={Math.max(0, width - 16)} height={Math.max(0, height - 16)} fill="none" stroke={meta.stroke} strokeDasharray="4 7" opacity="0.28" />
+                {doors.map((opening) => (
+                  <SavedMiniDoorOpening key={opening.id} opening={opening} x={x} y={y} width={width} height={height} />
+                ))}
+                {windows.map((opening) => (
+                  <SavedMiniWindowOpening key={opening.id} opening={opening} x={x} y={y} width={width} height={height} />
+                ))}
+                <text x={x + width / 2} y={y + height / 2 + 4} textAnchor="middle" fontSize={Math.max(11, Math.min(18, width * 0.18))} fontWeight="900" fill="#111827">{code}</text>
+                <circle cx={x + width - 8} cy={y + 8} r="4.5" fill={meta.stroke} />
+              </g>
+            );
+          }
+
+          const isCorridor = itemType === "CORRIDOR";
+          const blockFill = itemType === "PARKING" ? "#ecfdf5" : itemType === "LAUNDRY" ? "#eff6ff" : "#f8fafc";
+          const blockStroke = itemType === "PARKING" || itemType === "LAUNDRY" ? "#60a5fa" : "#cbd5e1";
+          return (
+            <g key={`${itemType}-${planValue(item, "id") ?? index}`}>
+              <rect x={x} y={y} width={width} height={height} rx={isCorridor ? Math.min(14, width / 2, height / 2) : 8} fill={blockFill} stroke={blockStroke} strokeWidth="1.6" strokeDasharray={itemType === "PARKING" || itemType === "LAUNDRY" ? "5 5" : undefined} />
+              <text
+                x={x + width / 2}
+                y={y + height / 2 + 4}
+                textAnchor="middle"
+                fontSize={Math.min(11, Math.max(8, width / 8))}
+                fontWeight="900"
+                fill="#64748b"
+                transform={isCorridor || metadata.orientation === "north" ? `rotate(-90 ${x + width / 2} ${y + height / 2})` : undefined}
+              >
+                {String(label).toUpperCase()}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </article>
+  );
+}
+
+function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom, savedFloorPlan }) {
   const roomsByFloor = useMemo(() => {
     const grouped = new Map();
     for (const floor of floors) grouped.set(floor, []);
@@ -650,6 +916,11 @@ function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
     }
     return grouped;
   }, [allRooms, floors]);
+  const roomsById = useMemo(() => new Map(allRooms.map((room) => [String(room.roomId), room])), [allRooms]);
+  const savedLayoutByFloor = useMemo(() => {
+    const layouts = Array.isArray(savedFloorPlan?.floors) ? savedFloorPlan.floors : [];
+    return new Map(layouts.map((floor) => [planValue(floor, "floorName", "floor_name"), floor]));
+  }, [savedFloorPlan]);
 
   if (floors.length === 0) {
     return (
@@ -661,22 +932,35 @@ function BuildingOverview({ floors, allRooms, onSelectFloor, onSelectRoom }) {
 
   return (
     <div className="overflow-x-auto rounded-[2rem] bg-[#e9e9e9] px-4 py-6 ring-1 ring-slate-200 xl:overflow-x-visible">
-      <div className="mx-auto grid min-w-[1048px] max-w-[1048px] grid-cols-5 items-start gap-3">
-        {floors.map((floor) => (
-          <MiniFloorOverview
-            key={floor}
-            floor={floor}
-            rooms={[...(roomsByFloor.get(floor) || [])].sort(sortRoomsByCode)}
-            onSelectRoom={onSelectRoom}
-            onSelectFloor={onSelectFloor}
-          />
-        ))}
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-2 items-start gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {floors.map((floor) => {
+          const floorLayout = savedLayoutByFloor.get(floor);
+          const savedItems = floorPlanItems(floorLayout);
+          return savedItems.length ? (
+            <SavedMiniFloorOverview
+              key={floor}
+              floor={floor}
+              floorLayout={floorLayout}
+              roomsById={roomsById}
+              onSelectRoom={onSelectRoom}
+              onSelectFloor={onSelectFloor}
+            />
+          ) : (
+            <MiniFloorOverview
+              key={floor}
+              floor={floor}
+              rooms={[...(roomsByFloor.get(floor) || [])].sort(sortRoomsByCode)}
+              onSelectRoom={onSelectRoom}
+              onSelectFloor={onSelectFloor}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor, onSelectRoom }) {
+function FloorPlanPanel({ floors, allRooms, onSelectFloor, onSelectRoom, savedFloorPlan }) {
   return (
     <div className="space-y-6 rounded-[2rem] bg-[#f3f5f8] p-5 text-slate-950 shadow-sm md:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -687,7 +971,7 @@ function FloorPlanPanel({ floors, selectedFloor, rooms, allRooms, onSelectFloor,
         <FloorPlanLegend />
       </div>
 
-      <BuildingOverview floors={floors} allRooms={allRooms} onSelectFloor={onSelectFloor} onSelectRoom={onSelectRoom} />
+      <BuildingOverview floors={floors} allRooms={allRooms} onSelectFloor={onSelectFloor} onSelectRoom={onSelectRoom} savedFloorPlan={savedFloorPlan} />
     </div>
   );
 }
@@ -766,13 +1050,14 @@ function RoomListingCard({ room, isSelected, onSelect, multiSelect, onToggleBatc
 }
 
 function RoomDetail({ room, onClose }) {
-  const [activeImage, setActiveImage] = useState(room.images[0]);
+  const [activeImage, setActiveImage] = useState(room.images?.[0] ?? room.image ?? ROOM_PLACEHOLDER_IMAGE);
+  const galleryImages = room.images?.length ? room.images : [room.image || ROOM_PLACEHOLDER_IMAGE];
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[#1e2746]/95 shadow-2xl">
       <div className="relative h-56 shrink-0 overflow-hidden bg-slate-900">
         <Image
-          src={activeImage}
+          src={activeImage || ROOM_PLACEHOLDER_IMAGE}
           alt={`Ảnh phòng ${room.id}`}
           fill
           sizes="(max-width: 1024px) 100vw, 420px"
@@ -814,7 +1099,7 @@ function RoomDetail({ room, onClose }) {
 
       <div className="custom-scrollbar flex-1 overflow-y-auto bg-white p-5 text-[#091426]">
         <div className="mb-5 grid grid-cols-4 gap-2">
-          {room.images.map((image, index) => (
+          {galleryImages.map((image, index) => (
             <button
               key={`${image}-${index}`}
               type="button"
@@ -903,7 +1188,7 @@ function RoomDetail({ room, onClose }) {
   );
 }
 
-export default function RoomsClient({ depositSuccess = false, requestedRoomId = "" }) {
+export default function RoomsClient({ depositSuccess = false, requestedRoomId = "", requestedPropertyId = "" }) {
   const allFloorsLabel = "Tất cả";
   const router = useRouter();
   const [viewMode, setViewMode] = useState("Listing");
@@ -916,6 +1201,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
 
   const [apiRooms, setApiRooms] = useState([]);
   const [catalogFloors, setCatalogFloors] = useState([]);
+  const [publicFloorPlan, setPublicFloorPlan] = useState(null);
   const [property, setProperty] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -924,10 +1210,14 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     try {
       setIsLoading(true);
       setIsError(false);
-      const catalog = await fetchPublicRoomCatalog();
+      const catalog = await fetchPublicRoomCatalog({ propertyId: requestedPropertyId || undefined });
+      const floorPlan = catalog.property
+        ? await fetchPublicPropertyFloorPlan(catalog.property.id).catch(() => null)
+        : null;
       setProperty(catalog.property);
       setCatalogFloors(catalog.floors);
       setApiRooms(catalog.rooms);
+      setPublicFloorPlan(floorPlan);
       setActiveFloorPlan((current) => (
         current === BUILDING_OVERVIEW_LABEL || catalog.floors.some((floor) => floor.name === current)
           ? current
@@ -940,7 +1230,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [requestedPropertyId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1160,6 +1450,7 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
                     selectedFloor={activeFloorPlan}
                     rooms={currentFloorRooms}
                     allRooms={visibleRooms}
+                    savedFloorPlan={publicFloorPlan}
                     onSelectFloor={setActiveFloorPlan}
                     onSelectRoom={openRoom}
                   />
@@ -1207,3 +1498,5 @@ export default function RoomsClient({ depositSuccess = false, requestedRoomId = 
     </div>
   );
 }
+
+

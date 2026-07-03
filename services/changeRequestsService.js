@@ -42,12 +42,12 @@ async function request(path, options = {}) {
 
 export async function fetchChangeRequests(filters = {}) {
     const { page = 0, size = 8, type = "all", status = "all", search = "" } = filters;
-    const params = new URLSearchParams({ 
-        page: String(page), 
-        size: String(size), 
-        sort: "createdAt,desc" 
+    const params = new URLSearchParams({
+        page: String(page),
+        size: String(size),
+        sort: "createdAt,desc"
     });
-    
+
     if (type && type !== "all") params.set("type", type.toUpperCase());
     if (status && status !== "all") params.set("status", status.toUpperCase());
     if (search.trim()) params.set("search", search.trim());

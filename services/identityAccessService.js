@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 export { API_BASE_URL };
 
@@ -97,60 +98,22 @@ export async function authenticatedFetch(url, options = {}) {
 }
 
 export async function getCurrentUserProfile() {
-    // Đổi thành false khi Backend đã sẵn sàng chạy thật
-    const IS_MOCK_MODE = false;
-
-    if (IS_MOCK_MODE) {
-        // fix cung
-        await new Promise((resolve) => setTimeout(resolve, 400)); // Giả lập delay mạng
-
-        return {
-            id: 42,
-            phone: "0901234567",
-            email: "admin@haidang.vn", //
-            role: "OWNER",
-            status: "ACTIVE",
-            emailVerified: true,
-            fullName: "Phạm Thành Công", // Đổ lên Top-bar
-            avatarUrl: "https://i.pravatar.cc/150?img=33",
-            lastLoginAt: "2026-05-25T12:10:00",
-            createdAt: "2026-05-22T12:00:00"
-        };
-    } else {
-        return authenticatedFetch(`${API_BASE_URL}/person-profiles/me`, {
-            method: "GET",
-        });
-    }
+    return authenticatedFetch(`${API_BASE_URL}/person-profiles/me`, {
+        method: "GET",
+    });
 }
 
 export async function loginWithPhonePassword({ phone, password }) {
-    const IS_MOCK_MODE = false;
-
-    if (IS_MOCK_MODE) {
-        return {
-            id: 42,
-            phone: "0901234567",
-            email: "admin@haidang.vn", // Khớp với email góc phải trên UI
-            role: "OWNER",
-            status: "ACTIVE",
-            emailVerified: true,
-            fullName: "Phạm Thành Công", // Đổ dữ liệu động thay cho chữ Chủ trọ tĩnh
-            avatarUrl: "https://i.pravatar.cc/150?img=33", // Đổ ảnh lên Avatar góc phải/trái
-            lastLoginAt: "2026-05-25T12:10:00",
-            createdAt: "2026-05-22T12:00:00"
-        };
-    } else {
-        const response = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Client-Type": "web",
-            },
-            body: JSON.stringify({ phone, password }),
-        });
-        return parseEnvelope(response);
-    }
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Client-Type": "web",
+        },
+        body: JSON.stringify({ phone, password }),
+    });
+    return parseEnvelope(response);
 }
 
 export async function logout() {
@@ -240,63 +203,88 @@ export async function restoreUser(userId) {
 function normalizeTenantAccountCandidate(item = {}) {
     return {
         ...item,
-        contractId: item.contractId ?? null,
-        contractCode: item.contractCode ?? "",
-        contractStatus: item.contractStatus ?? null,
-        startDate: item.startDate ?? null,
-        endDate: item.endDate ?? null,
-        signedAt: item.signedAt ?? null,
-        propertyId: item.propertyId ?? null,
-        propertyName: item.propertyName ?? "",
-        roomId: item.roomId ?? null,
-        roomCode: item.roomCode ?? "",
-        roomStatus: item.roomStatus ?? null,
-        occupantId: item.occupantId ?? null,
-        profileId: item.profileId ?? null,
-        roomRole: item.roomRole ?? null,
-        roomOccupantCount: item.roomOccupantCount ?? null,
-        roomMaxOccupants: item.roomMaxOccupants ?? null,
-        userId: item.userId ?? null,
-        fullName: item.fullName ?? "",
+        contractId: item.contractId ?? item.contract_id ?? null,
+        contractCode: item.contractCode ?? item.contract_code ?? "",
+        contractStatus: item.contractStatus ?? item.contract_status ?? null,
+        startDate: item.startDate ?? item.start_date ?? null,
+        endDate: item.endDate ?? item.end_date ?? null,
+        signedAt: item.signedAt ?? item.signed_at ?? null,
+        propertyId: item.propertyId ?? item.property_id ?? null,
+        propertyName: item.propertyName ?? item.property_name ?? "",
+        roomId: item.roomId ?? item.room_id ?? null,
+        roomCode: item.roomCode ?? item.room_code ?? "",
+        roomStatus: item.roomStatus ?? item.room_status ?? null,
+        occupantId: item.occupantId ?? item.occupant_id ?? null,
+        profileId: item.profileId ?? item.profile_id ?? null,
+        roomRole: item.roomRole ?? item.room_role ?? null,
+        occupantStatus: item.occupantStatus ?? item.occupant_status ?? null,
+        roomOccupantCount: item.roomOccupantCount ?? item.room_occupant_count ?? null,
+        roomMaxOccupants: item.roomMaxOccupants ?? item.room_max_occupants ?? null,
+        userId: item.userId ?? item.user_id ?? null,
+        fullName: item.fullName ?? item.full_name ?? "",
         phone: item.phone ?? "",
         email: item.email ?? "",
-        recipientEmail: item.recipientEmail ?? "",
+        recipientEmail: item.recipientEmail ?? item.recipient_email ?? "",
         role: item.role ?? null,
-        accountStatus: item.accountStatus ?? null,
-        mustChangePassword: item.mustChangePassword ?? null,
-        lastLoginAt: item.lastLoginAt ?? null,
-        accountCreatedAt: item.accountCreatedAt ?? null,
-        accountProvisioned: item.accountProvisioned ?? false,
-        emailAvailable: item.emailAvailable ?? Boolean(item.email),
-        provisioningStatus: item.provisioningStatus ?? "NOT_PROVISIONED",
-        sentAt: item.sentAt ?? null,
-        failedAt: item.failedAt ?? null,
-        failureReason: item.failureReason ?? "",
-        attemptCount: item.attemptCount ?? 0,
-        lastAttemptAt: item.lastAttemptAt ?? null,
-        profileStatus: item.profileStatus ?? null,
-        missingIdentity: item.missingIdentity ?? false,
-        missingPortrait: item.missingPortrait ?? false,
-        missingEmergencyContact: item.missingEmergencyContact ?? false,
+        accountStatus: item.accountStatus ?? item.account_status ?? null,
+        mustChangePassword: item.mustChangePassword ?? item.must_change_password ?? null,
+        lastLoginAt: item.lastLoginAt ?? item.last_login_at ?? null,
+        accountCreatedAt: item.accountCreatedAt ?? item.account_created_at ?? null,
+        accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
+        emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+        provisioningStatus:
+            item.provisioningStatus ??
+            item.provisioning_status ??
+            "NOT_PROVISIONED",
+        sentAt: item.sentAt ?? item.sent_at ?? null,
+        failedAt: item.failedAt ?? item.failed_at ?? null,
+        failureReason: item.failureReason ?? item.failure_reason ?? "",
+        disabledReason: item.disabledReason ?? item.disabled_reason ?? "",
+        disabledBy: item.disabledBy ?? item.disabled_by ?? null,
+        disabledAt: item.disabledAt ?? item.disabled_at ?? null,
+        attemptCount: item.attemptCount ?? item.attempt_count ?? 0,
+        lastAttemptAt: item.lastAttemptAt ?? item.last_attempt_at ?? null,
+        profileStatus: item.profileStatus ?? item.profile_status ?? null,
+        missingIdentity: item.missingIdentity ?? item.missing_identity ?? false,
+        missingPortrait: item.missingPortrait ?? item.missing_portrait ?? false,
+        missingEmergencyContact:
+            item.missingEmergencyContact ?? item.missing_emergency_contact ?? false,
         message: item.message ?? "",
     };
 }
 
 function normalizeTenantAccountCandidates(data) {
-    return Array.isArray(data) ? data.map(normalizeTenantAccountCandidate) : [];
+    return readPageItems(data).map(normalizeTenantAccountCandidate);
 }
 
-export async function fetchTenantAccountCandidates() {
-    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates`, {
+export async function fetchTenantAccountCandidates({ page = 0, size = 10 } = {}) {
+    const params = new URLSearchParams({
+        page: String(page),
+        size: String(size),
+    });
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates?${params.toString()}`, {
         method: "GET",
     });
-    return normalizeTenantAccountCandidates(data);
+    const items = normalizeTenantAccountCandidates(data);
+    return {
+        ...normalizePageResponse(data, { page: page + 1, size, items }),
+        items,
+    };
 }
 
 export async function sendTenantAccountCredentials(contractId, { retry = false } = {}) {
     const params = retry ? "?retry=true" : "";
     const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/send${params}`, {
         method: "POST",
+    });
+    return normalizeTenantAccountCandidate(data);
+}
+
+export async function disableTenantAccountAccess(contractId, profileId, { reason } = {}) {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates/${contractId}/profiles/${profileId}/disable`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
     });
     return normalizeTenantAccountCandidate(data);
 }
@@ -310,8 +298,6 @@ export async function updateCurrentUserProfile(payload) {
 }
 
 export async function uploadCurrentUserAvatar(file) {
-    // If backend doesn't support changing profile picture yet, we mock its return format
-    // or upload to generic file storage and mock the updating process.
     try {
         const formData = new FormData();
         formData.append("file", file);
@@ -321,8 +307,17 @@ export async function uploadCurrentUserAvatar(file) {
         });
         return { avatarUrl: data?.url };
     } catch {
-        // Mock fallback if /files/upload is not available
         return { avatarUrl: "https://i.pravatar.cc/150?img=33" };
     }
 }
 
+export async function changeCurrentUserPassword({ oldPassword, currentPassword, newPassword }) {
+    return authenticatedFetch(`${API_BASE_URL}/users/me/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            currentPassword: currentPassword ?? oldPassword,
+            newPassword,
+        }),
+    });
+}

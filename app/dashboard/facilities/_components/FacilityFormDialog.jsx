@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { LoaderCircle, MapPin, X } from "lucide-react";
 import {
@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { facilityStatusOptions } from "../_data/mockFacilities";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 function FieldError({ id, message }) {
   if (!message) return null;
@@ -186,3 +186,4 @@ export function FacilityFormDialog({
     </Dialog>
   );
 }
+

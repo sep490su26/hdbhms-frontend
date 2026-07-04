@@ -331,7 +331,11 @@ export default function AccountsPage() {
     const loadInitialData = async () => {
       try {
         const data = await fetchTenantAccountCandidates();
-        if (active) setItems(data);
+        if (active) {
+          setItems(data.items ?? []);
+          setTotalElements(data.totalElements ?? 0);
+          setTotalPages(data.totalPages ?? 1);
+        }
       } catch (loadError) {
         if (active)
           setError(

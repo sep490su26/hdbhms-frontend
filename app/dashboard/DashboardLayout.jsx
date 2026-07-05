@@ -116,7 +116,7 @@ const navigation = [
   },
   {
     path: "/dashboard/finance",
-    label: "Báo cáo tài chính",
+    label: "Báo cáo doanh thu",
     icon: WalletCards,
     permissionKey: "finance",
   },
@@ -545,14 +545,25 @@ function Topbar({
               <Bell className="h-5 w-5" />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-orange-400 ring-2 ring-white dark:ring-gray-900" />
             </button>
-            <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
-              {ROLE_LABELS[user?.role] || "Quản lý"}
-            </span>
-            <UserMenu
-              user={user}
-              onLogout={onLogout}
-              isLoggingOut={isLoggingOut}
-            />
+            {user ? (
+              <>
+                <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
+                  {ROLE_LABELS[user.role] || "Quản lý"}
+                </span>
+                <UserMenu
+                  user={user}
+                  onLogout={onLogout}
+                  isLoggingOut={isLoggingOut}
+                />
+              </>
+            ) : (
+              <Link
+                href="/login?redirect=%2Fdashboard%2Ffinance"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-bold text-white transition hover:bg-[#3641f5]"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -573,8 +584,12 @@ function DashboardLayoutShell({ children }) {
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
+  const allowedRoles = permissionKey
+    ? SECTION_PERMISSIONS[permissionKey] || []
+    : [];
+  const isPublicRoute = pathname?.startsWith("/dashboard/finance");
   const isAllowed = permissionKey
-    ? canAccessRole(effectiveRole, SECTION_PERMISSIONS[permissionKey] || [])
+    ? canAccessRole(effectiveRole, allowedRoles)
     : false;
 
   useEffect(() => {
@@ -612,7 +627,7 @@ function DashboardLayoutShell({ children }) {
 
   useEffect(() => {
     if (!hasHydratedAuth) return;
-    if (!user) {
+    if (!user && !isPublicRoute) {
       if (isLoggingOut) return;
       const redirect = pathname
         ? `?redirect=${encodeURIComponent(pathname)}`
@@ -630,6 +645,7 @@ function DashboardLayoutShell({ children }) {
     hasHydratedAuth,
     isAllowed,
     isLoggingOut,
+    isPublicRoute,
     pathname,
     router,
     user,

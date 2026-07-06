@@ -21,7 +21,6 @@ import {
   Phone,
   Ruler,
   ShieldCheck,
-  Upload,
   Wifi,
   X,
 } from "lucide-react";
@@ -39,6 +38,9 @@ import {
 } from "../../../services/depositContractsService";
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
 import { getAuthToken } from "../../../services/identityAccessService";
+import CameraCapture from "../../../components/CameraCapture";
+import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
+import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 
 const resolvePaymentExpiresAtMs = (paymentIntent) => {
   const expiresAt = paymentIntent?.expiresAt ?? paymentIntent?.expires_at;
@@ -403,6 +405,9 @@ const DEPOSIT_DRAFT_FIELDS = [
   "birthDate",
   "phone",
   "email",
+  "citizenId",
+  "idIssueDate",
+  "idIssuePlace",
   "permanentAddress",
   "paymentCycleMonths",
   "contractDate",
@@ -698,34 +703,15 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
   );
 }
 
-function FileUploadZone({ id, name, label, helperText, preview, onChange, required = true, error }) {
-  const { errors: formErrors } = useContext(DepositFormErrorContext);
-  const displayError = error || formErrors[name];
-
+function FormSection({ title, icon: Icon, children, className = "" }) {
   return (
-    <label
-      htmlFor={id}
-      className={`group flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-white px-4 py-5 text-center transition hover:border-[#091426] hover:bg-[#f5f3f4] ${displayError ? "border-rose-500 bg-rose-50/40" : "border-[#aeb1bb]"
-        }`}
-    >
-      <input id={id} name={name} type="file" accept="image/*" className="sr-only" onChange={onChange} />
-      {preview ? (
-        <div className="relative h-28 w-40 overflow-hidden rounded-lg border border-[#c5c6cd] bg-[#f5f3f4]">
-          <Image src={preview} alt={label} fill sizes="160px" className="object-cover" unoptimized />
-        </div>
-      ) : (
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff] text-[#232946] transition group-hover:bg-[#e0e7ff]">
-          <Upload className="h-5 w-5" />
-        </span>
-      )}
-      <span className="mt-4 text-sm font-bold text-[#091426]">
-        {label}
-        {required && <span className="text-rose-600"> *</span>}
-      </span>
-      <span className="mt-1 max-w-xs text-xs leading-5 text-[#6b7280]">{helperText}</span>
-      {displayError && <span className="mt-2 text-xs font-medium text-rose-600">{displayError}</span>}
-      {preview && <span className="mt-3 text-xs font-semibold text-[#006c49]">Đã chọn ảnh, bấm để thay đổi</span>}
-    </label>
+    <section className={`grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2 ${className}`}>
+      <div className="flex items-center gap-3">
+        {Icon && <Icon className="h-5 w-5 text-[#4f46e5]" />}
+        <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -878,6 +864,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     citizenIdBack: null,
     portraitImage: null,
   });
+  const [isPortraitCameraOpen, setIsPortraitCameraOpen] = useState(false);
   const [contractPreview, setContractPreview] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -1047,9 +1034,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     writeDepositDraftCookie(buildDepositDraftFromForm(event.currentTarget));
   };
 
-  const handleFileChange = (name) => (event) => {
-    const file = event.target.files?.[0];
-
+  const setDepositFile = (name, file, previewUrl = "") => {
     if (!file) {
       setImagePreviews((prev) => ({ ...prev, [name]: "" }));
       setSelectedFiles((prev) => ({ ...prev, [name]: null }));
@@ -1057,18 +1042,27 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
         ...currentErrors,
         [name]: REQUIRED_DEPOSIT_MESSAGES[name] || "",
       }));
-      return;
+      return false;
+    }
+
+    if (file.type && !file.type.startsWith("image/")) {
+      setImagePreviews((prev) => ({ ...prev, [name]: "" }));
+      setSelectedFiles((prev) => ({ ...prev, [name]: null }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        [name]: "Vui lòng chọn đúng định dạng ảnh.",
+      }));
+      return false;
     }
 
     if (file.size > MAX_DEPOSIT_UPLOAD_FILE_BYTES) {
-      event.target.value = "";
       setImagePreviews((prev) => ({ ...prev, [name]: "" }));
       setSelectedFiles((prev) => ({ ...prev, [name]: null }));
       setFieldErrors((currentErrors) => ({
         ...currentErrors,
         [name]: "Ảnh tải lên không được vượt quá 10MB.",
       }));
-      return;
+      return false;
     }
 
     const nextSelectedFiles = {
@@ -1080,7 +1074,6 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       .reduce((totalSize, selectedFile) => totalSize + selectedFile.size, 0);
 
     if (nextTotalSize > MAX_DEPOSIT_UPLOAD_TOTAL_BYTES) {
-      event.target.value = "";
       setImagePreviews((prev) => ({ ...prev, [name]: "" }));
       setSelectedFiles((prev) => ({ ...prev, [name]: null }));
       setFieldErrors((currentErrors) => ({
@@ -1088,7 +1081,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
         _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
         [name]: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
       }));
-      return;
+      return false;
     }
 
     setSelectedFiles((prev) => ({ ...prev, [name]: file }));
@@ -1098,11 +1091,131 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       [name]: "",
     }));
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreviews((prev) => ({ ...prev, [name]: reader.result }));
+    if (previewUrl) {
+      setImagePreviews((prev) => ({ ...prev, [name]: previewUrl }));
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreviews((prev) => ({ ...prev, [name]: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+
+    return true;
+  };
+
+  const handleFileChange = (name) => (event) => {
+    const didSetFile = setDepositFile(name, event.target.files?.[0]);
+    if (!didSetFile) event.target.value = "";
+  };
+
+  const handleFileRemove = (name) => {
+    setDepositFile(name, null);
+  };
+
+  const handlePortraitCapture = ({ file, previewUrl }) => {
+    setDepositFile("portraitImage", file, previewUrl);
+  };
+
+  const updateFormControlValue = (name, value) => {
+    const form = formRef.current;
+    const field = form?.elements?.namedItem(name);
+    if (!field || typeof value !== "string" || !value.trim()) return;
+
+    const prototype = field instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : field instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+    const valueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+
+    if (valueSetter) {
+      valueSetter.call(field, value);
+    } else {
+      field.value = value;
+    }
+
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const applyExtractedCccdIdentity = (identity = {}) => {
+    const extractedValues = {
+      fullName: identity.fullName || "",
+      birthDate: identity.dob || "",
+      citizenId: identity.idNumber || "",
+      idIssueDate: identity.issuedDate || "",
+      permanentAddress: identity.address || "",
     };
-    reader.readAsDataURL(file);
+
+    Object.entries(extractedValues).forEach(([name, value]) => {
+      updateFormControlValue(name, value);
+    });
+
+    if (formRef.current) {
+      writeDepositDraftCookie(buildDepositDraftFromForm(formRef.current));
+    }
+
+    setSavedDraft((currentDraft) => ({
+      ...currentDraft,
+      ...Object.fromEntries(Object.entries(extractedValues).filter(([, value]) => value)),
+    }));
+    setAcceptedContract(false);
+
+    setFieldErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors, _form: "" };
+      Object.entries(extractedValues).forEach(([name, value]) => {
+        if (value) {
+          nextErrors[name] = validateDepositField(name, value);
+        }
+      });
+
+      const birthDate = extractedValues.birthDate || formRef.current?.elements?.namedItem("birthDate")?.value || "";
+      const idIssueDate = extractedValues.idIssueDate || formRef.current?.elements?.namedItem("idIssueDate")?.value || "";
+      if (birthDate && idIssueDate && idIssueDate <= birthDate) {
+        nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
+      }
+
+      return nextErrors;
+    });
+  };
+
+  const handleCccdFilesChange = ({ files = {}, previews = {} }) => {
+    const nextSelectedFiles = {
+      ...selectedFiles,
+      citizenIdFront: files.citizenIdFront || null,
+      citizenIdBack: files.citizenIdBack || null,
+    };
+    const nextTotalSize = Object.values(nextSelectedFiles)
+      .filter(Boolean)
+      .reduce((totalSize, selectedFile) => totalSize + selectedFile.size, 0);
+
+    if (nextTotalSize > MAX_DEPOSIT_UPLOAD_TOTAL_BYTES) {
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
+        citizenIdFront: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+        citizenIdBack: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+      }));
+      return;
+    }
+
+    setSelectedFiles(nextSelectedFiles);
+    setImagePreviews((currentPreviews) => ({
+      ...currentPreviews,
+      citizenIdFront: previews.citizenIdFront || "",
+      citizenIdBack: previews.citizenIdBack || "",
+    }));
+    setFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      _form: "",
+      citizenIdFront: nextSelectedFiles.citizenIdFront ? "" : currentErrors.citizenIdFront,
+      citizenIdBack: nextSelectedFiles.citizenIdBack ? "" : currentErrors.citizenIdBack,
+    }));
+  };
+
+  const handleCccdExtracted = ({ identity }) => {
+    applyExtractedCccdIdentity(identity);
   };
 
   const validateFormData = (data, { includeFiles = true, includeContractAcceptance = true } = {}) => {
@@ -1225,39 +1338,33 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           noValidate
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
-          <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
-          <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
-          <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
-          <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
-          <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
-          <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
-          <label className="flex flex-col gap-1.5 sm:col-span-2">
-            <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
-              Chu kỳ thanh toán <span className="text-rose-600">*</span>
-            </span>
-            <select
-              name="paymentCycleMonths"
-              defaultValue={savedDraft.paymentCycleMonths || "1"}
-              required
-              aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
-              onChange={(event) => validateAndSetDepositField("paymentCycleMonths", event.target.value)}
-              className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.paymentCycleMonths
-                ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-                }`}
-            >
-              <option value="1">1 tháng/lần</option>
-              <option value="3">3 tháng/lần</option>
-            </select>
-            {fieldErrors.paymentCycleMonths && <span className="text-xs font-medium text-rose-600">{fieldErrors.paymentCycleMonths}</span>}
-          </label>
-          <div className="grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2">
-            <div className="flex items-center gap-3">
-              <Home className="h-5 w-5 text-[#4f46e5]" />
-              <h2 className="text-lg font-bold text-[#091426]">Thông tin số người ở</h2>
+          <CccdUploadFlow
+            value={{ files: selectedFiles, previews: imagePreviews }}
+            onFilesChange={handleCccdFilesChange}
+            onExtract={handleCccdExtracted}
+            disabled={isSubmitting}
+            maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+          />
+
+          <FormSection title="Thông tin định danh" icon={ShieldCheck}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
+              <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
+              <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
+              <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
+              <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
+              <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
             </div>
+          </FormSection>
+
+          <FormSection title="Thông tin liên hệ" icon={Phone}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
+              <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
+            </div>
+          </FormSection>
+
+          <FormSection title="Thông tin cư trú" icon={Home}>
             <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
@@ -1332,78 +1439,88 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                 </div>
               </div>
             ))}
-          </div>
-          <Field
-            label="Ngày hẹn ký hợp đồng"
-            name="contractDate"
-            type="date"
-            placeholder="dd/MM/yyyy"
-            min={minScheduleDate}
-            max={maxScheduleDate}
-            error={fieldErrors.contractDate}
-            validateValue={validateDepositField}
-            onChange={handleFieldChange}
-            onBlur={handleFieldBlur}
-            defaultValue={savedDraft.contractDate}
-          />
-          <Field
-            label="Ngày dự kiến vào ở"
-            name="moveInDate"
-            type="date"
-            placeholder="dd/MM/yyyy"
-            min={minScheduleDate}
-            max={maxScheduleDate}
-            error={fieldErrors.moveInDate}
-            validateValue={validateDepositField}
-            onChange={handleFieldChange}
-            onBlur={handleFieldBlur}
-            defaultValue={savedDraft.moveInDate}
-          />
-          {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
-              Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong vòng 14 ngày.
-            </div>
-          )}
+          </FormSection>
 
-          <div className="grid gap-4 sm:col-span-2 sm:grid-cols-2">
-            <FileUploadZone
-              id="citizen-id-front"
-              name="citizenIdFront"
-              label="Mặt trước CCCD"
-              helperText="Mặt hiển thị ảnh và thông tin cá nhân."
-              preview={imagePreviews.citizenIdFront}
-              onChange={handleFileChange("citizenIdFront")}
-            />
-            <FileUploadZone
-              id="citizen-id-back"
-              name="citizenIdBack"
-              label="Mặt sau CCCD"
-              helperText="Mặt hiển thị vân tay và đặc điểm nhận dạng."
-              preview={imagePreviews.citizenIdBack}
-              onChange={handleFileChange("citizenIdBack")}
-            />
-            <div className="sm:col-span-2">
-              <FileUploadZone
-                id="portrait-image"
-                name="portraitImage"
-                label="Ảnh chân dung"
-                helperText="Tải lên ảnh chân dung rõ mặt của khách thuê."
-                preview={imagePreviews.portraitImage}
-                onChange={handleFileChange("portraitImage")}
+          <FormSection title="Lịch đặt cọc và thanh toán" icon={CalendarDays}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Ngày hẹn ký hợp đồng"
+                name="contractDate"
+                type="date"
+                placeholder="dd/MM/yyyy"
+                min={minScheduleDate}
+                max={maxScheduleDate}
+                error={fieldErrors.contractDate}
+                validateValue={validateDepositField}
+                onChange={handleFieldChange}
+                onBlur={handleFieldBlur}
+                defaultValue={savedDraft.contractDate}
               />
+              <Field
+                label="Ngày dự kiến vào ở"
+                name="moveInDate"
+                type="date"
+                placeholder="dd/MM/yyyy"
+                min={minScheduleDate}
+                max={maxScheduleDate}
+                error={fieldErrors.moveInDate}
+                validateValue={validateDepositField}
+                onChange={handleFieldChange}
+                onBlur={handleFieldBlur}
+                defaultValue={savedDraft.moveInDate}
+              />
+              {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
+                  Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong vòng 14 ngày.
+                </div>
+              )}
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                  Chu kỳ thanh toán <span className="text-rose-600">*</span>
+                </span>
+                <select
+                  name="paymentCycleMonths"
+                  defaultValue={savedDraft.paymentCycleMonths || "1"}
+                  required
+                  aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
+                  onChange={(event) => validateAndSetDepositField("paymentCycleMonths", event.target.value)}
+                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.paymentCycleMonths
+                    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                    : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                    }`}
+                >
+                  <option value="1">1 tháng/lần</option>
+                  <option value="3">3 tháng/lần</option>
+                </select>
+                {fieldErrors.paymentCycleMonths && <span className="text-xs font-medium text-rose-600">{fieldErrors.paymentCycleMonths}</span>}
+              </label>
             </div>
-          </div>
+          </FormSection>
 
-          <label className="flex flex-col gap-1.5 sm:col-span-2">
-            <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>
-            <textarea
-              name="note"
-              rows={4}
-              placeholder="Yêu cầu về nội thất hoặc thời gian nhận phòng..."
-              defaultValue={savedDraft.note}
-              className="rounded-lg border border-[#c5c6cd] bg-white px-4 py-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+          <FormSection title="Hồ sơ bổ sung" icon={FileText}>
+            <PortraitUploadZone
+              id="portrait-image"
+              name="portraitImage"
+              file={selectedFiles.portraitImage}
+              preview={imagePreviews.portraitImage}
+              onChange={handleFileChange("portraitImage")}
+              onCapture={() => setIsPortraitCameraOpen(true)}
+              onRemove={() => handleFileRemove("portraitImage")}
+              disabled={isSubmitting}
+              error={fieldErrors.portraitImage}
             />
-          </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>
+              <textarea
+                name="note"
+                rows={4}
+                placeholder="Yêu cầu về nội thất hoặc thời gian nhận phòng..."
+                defaultValue={savedDraft.note}
+                className="rounded-lg border border-[#c5c6cd] bg-white px-4 py-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+              />
+            </label>
+          </FormSection>
 
           <div className="grid gap-3 rounded-xl border border-[#d8dde6] bg-white p-4 sm:col-span-2">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1477,6 +1594,13 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             )}
           </button>
         </form>
+        <CameraCapture
+          open={isPortraitCameraOpen}
+          onClose={() => setIsPortraitCameraOpen(false)}
+          onCapture={handlePortraitCapture}
+          facingMode="user"
+          title="Chụp ảnh chân dung"
+        />
         {isPreviewOpen && (
           <ContractPreviewModal
             preview={contractPreview}

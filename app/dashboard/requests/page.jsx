@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { fetchChangeRequests, fetchChangeRequestStats } from "@/services/changeRequestsService";
+import { useCallback, useEffect, useState } from "react";
+import {
+    approveChangeRequest,
+    fetchChangeRequests,
+    fetchChangeRequestStats,
+    rejectChangeRequest,
+} from "@/services/changeRequestsService";
 import { Loader2 } from "lucide-react";
 import {
     ArrowRightLeft,
@@ -11,9 +16,7 @@ import {
     MessageSquareWarning,
     Key,
     Search,
-    ChevronLeft,
     ChevronRight,
-    MoreHorizontal,
     FileCheck2,
     CalendarCheck,
     XCircle,
@@ -44,6 +47,14 @@ import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 
 const translateType = (type) => {
     const map = {
+        ROOM_TRANSFER: "Chuyển phòng",
+        MOVE_OUT: "Trả phòng",
+        PERMISSION_ACCESS: "Cấp quyền truy cập",
+        TENANT_PROFILE_ACCESS: "Xem hồ sơ khách thuê",
+        METER_READING_CORRECTION: "Điều chỉnh chỉ số",
+        INVOICE_ADJUSTMENT: "Điều chỉnh hóa đơn",
+        RENT_PRICE_ADJUSTMENT: "Điều chỉnh giá thuê",
+        DEPOSIT_REFUND_REQUEST: "Hoàn cọc",
         TRANSFER: "Chuyển phòng",
         MOVEOUT: "Trả phòng",
         RENEWAL: "Gia hạn HĐ",
@@ -65,6 +76,14 @@ const translateStatus = (status) => {
 };
 
 const TYPE_CONFIG = {
+    ROOM_TRANSFER: { color: "bg-blue-50", icon: <ArrowRightLeft className="w-5 h-5 text-blue-500" /> },
+    MOVE_OUT: { color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500" /> },
+    PERMISSION_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" /> },
+    TENANT_PROFILE_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" /> },
+    METER_READING_CORRECTION: { color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500" /> },
+    INVOICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" /> },
+    RENT_PRICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" /> },
+    DEPOSIT_REFUND_REQUEST: { color: "bg-green-50", icon: <FileCheck2 className="w-5 h-5 text-green-500" /> },
     TRANSFER: { color: "bg-blue-50", icon: <ArrowRightLeft className="w-5 h-5 text-blue-500" /> },
     MOVEOUT: { color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500" /> },
     RENEWAL: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" /> },
@@ -73,6 +92,12 @@ const TYPE_CONFIG = {
     COMPLAINT: { color: "bg-yellow-50", icon: <MessageSquareWarning className="w-5 h-5 text-yellow-500" /> },
     ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" /> },
 };
+
+const PROFILE_ACCESS_DURATIONS = [
+    { value: "DAYS_30", label: "30 ngày" },
+    { value: "DAYS_7", label: "7 ngày" },
+    { value: "HOURS_48", label: "48 giờ" },
+];
 
 export default function ApprovalCenter() {
     const [typeFilter, setTypeFilter] = useState("All Types");
@@ -84,8 +109,10 @@ export default function ApprovalCenter() {
     const [stats, setStats] = useState({ breakdown: [], pendingCount: 0, approvedCount: 0, rejectedCount: 0, totalCount: 0 });
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
+    const [actionId, setActionId] = useState("");
+    const [durationByRequestId, setDurationByRequestId] = useState({});
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const [dataRes, statsRes] = await Promise.all([
@@ -96,7 +123,22 @@ export default function ApprovalCenter() {
             setTotal(dataRes.total || 0);
 
             if (statsRes) {
-                const colors = { TRANSFER: "#3B82F6", MOVEOUT: "#22C55E", TERMINATION: "#FACC15", MAINTENANCE: "#A855F7", COMPLAINT: "#F472B6", ACCESS: "#9CA3AF" };
+                const colors = {
+                    ROOM_TRANSFER: "#3B82F6",
+                    MOVE_OUT: "#22C55E",
+                    PERMISSION_ACCESS: "#9CA3AF",
+                    TENANT_PROFILE_ACCESS: "#9CA3AF",
+                    METER_READING_CORRECTION: "#06B6D4",
+                    INVOICE_ADJUSTMENT: "#6366F1",
+                    RENT_PRICE_ADJUSTMENT: "#818CF8",
+                    DEPOSIT_REFUND_REQUEST: "#22C55E",
+                    TRANSFER: "#3B82F6",
+                    MOVEOUT: "#22C55E",
+                    TERMINATION: "#FACC15",
+                    MAINTENANCE: "#A855F7",
+                    COMPLAINT: "#F472B6",
+                    ACCESS: "#9CA3AF",
+                };
                 const breakdown = (statsRes.breakdown || []).map(b => ({
                     ...b,
                     label: translateType(b.type),
@@ -115,12 +157,41 @@ export default function ApprovalCenter() {
         } finally {
             setLoading(false);
         }
+    }, [page, search, statusFilter, typeFilter]);
+
+    const handleApprove = async (req) => {
+        try {
+            setActionId(String(req.id));
+            const durationCode = req.requestType === "TENANT_PROFILE_ACCESS"
+                ? durationByRequestId[req.id] || "DAYS_30"
+                : undefined;
+            await approveChangeRequest(req.id, durationCode);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setActionId("");
+        }
+    };
+
+    const handleReject = async (req) => {
+        const note = window.prompt("Lý do từ chối yêu cầu?", "");
+        if (note === null) return;
+        try {
+            setActionId(String(req.id));
+            await rejectChangeRequest(req.id, note);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setActionId("");
+        }
     };
 
     useEffect(() => {
         const t = setTimeout(loadData, 300);
         return () => clearTimeout(t);
-    }, [search, typeFilter, statusFilter, page]);
+    }, [loadData]);
 
     return (
         <div className="w-full min-w-0 flex flex-col gap-6 font-sans">
@@ -217,6 +288,10 @@ export default function ApprovalCenter() {
                                 ) : (
                                     data.map((req) => {
                                         const tc = TYPE_CONFIG[req.requestType] || TYPE_CONFIG.ACCESS;
+                                        const payload = req.requestPayload || {};
+                                        const tenantName = payload.fullName || `User #${req.requesterId || "--"}`;
+                                        const roomText = payload.roomCode ? `Phòng ${payload.roomCode}` : "--";
+                                        const detailText = payload.propertyName || payload.reason || req.description || "---";
                                         return (
                                             <TableRow key={req.id} className="hover:bg-gray-50/50 transition-colors">
                                                 <TableCell className="px-5 py-4">
@@ -231,11 +306,11 @@ export default function ApprovalCenter() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4">
-                                                    <p className="font-medium text-gray-900">Guest #{req.requesterId || "--"}</p>
-                                                    <p className="text-xs text-gray-400">---</p>
+                                                    <p className="font-medium text-gray-900">{tenantName}</p>
+                                                    <p className="text-xs text-gray-400">{detailText}</p>
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4 text-gray-600 font-medium">
-                                                    --
+                                                    {roomText}
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4 text-gray-600">
                                                     {formatDisplayDate(req.createdAt)}
@@ -251,9 +326,46 @@ export default function ApprovalCenter() {
                                                 </TableCell>
                                                 <TableCell className="px-5 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 px-4">
-                                                            Review
-                                                        </Button>
+                                                        {req.status === "PENDING" ? (
+                                                            <>
+                                                                {req.requestType === "TENANT_PROFILE_ACCESS" && (
+                                                                    <select
+                                                                        className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700"
+                                                                        value={durationByRequestId[req.id] || "DAYS_30"}
+                                                                        onChange={(event) => setDurationByRequestId((current) => ({
+                                                                            ...current,
+                                                                            [req.id]: event.target.value,
+                                                                        }))}
+                                                                        title="Thời hạn quyền xem hồ sơ"
+                                                                    >
+                                                                        {PROFILE_ACCESS_DURATIONS.map((option) => (
+                                                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+                                                                <Button
+                                                                    size="sm"
+                                                                    disabled={actionId === String(req.id)}
+                                                                    onClick={() => handleApprove(req)}
+                                                                    className="h-8 rounded-lg bg-emerald-600 px-3 text-white hover:bg-emerald-700 disabled:opacity-60"
+                                                                >
+                                                                    <FileCheck2 className="mr-1 h-4 w-4" />
+                                                                    Duyệt
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    disabled={actionId === String(req.id)}
+                                                                    onClick={() => handleReject(req)}
+                                                                    className="h-8 rounded-lg border-rose-200 px-3 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                                                                >
+                                                                    <XCircle className="mr-1 h-4 w-4" />
+                                                                    Từ chối
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs font-semibold text-gray-400">Đã xử lý</span>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>

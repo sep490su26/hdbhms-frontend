@@ -2,11 +2,6 @@ import { API_BASE_URL, ApiError, authenticatedFetch, getAuthToken, refreshTokenA
 
 const BASE = API_BASE_URL;
 
-function getAuthToken() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem("token") || "";
-}
-
 function authHeaders(extraHeaders = {}) {
   const token = getAuthToken();
   return {
@@ -154,7 +149,10 @@ export async function fetchContractHandover(contractId, handoverType = "MOVE_IN"
   );
 }
 
-
+/**
+ * Single-shot submit: saves readings + assets + confirms handover atomically.
+ * POST /api/v1/lease-contracts/{contractId}/handover/submit
+ */
 export async function submitHandover(contractId, payload) {
   if (!contractId) throw new Error("Missing contractId");
 
@@ -274,20 +272,6 @@ export async function downloadHandoverSignedPdf(
   URL.revokeObjectURL(url);
 }
 
-/**
- * Single-shot submit: saves readings + assets + confirms handover atomically.
- * POST /api/v1/lease-contracts/{contractId}/handover/submit
- */
-export async function submitHandover(contractId, payload) {
-  return authenticatedFetch(
-    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/submit`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-  );
-}
 
 export async function confirmHandover(contractId, body) {
   if (!contractId) throw new Error("Missing contractId");
@@ -296,76 +280,4 @@ export async function confirmHandover(contractId, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-}
-
-function authHeaders(extraHeaders = {}) {
-  const token = getAuthToken();
-  return {
-    "X-Client-Type": "web",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...extraHeaders,
-  };
-}
-
-async function fetchWithAuth(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: authHeaders(options.headers),
-  });
-
-  if (response.status !== 401) {
-    return response;
-  }
-
-  await refreshTokenApi();
-  return fetch(url, {
-    ...options,
-    credentials: "include",
-    headers: authHeaders(options.headers),
-  });
-}
-
-export async function downloadHandoverDraftPdf(contractId, handoverType = "MOVE_IN") {
-  const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
-  if (popup) {
-    popup.document.write("<!doctype html><title>Đang xử lý PDF</title><p style=\"font-family:Arial,sans-serif;padding:24px\">Đang tải biên bản bàn giao...</p>");
-  }
-
-  try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/draft-pdf?type=${encodeURIComponent(handoverType)}`, {
-      method: "GET",
-    });
-    if (!response.ok) {
-      throw new Error("Không thể tải file PDF bàn giao.");
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    if (popup) {
-      popup.opener = null;
-      popup.location.href = url;
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    popup?.close();
-    throw error;
-  }
-}
-
-export async function uploadHandoverSignedDocument(contractId, file, handoverType = "MOVE_IN") {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/document?type=${encodeURIComponent(handoverType)}`, {
-    method: "PATCH",
-    body: formData,
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.code !== 0) {
-    throw new Error(payload.message || "Lỗi upload biên bản bàn giao");
-  }
-  return true;
 }

@@ -147,8 +147,54 @@ export async function refreshTokenApi() {
     throw new Error("Không thể làm mới phiên đăng nhập");
 }
 
+function normalizeUserAccount(item = {}) {
+    const id = item.id ?? item.userId ?? item.user_id ?? null;
+    const email = item.email ?? "";
+    const phone = item.phone ?? "";
+    const displayName =
+        item.fullName ??
+        item.full_name ??
+        item.name ??
+        "";
+    const fullName =
+        displayName ||
+        email ||
+        phone ||
+        `Nhân viên #${id || ""}`.trim();
+
+    return {
+        ...item,
+        id,
+        userId: id,
+        fullName,
+        phone,
+        email,
+        role: item.role ?? item.roleName ?? item.role_name ?? "",
+        status: item.status ?? item.accountStatus ?? item.account_status ?? "",
+        mustChangePassword:
+            item.mustChangePassword ?? item.must_change_password ?? false,
+        lastLoginAt: item.lastLoginAt ?? item.last_login_at ?? null,
+        createdAt: item.createdAt ?? item.created_at ?? null,
+        updatedAt: item.updatedAt ?? item.updated_at ?? null,
+        deletedAt: item.deletedAt ?? item.deleted_at ?? null,
+        assignedProperties: item.assignedProperties ?? item.assigned_properties ?? [],
+    };
+}
+
+function normalizeUserAccounts(data) {
+    return readPageItems(data).map(normalizeUserAccount);
+}
+
+function normalizeSimpleProperty(item = {}) {
+    return {
+        id: item.id ?? item.propertyId ?? item.property_id ?? null,
+        name: item.name ?? item.propertyName ?? item.property_name ?? "",
+        code: item.propertyCode ?? item.property_code ?? item.code ?? "",
+    };
+}
+
 export async function createStaffAccount({ phone, email, fullName, role }) {
-    return authenticatedFetch(`${API_BASE_URL}/users/staff`, {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/staff`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -158,34 +204,52 @@ export async function createStaffAccount({ phone, email, fullName, role }) {
             initialRole: role,
         }),
     });
+    return normalizeUserAccount(data);
 }
 
-export async function fetchUsers({ page, size, status, role, search }) {
+export async function fetchUsers({ page = 0, size = 10, status, role, roles, search } = {}) {
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
     });
     if (status && status !== "all") params.set("status", status);
+    if (Array.isArray(roles)) {
+        roles.filter(Boolean).forEach((item) => params.append("roles", item));
+    }
     if (role && role !== "all") params.set("role", role);
     if (search?.trim()) params.set("keyword", search.trim());
 
-    return authenticatedFetch(`${API_BASE_URL}/users?${params.toString()}`);
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/accounts?${params.toString()}`);
+    const items = normalizeUserAccounts(data);
+    return {
+        ...normalizePageResponse(data, { page: page + 1, size, items }),
+        items,
+    };
 }
 
 export async function updateUserStatus(userId, { status }) {
-    return authenticatedFetch(`${API_BASE_URL}/users/${userId}/status`, {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/${userId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
     });
+    return normalizeUserAccount(data);
 }
 
 export async function updateUserRole(userId, role) {
-    return authenticatedFetch(`${API_BASE_URL}/users/${userId}/role`, {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/${userId}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
     });
+    return normalizeUserAccount(data);
+}
+
+export async function fetchSimpleProperties() {
+    const data = await authenticatedFetch(`${API_BASE_URL}/properties/simple`, {
+        method: "GET",
+    });
+    return (Array.isArray(data) ? data : readPageItems(data)).map(normalizeSimpleProperty);
 }
 
 export async function deleteUser(userId) {

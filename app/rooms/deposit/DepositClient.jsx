@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import ExpiryModal from "../../../components/ExpiryModal";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +30,7 @@ import { ROOM_HOLD_DURATION_MS, clearRoomHold, createRoomHold, formatHoldCountdo
 import {
   cancelDepositPayment,
   checkoutDeposit,
+  expireDepositPayment,
   fetchDepositPaymentStatus,
   fetchDepositRoomHoldStatus,
 } from "../../../services/roomsService";
@@ -513,7 +515,7 @@ const normalizePhoneValue = (value) => {
   return String(value || "").replace(/[\s.\-()]/g, "");
 };
 
-const validateDepositValue = (name, value, scheduleWindow = null) => {
+const validateDepositValue = (name, value, scheduleWindow = null, formValues = {}) => {
   const normalizedValue = String(value || "").trim();
   const todayDate = getTodayDateString();
   const maxScheduleDate = scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
@@ -529,7 +531,7 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
   }
 
-  if (name === "phone" && !VIETNAM_PHONE_PATTERN.test(normalizedValue)) {
+  if (name === "phone" && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
     return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
   }
 
@@ -559,6 +561,10 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
 
   if (name === "idIssueDate" && normalizedValue > todayDate) {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
+  }
+
+  if (name === "idIssueDate" && formValues.birthDate && normalizedValue && normalizedValue < formValues.birthDate) {
+    return "Ngày cấp CCCD không được trước ngày sinh.";
   }
 
   if ((name === "contractDate" || name === "moveInDate") && normalizedValue < minScheduleDate) {
@@ -863,6 +869,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   const todayDate = getTodayDateString();
   const minScheduleDate = scheduleWindow.minDate;
   const maxScheduleDate = scheduleWindow.maxDate;
+  const defaultDepositScheduleDate = getDateStringWithOffset(1);
   const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
   const formRef = useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
@@ -992,15 +999,25 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     }));
   };
 
-  const validateDepositField = (name, value) => {
-    return validateDepositValue(name, value, scheduleWindow);
+  const getCurrentDepositFormValues = (name, value) => ({
+    ...(formRef.current ? collectDepositFormData(formRef.current) : savedDraft),
+    [name]: value,
+  });
+
+  const validateDepositField = (name, value, formValues = null) => {
+    const contextValues = formValues || getCurrentDepositFormValues(name, value);
+    return validateDepositValue(name, value, scheduleWindow, contextValues);
   };
 
   const validateAndSetDepositField = (name, value) => {
-    const message = validateDepositField(name, value);
+    const formValues = getCurrentDepositFormValues(name, value);
+    const message = validateDepositField(name, value, formValues);
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
       [name]: message,
+      ...(name === "birthDate" && formValues.idIssueDate
+        ? { idIssueDate: validateDepositField("idIssueDate", formValues.idIssueDate, formValues) }
+        : {}),
     }));
     return !message;
   };
@@ -1122,16 +1139,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     const nextErrors = {};
 
     [...requiredFields, "email"].forEach((fieldName) => {
-      const message = validateDepositField(fieldName, data[fieldName]);
+      const message = validateDepositField(fieldName, data[fieldName], data);
       if (message) nextErrors[fieldName] = message;
     });
-
-    // Validate CCCD issue date must be after birth date
-    const birthDate = data.birthDate;
-    const idIssueDate = data.idIssueDate;
-    if (birthDate && idIssueDate && idIssueDate <= birthDate) {
-      nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
-    }
 
     Object.assign(nextErrors, validateOccupancyData(data));
 
@@ -1226,11 +1236,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
           <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
+          <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} validateValue={validateDepositField} onChange={handleFieldChange} onBlur={handleFieldBlur} />
           <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
           <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
           <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
+          <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} validateValue={validateDepositField} onChange={handleFieldChange} onBlur={handleFieldBlur} />
           <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
           <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
           <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -1344,7 +1354,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
-            defaultValue={savedDraft.contractDate}
+            defaultValue={savedDraft.contractDate || defaultDepositScheduleDate}
           />
           <Field
             label="Ngày dự kiến vào ở"
@@ -1357,7 +1367,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
             validateValue={validateDepositField}
             onChange={handleFieldChange}
             onBlur={handleFieldBlur}
-            defaultValue={savedDraft.moveInDate}
+            defaultValue={savedDraft.moveInDate || defaultDepositScheduleDate}
           />
           {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
@@ -1495,11 +1505,12 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
   );
 }
 
-function CopyablePaymentField({ label, value, valueClassName = "" }) {
+function CopyablePaymentField({ label, value, valueClassName = "", disabled = false }) {
   const [copied, setCopied] = useState(false);
   const displayValue = String(value ?? "").trim();
 
   const handleCopy = async () => {
+    if (disabled) return;
     const didCopy = await copyTextToClipboard(displayValue);
     if (!didCopy) return;
     setCopied(true);
@@ -1517,7 +1528,7 @@ function CopyablePaymentField({ label, value, valueClassName = "" }) {
       <button
         type="button"
         onClick={handleCopy}
-        disabled={!displayValue}
+        disabled={disabled || !displayValue}
         className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[#c5c6cd] bg-white px-3 text-xs font-bold text-[#091426] transition hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
         title={`Sao chép ${label.toLowerCase()}`}
       >
@@ -1562,8 +1573,47 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(() => Math.max(0, expiresAtMs - Date.now()) <= 0);
+  const [redirectSeconds, setRedirectSeconds] = useState(10);
   const didHandleExpiryRef = useRef(false);
   const didHandlePaidRef = useRef(false);
+
+  const handleSessionExpired = useCallback((message) => {
+    if (didHandlePaidRef.current) return;
+    setRemainingMs(0);
+    setRedirectSeconds(10);
+    setIsSessionExpired(true);
+    setPaymentStatusMessage(message || "Phiên giữ chỗ đã hết hạn.");
+
+    if (didHandleExpiryRef.current) return;
+    didHandleExpiryRef.current = true;
+    clearRoomHold(room.id);
+    if (paymentIntentId) {
+      expireDepositPayment(paymentIntentId)
+        .then((status) => {
+          if (status?.message) setPaymentStatusMessage(status.message);
+        })
+        .catch(() => {
+          setPaymentStatusMessage("Phiên giữ chỗ đã hết hạn. Hệ thống sẽ cập nhật trạng thái trong giây lát.");
+        });
+    }
+  }, [paymentIntentId, room.id]);
+
+  useEffect(() => {
+    if (!isSessionExpired) return undefined;
+
+    const countdownTimer = window.setInterval(() => {
+      setRedirectSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    const redirectTimer = window.setTimeout(() => {
+      router.replace("/rooms");
+    }, 10000);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearTimeout(redirectTimer);
+    };
+  }, [isSessionExpired, router]);
 
   useEffect(() => {
     if (isConfirmed) return undefined;
@@ -1573,17 +1623,14 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
       setRemainingMs(nextRemainingMs);
 
       if (nextRemainingMs <= 0 && !didHandleExpiryRef.current) {
-        didHandleExpiryRef.current = true;
-        clearRoomHold(room.id);
-        alert("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
-        router.replace("/rooms");
+        handleSessionExpired("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
       }
     };
 
     tick();
     const timerId = window.setInterval(tick, 1000);
     return () => window.clearInterval(timerId);
-  }, [expiresAtMs, isConfirmed, room.id, router]);
+  }, [expiresAtMs, handleSessionExpired, isConfirmed]);
 
   useEffect(() => {
     if (!qrPayload) {
@@ -1629,10 +1676,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
         }
 
         if (isTerminalFailedPaymentStatus(status) && !didHandleExpiryRef.current) {
-          didHandleExpiryRef.current = true;
-          clearRoomHold(room.id);
-          alert(status?.message || "Phiên thanh toán đã kết thúc. Vui lòng chọn lại phòng.");
-          router.replace("/rooms");
+          handleSessionExpired(status?.message || "Phiên thanh toán đã kết thúc. Vui lòng chọn lại phòng.");
         }
       } catch {
         setPaymentStatusMessage("Chưa nhận được xác nhận thanh toán từ PayOS.");
@@ -1642,9 +1686,13 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     pollPaymentStatus();
     const pollingTimer = window.setInterval(pollPaymentStatus, 2500);
     return () => window.clearInterval(pollingTimer);
-  }, [expiresAtMs, isConfirmed, paymentIntentId, room.id, router]);
+  }, [expiresAtMs, handleSessionExpired, isConfirmed, paymentIntentId, room.id]);
 
   const handleOpenCheckout = () => {
+    if (isSessionExpired || remainingMs <= 0) {
+      handleSessionExpired("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+      return;
+    }
     if (!checkoutUrl) {
       alert("Chưa có đường dẫn thanh toán PayOS. Vui lòng quét mã QR hoặc tạo lại yêu cầu đặt cọc.");
       return;
@@ -1653,9 +1701,8 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   };
 
   const handleConfirmPayment = async () => {
-    if (remainingMs <= 0) {
-      alert("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
-      router.replace("/rooms");
+    if (isSessionExpired || remainingMs <= 0) {
+      handleSessionExpired("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
       return;
     }
 
@@ -1671,6 +1718,10 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   };
 
   const handleCancelPayment = async () => {
+    if (isSessionExpired || remainingMs <= 0) {
+      handleSessionExpired("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+      return;
+    }
     try {
       setIsCancelling(true);
       await cancelDepositPayment(paymentIntentId);
@@ -1709,6 +1760,8 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
       alert(error.message || "Không thể tải hợp đồng đặt cọc.");
     }
   };
+
+  const paymentActionsDisabled = isSessionExpired || remainingMs <= 0;
 
   if (isConfirmed) {
     return (
@@ -1750,6 +1803,12 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
 
   return (
     <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-6 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
+      <ExpiryModal
+        open={isSessionExpired}
+        redirectSeconds={redirectSeconds}
+        onChooseRooms={() => router.replace("/rooms")}
+        onHome={() => router.replace("/")}
+      />
       <div className="flex flex-col gap-4 border-b border-[#c5c6cd] pb-6 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">Bước đặt cọc</p>
@@ -1774,16 +1833,21 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
             <p className="mt-2 text-sm leading-6 text-[#6b7280]">
               Vui lòng chuyển đúng số tiền và đúng nội dung chuyển khoản để hệ thống tự động xác nhận.
             </p>
-            {hasManualTransferDetails ? (
+            {isSessionExpired ? (
+              <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold leading-6 text-rose-700">
+                Thông tin chuyển khoản đã được ẩn vì phiên giữ chỗ đã hết hạn.
+              </div>
+            ) : hasManualTransferDetails ? (
               <div className="mt-5 grid gap-3">
-                <CopyablePaymentField label="Ngân hàng" value={bankName} />
-                <CopyablePaymentField label="Số tài khoản" value={accountNumber} />
-                <CopyablePaymentField label="Tên người nhận" value={accountName} />
-                <CopyablePaymentField label="Số tiền" value={depositAmountLabel} valueClassName="text-[#006c49]" />
+                <CopyablePaymentField label="Ngân hàng" value={bankName} disabled={paymentActionsDisabled} />
+                <CopyablePaymentField label="Số tài khoản" value={accountNumber} disabled={paymentActionsDisabled} />
+                <CopyablePaymentField label="Tên người nhận" value={accountName} disabled={paymentActionsDisabled} />
+                <CopyablePaymentField label="Số tiền" value={depositAmountLabel} valueClassName="text-[#006c49]" disabled={paymentActionsDisabled} />
                 <CopyablePaymentField
                   label="Nội dung chuyển khoản"
                   value={transferDescription}
                   valueClassName="text-[#b45309]"
+                  disabled={paymentActionsDisabled}
                 />
               </div>
             ) : (
@@ -1806,19 +1870,33 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
         </div>
 
         <div className="rounded-xl border border-[#c5c6cd] bg-white p-5 text-center">
-          <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
+          <div className="relative mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
             {qrDataUrl ? (
-              <Image src={qrDataUrl} alt={`Mã QR thanh toán PayOS ${paymentCode}`} width={260} height={260} className="h-full w-full rounded-xl object-contain p-3" unoptimized />
+              <Image
+                src={qrDataUrl}
+                alt={`Mã QR thanh toán PayOS ${paymentCode}`}
+                width={260}
+                height={260}
+                className={`h-full w-full rounded-xl object-contain p-3 transition ${isSessionExpired ? "blur-md opacity-10 grayscale" : ""}`}
+                unoptimized
+              />
             ) : (
               <div className="px-4 text-sm font-semibold leading-6 text-[#45474c]">
                 Đang tạo mã QR thanh toán...
               </div>
             )}
+            {isSessionExpired ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/85">
+                <span className="-rotate-12 rounded-lg border-2 border-rose-600 px-4 py-2 text-sm font-black tracking-[0.12em] text-rose-700">
+                  ĐÃ HẾT HẠN
+                </span>
+              </div>
+            ) : null}
           </div>
           <p className="mt-4 text-sm leading-6 text-[#45474c]">
             Quét mã QR hoặc chuyển khoản theo thông tin bên cạnh. Hệ thống sẽ tự cập nhật khi giao dịch được xác nhận.
           </p>
-          {paymentLinkId && (
+          {paymentLinkId && !isSessionExpired && (
             <p className="mt-2 break-all text-xs text-[#6b7280]">Mã liên kết thanh toán: {paymentLinkId}</p>
           )}
           <p className="mt-2 text-xs font-semibold text-[#091426]">{paymentStatusMessage}</p>
@@ -1832,7 +1910,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
 
       <button
         type="button"
-        disabled={isConfirming || isCancelling || remainingMs <= 0}
+        disabled={isConfirming || isCancelling || paymentActionsDisabled}
         onClick={handleConfirmPayment}
         className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75"
       >
@@ -1845,7 +1923,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
       </button>
       <button
         type="button"
-        disabled={isConfirming || isCancelling}
+        disabled={isConfirming || isCancelling || paymentActionsDisabled}
         onClick={handleCancelPayment}
         className="mt-3 flex h-12 w-full items-center justify-center rounded-xl border border-[#c5c6cd] bg-white text-sm font-bold text-[#091426] transition hover:bg-[#f5f3f4] disabled:opacity-75"
       >

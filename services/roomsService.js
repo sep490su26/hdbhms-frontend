@@ -369,6 +369,31 @@ export async function cancelBatchDeposit(batchId) {
   return payload.data ?? payload;
 }
 
+export async function expireBatchDeposit(batchId) {
+  if (!batchId) {
+    throw new Error("Thiếu mã phiên đặt cọc để xác nhận hết hạn.");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/expire`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Type": "web",
+      },
+      body: JSON.stringify({}),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || (payload.code !== undefined && payload.code !== 0)) {
+    throw new Error(payload.message || payload.details || "Không thể xác nhận phiên giữ chỗ đã hết hạn.");
+  }
+
+  return payload.data ?? payload;
+}
+
 export async function fetchDepositRoomHoldStatus(roomId, dates = {}) {
   if (!roomId) return null;
 
@@ -428,6 +453,28 @@ export async function cancelDepositPayment(paymentIntentId) {
 
   if (!response.ok || payload.code !== 0) {
     throw new Error(payload.message || payload.details || "Không thể hủy phiên giữ chỗ.");
+  }
+
+  return payload.data ?? null;
+}
+
+export async function expireDepositPayment(paymentIntentId) {
+  if (!paymentIntentId) {
+    throw new Error("Thiếu mã phiên thanh toán để xác nhận hết hạn.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/expire`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Type": "web",
+    },
+    body: JSON.stringify({}),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || payload.details || "Không thể xác nhận phiên giữ chỗ đã hết hạn.");
   }
 
   return payload.data ?? null;

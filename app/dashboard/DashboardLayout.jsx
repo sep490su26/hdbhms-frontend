@@ -19,6 +19,7 @@ import {
   Menu,
   Moon,
   MoreHorizontal,
+  ReceiptText,
   Search,
   Settings,
   Sun,
@@ -95,6 +96,18 @@ const navigation = [
     label: "Bảo trì",
     icon: Wrench,
     permissionKey: "maintenance",
+  },
+  {
+    path: "/dashboard/billing",
+    label: "Hóa đơn & Thu tiền",
+    icon: ReceiptText,
+    permissionKey: "billing",
+  },
+  {
+    path: "/dashboard/debt",
+    label: "Công nợ",
+    icon: WalletCards,
+    permissionKey: "debt",
   },
   {
     path: "/dashboard/deposits",

@@ -27,6 +27,8 @@ export const SECTION_PERMISSIONS = {
   accounts: [ROLES.OWNER],
   meterReadings: [ROLES.OWNER, ROLES.MANAGER],
   maintenance: [ROLES.OWNER, ROLES.MANAGER],
+  billing: [ROLES.OWNER, ROLES.MANAGER],
+  debt: [ROLES.OWNER, ROLES.MANAGER],
   deposits: [ROLES.OWNER],
   contract: [ROLES.OWNER],
   finance: [ROLES.OWNER, ROLES.ACCOUNTANT],

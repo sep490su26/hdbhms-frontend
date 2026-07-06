@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import ExpiryModal from "../../../components/ExpiryModal";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -29,6 +30,7 @@ import {
 import {
   cancelBatchDeposit,
   checkoutBatchDeposit,
+  expireBatchDeposit,
   fetchBatchDepositStatus,
   fetchDepositRoomHoldStatus,
 } from "../../../services/roomsService";
@@ -37,12 +39,12 @@ import {
   readDepositBatchDraft,
   writeDepositBatchDraft,
 } from "../../../services/depositBatchDraftStorage";
+import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
 import { previewDepositContract } from "../../../services/depositContractsService";
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
 import { getAuthToken } from "../../../services/identityAccessService";
 
 const DEPOSIT_PER_ROOM = 2000;
-const FALLBACK_HOLD_DURATION_MS = 5 * 60 * 1000;
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
@@ -76,7 +78,7 @@ function formatCountdown(remainingMs) {
 
 function resolveExpiresAtMs(checkout) {
   const parsed = new Date(checkout?.expiresAt || "").getTime();
-  return Number.isFinite(parsed) ? parsed : Date.now() + FALLBACK_HOLD_DURATION_MS;
+  return Number.isFinite(parsed) ? parsed : Date.now() + ROOM_HOLD_DURATION_MS;
 }
 
 function validateField(name, value, form = {}) {
@@ -183,12 +185,12 @@ function RoomFeature({ icon: Icon, children }) {
   );
 }
 
-function CopyRow({ label, value }) {
+function CopyRow({ label, value, disabled = false }) {
   const [copied, setCopied] = useState(false);
   const displayValue = String(value ?? "").trim();
 
   const copy = async () => {
-    if (!displayValue) return;
+    if (disabled || !displayValue) return;
     await navigator.clipboard.writeText(displayValue);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1200);
@@ -205,7 +207,7 @@ function CopyRow({ label, value }) {
       <button
         type="button"
         onClick={copy}
-        disabled={!displayValue}
+        disabled={disabled || !displayValue}
         className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[#c5c6cd] bg-white px-3 text-xs font-bold text-[#091426] transition hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
         aria-label={`Sao chép ${label}`}
       >
@@ -355,10 +357,13 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingPayment, setCancellingPayment] = useState(false);
   const [remainingMs, setRemainingMs] = useState(null);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [redirectSeconds, setRedirectSeconds] = useState(10);
   const [contractReviews, setContractReviews] = useState({});
   const [activeContractRoomId, setActiveContractRoomId] = useState(null);
   const [previewingRoomId, setPreviewingRoomId] = useState(null);
   const dismissedConflictRef = useRef("");
+  const didHandleExpiryRef = useRef(false);
 
   const totalAmount = rooms.length * DEPOSIT_PER_ROOM;
   const expiresAtMs = useMemo(() => (checkout ? resolveExpiresAtMs(checkout) : null), [checkout]);
@@ -371,6 +376,41 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
     () => initialRooms.map((room) => String(room.roomId)).join(","),
     [initialRooms],
   );
+
+  const handleSessionExpired = useCallback((message) => {
+    setRemainingMs(0);
+    setRedirectSeconds(10);
+    setIsSessionExpired(true);
+    setError("");
+
+    if (didHandleExpiryRef.current) return;
+    didHandleExpiryRef.current = true;
+    if (checkout?.batchId) {
+      expireBatchDeposit(checkout.batchId)
+        .then((status) => {
+          if (status) setBatchStatus(status);
+        })
+        .catch(() => {
+          setBatchStatus((current) => current ?? { status: "EXPIRED", message });
+        });
+    }
+  }, [checkout?.batchId]);
+
+  useEffect(() => {
+    if (!isSessionExpired) return undefined;
+
+    const countdownTimer = window.setInterval(() => {
+      setRedirectSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    const redirectTimer = window.setTimeout(() => {
+      router.replace("/rooms");
+    }, 10000);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearTimeout(redirectTimer);
+    };
+  }, [isSessionExpired, router]);
 
   useEffect(() => {
     const nextRoomIds = new Set(initialRooms.map((room) => String(room.roomId)));
@@ -513,11 +553,17 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
       return undefined;
     }
 
-    const tick = () => setRemainingMs(Math.max(0, expiresAtMs - Date.now()));
+    const tick = () => {
+      const nextRemainingMs = Math.max(0, expiresAtMs - Date.now());
+      setRemainingMs(nextRemainingMs);
+      if (nextRemainingMs <= 0 && !didHandleExpiryRef.current) {
+        handleSessionExpired("Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+      }
+    };
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [batchStatus?.status, expiresAtMs]);
+  }, [batchStatus?.status, expiresAtMs, handleSessionExpired]);
 
   useEffect(() => {
     if (
@@ -545,6 +591,12 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
       window.clearInterval(timer);
     };
   }, [batchStatus?.status, checkout?.batchId, paymentExpired]);
+
+  useEffect(() => {
+    if (batchStatus?.status === "EXPIRED") {
+      handleSessionExpired(batchStatus.message || "Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+    }
+  }, [batchStatus?.message, batchStatus?.status, handleSessionExpired]);
 
   useEffect(() => {
     setQrImage("");
@@ -929,7 +981,11 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
       setSubmitting(true);
       const response = await checkoutBatchDeposit(body);
       clearDepositBatchDraft();
+      didHandleExpiryRef.current = false;
+      setIsSessionExpired(false);
+      setRedirectSeconds(10);
       setCheckout(response);
+      setBatchStatus(null);
     } catch (requestError) {
       if (requestError.status === 409 && requestError.payload?.code === "BATCH_ROOM_UNAVAILABLE") {
         setUnavailableRooms(requestError.payload.unavailableRooms || []);
@@ -979,6 +1035,9 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
       setCheckout(null);
       setBatchStatus(null);
       setRemainingMs(null);
+      didHandleExpiryRef.current = false;
+      setIsSessionExpired(false);
+      setRedirectSeconds(10);
       setQrImage("");
       setUnavailableRooms([]);
       setError("Đã hủy giữ chỗ. Bạn có thể chỉnh danh sách phòng và tiếp tục đặt cọc ngay.");
@@ -1002,7 +1061,7 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
     : null;
 
   if (checkout) {
-    const paymentUnavailable = terminalError || paymentExpired;
+    const paymentUnavailable = terminalError || paymentExpired || isSessionExpired;
     const paymentRooms = checkout.rooms || rooms;
     const totalAmountLabel = `${Number(checkout.totalAmount || 0).toLocaleString("vi-VN")} VND`;
     const roomCodesLabel = paymentRooms.map((room) => room.roomCode).filter(Boolean).join(", ");
@@ -1014,6 +1073,12 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
     );
     return (
       <main className="min-h-screen bg-[#f5f3f4] px-4 pb-16 pt-28 text-[#091426] sm:px-6">
+        <ExpiryModal
+          open={isSessionExpired}
+          redirectSeconds={redirectSeconds}
+          onChooseRooms={chooseOtherRooms}
+          onHome={() => router.replace("/")}
+        />
         <div className="mx-auto max-w-7xl">
           {paymentFinished ? (
             <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-8 text-center shadow-sm">
@@ -1136,12 +1201,12 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                     {error}
                   </div>
                 ) : null}
-                {terminalError && (
+                {batchStatus?.status === "REFUND_REQUIRED" && (
                   <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
                     Giao dịch đến sau thời gian giữ phòng. Khoản tiền cần được đối soát/hoàn lại và không phòng nào được xác nhận.
                   </div>
                 )}
-                {paymentExpired && !terminalError ? (
+                {paymentExpired && !terminalError && !isSessionExpired ? (
                   <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
                     Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng để tạo giao dịch mới.
                   </div>
@@ -1157,13 +1222,17 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                         <p className="mt-2 text-sm leading-6 text-[#6b7280]">
                           Vui lòng chuyển đúng số tiền và đúng nội dung chuyển khoản để hệ thống tự động xác nhận.
                         </p>
-                        {manualTransferAvailable ? (
+                        {paymentUnavailable ? (
+                          <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold leading-6 text-rose-700">
+                            Thông tin chuyển khoản đã được ẩn vì phiên giữ chỗ đã hết hạn.
+                          </div>
+                        ) : manualTransferAvailable ? (
                           <div className="mt-5 grid gap-3">
-                            <CopyRow label="Ngân hàng" value={checkout.bankShortName} />
-                            <CopyRow label="Số tài khoản" value={checkout.accountNumber} />
-                            <CopyRow label="Tên người nhận" value={checkout.accountName} />
-                            <CopyRow label="Số tiền" value={totalAmountLabel} />
-                            <CopyRow label="Nội dung chuyển khoản" value={checkout.transferDescription} />
+                            <CopyRow label="Ngân hàng" value={checkout.bankShortName} disabled={paymentUnavailable} />
+                            <CopyRow label="Số tài khoản" value={checkout.accountNumber} disabled={paymentUnavailable} />
+                            <CopyRow label="Tên người nhận" value={checkout.accountName} disabled={paymentUnavailable} />
+                            <CopyRow label="Số tiền" value={totalAmountLabel} disabled={paymentUnavailable} />
+                            <CopyRow label="Nội dung chuyển khoản" value={checkout.transferDescription} disabled={paymentUnavailable} />
                           </div>
                         ) : (
                           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
@@ -1184,14 +1253,14 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                     </div>
 
                     <div className="rounded-xl border border-[#c5c6cd] bg-white p-5 text-center">
-                      <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
+                      <div className="relative mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
                         {qrImage ? (
                           <Image
                             src={qrImage}
                             alt="QR thanh toán đặt cọc nhiều phòng"
                             width={260}
                             height={260}
-                            className="h-full w-full rounded-xl object-contain p-3"
+                            className={`h-full w-full rounded-xl object-contain p-3 transition ${paymentUnavailable ? "blur-md opacity-10 grayscale" : ""}`}
                             unoptimized
                           />
                         ) : (
@@ -1199,11 +1268,18 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                             Vui lòng mở trang thanh toán PayOS.
                           </p>
                         )}
+                        {paymentUnavailable ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/85">
+                            <span className="-rotate-12 rounded-lg border-2 border-rose-600 px-4 py-2 text-sm font-black tracking-[0.12em] text-rose-700">
+                              ĐÃ HẾT HẠN
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                       <p className="mt-4 text-sm leading-6 text-[#45474c]">
                         Quét mã QR hoặc chuyển khoản theo thông tin bên cạnh. Hệ thống sẽ tự cập nhật khi giao dịch được xác nhận.
                       </p>
-                      {checkout.paymentLinkId ? (
+                      {checkout.paymentLinkId && !paymentUnavailable ? (
                         <p className="mt-2 break-all text-xs text-[#6b7280]">
                           Mã liên kết thanh toán: {checkout.paymentLinkId}
                         </p>
@@ -1232,7 +1308,10 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                   <button
                     type="button"
                     disabled={paymentUnavailable || !checkout.checkoutUrl}
-                    onClick={() => window.open(checkout.checkoutUrl, "_blank", "noopener,noreferrer")}
+                    onClick={() => {
+                      if (paymentUnavailable || !checkout.checkoutUrl) return;
+                      window.open(checkout.checkoutUrl, "_blank", "noopener,noreferrer");
+                    }}
                     className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Mở trang thanh toán

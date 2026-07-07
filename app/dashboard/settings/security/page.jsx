@@ -59,7 +59,7 @@ function PasswordField({
 
   return (
     <div className="grid gap-2">
-      <label className="text-sm font-bold text-[#091426]" htmlFor={id}>
+      <label className="text-sm font-bold text-slate-900 dark:text-white" htmlFor={id}>
         {label}
       </label>
       <span className="relative">
@@ -71,23 +71,23 @@ function PasswordField({
           autoComplete={autoComplete}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
-          className={`h-11 w-full rounded-lg border bg-white px-3 pr-11 text-sm font-semibold text-[#091426] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${
+          className={`h-11 w-full rounded-lg border bg-white dark:bg-[#0f172a] px-3 pr-11 text-sm font-semibold text-slate-900 dark:text-white outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${
             error
               ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-              : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+              : "border-[#c5c6cd] dark:border-white/10 focus:border-[#1e40af] focus:ring-[#1e40af]/10"
           }`}
         />
         <button
           type="button"
           onClick={onToggleVisibility}
-          className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-lg text-[#6b7280] hover:text-[#091426] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#091426]/20"
+          className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1e40af]/20"
           aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
         >
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </span>
       {error && (
-        <span id={errorId} className="text-xs font-bold text-rose-700">
+        <span id={errorId} className="text-xs font-bold text-rose-700 dark:text-rose-300">
           {error}
         </span>
       )}
@@ -156,14 +156,14 @@ export default function SecuritySettingsPage() {
       <header>
         <Link
           href="/dashboard/settings"
-          className="inline-flex items-center gap-2 rounded-md text-sm font-bold text-[#505f76] hover:text-[#091426] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#091426]/20"
+          className="inline-flex items-center gap-2 rounded-md text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e40af]/20"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to settings
         </Link>
         <div className="mt-5">
-          <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#091426]">Security & Password</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#505f76]">
+          <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">Security & Password</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             Update your password to keep your account secure.
           </p>
         </div>
@@ -173,15 +173,15 @@ export default function SecuritySettingsPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="rounded-xl border border-[#c5c6cd] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8"
+          className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8"
         >
-          <div className="flex items-start gap-4 border-b border-[#e2e8f0] pb-6">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f2f4f6] text-[#091426]">
+          <div className="flex items-start gap-4 border-b border-[#e2e8f0] dark:border-white/10 pb-6">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f2f4f6] dark:bg-white/5 text-slate-900 dark:text-white">
               <LockKeyhole className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-lg font-bold text-[#091426]">Change password</h2>
-              <p className="mt-1 text-sm leading-6 text-[#6b7280]">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Change password</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 Enter your current password before choosing a new one.
               </p>
             </div>
@@ -191,8 +191,8 @@ export default function SecuritySettingsPage() {
             <div
               className={`mt-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${
                 isSuccess
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                  : "border-rose-200 bg-rose-50 text-rose-800"
+                  ? "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                  : "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
               }`}
               role={isSuccess ? "status" : "alert"}
             >
@@ -234,17 +234,17 @@ export default function SecuritySettingsPage() {
             />
           </div>
 
-          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#e2e8f0] pt-6 sm:flex-row sm:justify-end">
+          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#e2e8f0] dark:border-white/10 pt-6 sm:flex-row sm:justify-end">
             <Link
               href="/dashboard/settings"
-              className="inline-flex h-11 items-center justify-center rounded-lg px-5 text-sm font-bold text-[#505f76] hover:bg-[#f2f4f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#091426]/20"
+              className="inline-flex h-11 items-center justify-center rounded-lg px-5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e40af]/20"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white transition-colors hover:bg-[#16253a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#091426]/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white transition-colors hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e40af]/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               {isSubmitting ? "Updating..." : "Update password"}
@@ -252,20 +252,20 @@ export default function SecuritySettingsPage() {
           </div>
         </form>
 
-        <aside className="rounded-xl border border-[#c5c6cd] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-6">
+        <aside className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-6">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
               <ShieldCheck className="h-5 w-5" />
             </span>
-            <h2 className="text-lg font-bold text-[#091426]">Password guidance</h2>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Password guidance</h2>
           </div>
-          <ul className="mt-5 grid gap-3 text-sm leading-6 text-[#505f76]">
+          <ul className="mt-5 grid gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
             <li className="flex gap-3">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#091426]" />
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1e40af] dark:bg-[#2563eb]" />
               Use at least 6 characters.
             </li>
             <li className="flex gap-3">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#091426]" />
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1e40af] dark:bg-[#2563eb]" />
               Avoid reusing passwords from other accounts.
             </li>
 

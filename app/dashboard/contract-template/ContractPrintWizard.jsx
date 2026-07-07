@@ -184,7 +184,7 @@ function Field({label, value, onChange, type = "text", placeholder = ""}) {
                 value={value ?? ""}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
-                className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
+                className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
             />
         </label>
     );
@@ -485,7 +485,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm"
              onClick={onClose}>
-            <section className="max-h-[94vh] w-full max-w-[1160px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            <section className="max-h-[94vh] w-full max-w-[1160px] overflow-hidden rounded-2xl bg-white dark:bg-[#0f172a] shadow-2xl"
                      onClick={(event) => event.stopPropagation()}>
                 <header className="relative bg-[#05091d] px-5 py-5 text-white">
                     <button type="button" onClick={onClose}
@@ -507,10 +507,10 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                 </header>
 
                 <div
-                    className="grid max-h-[calc(94vh-132px)] overflow-y-auto bg-[#f3f6fb] p-4 lg:grid-cols-[230px_minmax(0,1fr)]">
+                    className="grid max-h-[calc(94vh-132px)] overflow-y-auto bg-[#f3f6fb] dark:bg-white/5 p-4 lg:grid-cols-[230px_minmax(0,1fr)]">
                     <aside className="grid content-start gap-3">
-                        <div className="rounded-xl border border-[#dfe5ef] bg-white p-3">
-                            <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.08em] text-[#607089]">Các
+                        <div className="rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-3">
+                            <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Các
                                 bước xử lý</p>
                             {STEP_ITEMS.map((item) => (
                                 <button
@@ -518,18 +518,18 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                     type="button"
                                     onClick={() => setStep(item.id)}
                                     className={`mb-2 flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-extrabold ${
-                                        step === item.id ? "bg-[#091426] text-white" : "bg-[#f6f8fb] text-[#091426] hover:bg-[#e9eef6]"
+                                        step === item.id ? "bg-[#1e40af] dark:bg-[#2563eb] text-white" : "bg-[#f6f8fb] dark:bg-white/5 text-slate-900 dark:text-white hover:bg-[#e9eef6]"
                                     }`}
                                 >
                                     <span
-                                        className={`grid h-6 w-6 place-items-center rounded-full ${step === item.id ? "bg-white/15" : "bg-white"}`}>{item.id}</span>
+                                        className={`grid h-6 w-6 place-items-center rounded-full ${step === item.id ? "bg-white/15" : "bg-white dark:bg-[#0f172a]"}`}>{item.id}</span>
                                     {item.label}
                                 </button>
                             ))}
                         </div>
                         <div
-                            className="rounded-xl border border-[#dfe5ef] bg-white p-4 text-xs leading-5 text-[#607089]">
-                            <p className="font-extrabold text-[#091426]">Rule đúng</p>
+                            className="rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                            <p className="font-extrabold text-slate-900 dark:text-white">Rule đúng</p>
                             <p className="mt-2">1. Điền thông tin trước.</p>
                             <p>2. Nhập bàn giao trước.</p>
                             <p>3. Xuất PDF rồi in cho khách ký.</p>
@@ -537,18 +537,18 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                         </div>
                     </aside>
 
-                    <main className="mt-4 rounded-xl border border-[#dfe5ef] bg-white p-4 lg:ml-4 lg:mt-0 xl:p-5">
+                    <main className="mt-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 lg:ml-4 lg:mt-0 xl:p-5">
                         {step === 1 && (
                             <div>
-                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-[#091426]">
-                                    <FileText className="h-5 w-5 text-indigo-500"/>
+                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
+                                    <FileText className="h-5 w-5 text-indigo-500 dark:text-blue-300"/>
                                     Bước 1: Thông tin hợp đồng
                                 </h3>
-                                <p className="mt-1 text-sm text-[#607089]">Dữ liệu lấy từ hợp đồng/API; trường thiếu để
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Dữ liệu lấy từ hợp đồng/API; trường thiếu để
                                     trống, không dùng mock bên B.</p>
                                 <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                                    <section className="rounded-xl border border-[#dfe5ef] p-4">
-                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-[#091426]">
+                                    <section className="rounded-xl border border-[#dfe5ef] dark:border-white/10 p-4">
+                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-slate-900 dark:text-white">
                                             <Home className="h-4 w-4"/>Thông tin phòng</h4>
                                         <div className="grid gap-3">
                                             <Field label="Cơ sở" value={form.propertyName}
@@ -563,8 +563,8 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                    onChange={(value) => updateForm("occupantsCount", value)}/>
                                         </div>
                                     </section>
-                                    <section className="rounded-xl border border-[#dfe5ef] p-4">
-                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-[#091426]">
+                                    <section className="rounded-xl border border-[#dfe5ef] dark:border-white/10 p-4">
+                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-slate-900 dark:text-white">
                                             <CalendarDays className="h-4 w-4"/>Thông tin hợp đồng</h4>
                                         <div className="grid gap-3">
                                             <Field label="Mã hợp đồng" value={form.contractCode}
@@ -580,8 +580,8 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                    onChange={(value) => updateForm("paymentCycleMonths", value)}/>
                                         </div>
                                     </section>
-                                    <section className="rounded-xl border border-[#dfe5ef] p-4 lg:col-span-2">
-                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-[#091426]">
+                                    <section className="rounded-xl border border-[#dfe5ef] dark:border-white/10 p-4 lg:col-span-2">
+                                        <h4 className="mb-4 inline-flex items-center gap-2 font-extrabold text-slate-900 dark:text-white">
                                             <Users className="h-4 w-4"/>Thông tin bên thuê</h4>
                                         <div className="grid gap-3 md:grid-cols-2">
                                             <Field label="Họ tên" value={form.tenantName}
@@ -613,13 +613,13 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
 
                         {step === 2 && (
                             <div>
-                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-[#091426]">
-                                    <Gauge className="h-5 w-5 text-indigo-500"/>
+                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
+                                    <Gauge className="h-5 w-5 text-indigo-500 dark:text-blue-300"/>
                                     Bước 2: Bàn giao phòng
                                 </h3>
-                                <p className="mt-1 text-sm text-[#607089]">Thông tin này sẽ được fill vào hợp đồng trước
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Thông tin này sẽ được fill vào hợp đồng trước
                                     khi in cho khách ký.</p>
-                                <section className="mt-5 rounded-xl border border-[#dfe5ef] p-4">
+                                <section className="mt-5 rounded-xl border border-[#dfe5ef] dark:border-white/10 p-4">
                                     <div className="grid gap-3 md:grid-cols-3">
                                         <Field label="Ngày bàn giao" type="date" value={handover.handoverDate}
                                                onChange={(value) => updateHandover("handoverDate", value)}/>
@@ -630,10 +630,10 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                onChange={(value) => updateHandover("waterReading", value)}/>
                                     </div>
                                 </section>
-                                <div className="mt-4 overflow-x-auto rounded-xl border border-[#dfe5ef]">
+                                <div className="mt-4 overflow-x-auto rounded-xl border border-[#dfe5ef] dark:border-white/10">
                                     <table className="w-full min-w-[820px] text-left text-xs">
                                         <thead
-                                            className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase text-[#6b7280]">
+                                            className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400">
                                         <tr>
                                             <th className="px-3 py-3">STT</th>
                                             <th className="px-3 py-3">Tên thiết bị</th>
@@ -653,7 +653,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                             type={field === "quantity" ? "number" : "text"}
                                                             value={asset[field]}
                                                             onChange={(event) => updateAsset(index, field, event.target.value)}
-                                                            className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426]"
+                                                            className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af]"
                                                         />
                                                     </td>
                                                 ))}
@@ -663,37 +663,37 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                     </table>
                                 </div>
                                 <div className="mt-4 grid gap-1.5">
-                                    <span className="text-xs font-bold text-[#607089]">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                                         Ngày bàn giao
-                                        <span className="ml-1 text-rose-600">*</span>
+                                        <span className="ml-1 text-rose-600 dark:text-rose-300">*</span>
                                     </span>
                                     <input
                                         type="date"
                                         value={handover.handoverDate}
                                         disabled={true}
                                         onChange={(e) => updateHandover("handoverDate", e.target.value)}
-                                        className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:opacity-70"
+                                        className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
                                     />
                                 </div>
                                 <label className="mt-4 grid gap-1.5">
                                     <span className="text-xs font-bold text-[#58667c]">Ghi chú bàn giao</span>
                                     <textarea value={handover.note} rows={3}
                                               onChange={(event) => updateHandover("note", event.target.value)}
-                                              className="rounded-lg border border-[#cbd5e1] p-3 outline-none focus:border-[#091426]"/>
+                                              className="rounded-lg border border-[#cbd5e1] dark:border-white/10 p-3 outline-none focus:border-[#1e40af]"/>
                                 </label>
                             </div>
                         )}
 
                         {step === 3 && (
                             <div>
-                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-[#091426]">
-                                    <Printer className="h-5 w-5 text-indigo-500"/>
+                                <h3 className="inline-flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
+                                    <Printer className="h-5 w-5 text-indigo-500 dark:text-blue-300"/>
                                     Bước 3: Preview / Xuất PDF hợp đồng
                                 </h3>
-                                <p className="mt-1 text-sm text-[#607089]">PDF sẽ mở ở tab mới, dùng lệnh in của trình
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">PDF sẽ mở ở tab mới, dùng lệnh in của trình
                                     duyệt để xuất PDF.</p>
                                 <section
-                                    className="mt-5 overflow-hidden rounded-xl border border-[#cbd5e1] bg-[#eef0f4]">
+                                    className="mt-5 overflow-hidden rounded-xl border border-[#cbd5e1] dark:border-white/10 bg-[#eef0f4]">
                                     <iframe
                                         title="Preview hợp đồng thuê"
                                         srcDoc={previewHtml}
@@ -742,17 +742,17 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                     </div>
                                 </section>
                                 <button type="button" onClick={handlePrint}
-                                        className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a]">
+                                        className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-extrabold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]">
                                     <Download className="h-4 w-4"/>
                                     Xuất PDF / In hợp đồng
                                 </button>
                             </div>
                         )}
 
-                        <div className="mt-6 flex justify-between border-t border-[#dfe5ef] pt-4">
+                        <div className="mt-6 flex justify-between border-t border-[#dfe5ef] dark:border-white/10 pt-4">
                             <button type="button" onClick={() => setStep((current) => Math.max(1, current - 1))}
                                     disabled={step === 1 || saving}
-                                    className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold disabled:opacity-50">
+                                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-extrabold disabled:opacity-50">
                                 Quay lại
                             </button>
                             <button
@@ -765,7 +765,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                     setStep((current) => Math.min(3, current + 1));
                                 }}
                                 disabled={step === 3 || saving}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white disabled:opacity-50"
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-extrabold text-white disabled:opacity-50"
                             >
                                 {saving && <Loader2 className="h-4 w-4 animate-spin"/>}
                                 {saving ? "Đang lưu..." : "Tiếp tục"}

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -87,13 +87,13 @@ const navigation = [
   },
   {
     path: "/dashboard/meter-readings",
-    label: "Nhập số điện nước",
+    label: "Quản lý điện nước",
     icon: Gauge,
     permissionKey: "meterReadings",
   },
   {
     path: "/dashboard/maintenance",
-    label: "Bảo trì",
+    label: "Sự cố & Bảo trì",
     icon: Wrench,
     permissionKey: "maintenance",
   },
@@ -105,7 +105,7 @@ const navigation = [
   },
   {
     path: "/dashboard/debt",
-    label: "Công nợ",
+    label: "Quản lý công nợ",
     icon: WalletCards,
     permissionKey: "debt",
   },
@@ -117,13 +117,13 @@ const navigation = [
   },
   {
     path: "/dashboard/contract-template",
-    label: "Hợp đồng cọc",
+    label: "Quản lý hợp đồng",
     icon: FileText,
     permissionKey: "contract",
   },
   {
     path: "/dashboard/requests",
-    label: "Hộp thư yêu cầu",
+    label: "Quản lý yêu cầu",
     icon: Inbox,
     permissionKey: "requests",
   },
@@ -233,7 +233,7 @@ function UserAvatar({ user, size = "md", className = "" }) {
 
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 ${sizeClass} ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gray-100 font-semibold text-slate-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 ${sizeClass} ${className}`}
     >
       {getInitials(label)}
     </span>
@@ -250,39 +250,39 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center text-gray-700 outline-none transition-colors hover:text-gray-900 focus-visible:ring-2 focus-visible:ring-[#465fff]/20 dark:text-gray-400 dark:hover:text-white"
+          className="flex items-center text-slate-700 outline-none transition-colors hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[#1e40af]/20 dark:text-slate-400 dark:hover:text-white"
         >
           <span className="ml-3 mr-1 hidden max-w-32 truncate text-sm font-medium lg:block">
             {displayName}
           </span>
-          <ChevronDown className="hidden h-5 w-5 text-gray-500 transition-transform lg:block dark:text-gray-400" />
+          <ChevronDown className="hidden h-5 w-5 text-slate-500 transition-transform dark:text-slate-400 lg:block" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="end"
         sideOffset={17}
-        className="flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-gray-800 dark:bg-[#1a2231]"
+        className="flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
       >
         <div className="px-1 pb-3">
-          <span className="block truncate text-sm font-medium text-gray-700 dark:text-gray-400">
+          <span className="block truncate text-sm font-medium text-slate-700 dark:text-slate-300">
             {displayName}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+          <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
             {displayEmail}
           </span>
         </div>
 
-        <div className="flex flex-col gap-1 border-y border-gray-200 py-3 dark:border-gray-800">
+        <div className="flex flex-col gap-1 border-y border-gray-200 py-3 dark:border-white/10">
           <DropdownMenuItem
             asChild
             className="rounded-lg p-0 focus:bg-transparent"
           >
             <Link
               href="/dashboard/profile"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
-              <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <User className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               Edit profile
             </Link>
           </DropdownMenuItem>
@@ -292,9 +292,9 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
           >
             <Link
               href="/dashboard/settings"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
-              <UserCog className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <UserCog className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               Account settings
             </Link>
           </DropdownMenuItem>
@@ -304,9 +304,9 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
           >
             <Link
               href="/dashboard/requests"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
-              <CircleHelp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              <CircleHelp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               Support
             </Link>
           </DropdownMenuItem>
@@ -316,12 +316,12 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
         <DropdownMenuItem
           disabled={isLoggingOut}
           onClick={onLogout}
-          className="mt-3 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-700 focus:bg-gray-100 focus:text-gray-700 disabled:pointer-events-none disabled:opacity-60 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 dark:focus:bg-white/5 dark:focus:text-gray-300"
+          className="mt-3 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 focus:bg-gray-100 focus:text-slate-900 disabled:pointer-events-none disabled:opacity-60 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300 dark:focus:bg-white/5 dark:focus:text-slate-300"
         >
           {isLoggingOut ? (
-            <Loader2 className="h-5 w-5 animate-spin text-gray-500 dark:text-gray-400" />
+            <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-slate-400" />
           ) : (
-            <LogOut className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <LogOut className="h-5 w-5 text-slate-500 dark:text-slate-400" />
           )}
           <span>{isLoggingOut ? "Signing out..." : "Sign out"}</span>
         </DropdownMenuItem>
@@ -332,16 +332,16 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
 
 export function AccessDeniedPage() {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <section className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
       <div className="flex max-w-2xl items-start gap-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 dark:bg-rose-500/10 dark:text-rose-300">
           <X className="h-5 w-5" />
         </span>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
             Không có quyền truy cập
           </h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
             Man hinh nay dang bi an theo phan quyen hien tai. Vui long chon chuc
             nang phu hop voi vai tro cua ban.
           </p>
@@ -365,7 +365,7 @@ function Sidebar({ isOpen, onClose }) {
         />
       )}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen shrink-0 flex-col border-r border-gray-200 bg-white px-5 text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:sticky lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-screen shrink-0 flex-col border-r border-gray-200 bg-white px-5 text-slate-900 transition-all duration-300 ease-in-out dark:border-white/10 dark:bg-[#0f172a] dark:text-white lg:sticky lg:translate-x-0 ${
           showText ? "w-[290px]" : "w-[90px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
         onMouseEnter={() => !isExpanded && setIsHovered(true)}
@@ -375,16 +375,46 @@ function Sidebar({ isOpen, onClose }) {
           className={`flex py-8 ${showText ? "justify-between" : "justify-center"}`}
         >
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#465fff] text-white">
-              <Home className="h-5 w-5" />
+            <span className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg bg-[#1e40af] text-white shadow-sm">
+              <Home className="h-4 w-4" />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1e40af] to-[#1e40af] text-white shadow-md">
+                <svg
+                  viewBox="0 0 64 64"
+                  className="h-7 w-7"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M14 31L32 16L50 31"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M20 29V49H44V29"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M28 49V38H36V49"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
             </span>
             {showText && (
               <span className="min-w-0">
-                <span className="block truncate text-lg font-semibold leading-6 text-gray-900 dark:text-white">
+                <span className="block truncate text-lg font-semibold leading-6 text-slate-900 dark:text-white">
                   Hai Dang
                 </span>
-                <span className="block truncate text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Property management
+                <span className="block truncate text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Boarding house management
                 </span>
               </span>
             )}
@@ -393,7 +423,7 @@ function Sidebar({ isOpen, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="rounded-lg p-2 text-slate-500 hover:bg-gray-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300 lg:hidden"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
@@ -404,7 +434,7 @@ function Sidebar({ isOpen, onClose }) {
         <div className="flex flex-1 flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
           <nav className="mb-6">
             <h2
-              className={`mb-4 flex text-xs uppercase leading-5 text-gray-400 ${
+              className={`mb-4 flex text-xs uppercase leading-5 text-slate-400 dark:text-slate-500 ${
                 showText ? "justify-start" : "justify-center"
               }`}
             >
@@ -429,15 +459,15 @@ function Sidebar({ isOpen, onClose }) {
                         showText ? "justify-start" : "justify-center"
                       } ${
                         isActive
-                          ? "bg-[#ecf3ff] text-[#465fff] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff]"
-                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                          ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                          : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
                       }`}
                     >
                       <Icon
                         className={`h-5 w-5 shrink-0 ${
                           isActive
-                            ? "text-[#465fff] dark:text-[#9cb9ff]"
-                            : "text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300"
+                            ? "text-[#1e40af] dark:text-[#93c5fd]"
+                            : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
                         }`}
                       />
                       {showText && (
@@ -478,12 +508,12 @@ function Topbar({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex w-full border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <header className="sticky top-0 z-30 flex w-full border-b border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
       <div className="flex grow flex-col items-center justify-between lg:flex-row lg:px-6">
-        <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
+        <div className="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 dark:border-white/10 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
           <button
             type="button"
-            className="z-30 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-white/5 lg:h-11 lg:w-11"
+            className="z-30 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-slate-500 hover:bg-gray-100 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5 lg:h-11 lg:w-11"
             onClick={handleToggle}
             aria-label="Toggle sidebar"
           >
@@ -495,10 +525,10 @@ function Topbar({
           </button>
 
           <Link href="/" className="flex items-center gap-2 lg:hidden">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#465fff] text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1e40af] text-white">
               <Home className="h-4 w-4" />
             </span>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+            <span className="text-sm font-semibold text-slate-900 dark:text-white">
               Hai Dang
             </span>
           </Link>
@@ -506,28 +536,28 @@ function Topbar({
           <button
             type="button"
             onClick={() => setApplicationMenuOpen((prev) => !prev)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-white/5 lg:hidden"
             aria-label="Toggle application menu"
           >
             <MoreHorizontal className="h-6 w-6" />
           </button>
 
-          <div className="hidden lg:block">
+          {/*<div className="hidden lg:block">
             <form onSubmit={(event) => event.preventDefault()}>
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2">
-                  <Search className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                  <Search className="h-5 w-5 text-slate-500 dark:text-slate-400" />
                 </span>
                 <input
                   value={search}
                   onChange={(event) => onSearchChange(event.target.value)}
                   type="text"
                   placeholder="Search or type command..."
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] outline-none placeholder:text-gray-400 focus:border-[#9cb9ff] focus:ring-4 focus:ring-[#465fff]/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 xl:w-[430px]"
+                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-slate-800 shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] outline-none placeholder:text-slate-400 focus:border-[#9cb9ff] focus:ring-4 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:placeholder:text-slate-500 xl:w-[430px]"
                 />
               </div>
             </form>
-          </div>
+          </div>*/}
         </div>
 
         <div
@@ -542,7 +572,7 @@ function Topbar({
               aria-label={
                 isDarkMode ? "Switch to light mode" : "Switch to dark mode"
               }
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-slate-500 transition-colors hover:bg-gray-100 hover:text-slate-700 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               {isDarkMode ? (
                 <Sun className="h-5 w-5" />
@@ -553,12 +583,12 @@ function Topbar({
             <button
               type="button"
               aria-label="Notifications"
-              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-slate-500 transition-colors hover:bg-gray-100 hover:text-slate-700 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               <Bell className="h-5 w-5" />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-orange-400 ring-2 ring-white dark:ring-gray-900" />
             </button>
-            <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
+            <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#1e40af]/[0.12] dark:text-[#9cb9ff] sm:flex">
               {ROLE_LABELS[user?.role] || "Quản lý"}
             </span>
             <UserMenu
@@ -672,7 +702,7 @@ function DashboardLayoutShell({ children }) {
 
   return (
     <DashboardLayoutProvider value={contextValue}>
-      <div className="dashboard-shell min-h-screen w-full overflow-x-hidden bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white/90 lg:flex">
+      <div className="dashboard-shell min-h-screen w-full overflow-x-hidden bg-gray-50 text-slate-900 dark:bg-[#020817] dark:text-white lg:flex">
         <Sidebar
           isOpen={isMobileOpen}
           onClose={() => {
@@ -692,8 +722,8 @@ function DashboardLayoutShell({ children }) {
           <main className="dashboard-main !w-full !max-w-none min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
             <div className="dashboard-content flex w-full max-w-none min-w-0 flex-col items-stretch gap-8">
               {!hasHydratedAuth || isLoadingUser ? (
-                <section className="flex min-h-[360px] items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                  <span className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 dark:text-gray-400">
+                <section className="flex min-h-[360px] items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
+                  <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Đang kiểm tra quyền truy cập...
                   </span>

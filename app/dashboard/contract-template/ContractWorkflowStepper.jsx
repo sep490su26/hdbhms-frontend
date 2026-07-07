@@ -307,25 +307,25 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
     amber: {
       ring: "ring-amber-500/20",
       circle: "bg-amber-600",
-      circleLight: "bg-amber-50 text-amber-700",
+      circleLight: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
       btn: "bg-amber-600 hover:bg-amber-700 text-white",
-      btnDone: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
+      btnDone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 border-amber-200 dark:border-yellow-500/20 hover:bg-amber-100 dark:hover:bg-yellow-500/10",
       tag: "bg-amber-600",
     },
     blue: {
       ring: "ring-blue-500/20",
       circle: "bg-blue-600",
-      circleLight: "bg-blue-50 text-blue-700",
+      circleLight: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
       btn: "bg-blue-600 hover:bg-blue-700 text-white",
-      btnDone: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
+      btnDone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/10",
       tag: "bg-blue-600",
     },
     indigo: {
       ring: "ring-indigo-500/20",
       circle: "bg-indigo-600",
-      circleLight: "bg-indigo-50 text-indigo-700",
+      circleLight: "bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300",
       btn: "bg-indigo-600 hover:bg-indigo-700 text-white",
-      btnDone: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
+      btnDone: "bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300 border-indigo-200 dark:border-blue-500/20 hover:bg-indigo-100 dark:hover:bg-blue-500/10",
       tag: "bg-indigo-600",
     },
   };
@@ -333,7 +333,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   return (
     <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white shadow-sm mb-6 overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-5 border-b border-slate-100 bg-white px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
+      <div className="flex flex-col gap-5 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
         <div className="flex items-center gap-3.5">
           <div className={`grid h-10 w-10 place-items-center rounded-xl shadow-sm transition-colors ${allDone ? "bg-emerald-600" : "bg-slate-900"}`}>
             {allDone
@@ -361,7 +361,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <span className={`text-xs font-extrabold ${allDone ? "text-emerald-600" : "text-slate-700"}`}>
+            <span className={`text-xs font-extrabold ${allDone ? "text-emerald-600 dark:text-emerald-300" : "text-slate-700"}`}>
               {completedCount}/{STEP_META.length}
             </span>
           </div>
@@ -402,24 +402,24 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
 
       {/* ── Phase labels ── */}
       {hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1.5fr_1.5fr] gap-0 border-b border-slate-100 bg-white px-8">
+        <div className="hidden md:grid md:grid-cols-[1fr_1.5fr_1.5fr] gap-0 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-8">
           <div className="flex items-center gap-2 py-3 pr-4">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-yellow-300">
               Hợp đồng đặt cọc
             </span>
             <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-300">
               Hợp đồng thuê
             </span>
             <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–4</span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-blue-300">
               Bàn giao phòng
             </span>
             <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 5–7</span>
@@ -427,17 +427,17 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
         </div>
       )}
       {!hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1fr] gap-0 border-b border-slate-100 bg-white px-8">
+        <div className="hidden md:grid md:grid-cols-[1fr_1fr] gap-0 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-8">
           <div className="flex items-center gap-2 py-3 pr-4">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-300">
               Hợp đồng thuê
             </span>
             <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-blue-300">
               Bàn giao phòng
             </span>
             <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–5</span>
@@ -464,7 +464,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
             return (
               <div
                 key={meta.num}
-                className={`relative rounded-xl border bg-white p-4 flex flex-col transition-all duration-200 ${
+                className={`relative rounded-xl border bg-white dark:bg-[#0f172a] p-4 flex flex-col transition-all duration-200 ${
                   state.done
                     ? "border-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
                     : state.disabled
@@ -486,7 +486,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
                     {state.done ? <CheckCircle2 className="h-5 w-5" /> : meta.num}
                   </div>
                   <div className="min-w-0">
-                    <h3 className={`text-sm font-extrabold leading-tight ${state.done ? "text-emerald-800" : "text-slate-800"}`}>
+                    <h3 className={`text-sm font-extrabold leading-tight ${state.done ? "text-emerald-800 dark:text-emerald-300" : "text-slate-800"}`}>
                       {meta.title}
                     </h3>
                     <p className="text-[11px] leading-snug text-slate-500 mt-0.5 line-clamp-2">
@@ -529,9 +529,9 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
 
       {/* ── Footer note ── */}
       {!allDone && (
-        <div className="mx-4 mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 md:mx-8 md:mb-6">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <div className="text-xs leading-relaxed text-amber-800">
+        <div className="mx-4 mb-4 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-yellow-500/20 bg-amber-50/70 px-4 py-3 md:mx-8 md:mb-6">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-yellow-300" />
+          <div className="text-xs leading-relaxed text-amber-800 dark:text-yellow-300">
             <p className="font-bold mb-1">Lưu ý</p>
             <ul className="list-disc space-y-0.5 pl-4 text-amber-700/90">
               {hasDeposit && (

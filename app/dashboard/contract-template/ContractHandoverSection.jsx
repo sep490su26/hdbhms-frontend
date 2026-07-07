@@ -68,9 +68,9 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label
-        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] px-3 text-xs font-bold ${disabled
+        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 px-3 text-xs font-bold ${disabled
             ? "cursor-not-allowed bg-slate-100 text-slate-400"
-            : "cursor-pointer text-[#607089] hover:border-[#091426] hover:bg-[#f8fafc]"
+            : "cursor-pointer text-slate-500 dark:text-slate-400 hover:border-[#1e40af] hover:bg-[#f8fafc] dark:hover:bg-white/5"
           }`}
       >
         <Camera className="h-3.5 w-3.5 shrink-0" />
@@ -90,7 +90,7 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
           width={100}
           height={70}
           unoptimized
-          className="h-16 w-full rounded-lg border border-[#dfe5ef] object-cover"
+          className="h-16 w-full rounded-lg border border-[#dfe5ef] dark:border-white/10 object-cover"
         />
       )}
     </div>
@@ -393,22 +393,22 @@ export default function ContractHandoverSection({
   /*  Render                                                            */
   /* ----------------------------------------------------------------- */
   return (
-    <section id="handover-entry-section" className="rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 lg:col-span-2 xl:p-5">
+    <section id="handover-entry-section" className="rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-[#fbfbfe] dark:bg-white/5 p-4 lg:col-span-2 xl:p-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#091426] xl:text-xl">
+          <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-slate-900 dark:text-white xl:text-xl">
             <Gauge className="h-5 w-5" />
             Bàn giao phòng
           </h3>
-          <p className="mt-1 text-xs leading-5 text-[#607089] xl:text-sm">
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 xl:text-sm">
             Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng{" "}
             {roomCode || "chưa cập nhật"}.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {!roomId && (
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+            <span className="rounded-full border border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-yellow-300">
               Chưa xác định phòng
             </span>
           )}
@@ -418,7 +418,7 @@ export default function ContractHandoverSection({
             </span>
           )}
           {isConfirmed && !readonly && (
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+            <span className="rounded-full border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
               Đã xác nhận bàn giao
             </span>
           )}
@@ -426,11 +426,11 @@ export default function ContractHandoverSection({
       </div>
 
       {/* Handover Date */}
-      <div className="mt-5 rounded-xl border border-[#dfe5ef] bg-white p-4">
+      <div className="mt-5 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
         <label className="grid gap-1.5 max-w-xs">
-          <span className="text-xs font-bold text-[#607089]">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
             Ngày bàn giao
-            <span className="ml-1 text-rose-600">*</span>
+            <span className="ml-1 text-rose-600 dark:text-rose-300">*</span>
           </span>
 
           <input
@@ -438,7 +438,7 @@ export default function ContractHandoverSection({
             value={handoverDate}
             disabled={true}
             onChange={(e) => setHandoverDate(e.target.value)}
-            className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:opacity-70"
+            className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
           />
         </label>
       </div>
@@ -446,8 +446,8 @@ export default function ContractHandoverSection({
       {/* Meter Readings */}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {/* Electric Card */}
-        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
-          <h4 className="font-extrabold text-[#091426]">Đồng hồ điện</h4>
+        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ điện</h4>
 
           <div className="grid gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (kWh) *</span>
@@ -458,7 +458,7 @@ export default function ContractHandoverSection({
               disabled={effectiveReadonly}
               onChange={(e) => setElectricReading(e.target.value)}
               placeholder="VD: 1234"
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
           </div>
 
@@ -469,7 +469,7 @@ export default function ContractHandoverSection({
               value={electricReadingDate}
               disabled={effectiveReadonly}
               onChange={(e) => setElectricReadingDate(e.target.value)}
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
           </div>
 
@@ -484,8 +484,8 @@ export default function ContractHandoverSection({
         </div>
 
         {/* Water Card */}
-        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] bg-white p-4">
-          <h4 className="font-extrabold text-[#091426]">Đồng hồ nước</h4>
+        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ nước</h4>
 
           <div className="grid gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (m³) *</span>
@@ -496,7 +496,7 @@ export default function ContractHandoverSection({
               disabled={effectiveReadonly}
               onChange={(e) => setWaterReading(e.target.value)}
               placeholder="VD: 56"
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
           </div>
 
@@ -507,7 +507,7 @@ export default function ContractHandoverSection({
               value={waterReadingDate}
               disabled={effectiveReadonly}
               onChange={(e) => setWaterReadingDate(e.target.value)}
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
           </div>
 
@@ -523,12 +523,12 @@ export default function ContractHandoverSection({
       </div>
 
       {/* Assets Table */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] bg-white">
-        <div className="flex items-center justify-between border-b border-[#dfe5ef] px-4 py-3">
+      <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a]">
+        <div className="flex items-center justify-between border-b border-[#dfe5ef] dark:border-white/10 px-4 py-3">
           <div className="flex items-center gap-2">
-            <h4 className="font-extrabold text-[#091426]">Hiện trạng thiết bị</h4>
+            <h4 className="font-extrabold text-slate-900 dark:text-white">Hiện trạng thiết bị</h4>
             {fromApi && (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
                 Từ hệ thống
               </span>
             )}
@@ -540,7 +540,7 @@ export default function ContractHandoverSection({
           </div>
           <div className="flex items-center gap-2">
             {loadingAssets && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-[#607089]">
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Đang tải…
               </span>
@@ -549,7 +549,7 @@ export default function ContractHandoverSection({
               <button
                 type="button"
                 onClick={loadAssets}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#607089] hover:bg-[#f3f5f9]"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-[#f3f5f9] dark:hover:bg-white/5"
               >
                 <RefreshCw className="h-3 w-3" />
                 Tải lại
@@ -559,14 +559,14 @@ export default function ContractHandoverSection({
         </div>
 
         {loadError && (
-          <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+          <div className="border-b border-red-100 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-4 py-2 text-sm font-semibold text-red-700 dark:text-rose-300">
             {loadError}
           </div>
         )}
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-xs xl:text-sm">
-            <thead className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase tracking-[0.03em] text-[#6b7280] xl:text-xs">
+            <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="w-10 px-3 py-3">STT</th>
                 <th className="min-w-52 px-3 py-3">Tên thiết bị</th>
@@ -579,14 +579,14 @@ export default function ContractHandoverSection({
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
               {assets.map((asset, index) => (
-                <tr key={asset.id ?? `new-${index}`} className="hover:bg-[#fafbff]">
-                  <td className="px-3 py-2.5 font-bold text-[#607089]">{index + 1}</td>
+                <tr key={asset.id ?? `new-${index}`} className="hover:bg-[#fafbff] dark:hover:bg-white/5">
+                  <td className="px-3 py-2.5 font-bold text-slate-500 dark:text-slate-400">{index + 1}</td>
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.assetName}
                       disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "assetName", e.target.value)}
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
+                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
@@ -594,7 +594,7 @@ export default function ContractHandoverSection({
                       value={asset.assetCategory}
                       disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "assetCategory", e.target.value)}
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
+                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
@@ -604,7 +604,7 @@ export default function ContractHandoverSection({
                       value={asset.quantity}
                       disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "quantity", e.target.value)}
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
+                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
@@ -612,7 +612,7 @@ export default function ContractHandoverSection({
                       value={asset.currentCondition}
                       disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "currentCondition", e.target.value)}
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] bg-white px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
+                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     >
                       {CONDITION_OPTIONS.map(({ value, label }) => (
                         <option key={value} value={value}>
@@ -627,14 +627,14 @@ export default function ContractHandoverSection({
                       disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "description", e.target.value)}
                       placeholder="Chưa cập nhật"
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 outline-none focus:border-[#091426] disabled:bg-slate-100"
+                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     <label
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${effectiveReadonly
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 text-[11px] font-bold ${effectiveReadonly
                           ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                          : "cursor-pointer hover:bg-[#f8fafc]"
+                          : "cursor-pointer hover:bg-[#f8fafc] dark:hover:bg-white/5"
                         }`}
                     >
                       <Camera className="h-3.5 w-3.5" />
@@ -654,7 +654,7 @@ export default function ContractHandoverSection({
                         width={80}
                         height={56}
                         unoptimized
-                        className="mt-1.5 h-12 w-20 rounded-lg border border-[#dfe5ef] object-cover"
+                        className="mt-1.5 h-12 w-20 rounded-lg border border-[#dfe5ef] dark:border-white/10 object-cover"
                       />
                     )}
                   </td>
@@ -674,18 +674,18 @@ export default function ContractHandoverSection({
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           placeholder="Chưa cập nhật"
-          className="w-full rounded-lg border border-[#cbd5e1] bg-white p-3 text-sm outline-none focus:border-[#091426] disabled:bg-slate-100"
+          className="w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] p-3 text-sm outline-none focus:border-[#1e40af] disabled:bg-slate-100"
         />
       </label>
 
       {/* Feedback */}
       {saveError && (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700">
+        <div className="mt-3 rounded-lg border border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-red-700 dark:text-rose-300">
           {saveError}
         </div>
       )}
       {saveSuccess && (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
+        <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
           ✓ Đã lưu hiện trạng thiết bị thành công.
         </div>
       )}
@@ -697,7 +697,7 @@ export default function ContractHandoverSection({
             type="button"
             onClick={handleSave}
             disabled={saving || loadingAssets}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-extrabold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

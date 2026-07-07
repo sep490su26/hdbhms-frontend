@@ -89,7 +89,7 @@ const roleLabel = (role) =>
 
 const roleClass = (role) =>
   String(role).toUpperCase() === "PRIMARY"
-    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+    ? "border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300"
     : "border-slate-200 bg-slate-50 text-slate-700";
 
 const profileStatusLabel = (status, fallback) => {
@@ -104,13 +104,13 @@ const profileStatusLabel = (status, fallback) => {
 const profileStatusClass = (status) => {
   const value = String(status || "").toUpperCase();
   if (value === "COMPLETED")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   if (
     value === "MISSING_CCCD" ||
     value === "MISSING_PORTRAIT" ||
     value === "MISSING_EMERGENCY_CONTACT"
   ) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
   }
   return "border-slate-200 bg-slate-50 text-slate-700";
 };
@@ -132,14 +132,14 @@ const accountStatusLabel = (status) => {
 const accountStatusClass = (status) => {
   const value = String(status || "").toUpperCase();
   if (value === "ACTIVE")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   if (
     value === "INACTIVE" ||
     value === "DISABLED" ||
     value === "CLOSED" ||
     value === "ARCHIVED"
   ) {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300";
   }
   return "border-slate-200 bg-slate-50 text-slate-700";
 };
@@ -169,10 +169,10 @@ const contractStatusLabel = (status) => {
 const contractStatusClass = (status) => {
   const value = String(status || "").toUpperCase();
   if (value === "ACTIVE")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   if (value === "EXPIRING_SOON")
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  if (value === "EXPIRED") return "border-red-200 bg-red-50 text-red-700";
+    return "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
+  if (value === "EXPIRED") return "border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300";
   if (
     [
       "PENDING_SIGNATURE",
@@ -181,10 +181,10 @@ const contractStatusClass = (status) => {
       "WAITING_ACTIVATE",
     ].includes(value)
   ) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
+    return "border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300";
   }
   if (value === "RENEWED")
-    return "border-indigo-200 bg-indigo-50 text-indigo-700";
+    return "border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300";
   return "border-slate-200 bg-slate-50 text-slate-700";
 };
 
@@ -241,7 +241,7 @@ function InfoItem({ label, value, strong = false }) {
     <div>
       <p className="text-xs font-bold text-[#7b8494]">{label}</p>
       <p
-        className={`mt-1 text-sm ${strong ? "font-black text-[#091426]" : "font-semibold text-[#243247]"}`}
+        className={`mt-1 text-sm ${strong ? "font-black text-slate-900 dark:text-white" : "font-semibold text-slate-700 dark:text-slate-200"}`}
       >
         {value || "Chưa cập nhật"}
       </p>
@@ -252,11 +252,11 @@ function InfoItem({ label, value, strong = false }) {
 function DetailSection({ icon: Icon, title, children, className = "" }) {
   return (
     <section
-      className={`rounded-xl border border-[#d8dee8] bg-white p-5 ${className}`}
+      className={`rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 ${className}`}
     >
       <div className="mb-5 flex items-center gap-3">
-        <Icon className="h-5 w-5 text-[#091426]" />
-        <h3 className="text-sm font-black uppercase tracking-[0.06em] text-[#45474c]">
+        <Icon className="h-5 w-5 text-slate-900 dark:text-white" />
+        <h3 className="text-sm font-black uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">
           {title}
         </h3>
       </div>
@@ -301,9 +301,9 @@ function ProtectedImage({ fileUrl, alt, placeholder }) {
 
   if (displayState !== "ready") {
     return (
-      <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f1f5f9] p-4 text-center text-sm font-bold text-[#64748b]">
+      <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#f1f5f9] dark:bg-white/5 p-4 text-center text-sm font-bold text-slate-500 dark:text-slate-400">
         <div>
-          <ImageOff className="mx-auto mb-3 h-8 w-8 text-[#94a3b8]" />
+          <ImageOff className="mx-auto mb-3 h-8 w-8 text-slate-400 dark:text-slate-500" />
           {displayState === "loading" ? "Đang tải ảnh..." : placeholder}
         </div>
       </div>
@@ -315,7 +315,7 @@ function ProtectedImage({ fileUrl, alt, placeholder }) {
     <img
       src={objectUrl}
       alt={alt}
-      className="h-[220px] w-full rounded-xl border border-[#d8dee8] bg-[#f8fafc] object-contain"
+      className="h-[220px] w-full rounded-xl border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 object-contain"
       onError={() => setState("error")}
     />
   );
@@ -323,13 +323,13 @@ function ProtectedImage({ fileUrl, alt, placeholder }) {
 
 function ChecklistRow({ label, done, doneText, missingText }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-[#f1f5ff] px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl bg-[#f1f5ff] dark:bg-white/5 px-4 py-3">
       <div className="flex items-center gap-3">
-        <FileText className="h-5 w-5 text-[#4166b2]" />
-        <span className="font-bold text-[#243247]">{label}</span>
+        <FileText className="h-5 w-5 text-[#1e40af] dark:text-[#93c5fd]" />
+        <span className="font-bold text-slate-700 dark:text-slate-200">{label}</span>
       </div>
       <span
-        className={`flex items-center gap-1 text-xs font-black uppercase ${done ? "text-emerald-600" : "text-amber-700"}`}
+        className={`flex items-center gap-1 text-xs font-black uppercase ${done ? "text-emerald-600 dark:text-emerald-300" : "text-amber-700 dark:text-yellow-300"}`}
       >
         {done ? (
           <CheckCircle2 className="h-4 w-4" />
@@ -345,12 +345,12 @@ function ChecklistRow({ label, done, doneText, missingText }) {
 function ContactLine({ icon: Icon, label, value }) {
   return (
     <div className="flex items-center gap-4">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#4166b2]">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef4ff] text-[#1e40af] dark:text-[#93c5fd]">
         <Icon className="h-5 w-5" />
       </span>
       <span>
         <span className="block text-xs font-bold text-[#7b8494]">{label}</span>
-        <span className="block text-sm font-black text-[#091426]">
+        <span className="block text-sm font-black text-slate-900 dark:text-white">
           {value || "Chưa cập nhật"}
         </span>
       </span>
@@ -370,12 +370,12 @@ function getProfileContractId(profile) {
 
 function ContractDetailInfo({ label, value, strong = false }) {
   return (
-    <div className="rounded-xl bg-[#f8fafc] p-4">
+    <div className="rounded-xl bg-[#f8fafc] dark:bg-white/5 p-4">
       <p className="text-xs font-black uppercase tracking-[0.06em] text-[#7b8494]">
         {label}
       </p>
       <p
-        className={`mt-2 text-sm ${strong ? "font-black text-[#091426]" : "font-bold text-[#243247]"}`}
+        className={`mt-2 text-sm ${strong ? "font-black text-slate-900 dark:text-white" : "font-bold text-slate-700 dark:text-slate-200"}`}
       >
         {value || "Chưa cập nhật"}
       </p>
@@ -413,7 +413,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
       role="dialog"
       aria-modal="true"
     >
-      <section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
         <header className="relative bg-[#05091d] px-6 py-7 text-white">
           <button
             type="button"
@@ -437,7 +437,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
           </span>
         </header>
 
-        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] p-5">
+        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] dark:bg-white/5 p-5">
           <div className="grid gap-5 lg:grid-cols-2">
             <DetailSection icon={MapPin} title="Thông tin phòng">
               <div className="grid gap-4 md:grid-cols-2">
@@ -542,9 +542,9 @@ function LeaseContractDetailModal({ contract, onClose }) {
 
           <DetailSection icon={Users} title="Người ở trong hợp đồng">
             {occupants.length ? (
-              <div className="dashboard-table rounded-xl border border-[#e2e8f0]">
+              <div className="dashboard-table rounded-xl border border-[#e2e8f0] dark:border-white/10">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
+                  <thead className="bg-[#f8fafc] dark:bg-white/5 text-xs font-black uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-4 py-3">Họ tên</th>
                       <th className="px-4 py-3">Vai trò</th>
@@ -564,7 +564,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
                           ) || index
                         }
                       >
-                        <td className="px-4 py-3 font-black text-[#091426]">
+                        <td className="px-4 py-3 font-black text-slate-900 dark:text-white">
                           {valueOf(occupant, "fullName", "full_name") ||
                             "Chưa cập nhật"}
                         </td>
@@ -597,7 +597,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
                 </table>
               </div>
             ) : (
-              <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+              <p className="rounded-xl bg-[#f8fafc] dark:bg-white/5 px-4 py-5 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Chưa có danh sách người ở trong hợp đồng.
               </p>
             )}
@@ -605,12 +605,12 @@ function LeaseContractDetailModal({ contract, onClose }) {
 
           <DetailSection icon={FileText} title="File hợp đồng đã ký">
             {contractFile ? (
-              <div className="rounded-xl bg-[#f8fafc] p-4">
-                <p className="font-black text-[#091426]">
+              <div className="rounded-xl bg-[#f8fafc] dark:bg-white/5 p-4">
+                <p className="font-black text-slate-900 dark:text-white">
                   {valueOf(contractFile, "fileName", "file_name", "name") ||
                     "File hợp đồng"}
                 </p>
-                <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                   Upload:{" "}
                   {formatDate(
                     valueOf(
@@ -624,7 +624,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
                 </p>
               </div>
             ) : (
-              <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+              <p className="rounded-xl bg-[#f8fafc] dark:bg-white/5 px-4 py-5 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Chưa có file hợp đồng đã ký.
               </p>
             )}
@@ -672,27 +672,27 @@ function TenantProfileModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-[#d8dee8] px-6 py-5">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
+        <header className="flex items-center justify-between border-b border-[#d8dee8] dark:border-white/10 px-6 py-5">
           <div className="flex items-center gap-4">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300">
               <UserRound className="h-6 w-6" />
             </span>
-            <h2 className="text-2xl font-black text-[#091426]">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">
               Chi tiết hồ sơ khách thuê
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-[#45474c] hover:bg-[#f2f4f6]"
+            className="rounded-lg p-2 text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5"
             aria-label="Đóng"
           >
             <X className="h-6 w-6" />
           </button>
         </header>
 
-        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] dark:bg-white/5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid content-start gap-5">
             <DetailSection icon={IdCard} title="Thông tin cá nhân">
               <div className="grid gap-5 md:grid-cols-3">
@@ -772,9 +772,9 @@ function TenantProfileModal({
 
             <DetailSection icon={Users} title="Danh sách người cùng phòng">
               {roommates.length ? (
-                <div className="dashboard-table rounded-xl border border-[#e2e8f0]">
+                <div className="dashboard-table rounded-xl border border-[#e2e8f0] dark:border-white/10">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
+                    <thead className="bg-[#f8fafc] dark:bg-white/5 text-xs font-black uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
                       <tr>
                         <th className="px-4 py-3">Họ tên</th>
                         <th className="px-4 py-3">Năm sinh</th>
@@ -793,7 +793,7 @@ function TenantProfileModal({
                         >
                           <td
                             data-label="Họ tên"
-                            className="px-4 py-3 font-bold text-[#091426]"
+                            className="px-4 py-3 font-bold text-slate-900 dark:text-white"
                           >
                             {valueOf(roommate, "fullName", "full_name")}
                           </td>
@@ -817,7 +817,7 @@ function TenantProfileModal({
                               onClick={() =>
                                 openRoommateProfile(valueOf(roommate, "id"))
                               }
-                              className="rounded-lg border border-[#d8dee8] px-3 py-2 text-xs font-bold text-[#091426] hover:bg-[#f2f4f6]"
+                              className="rounded-lg border border-[#d8dee8] dark:border-white/10 px-3 py-2 text-xs font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
                             >
                               Xem hồ sơ
                             </button>
@@ -828,7 +828,7 @@ function TenantProfileModal({
                   </table>
                 </div>
               ) : (
-                <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+                <p className="rounded-xl bg-[#f8fafc] dark:bg-white/5 px-4 py-5 text-sm font-semibold text-slate-500 dark:text-slate-400">
                   Phòng hiện chỉ có 1 người ở.
                 </p>
               )}
@@ -840,7 +840,7 @@ function TenantProfileModal({
                   {vehicles.map((vehicle, index) => (
                     <div
                       key={valueOf(vehicle, "id") || index}
-                      className="grid gap-5 rounded-xl bg-[#f8fafc] p-4 md:grid-cols-3"
+                      className="grid gap-5 rounded-xl bg-[#f8fafc] dark:bg-white/5 p-4 md:grid-cols-3"
                     >
                       <InfoItem
                         label="Hãng xe"
@@ -862,7 +862,7 @@ function TenantProfileModal({
                   ))}
                 </div>
               ) : (
-                <p className="rounded-xl bg-[#f8fafc] px-4 py-5 text-sm font-semibold text-[#64748b]">
+                <p className="rounded-xl bg-[#f8fafc] dark:bg-white/5 px-4 py-5 text-sm font-semibold text-slate-500 dark:text-slate-400">
                   Chưa đăng ký xe
                 </p>
               )}
@@ -1006,18 +1006,18 @@ function TenantProfileModal({
                   label="Email"
                   value={valueOf(profile, "email")}
                 />
-                <div className="rounded-xl bg-[#f8fafc] p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.06em] text-[#64748b]">
+                <div className="rounded-xl bg-[#f8fafc] dark:bg-white/5 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
                     Liên hệ khẩn cấp
                   </p>
                   {firstEmergency ? (
-                    <div className="mt-3 grid gap-2 text-sm font-semibold text-[#243247]">
+                    <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                       <p>{valueOf(firstEmergency, "fullName", "full_name")}</p>
                       <p>Quan hệ: {valueOf(firstEmergency, "relationship")}</p>
                       <p>SĐT: {valueOf(firstEmergency, "phone")}</p>
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm font-semibold text-[#64748b]">
+                    <p className="mt-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
                       Chưa cập nhật liên hệ khẩn cấp
                     </p>
                   )}
@@ -1027,11 +1027,11 @@ function TenantProfileModal({
           </aside>
         </div>
 
-        <footer className="flex justify-end border-t border-[#d8dee8] bg-white px-6 py-4">
+        <footer className="flex justify-end border-t border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-6 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="h-11 rounded-lg border border-[#c5c6cd] px-8 text-sm font-bold text-[#45474c] hover:bg-[#f2f4f6]"
+            className="h-11 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-8 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5"
           >
             Đóng
           </button>
@@ -1211,10 +1211,10 @@ export default function TenantsPage() {
     <section className="w-full min-w-0 flex flex-col gap-6">
       <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-[-0.02em] text-[#091426]">
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
             Hồ sơ khách thuê
           </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#45474c]">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và
             người ở cùng.
           </p>
@@ -1222,14 +1222,14 @@ export default function TenantsPage() {
         <button
           type="button"
           onClick={loadProfiles}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-4 text-sm font-bold text-[#091426] hover:bg-[#f2f4f6]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
         >
           <RefreshCcw className="h-4 w-4" />
           Làm mới
         </button>
       </section>
 
-      <section className="rounded-xl border border-[#d8dee8] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">
+      <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b97aa]" />
@@ -1237,13 +1237,13 @@ export default function TenantsPage() {
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="Tìm theo tên, SĐT, email hoặc số phòng"
-              className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white pl-12 pr-4 text-sm outline-none focus:border-[#4166b2]"
+              className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-12 pr-4 text-sm outline-none focus:border-[#1e40af]"
             />
           </div>
           <select
             value={roomFilter}
             onChange={(event) => setRoomFilter(event.target.value)}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]"
+            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả phòng</option>
             {roomOptions.map((room) => (
@@ -1255,7 +1255,7 @@ export default function TenantsPage() {
           <select
             value={propertyFilter}
             onChange={(event) => setPropertyFilter(event.target.value)}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]"
+            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả cơ sở</option>
             {propertyOptions.map((property) => (
@@ -1267,7 +1267,7 @@ export default function TenantsPage() {
           <select
             value={profileStatusFilter}
             onChange={(event) => setProfileStatusFilter(event.target.value)}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]"
+            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="COMPLETED">Hồ sơ đủ</option>
@@ -1280,7 +1280,7 @@ export default function TenantsPage() {
           <select
             value={roleFilter}
             onChange={(event) => setRoleFilter(event.target.value)}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-semibold outline-none focus:border-[#4166b2]"
+            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả vai trò</option>
             <option value="PRIMARY">Người ký chính</option>
@@ -1290,21 +1290,21 @@ export default function TenantsPage() {
       </section>
 
       {isLoading && (
-        <section className="rounded-xl border border-[#d8dee8] bg-white p-10 text-center shadow-sm">
-          <p className="text-sm font-bold text-[#64748b]">
+        <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-10 text-center shadow-sm">
+          <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
             Đang tải hồ sơ khách thuê...
           </p>
         </section>
       )}
 
       {!isLoading && error && (
-        <section className="rounded-xl border border-rose-200 bg-rose-50 p-10 text-center">
-          <AlertCircle className="mx-auto h-10 w-10 text-rose-600" />
-          <p className="mt-3 text-sm font-bold text-rose-700">{error}</p>
+        <section className="rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-10 text-center">
+          <AlertCircle className="mx-auto h-10 w-10 text-rose-600 dark:text-rose-300" />
+          <p className="mt-3 text-sm font-bold text-rose-700 dark:text-rose-300">{error}</p>
           <button
             type="button"
             onClick={loadProfiles}
-            className="mt-5 h-10 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white"
+            className="mt-5 h-10 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white"
           >
             Thử lại
           </button>
@@ -1312,9 +1312,9 @@ export default function TenantsPage() {
       )}
 
       {!isLoading && !error && groupedByRoom.length === 0 && (
-        <section className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-16 text-center">
-          <UserRound className="mx-auto h-10 w-10 text-[#94a3b8]" />
-          <p className="mt-3 text-sm font-bold text-[#64748b]">
+        <section className="rounded-xl border border-dashed border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] py-16 text-center">
+          <UserRound className="mx-auto h-10 w-10 text-slate-400 dark:text-slate-500" />
+          <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">
             Không tìm thấy hồ sơ khách thuê phù hợp.
           </p>
         </section>
@@ -1340,15 +1340,15 @@ export default function TenantsPage() {
             return (
               <div
                 key={`${valueOf(roomProfile, "propertyId", "property_id")}-${valueOf(roomProfile, "roomCode", "room_code")}`}
-                className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
+                className="overflow-hidden rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
               >
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] bg-[#f8fafc] px-6 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-lg font-black text-[#091426]">
+                      <h2 className="text-lg font-black text-slate-900 dark:text-white">
                         Phòng {valueOf(roomProfile, "roomCode", "room_code")}
                       </h2>
-                      <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                      <Badge className="border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                         {residenceStatusLabel(
                           valueOf(
                             roomProfile,
@@ -1358,12 +1358,12 @@ export default function TenantsPage() {
                         )}
                       </Badge>
                       {currentOccupants >= maxOccupants && (
-                        <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+                        <Badge className="border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300">
                           Đã đủ người
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                       {valueOf(roomProfile, "propertyName", "property_name") ||
                         "Chưa có cơ sở"}{" "}
                       · Hợp đồng{" "}
@@ -1371,15 +1371,15 @@ export default function TenantsPage() {
                         "chưa cập nhật"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#091426] ring-1 ring-[#d8dee8]">
-                    <Users className="h-4 w-4 text-[#4166b2]" />
+                  <div className="flex items-center gap-2 rounded-lg bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white ring-1 ring-[#d8dee8]">
+                    <Users className="h-4 w-4 text-[#1e40af] dark:text-[#93c5fd]" />
                     {roomOccupancyText(roomProfile)} người
                   </div>
                 </div>
 
                 <div className="dashboard-table">
                   <table className="w-full text-left">
-                    <thead className="bg-white text-xs font-black uppercase tracking-[0.05em] text-[#64748b]">
+                    <thead className="bg-white dark:bg-[#0f172a] text-xs font-black uppercase tracking-[0.05em] text-slate-500 dark:text-slate-400">
                       <tr>
                         <th className="px-6 py-4">Họ tên</th>
                         <th className="px-6 py-4">SĐT</th>
@@ -1396,7 +1396,7 @@ export default function TenantsPage() {
                       {roomProfiles.map((profile, index) => (
                         <tr
                           key={profileRowKey(profile, index)}
-                          className="hover:bg-[#f8fafc]"
+                          className="hover:bg-[#f8fafc] dark:hover:bg-white/5"
                         >
                           <td data-label="Họ tên" className="px-6 py-5">
                             <div className="flex items-center gap-3">
@@ -1406,10 +1406,10 @@ export default function TenantsPage() {
                                 )}
                               </span>
                               <span>
-                                <span className="block font-black text-[#091426]">
+                                <span className="block font-black text-slate-900 dark:text-white">
                                   {valueOf(profile, "fullName", "full_name")}
                                 </span>
-                                <span className="mt-1 block text-xs font-semibold text-[#64748b]">
+                                <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
                                   ID hồ sơ: #{valueOf(profile, "id")}
                                 </span>
                               </span>
@@ -1417,25 +1417,25 @@ export default function TenantsPage() {
                           </td>
                           <td
                             data-label="SĐT"
-                            className="px-6 py-5 text-sm font-semibold text-[#243247]"
+                            className="px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
                           >
                             {valueOf(profile, "phone") || "Chưa cập nhật"}
                           </td>
                           <td
                             data-label="Email"
-                            className="break-words px-6 py-5 text-sm font-semibold text-[#243247]"
+                            className="break-words px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
                           >
                             {valueOf(profile, "email") || "Chưa cập nhật"}
                           </td>
                           <td
                             data-label="Số phòng"
-                            className="px-6 py-5 text-sm font-black text-[#091426]"
+                            className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white"
                           >
                             Phòng {valueOf(profile, "roomCode", "room_code")}
                           </td>
                           <td
                             data-label="Số người"
-                            className="px-6 py-5 text-sm font-black text-[#091426]"
+                            className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white"
                           >
                             {roomOccupancyText(profile)}
                           </td>
@@ -1492,7 +1492,7 @@ export default function TenantsPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedProfile(profile)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6]"
+                              className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
                             >
                               <Eye className="h-4 w-4" />
                               Xem hồ sơ

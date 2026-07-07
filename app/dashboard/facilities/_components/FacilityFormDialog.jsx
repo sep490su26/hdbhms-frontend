@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { LoaderCircle, MapPin, X } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ function FieldError({ id, message }) {
   if (!message) return null;
 
   return (
-    <p id={id} className="text-xs font-semibold text-rose-600">
+    <p id={id} className="text-xs font-semibold text-rose-600 dark:text-rose-300">
       {message}
     </p>
   );
@@ -40,9 +40,9 @@ export function FacilityFormDialog({
         showCloseButton={false}
         className="max-h-[calc(100vh-2rem)] max-w-xl overflow-y-auto p-0"
       >
-        <DialogHeader className="flex-row items-start justify-between border-b border-[#e2e8f0] px-6 py-5 text-left">
+        <DialogHeader className="flex-row items-start justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-5 text-left">
           <div>
-            <DialogTitle className="text-xl font-bold text-[#091426]">
+            <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
               {isEditing ? "Chỉnh sửa cơ sở" : "Thêm cơ sở mới"}
             </DialogTitle>
             <DialogDescription className="mt-1.5">
@@ -55,7 +55,7 @@ export function FacilityFormDialog({
             type="button"
             onClick={onClose}
             disabled={formState.isSubmitting}
-            className="rounded-lg p-2 text-[#6b7280] transition hover:bg-[#f2f4f6] hover:text-[#091426] disabled:opacity-50"
+            className="rounded-lg p-2 text-slate-500 dark:text-slate-400 transition hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white disabled:opacity-50"
             aria-label="Đóng biểu mẫu"
           >
             <X className="h-5 w-5" />
@@ -70,8 +70,8 @@ export function FacilityFormDialog({
         >
           <div className="grid gap-5 px-6 py-6">
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#243047]">
-                Tên cơ sở <span className="text-rose-600">*</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Tên cơ sở <span className="text-rose-600 dark:text-rose-300">*</span>
               </span>
               <input
                 autoFocus
@@ -83,10 +83,10 @@ export function FacilityFormDialog({
                   formState.errors.name ? "facility-name-error" : undefined
                 }
                 className={cn(
-                  "h-12 rounded-lg border bg-white px-4 text-sm font-medium text-[#091426] outline-none transition placeholder:text-[#9aa3b2] focus:ring-2",
+                  "h-12 rounded-lg border bg-white dark:bg-[#0f172a] px-4 text-sm font-medium text-slate-900 dark:text-white outline-none transition placeholder:text-slate-400 dark:text-slate-500 focus:ring-2",
                   formState.errors.name
                     ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-                    : "border-[#cbd3df] focus:border-[#091426] focus:ring-[#091426]/10",
+                    : "border-[#cbd3df] dark:border-white/10 focus:border-[#1e40af] focus:ring-[#1e40af]/10",
                 )}
               />
               <FieldError
@@ -96,11 +96,11 @@ export function FacilityFormDialog({
             </label>
 
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#243047]">
-                Địa chỉ <span className="text-rose-600">*</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Địa chỉ <span className="text-rose-600 dark:text-rose-300">*</span>
               </span>
               <span className="relative">
-                <MapPin className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9aa3b2]" />
+                <MapPin className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
                   value={formState.values.address}
                   onChange={(event) =>
@@ -114,10 +114,10 @@ export function FacilityFormDialog({
                       : undefined
                   }
                   className={cn(
-                    "h-12 w-full rounded-lg border bg-white px-4 pr-12 text-sm font-medium text-[#091426] outline-none transition placeholder:text-[#9aa3b2] focus:ring-2",
+                    "h-12 w-full rounded-lg border bg-white dark:bg-[#0f172a] px-4 pr-12 text-sm font-medium text-slate-900 dark:text-white outline-none transition placeholder:text-slate-400 dark:text-slate-500 focus:ring-2",
                     formState.errors.address
                       ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-                      : "border-[#cbd3df] focus:border-[#091426] focus:ring-[#091426]/10",
+                      : "border-[#cbd3df] dark:border-white/10 focus:border-[#1e40af] focus:ring-[#1e40af]/10",
                   )}
                 />
               </span>
@@ -128,13 +128,13 @@ export function FacilityFormDialog({
             </label>
 
            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#243047]">
-                Trạng thái <span className="text-rose-600">*</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Trạng thái <span className="text-rose-600 dark:text-rose-300">*</span>
               </span>
               <select
                 value={formState.values.status || "ACTIVE"} 
                 onChange={(event) => onChange("status", event.target.value)} 
-                className="h-12 w-full rounded-lg border border-[#cbd3df] bg-white px-4 text-sm font-medium text-[#091426] outline-none transition focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+                className="h-12 w-full rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-medium text-slate-900 dark:text-white outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
               >
                 {facilityStatusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -145,31 +145,31 @@ export function FacilityFormDialog({
             </label>
 
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#243047]">Mô tả</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Mô tả</span>
               <textarea
                 value={formState.values.description}
                 onChange={(event) =>
                   onChange("description", event.target.value)
                 }
                 placeholder="Thông tin bổ sung về cơ sở..."
-                className="min-h-28 resize-y rounded-lg border border-[#cbd3df] bg-white px-4 py-3 text-sm font-medium text-[#091426] outline-none transition placeholder:text-[#9aa3b2] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+                className="min-h-28 resize-y rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-3 text-sm font-medium text-slate-900 dark:text-white outline-none transition placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
               />
             </label>
           </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-[#e2e8f0] bg-[#f8fafc] px-6 py-5 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-3 border-t border-[#e2e8f0] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-5 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
               disabled={formState.isSubmitting}
-              className="h-11 rounded-lg border border-[#cbd3df] bg-white px-5 text-sm font-bold text-[#243047] transition hover:bg-[#f2f4f6] disabled:opacity-50"
+              className="h-11 rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-5 text-sm font-bold text-slate-700 dark:text-slate-200 transition hover:bg-[#f2f4f6] dark:hover:bg-white/5 disabled:opacity-50"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={formState.isSubmitting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white transition hover:bg-[#16253a] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {formState.isSubmitting && (
                 <LoaderCircle className="h-4 w-4 animate-spin" />

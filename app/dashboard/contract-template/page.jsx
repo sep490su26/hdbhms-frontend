@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
@@ -375,10 +375,31 @@ function getWorkflow(item) {
   return "PENDING_SIGNATURE";
 }
 
+function isRoomTransferManagedContract(item) {
+  return Boolean(item?.transferRequestId);
+}
+
 function needsActivationFlow(item) {
   if (!item) return false;
+  if (isRoomTransferManagedContract(item)) return false;
   if (!item.leaseContractId && item.depositAgreementId) return true;
   return Boolean(item.leaseContractId && ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item)));
+}
+
+function getTransferContractNotice(item) {
+  if (!isRoomTransferManagedContract(item)) return null;
+  const requestedDate = formatDate(item.transferRequestedDate);
+  const code = item.transferRequestCode || `#${item.transferRequestId}`;
+  if (item.transferStatus === "WAITING_TRANSFER_DATE") {
+    return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; bàn giao/kích hoạt vẫn phải xử lý trong chi tiết yêu cầu chuyển phòng.`;
+  }
+  if (["READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(item.transferStatus)) {
+    return `Đã tới bước vận hành của yêu cầu chuyển phòng ${code}. Hãy thực hiện bàn giao/kích hoạt trong chi tiết yêu cầu chuyển phòng.`;
+  }
+  if (item.transferStatus === "EXECUTED") {
+    return `Hợp đồng này đã được xử lý qua yêu cầu chuyển phòng ${code}.`;
+  }
+  return `Hợp đồng này thuộc yêu cầu chuyển phòng ${code}; việc ký, bàn giao và kích hoạt phải đi theo luồng chuyển phòng.`;
 }
 
 function unwrapHandoverResponse(response) {
@@ -527,27 +548,30 @@ export default function ContractTemplatePage() {
   const [printWizard, setPrintWizard] = useState(null);
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
 
-  async function loadContracts() {
+  const loadContracts = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const data = await fetchLeaseContractManagementList();
-      setContracts(data);
-      return data;
+      const visibleContracts = data.filter((item) => !isRoomTransferManagedContract(item));
+      setContracts(visibleContracts);
+      setSelected((current) => (isRoomTransferManagedContract(current) ? null : current));
+      setDetails((current) => (isRoomTransferManagedContract(current) ? null : current));
+      return visibleContracts;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
     } finally {
       setLoading(false);
     }
     return [];
-  }
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       loadContracts();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadContracts]);
 
   useEffect(() => {
     let ignore = false;
@@ -641,6 +665,12 @@ export default function ContractTemplatePage() {
       status: details.status ?? selected.status,
       tenantIntention: details.tenantIntention ?? selected.tenantIntention ?? null,
       expectedVacantDate: details.expectedVacantDate ?? selected.expectedVacantDate ?? null,
+      transferRequestId: details.transferRequestId ?? selected.transferRequestId ?? null,
+      transferRequestCode: details.transferRequestCode ?? selected.transferRequestCode ?? null,
+      transferStatus: details.transferStatus ?? selected.transferStatus ?? null,
+      transferRequestedDate: details.transferRequestedDate ?? selected.transferRequestedDate ?? null,
+      transferContractRole: details.transferContractRole ?? selected.transferContractRole ?? null,
+      transferActivationLocked: details.transferActivationLocked ?? selected.transferActivationLocked ?? false,
       intentionRecordedAt: details.intentionRecordedAt ?? selected.intentionRecordedAt ?? null,
       intentionNote: details.intentionNote ?? selected.intentionNote ?? null,
       intentionSource: details.intentionSource ?? selected.intentionSource ?? null,
@@ -818,6 +848,11 @@ export default function ContractTemplatePage() {
 
   async function handleActivate(item) {
     if (!item?.leaseContractId) return;
+
+    if (isRoomTransferManagedContract(item)) {
+      window.alert("Hợp đồng này thuộc yêu cầu chuyển phòng. Vui lòng thực hiện bàn giao/kích hoạt trong chi tiết yêu cầu chuyển phòng.");
+      return;
+    }
 
     if (!item.contractFileId) {
       window.alert("Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.");
@@ -1168,7 +1203,7 @@ export default function ContractTemplatePage() {
   }
 
   const isBusy = Boolean(actionLoading);
-  const stepperVisible = mergedSelected && (
+  const stepperVisible = mergedSelected && !isRoomTransferManagedContract(mergedSelected) && (
     ["DRAFT", "PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(getWorkflow(mergedSelected)) ||
     (getWorkflow(mergedSelected) === "ACTIVE" && !["SENT", "ACTIVE"].includes(details?.accountProvisioningStatus))
   );
@@ -1463,6 +1498,15 @@ export default function ContractTemplatePage() {
             </header>
 
             <div className="grid gap-4 px-5 xl:gap-5 xl:px-7 lg:grid-cols-2">
+              {getTransferContractNotice(mergedSelected) && (
+                <div className="lg:col-span-2 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div>
+                    <p className="font-extrabold">Hợp đồng thuộc luồng chuyển phòng</p>
+                    <p className="mt-1">{getTransferContractNotice(mergedSelected)}</p>
+                  </div>
+                </div>
+              )}
               {needsActivationFlow(mergedSelected) ? (
                 <ContractActivationFlow
                   contract={mergedSelected}
@@ -1827,7 +1871,7 @@ export default function ContractTemplatePage() {
                 </div>
               </DetailCard>
 
-              {mergedSelected.leaseContractId && (
+              {mergedSelected.leaseContractId && !isRoomTransferManagedContract(mergedSelected) && (
                 <ContractHandoverSection
                   key={mergedSelected.leaseContractId}
                   contractId={mergedSelected.leaseContractId}

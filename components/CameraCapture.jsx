@@ -1,14 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export default function CameraCapture({ open, onClose, onCapture }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-    const [stream, setStream] = useState(null);
+    const [, setStream] = useState(null);
     const [error, setError] = useState(null);
 
-    const startCamera = async () => {
+    const startCamera = useCallback(async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment" }
@@ -21,14 +21,14 @@ export default function CameraCapture({ open, onClose, onCapture }) {
             console.error("Lỗi khi mở camera:", err);
             setError(err.message || "Không thể truy cập camera");
         }
-    };
+    }, []);
 
-    const stopCamera = () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-        }
-    };
+    const stopCamera = useCallback(() => {
+        setStream((currentStream) => {
+            currentStream?.getTracks().forEach(track => track.stop());
+            return null;
+        });
+    }, []);
 
     const handleFallbackUpload = (e) => {
         const file = e.target.files?.[0];
@@ -61,13 +61,17 @@ export default function CameraCapture({ open, onClose, onCapture }) {
 
     useEffect(() => {
         if (open) {
-            setError(null);
-            startCamera();
-        } else {
-            stopCamera();
+            const timer = window.setTimeout(() => {
+                setError(null);
+                void startCamera();
+            }, 0);
+            return () => {
+                window.clearTimeout(timer);
+                stopCamera();
+            };
         }
         return () => stopCamera();
-    }, [open]);
+    }, [open, startCamera, stopCamera]);
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>

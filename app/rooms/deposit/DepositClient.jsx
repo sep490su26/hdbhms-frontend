@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import {
   ArrowLeft,
@@ -31,6 +31,8 @@ import {
   checkoutDeposit,
   fetchDepositPaymentStatus,
   fetchDepositRoomHoldStatus,
+  fetchPublicRoomById,
+  normalizeApiRoom,
 } from "../../../services/roomsService";
 import {
   downloadDepositContractByPaymentPdf,
@@ -1701,8 +1703,15 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   );
 }
 
-export function DepositClient({ room }) {
+export function DepositClient({ room: initialRoom = null }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryRoomIdentifier = searchParams.get("roomCode") || searchParams.get("roomId") || "";
+  const [room, setRoom] = useState(initialRoom);
+  const [roomLookup, setRoomLookup] = useState(() => ({
+    identifier: initialRoom ? queryRoomIdentifier : "",
+    error: "",
+  }));
   const [customer, setCustomer] = useState({});
   const [paymentIntent, setPaymentIntent] = useState(null);
   const [step, setStep] = useState("info");
@@ -1711,7 +1720,35 @@ export function DepositClient({ room }) {
   const [depositApiFieldErrors, setDepositApiFieldErrors] = useState({});
   const didRedirectReservedRef = useRef(false);
   const roomIdentifier = room?.roomId ?? room?.roomCode ?? room?.id;
+  const isLoadingRoom = !initialRoom && Boolean(queryRoomIdentifier) && roomLookup.identifier !== queryRoomIdentifier;
+  const roomLoadError = roomLookup.identifier === queryRoomIdentifier ? roomLookup.error : "";
   const isBlockedOnInfoStep = Boolean(step === "info" && blockingStatus && !blockingStatus.canBook);
+
+  useEffect(() => {
+    if (initialRoom) return undefined;
+    if (!queryRoomIdentifier) return undefined;
+
+    let isActive = true;
+
+    fetchPublicRoomById(queryRoomIdentifier)
+      .then((apiRoom) => {
+        if (!isActive) return;
+        setRoom(apiRoom ? normalizeApiRoom(apiRoom) : null);
+        setRoomLookup({ identifier: queryRoomIdentifier, error: "" });
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setRoom(null);
+        setRoomLookup({
+          identifier: queryRoomIdentifier,
+          error: "Không thể tải chi tiết phòng. Vui lòng thử lại sau.",
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [initialRoom, queryRoomIdentifier]);
 
   const applyRoomHoldStatus = useCallback((status) => {
     const nextBlockingStatus = toBlockingStatus(status);
@@ -1822,6 +1859,19 @@ export function DepositClient({ room }) {
     }
   };
 
+  if (isLoadingRoom) {
+    return (
+      <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
+        <div className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
+          <h1 className="text-2xl font-bold">Đang tải phòng</h1>
+          <p className="mt-3 text-sm leading-6 text-[#45474c]">
+            Hệ thống đang kiểm tra thông tin phòng trước khi đặt cọc.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!room) {
     return (
       <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
@@ -1829,7 +1879,7 @@ export function DepositClient({ room }) {
           className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
           <h1 className="text-2xl font-bold">Không tìm thấy phòng</h1>
           <p className="mt-3 text-sm leading-6 text-[#45474c]">
-            Mã phòng trong đường dẫn không tồn tại trong dữ liệu backend hiện tại.
+            {roomLoadError || "Mã phòng trong đường dẫn không tồn tại trong dữ liệu backend hiện tại."}
           </p>
           <Link href="/rooms"
             className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-[#091426] px-6 text-sm font-bold text-white transition hover:bg-[#16253a]">

@@ -282,6 +282,28 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
   const allDone = hasDeposit 
     ? step0Done && step1Done && step2Done && step5Done
     : step2Done && step5Done;
+  const stepsGridClass = hasDeposit ? "md:grid-cols-7" : "md:grid-cols-5";
+  const phaseGridClass = hasDeposit ? "md:grid-cols-[1fr_1fr_1.5fr]" : "md:grid-cols-[1fr_1.5fr]";
+  const phaseLabels = {
+    deposit: "Hợp đồng đặt cọc",
+    contract: "Hợp đồng thuê",
+    handover: "Bàn giao phòng",
+  };
+  const phaseStyles = {
+    deposit: { dot: "bg-amber-600", text: "text-amber-700" },
+    contract: { dot: "bg-blue-600", text: "text-blue-700" },
+    handover: { dot: "bg-indigo-600", text: "text-indigo-700" },
+  };
+  const phaseBands = STEP_META.reduce((bands, step, index) => {
+    const displayStep = index + 1;
+    const last = bands[bands.length - 1];
+    if (last?.phase === step.phase) {
+      last.end = displayStep;
+      return bands;
+    }
+    return [...bands, { phase: step.phase, start: displayStep, end: displayStep }];
+  }, []);
+  const phaseEndIndexes = new Set(phaseBands.slice(0, -1).map((band) => band.end - 1));
 
   const accentStyles = {
     amber: {
@@ -381,49 +403,26 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
       </div>
 
       {/* ── Phase labels ── */}
-      {hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1.5fr_1.5fr] gap-0 border-b border-slate-100 bg-white px-8">
-          <div className="flex items-center gap-2 py-3 pr-4">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700">
-              Hợp đồng đặt cọc
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
-              Hợp đồng thuê
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–4</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
-              Bàn giao phòng
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 5–7</span>
-          </div>
-        </div>
-      )}
-      {!hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1fr] gap-0 border-b border-slate-100 bg-white px-8">
-          <div className="flex items-center gap-2 py-3 pr-4">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
-              Hợp đồng thuê
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
-              Bàn giao phòng
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–5</span>
-          </div>
-        </div>
-      )}
+      <div className={`hidden md:grid ${phaseGridClass} gap-0 border-b border-slate-100 bg-white px-8`}>
+        {phaseBands.map((band, index) => {
+          const styles = phaseStyles[band.phase];
+          const rangeLabel = band.start === band.end
+            ? `Bước ${band.start}`
+            : `Bước ${band.start} - ${band.end}`;
+          return (
+            <div
+              key={band.phase}
+              className={`flex items-center gap-2 py-3 ${index === 0 ? "pr-4" : "border-l border-slate-200 pl-6"}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />
+              <span className={`text-[11px] font-extrabold uppercase tracking-widest ${styles.text}`}>
+                {phaseLabels[band.phase]}
+              </span>
+              <span className="ml-auto text-[11px] font-bold text-slate-400">{rangeLabel}</span>
+            </div>
+          );
+        })}
+      </div>
 
       {/* ── Steps ── */}
       <div className="relative px-4 py-6 md:px-8 md:py-8">
@@ -436,11 +435,12 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-7 md:gap-3 relative z-10">
+        <div className={`grid grid-cols-1 gap-4 ${stepsGridClass} md:gap-3 relative z-10`}>
           {STEP_META.map((meta, idx) => {
             const accent = accentStyles[meta.accent];
             const state = getStepState(meta.num);
-            const isLastInPhase = idx === 1 || idx === 3;
+            const displayStepNumber = idx + 1;
+            const isLastInPhase = phaseEndIndexes.has(idx);
             return (
               <div
                 key={meta.num}
@@ -463,7 +463,7 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
                           : `${accent.circleLight} ring-4 ${accent.ring}`
                     }`}
                   >
-                    {state.done ? <CheckCircle2 className="h-5 w-5" /> : meta.num}
+                    {state.done ? <CheckCircle2 className="h-5 w-5" /> : displayStepNumber}
                   </div>
                   <div className="min-w-0">
                     <h3 className={`text-sm font-extrabold leading-tight ${state.done ? "text-emerald-800" : "text-slate-800"}`}>

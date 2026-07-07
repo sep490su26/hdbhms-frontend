@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import {
   AlertTriangle,
@@ -31,6 +31,8 @@ import {
   checkoutBatchDeposit,
   fetchBatchDepositStatus,
   fetchDepositRoomHoldStatus,
+  fetchPublicRoomCatalog,
+  normalizeApiRoom,
 } from "../../../services/roomsService";
 import {
   clearDepositBatchDraft,
@@ -319,12 +321,23 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
   );
 }
 
-export function BatchDepositClient({ initialRooms }) {
+export function BatchDepositClient({ initialRooms = [] }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const roomIdsParam = searchParams.get("roomIds") || "";
+  const requestedRoomIds = useMemo(
+    () => roomIdsParam.split(",").map((value) => value.trim()).filter(Boolean),
+    [roomIdsParam],
+  );
+  const requestedRoomKey = requestedRoomIds.join(",");
   const [rooms, setRooms] = useState(initialRooms);
   const [roomForms, setRoomForms] = useState(() => Object.fromEntries(
     initialRooms.map((room) => [room.roomId, { occupantCount: 1, coOccupants: [] }]),
   ));
+  const [roomLookup, setRoomLookup] = useState(() => ({
+    key: initialRooms.length > 0 ? requestedRoomKey : "",
+    error: "",
+  }));
   const [form, setForm] = useState({
     fullName: "",
     dob: "",
@@ -356,6 +369,8 @@ export function BatchDepositClient({ initialRooms }) {
   const [previewingRoomId, setPreviewingRoomId] = useState(null);
   const dismissedConflictRef = useRef("");
 
+  const isLoadingRooms = Boolean(requestedRoomKey) && roomLookup.key !== requestedRoomKey;
+  const roomLoadError = roomLookup.key === requestedRoomKey ? roomLookup.error : "";
   const totalAmount = rooms.length * DEPOSIT_PER_ROOM;
   const expiresAtMs = useMemo(() => (checkout ? resolveExpiresAtMs(checkout) : null), [checkout]);
   const paymentExpired = Boolean(expiresAtMs && remainingMs !== null && remainingMs <= 0);
@@ -363,6 +378,41 @@ export function BatchDepositClient({ initialRooms }) {
     const review = contractReviews[room.roomId];
     return review?.accepted && review.signature === contractSignature(room, form);
   });
+
+  useEffect(() => {
+    if (!requestedRoomKey) return undefined;
+
+    let isActive = true;
+
+    fetchPublicRoomCatalog()
+      .then((catalog) => {
+        if (!isActive) return;
+        const requestedIdSet = new Set(requestedRoomIds);
+        const nextRooms = catalog.rooms
+          .map((room) => normalizeApiRoom(room))
+          .filter((room) => requestedIdSet.has(String(room.roomId)));
+        setRooms(nextRooms);
+        setRoomForms((current) => Object.fromEntries(
+          nextRooms.map((room) => [
+            room.roomId,
+            current[room.roomId] || { occupantCount: 1, coOccupants: [] },
+          ]),
+        ));
+        setRoomLookup({ key: requestedRoomKey, error: "" });
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setRooms([]);
+        setRoomLookup({
+          key: requestedRoomKey,
+          error: "Không thể tải danh sách phòng đã chọn. Vui lòng thử lại sau.",
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [requestedRoomIds, requestedRoomKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -973,6 +1023,19 @@ export function BatchDepositClient({ initialRooms }) {
     ? contractReviews[activeContractRoom.roomId]
     : null;
 
+  if (isLoadingRooms) {
+    return (
+      <main className="min-h-screen bg-[#f5f3f4] px-4 pb-16 pt-28 text-[#091426] sm:px-6">
+        <div className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-black">Đang tải danh sách phòng</h1>
+          <p className="mt-3 text-sm leading-6 text-[#45474c]">
+            Hệ thống đang kiểm tra các phòng đã chọn trước khi đặt cọc.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (checkout) {
     const paymentUnavailable = terminalError || paymentExpired;
     const paymentRooms = checkout.rooms || rooms;
@@ -1249,7 +1312,7 @@ export function BatchDepositClient({ initialRooms }) {
 
         {rooms.length < 1 && (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-800">
-            Cần có ít nhất 1 phòng để tiếp tục đặt cọc.
+            {roomLoadError || "Cần có ít nhất 1 phòng để tiếp tục đặt cọc."}
           </div>
         )}
         {fieldErrors.rooms ? (

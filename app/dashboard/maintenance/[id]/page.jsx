@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -294,14 +295,14 @@ function AuthorizedAttachmentLink({ attachment, title }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="group overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]"
+      className="group relative block h-36 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]"
     >
       {failed ? (
         <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-[#64748b]">
           Không tải được ảnh.
         </div>
       ) : objectUrl ? (
-        <img src={objectUrl} alt={attachment.name || title} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
+        <Image src={objectUrl} alt={attachment.name || title} fill sizes="240px" className="object-cover transition group-hover:scale-[1.02]" unoptimized />
       ) : (
         <div className="grid h-36 place-items-center text-xs font-bold text-[#64748b]">
           Đang tải ảnh...
@@ -676,7 +677,7 @@ export default function MaintenanceTicketDetailPage() {
             <div className="flex flex-wrap gap-3">
               {completeForm.images.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]">
-                  <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-cover" />
+                  <Image src={URL.createObjectURL(file)} alt={file.name} fill sizes="80px" className="object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => setCompleteForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}

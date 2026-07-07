@@ -309,6 +309,17 @@ export async function updateCurrentUserProfile(payload) {
     });
 }
 
+export async function changeCurrentUserPassword({ currentPassword, oldPassword, newPassword }) {
+    return authenticatedFetch(`${API_BASE_URL}/users/me/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            currentPassword: currentPassword || oldPassword,
+            newPassword,
+        }),
+    });
+}
+
 export async function uploadCurrentUserAvatar(file) {
     // If backend doesn't support changing profile picture yet, we mock its return format
     // or upload to generic file storage and mock the updating process.

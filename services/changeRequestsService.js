@@ -3,6 +3,16 @@ import { API_BASE_URL } from "@/lib/apiConfig";
 
 const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 
+const REQUEST_TYPE_TO_API = {
+    TRANSFER: "ROOM_TRANSFER",
+    MOVEOUT: "MOVE_OUT",
+    RENEWAL: "CONTRACT_RENEWAL",
+    TERMINATION: "CONTRACT_TERMINATION",
+    MAINTENANCE: "MAINTENANCE",
+    COMPLAINT: "COMPLAINT",
+    ACCESS: "ACCESS_REQUEST",
+};
+
 async function request(path, options = {}) {
     const token = getAuthToken();
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -48,7 +58,10 @@ export async function fetchChangeRequests(filters = {}) {
         sort: "createdAt,desc" 
     });
     
-    if (type && type !== "all") params.set("type", type.toUpperCase());
+    if (type && type !== "all") {
+        const normalizedType = REQUEST_TYPE_TO_API[type] || type.toUpperCase();
+        params.set("type", normalizedType);
+    }
     if (status && status !== "all") params.set("status", status.toUpperCase());
     if (search.trim()) params.set("search", search.trim());
 
@@ -63,6 +76,7 @@ export async function fetchChangeRequests(filters = {}) {
         description: r.description,
         status: r.status,
         requesterId: r.requesterId,
+        targetId: r.targetId,
         resolutionNote: r.resolutionNote,
         resolvedAt: r.resolvedAt,
         createdAt: r.createdAt,

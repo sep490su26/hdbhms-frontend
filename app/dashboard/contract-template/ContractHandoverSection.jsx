@@ -239,7 +239,7 @@ export default function ContractHandoverSection({
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId]);
+  }, [contractId, electricReading, loadReadings, readonly, waterReading]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {

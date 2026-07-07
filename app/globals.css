@@ -54,7 +54,7 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(0.145 0 0);
+  --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
 }
 
@@ -62,7 +62,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
 
   /* Brand palette */
   --color-brand-primary: #f6c915;
@@ -457,4 +456,15 @@ body {
   html {
     @apply font-sans;
   }
+}
+
+/* Re-assert final semantic tokens after imported theme layers */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
 }

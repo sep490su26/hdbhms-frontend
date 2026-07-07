@@ -126,6 +126,12 @@ export function normalizeLeaseContractItem(item = {}) {
       null,
     tenantIntention: item.tenantIntention ?? null,
     expectedVacantDate: item.expectedVacantDate ?? null,
+    transferRequestId: item.transferRequestId ?? null,
+    transferRequestCode: item.transferRequestCode ?? null,
+    transferStatus: item.transferStatus ?? null,
+    transferRequestedDate: item.transferRequestedDate ?? null,
+    transferContractRole: item.transferContractRole ?? null,
+    transferActivationLocked: item.transferActivationLocked ?? false,
     intentionRecordedAt: item.intentionRecordedAt ?? null,
     intentionNote:
       item.intentionNote ??
@@ -428,6 +434,12 @@ function normalizeLeaseContractDetails(details = {}) {
       null,
     tenantIntention: details.tenantIntention ?? null,
     expectedVacantDate: details.expectedVacantDate ?? null,
+    transferRequestId: details.transferRequestId ?? null,
+    transferRequestCode: details.transferRequestCode ?? null,
+    transferStatus: details.transferStatus ?? null,
+    transferRequestedDate: details.transferRequestedDate ?? null,
+    transferContractRole: details.transferContractRole ?? null,
+    transferActivationLocked: details.transferActivationLocked ?? false,
     intentionRecordedAt: details.intentionRecordedAt ?? null,
     intentionNote:
       details.intentionNote ??

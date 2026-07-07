@@ -19,13 +19,23 @@ import {
   loginWithPhonePassword,
 } from "@/services/identityAccessService";
 
+function getRememberedLogin() {
+  if (typeof window === "undefined") {
+    return { phone: "", password: "", rememberMe: false };
+  }
+  const phone = window.localStorage.getItem("rememberedPhone") || "";
+  const password = window.localStorage.getItem("rememberedPassword") || "";
+  return { phone, password, rememberMe: Boolean(phone && password) };
+}
+
 function LoginForm() {
   const router = useRouter();
   const { setUser, refreshUser } = useAuth();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [initialLogin] = useState(getRememberedLogin);
+  const [phone, setPhone] = useState(initialLogin.phone);
+  const [password, setPassword] = useState(initialLogin.password);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(initialLogin.rememberMe);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false); // toggle state
@@ -37,14 +47,6 @@ function LoginForm() {
       refreshUser(token)
         .then(() => router.replace("/dashboard"))
         .catch(() => clearAuthSession());
-    }
-
-    const savedPhone = window.localStorage.getItem("rememberedPhone");
-    const savedPassword = window.localStorage.getItem("rememberedPassword");
-    if (savedPhone && savedPassword) {
-      setPhone(savedPhone);
-      setPassword(savedPassword);
-      setRememberMe(true);
     }
   }, [refreshUser, router]);
 

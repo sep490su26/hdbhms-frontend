@@ -1,30 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Rnd } from "react-rnd";
 import { ArrowLeft, Plus, Save, Layers3, Move, Maximize2 } from "lucide-react";
 
-const GRID_SIZE = 20; 
+const GRID_SIZE = 20;
+
+function buildInitialFloors(facility) {
+  return (facility?.floors || []).map((floor) => ({
+    ...floor,
+    rooms: floor.rooms.map((room) => ({
+      ...room,
+      floorPlan: room.floorPlan || { x: 40, y: 40, w: 120, h: 160 },
+    })),
+  }));
+}
 
 export function FacilityFloorPlanDesigner({ facility, onClose, onSave }) {
   const [selectedFloorId, setSelectedFloorId] = useState(
     facility?.floors?.[0]?.id || null
   );
 
-  const [floorsData, setFloorsData] = useState([]);
-
-  useEffect(() => {
-    if (facility?.floors) {
-      const initializedFloors = facility.floors.map((floor) => ({
-        ...floor,
-        rooms: floor.rooms.map((room) => ({
-          ...room,
-          floorPlan: room.floorPlan || { x: 40, y: 40, w: 120, h: 160 },
-        })),
-      }));
-      setFloorsData(initializedFloors);
-    }
-  }, [facility]);
+  const [floorsData, setFloorsData] = useState(() => buildInitialFloors(facility));
 
   const currentFloor = floorsData.find((f) => f.id === selectedFloorId);
   const handleAddFloor = () => {
@@ -250,7 +247,7 @@ export function FacilityFloorPlanDesigner({ facility, onClose, onSave }) {
           {currentFloor?.rooms?.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <p className="text-sm font-semibold text-[#8490a3] bg-white px-4 py-2 rounded-full shadow-sm border border-[#e2e8f0]">
-                Tầng này chưa có phòng. Hãy nhấn "Thêm ô phòng mới" ở sidebar.
+                Tầng này chưa có phòng. Hãy nhấn &quot;Thêm ô phòng mới&quot; ở sidebar.
               </p>
             </div>
           )}

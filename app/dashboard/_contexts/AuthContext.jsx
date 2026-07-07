@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { clearAuthSession, getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
 import {readCachedProfile, writeCachedProfile} from "@/lib/profileCache";
@@ -40,7 +39,6 @@ function normalizeUser(user, fallbackRole = null) {
 }
 
 export function AuthProvider({ initialUser = null, user: legacyUser = null, children }) {
-  const router = useRouter();
   const [user, setUserState] = useState(() => normalizeUser(initialUser || legacyUser));
   const [isLoadingUser, setIsLoadingUser] = useState(false);
 
@@ -107,8 +105,7 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
     clearAuthSession();
 
     setUserState(null);
-    // router.push("/login");
-  }, [router]);
+  }, []);
 
   const value = useMemo(
     () => ({

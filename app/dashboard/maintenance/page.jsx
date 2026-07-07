@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -793,7 +794,7 @@ export default function MaintenancePage() {
             <div className="flex flex-wrap gap-3">
               {createForm.images.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]">
-                  <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-cover" />
+                  <Image src={URL.createObjectURL(file)} alt={file.name} fill sizes="80px" className="object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => setCreateForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}

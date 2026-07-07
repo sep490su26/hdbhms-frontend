@@ -115,7 +115,7 @@ function MeterPhoto({ src }) {
         <div
             className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 relative group">
             {src ? (
-                <img src={src} alt="thumbnail" className="w-full h-full object-cover" />
+                <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized />
             ) : (
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -144,7 +144,7 @@ export default function MeterReadings() {
     const queryPeriod = searchParams.get("period") || "";
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetchBatchMeterReadingsStatus(period, 1);
@@ -173,10 +173,14 @@ export default function MeterReadings() {
         } finally {
             setLoading(false);
         }
-    }
-    useEffect(() => {
-        loadData();
     }, [period]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            void loadData();
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [loadData]);
 
     useEffect(() => {
         if (focusRoomId) {
@@ -961,8 +965,8 @@ export default function MeterReadings() {
 
                                     <div className="pt-2">
                                         {capturedPhotos[room.id] ? (
-                                            <div className="relative rounded-lg overflow-hidden border border-gray-200">
-                                                <img src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-48 object-contain bg-gray-50 bg-black/5" />
+                                            <div className="relative h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" fill sizes="(max-width: 768px) 100vw, 320px" className="object-contain bg-black/5" unoptimized />
                                                 <button 
                                                     onClick={() => {
                                                         const newPhotos = {...capturedPhotos};

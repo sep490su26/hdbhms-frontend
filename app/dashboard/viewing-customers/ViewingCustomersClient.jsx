@@ -32,6 +32,7 @@ import {
     updateViewingCustomer,
     updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const emptyForm = {
     fullName: "",
@@ -117,28 +118,6 @@ const MOCK_VIEWING_CUSTOMERS = [
         createdLabel: "11:45 04/06/2026",
     },
 ];
-
-function MetricCard({icon: Icon, label, value, tone}) {
-    const tones = {
-        blue: "bg-blue-100 text-blue-700",
-        amber: "bg-amber-100 text-amber-700",
-        green: "bg-emerald-100 text-emerald-700",
-        indigo: "bg-indigo-100 text-indigo-700",
-    };
-
-    return (
-        <article
-            className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${tones[tone]}`}>
-        <Icon className="h-5 w-5"/>
-      </span>
-            <div className="min-w-0">
-                <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-                <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#091426]">{value}</p>
-            </div>
-        </article>
-    );
-}
 
 function StatusSelect({status, onChange}) {
     const styles = {
@@ -693,11 +672,11 @@ export default function ViewingCustomersClient() {
                     </section>
 
                     <section className="mt-7 grid gap-5 md:grid-cols-3">
-                        <MetricCard icon={CalendarDays} label="Hôm nay"
+                        <DashboardStatCard icon={CalendarDays} label="Hôm nay"
                                     value={String(stats.todayCount ?? 0).padStart(2, "0")} tone="blue"/>
-                        <MetricCard icon={ClipboardList} label="Chưa xem"
+                        <DashboardStatCard icon={ClipboardList} label="Chưa xem"
                                     value={String(stats.pendingCount ?? 0).padStart(2, "0")} tone="amber"/>
-                        <MetricCard icon={CheckCircle2} label="Đã xem"
+                        <DashboardStatCard icon={CheckCircle2} label="Đã xem"
                                     value={String(stats.viewedCount ?? 0).padStart(2, "0")} tone="green"/>
                     </section>
 

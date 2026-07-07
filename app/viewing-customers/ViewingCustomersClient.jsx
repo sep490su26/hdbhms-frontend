@@ -46,6 +46,7 @@ import {
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const emptyForm = {
   fullName: "",
@@ -152,27 +153,6 @@ function Topbar({ search, onSearchChange }) {
         </button>
       </div>
     </header>
-  );
-}
-
-function MetricCard({ icon: Icon, label, value, tone }) {
-  const tones = {
-    blue: "bg-blue-100 text-blue-700",
-    amber: "bg-amber-100 text-amber-700",
-    green: "bg-emerald-100 text-emerald-700",
-    indigo: "bg-indigo-100 text-indigo-700",
-  };
-
-  return (
-    <article className="flex min-h-[86px] items-center gap-4 rounded-lg border border-[#cfd5de] bg-white px-5 shadow-[0_1px_1px_rgba(9,20,38,0.03)]">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${tones[tone]}`}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#4b5563]">{label}</p>
-        <p className="text-2xl font-extrabold leading-7 text-[#111827]">{value}</p>
-      </div>
-    </article>
   );
 }
 
@@ -653,9 +633,9 @@ export default function ViewingCustomersClient() {
           </section>
 
           <section className="mt-7 grid gap-5 md:grid-cols-3">
-            <MetricCard icon={CalendarDays} label="Hôm nay" value={String(stats.todayCount ?? 0).padStart(2, "0")} tone="blue" />
-            <MetricCard icon={ClipboardList} label="Chưa xem" value={String(stats.pendingCount ?? 0).padStart(2, "0")} tone="amber" />
-            <MetricCard icon={CheckCircle2} label="Đã xem" value={String(stats.viewedCount ?? 0).padStart(2, "0")} tone="green" />
+            <DashboardStatCard icon={CalendarDays} label="Hôm nay" value={String(stats.todayCount ?? 0).padStart(2, "0")} tone="blue" />
+            <DashboardStatCard icon={ClipboardList} label="Chưa xem" value={String(stats.pendingCount ?? 0).padStart(2, "0")} tone="amber" />
+            <DashboardStatCard icon={CheckCircle2} label="Đã xem" value={String(stats.viewedCount ?? 0).padStart(2, "0")} tone="green" />
           </section>
 
           <section className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)]">

@@ -33,6 +33,7 @@ import {
 } from "../../../../services/viewingCustomersService";
 import { formatHoldCountdown, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
 import { formatDate } from "../../../../lib/dateFormat";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -69,16 +70,6 @@ const REQUIRED_MESSAGES = {
 };
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
-
-function MetricCard({ icon: Icon, label, value }) {
-  return (
-    <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-5 text-center transition hover:border-blue-100 hover:bg-blue-50/50">
-      <Icon className="mx-auto mb-3 h-6 w-6 text-blue-500" />
-      <p className="text-lg font-bold text-[#091426]">{value}</p>
-      <p className="mt-1 text-xs font-medium text-slate-500">{label}</p>
-    </div>
-  );
-}
 
 function DetailSection({ title, children }) {
   return (
@@ -822,9 +813,9 @@ export function RoomDetailPageClient({ roomId }) {
 
               {/* 3 Khối Thông số */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <MetricCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} />
-                <MetricCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} />
-                <MetricCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} />
+                <DashboardStatCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} tone="blue" />
+                <DashboardStatCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} tone="blue" />
+                <DashboardStatCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} tone="blue" />
               </div>
 
               {/* Các thông tin chi tiết */}

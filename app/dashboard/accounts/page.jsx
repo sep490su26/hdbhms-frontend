@@ -21,6 +21,7 @@ import {
 } from "@/services/identityAccessService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const ALL_VALUE = "Tất cả";
 
@@ -216,34 +217,6 @@ function resolveAccountState(item) {
     hint: "Khách đã đổi mật khẩu lần đầu.",
     className: "border-emerald-200 bg-emerald-50 text-emerald-700",
   };
-}
-
-function MetricCard({ icon: Icon, label, value, tone }) {
-  const toneClass = {
-    slate: "bg-slate-100 text-slate-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
-  }[tone];
-
-  return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-      <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33]">
-          {value}
-        </p>
-      </div>
-    </article>
-  );
 }
 
 function SelectFilter({ value, options, onChange, label }) {
@@ -523,31 +496,31 @@ export default function AccountsPage() {
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
-        <MetricCard
+        <DashboardStatCard
           icon={Home}
           label="Hợp đồng hiệu lực"
           value={metrics.contracts}
           tone="slate"
         />
-        <MetricCard
+        <DashboardStatCard
           icon={KeyRound}
           label="Chưa cấp"
           value={metrics.notSent}
           tone="amber"
         />
-        <MetricCard
+        <DashboardStatCard
           icon={Mail}
           label="Đã gửi"
           value={metrics.sent}
           tone="blue"
         />
-        <MetricCard
+        <DashboardStatCard
           icon={ShieldCheck}
           label="Đã kích hoạt"
           value={metrics.activated}
           tone="emerald"
         />
-        <MetricCard
+        <DashboardStatCard
           icon={AlertCircle}
           label="Thiếu email"
           value={metrics.missingEmail}

@@ -12,6 +12,7 @@ import {
   FolderOpen,
   IdCard,
   ImageOff,
+  LockKeyhole,
   Mail,
   MapPin,
   Phone,
@@ -24,6 +25,7 @@ import {
 import {
   fetchPrivateFileObjectUrl,
   fetchTenantProfiles,
+  requestTenantProfileAccess,
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
@@ -643,6 +645,9 @@ function TenantProfileModal({
   onOpenContractDetails,
   contractDetailsLoadingId,
   contractDetailsError,
+  onRequestAccess,
+  accessRequestLoadingId,
+  accessRequestError,
 }) {
   const identity =
     valueOf(profile, "identityDocument", "identity_document") || {};
@@ -658,6 +663,19 @@ function TenantProfileModal({
   const contractId = getProfileContractId(profile);
   const isLoadingContractDetails =
     contractId && String(contractDetailsLoadingId) === String(contractId);
+  const profileId = valueOf(profile, "id");
+  const accessStatus = String(
+    valueOf(profile, "profileAccessStatus", "profile_access_status") || "",
+  ).toUpperCase();
+  const canViewSensitiveProfile = valueOf(
+    profile,
+    "canViewSensitiveProfile",
+    "can_view_sensitive_profile",
+  );
+  const accessRestricted = canViewSensitiveProfile === false;
+  const accessPending = accessStatus === "PENDING";
+  const isRequestingAccess =
+    profileId && String(accessRequestLoadingId) === String(profileId);
 
   const openRoommateProfile = (roommateId) => {
     const nextProfile = profiles.find(
@@ -691,6 +709,36 @@ function TenantProfileModal({
             <X className="h-6 w-6" />
           </button>
         </header>
+
+        {accessRestricted && (
+          <div className="flex flex-col gap-4 border-b border-amber-200 bg-amber-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+              <div>
+                <p className="font-black text-amber-950">
+                  {accessPending ? "Đang chờ chủ trọ duyệt quyền xem" : "Thông tin nhạy cảm đang được bảo vệ"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-amber-800">
+                  Số CCCD, địa chỉ, ảnh hồ sơ và liên hệ chi tiết chỉ hiển thị sau khi yêu cầu được duyệt.
+                </p>
+                {accessRequestError && (
+                  <p className="mt-2 text-sm font-bold text-red-700">{accessRequestError}</p>
+                )}
+              </div>
+            </div>
+            {!accessPending && (
+              <button
+                type="button"
+                onClick={() => onRequestAccess(profile)}
+                disabled={isRequestingAccess}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-black text-white hover:bg-[#15243a] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRequestingAccess ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
+                {isRequestingAccess ? "Đang gửi..." : "Yêu cầu quyền xem"}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] dark:bg-white/5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid content-start gap-5">
@@ -1049,6 +1097,8 @@ export default function TenantsPage() {
   const [selectedContract, setSelectedContract] = useState(null);
   const [contractDetailsLoadingId, setContractDetailsLoadingId] = useState("");
   const [contractDetailsError, setContractDetailsError] = useState("");
+  const [accessRequestLoadingId, setAccessRequestLoadingId] = useState("");
+  const [accessRequestError, setAccessRequestError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
@@ -1092,6 +1142,35 @@ export default function TenantsPage() {
       );
     } finally {
       setContractDetailsLoadingId("");
+    }
+  };
+
+  const requestProfileAccess = async (profile) => {
+    const profileId = valueOf(profile, "id");
+    if (!profileId) return;
+
+    try {
+      setAccessRequestError("");
+      setAccessRequestLoadingId(profileId);
+      const result = await requestTenantProfileAccess(profileId);
+      const updatedProfile = {
+        ...profile,
+        profileAccessStatus: result?.status || "PENDING",
+        profileAccessRequestId: result?.requestId || null,
+        canViewSensitiveProfile: Boolean(result?.canViewSensitiveProfile),
+      };
+      setProfiles((current) =>
+        current.map((item) =>
+          String(valueOf(item, "id")) === String(profileId) ? updatedProfile : item,
+        ),
+      );
+      setSelectedProfile(updatedProfile);
+    } catch (requestError) {
+      setAccessRequestError(
+        requestError?.message || "Không thể gửi yêu cầu quyền xem hồ sơ.",
+      );
+    } finally {
+      setAccessRequestLoadingId("");
     }
   };
 
@@ -1533,6 +1612,9 @@ export default function TenantsPage() {
           onOpenContractDetails={openContractDetails}
           contractDetailsLoadingId={contractDetailsLoadingId}
           contractDetailsError={contractDetailsError}
+          onRequestAccess={requestProfileAccess}
+          accessRequestLoadingId={accessRequestLoadingId}
+          accessRequestError={accessRequestError}
         />
       )}
 

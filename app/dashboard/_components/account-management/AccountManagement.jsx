@@ -21,6 +21,7 @@ import {
   facilityOptions,
   initialEmployeeAccounts,
 } from "./data";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 function StatusBadge({ status }) {
   const meta = accountStatusMeta[status] || accountStatusMeta.pending;
@@ -29,27 +30,6 @@ function StatusBadge({ status }) {
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${meta.className}`}>
       {meta.label}
     </span>
-  );
-}
-
-function MetricCard({ icon: Icon, label, value, tone = "slate" }) {
-  const tones = {
-    slate: "bg-slate-100 text-slate-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    rose: "bg-rose-50 text-rose-700",
-  };
-
-  return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${tones[tone]}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-        <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#091426]">{value}</p>
-      </div>
-    </article>
   );
 }
 
@@ -203,10 +183,10 @@ export function AccountManagement() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={UsersRound} label="Tổng nhân sự" value={metrics.total} />
-        <MetricCard icon={ShieldCheck} label="Đang hoạt động" value={metrics.active} tone="emerald" />
-        <MetricCard icon={UserRoundCog} label="Chờ duyệt" value={metrics.pending} tone="amber" />
-        <MetricCard icon={LockKeyhole} label="Đã khóa" value={metrics.locked} tone="rose" />
+        <DashboardStatCard icon={UsersRound} label="Tổng nhân sự" value={metrics.total} />
+        <DashboardStatCard icon={ShieldCheck} label="Đang hoạt động" value={metrics.active} tone="emerald" />
+        <DashboardStatCard icon={UserRoundCog} label="Chờ duyệt" value={metrics.pending} tone="amber" />
+        <DashboardStatCard icon={LockKeyhole} label="Đã khóa" value={metrics.locked} tone="rose" />
       </section>
 
       {(pageNotice || pageError) && (

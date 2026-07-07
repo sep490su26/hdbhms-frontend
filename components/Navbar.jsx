@@ -4,13 +4,12 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Home, LayoutDashboard, LogIn, Menu, X } from 'lucide-react';
+import { Home, LayoutDashboard, LogIn, Menu, X } from 'lucide-react';
 
 const STAFF_ROLES = new Set(['OWNER', 'MANAGER', 'owner', 'manager']);
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [staffRole, setStaffRole] = useState(null);
   const pathname = usePathname();
@@ -45,11 +44,11 @@ export function Navbar() {
   const navLinks = [
     { name: 'Giới thiệu', href: '/about' },
     { name: 'Phòng trọ', href: '/rooms' },
+    { name: 'Nội quy', href: '/rules' },
     { name: 'Liên hệ', href: '/contact' },
   ];
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((current) => !current);
-  const toggleDropdown = () => setIsDropdownOpen((current) => !current);
   const goToPrimaryAction = () => {
     setIsMobileMenuOpen(false);
     if (staffRole === 'MANAGER' || staffRole === 'manager') {
@@ -113,45 +112,6 @@ export function Navbar() {
                   </Link>
                 );
               })}
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={toggleDropdown}
-                  onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                  aria-expanded={isDropdownOpen}
-                  aria-haspopup="true"
-                  aria-label="Xem thêm trang"
-                  className={`flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-all ${isDropdownOpen
-                    ? 'bg-white/10 text-white'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                    }`}
-                >
-                  Khác
-                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute right-0 z-50 mt-3 w-44 origin-top-right overflow-hidden rounded-xl border border-white/10 bg-[#1e2746] shadow-2xl"
-                    >
-                      <div className="p-1">
-                        <Link href="/policy" className="block rounded-lg px-4 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white">
-                          Chính sách
-                        </Link>
-                        <Link href="/support" className="block rounded-lg px-4 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white">
-                          Hỗ trợ
-                        </Link>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
             </div>
 
             <button
@@ -201,13 +161,6 @@ export function Navbar() {
                   </Link>
                 );
               })}
-              <div className="my-2 h-px bg-white/10" />
-              <Link href="/policy" className="block rounded-xl px-4 py-3 text-base font-medium text-slate-300 hover:bg-white/5">
-                Chính sách
-              </Link>
-              <Link href="/support" className="block rounded-xl px-4 py-3 text-base font-medium text-slate-300 hover:bg-white/5">
-                Hỗ trợ
-              </Link>
               <button
                 type="button"
                 onClick={goToPrimaryAction}

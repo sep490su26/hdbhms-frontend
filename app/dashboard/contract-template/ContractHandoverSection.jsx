@@ -130,8 +130,10 @@ export default function ContractHandoverSection({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   const previewUrlsRef = useRef(new Set());
+  const effectiveReadonly = readonly || isConfirmed;
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
@@ -213,6 +215,9 @@ export default function ContractHandoverSection({
           .then((data) => {
             if (controller.signal.aborted) return;
             if (data) {
+              const status = data.status;
+              setIsConfirmed(status === "CONFIRMED" || status === "CONFIRMED_BY_TENANT");
+
               const hDate = data.handover_date || data.handoverDate;
               if (hDate) setHandoverDate(hDate.split("T")[0]);
               
@@ -226,6 +231,7 @@ export default function ContractHandoverSection({
               }
               if (data.note) setNote(data.note);
             } else {
+              setIsConfirmed(false);
               if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
             }
           })
@@ -306,6 +312,8 @@ export default function ContractHandoverSection({
 
   /* Save — single atomic call via /handover/submit ----------------- */
   async function handleSave() {
+    if (effectiveReadonly) return;
+
     if (!isValid) {
       window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
       return;
@@ -321,11 +329,11 @@ export default function ContractHandoverSection({
       let waterPhotoId = null;
       if (electricImageFile) {
         const res = await uploadFile(electricImageFile, "METER_PHOTO");
-        electricPhotoId = res?.id;
+        electricPhotoId = res?.fileId || res?.id;
       }
       if (waterImageFile) {
         const res = await uploadFile(waterImageFile, "METER_PHOTO");
-        waterPhotoId = res?.id;
+        waterPhotoId = res?.fileId || res?.id;
       }
 
       // 2. Upload new asset images
@@ -334,7 +342,7 @@ export default function ContractHandoverSection({
           let assetImageId = null;
           if (asset.imageFile) {
             const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
-            assetImageId = res?.id;
+            assetImageId = res?.fileId || res?.id;
           } else if (asset.imageUrl && asset.fileImageId) {
             assetImageId = asset.fileImageId;
           }
@@ -372,6 +380,7 @@ export default function ContractHandoverSection({
       // Update local asset IDs from response
       setFromApi(true);
       setSaveSuccess(true);
+      setIsConfirmed(true);
       onSaved?.();
     } catch (err) {
       setSaveError(err?.message ?? "Lưu thông tin thất bại.");
@@ -408,6 +417,11 @@ export default function ContractHandoverSection({
               Chỉ xem
             </span>
           )}
+          {isConfirmed && !readonly && (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              Đã xác nhận bàn giao
+            </span>
+          )}
         </div>
       </div>
 
@@ -441,7 +455,7 @@ export default function ContractHandoverSection({
               type="number"
               min="0"
               value={electricReading}
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => setElectricReading(e.target.value)}
               placeholder="VD: 1234"
               className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
@@ -453,7 +467,7 @@ export default function ContractHandoverSection({
             <input
               type="date"
               value={electricReadingDate}
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => setElectricReadingDate(e.target.value)}
               className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
             />
@@ -463,7 +477,7 @@ export default function ContractHandoverSection({
             <ImageUploadButton
               imageUrl={electricImageUrl}
               label="Chụp ảnh đồng hồ điện"
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => handleMeterImage("electric", e.target.files?.[0])}
             />
           </div>
@@ -479,7 +493,7 @@ export default function ContractHandoverSection({
               type="number"
               min="0"
               value={waterReading}
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => setWaterReading(e.target.value)}
               placeholder="VD: 56"
               className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
@@ -491,7 +505,7 @@ export default function ContractHandoverSection({
             <input
               type="date"
               value={waterReadingDate}
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => setWaterReadingDate(e.target.value)}
               className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
             />
@@ -501,7 +515,7 @@ export default function ContractHandoverSection({
             <ImageUploadButton
               imageUrl={waterImageUrl}
               label="Chụp ảnh đồng hồ nước"
-              disabled={readonly}
+              disabled={effectiveReadonly}
               onChange={(e) => handleMeterImage("water", e.target.files?.[0])}
             />
           </div>
@@ -570,7 +584,7 @@ export default function ContractHandoverSection({
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.assetName}
-                      disabled={readonly}
+                      disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "assetName", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 font-semibold outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
@@ -578,7 +592,7 @@ export default function ContractHandoverSection({
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.assetCategory}
-                      disabled={readonly}
+                      disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "assetCategory", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
@@ -588,7 +602,7 @@ export default function ContractHandoverSection({
                       type="number"
                       min="1"
                       value={asset.quantity}
-                      disabled={readonly}
+                      disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "quantity", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     />
@@ -596,7 +610,7 @@ export default function ContractHandoverSection({
                   <td className="px-3 py-2.5">
                     <select
                       value={asset.currentCondition}
-                      disabled={readonly}
+                      disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "currentCondition", e.target.value)}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] bg-white px-2 outline-none focus:border-[#091426] disabled:bg-slate-100"
                     >
@@ -610,7 +624,7 @@ export default function ContractHandoverSection({
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.description}
-                      disabled={readonly}
+                      disabled={effectiveReadonly}
                       onChange={(e) => updateAsset(index, "description", e.target.value)}
                       placeholder="Chưa cập nhật"
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] px-2.5 outline-none focus:border-[#091426] disabled:bg-slate-100"
@@ -618,7 +632,7 @@ export default function ContractHandoverSection({
                   </td>
                   <td className="px-3 py-2.5">
                     <label
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${readonly
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] px-2 text-[11px] font-bold ${effectiveReadonly
                           ? "cursor-not-allowed bg-slate-100 text-slate-400"
                           : "cursor-pointer hover:bg-[#f8fafc]"
                         }`}
@@ -628,7 +642,7 @@ export default function ContractHandoverSection({
                       <input
                         type="file"
                         accept="image/*"
-                        disabled={readonly}
+                        disabled={effectiveReadonly}
                         className="hidden"
                         onChange={(e) => handleAssetImageChange(index, e.target.files?.[0])}
                       />
@@ -656,7 +670,7 @@ export default function ContractHandoverSection({
         <span className="text-xs font-bold text-[#58667c]">Ghi chú bàn giao</span>
         <textarea
           value={note}
-          disabled={readonly}
+          disabled={effectiveReadonly}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           placeholder="Chưa cập nhật"
@@ -677,7 +691,7 @@ export default function ContractHandoverSection({
       )}
 
       {/* Save button */}
-      {!readonly && (
+      {!effectiveReadonly && (
         <div className="mt-4 flex justify-end">
           <button
             type="button"

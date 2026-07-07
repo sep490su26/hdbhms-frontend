@@ -3,13 +3,14 @@ import {
     FileCheck2,
     FileText,
     Gauge,
+    Inbox,
     LayoutDashboard,
+    ReceiptText,
     Settings,
     UserRoundCog,
     UsersRound,
     WalletCards,
     Wrench,
-    Inbox,
 } from "lucide-react";
 
 export const navigation = [
@@ -19,6 +20,8 @@ export const navigation = [
     { path: "/dashboard/accounts", label: "Quản lý nhân sự", icon: UserRoundCog },
     { path: "/dashboard/meter-readings", label: "Nhập số điện nước", icon: Gauge },
     { path: "/dashboard/maintenance", label: "Bảo trì", icon: Wrench },
+    { path: "/dashboard/billing", label: "Hóa đơn & Thu tiền", icon: ReceiptText },
+    { path: "/dashboard/debt", label: "Công nợ", icon: WalletCards },
     { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2 },
     { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText },
     { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
@@ -33,6 +36,8 @@ export const navigationPermissionKeys = {
     "/dashboard/accounts": "accounts",
     "/dashboard/meter-readings": "meterReadings",
     "/dashboard/maintenance": "maintenance",
+    "/dashboard/billing": "billing",
+    "/dashboard/debt": "debt",
     "/dashboard/deposits": "deposits",
     "/dashboard/contract-template": "contract",
     "/dashboard/requests": "requests",

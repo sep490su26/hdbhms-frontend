@@ -103,6 +103,7 @@ export async function uploadFile(file, category = "OTHER") {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("category", category);
+  formData.append("isSensitive", "false");
 
   return authenticatedFetch(`${BASE}/files/upload`, {
     method: "POST",

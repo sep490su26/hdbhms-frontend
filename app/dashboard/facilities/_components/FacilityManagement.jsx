@@ -19,6 +19,7 @@ import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { facilityStatusOptions } from "@/services/facilityService";
 
 const statCards = [
@@ -26,25 +27,25 @@ const statCards = [
     key: "totalFacilities",
     label: "Tổng cơ sở",
     icon: Building2,
-    tone: "bg-blue-100 text-blue-700",
+    tone: "blue",
   },
   {
     key: "activeFacilities",
     label: "Đang hoạt động",
     icon: CheckCircle2,
-    tone: "bg-emerald-100 text-emerald-700",
+    tone: "emerald",
   },
   {
     key: "totalRooms",
     label: "Tổng số phòng",
     icon: BedDouble,
-    tone: "bg-purple-100 text-purple-700",
+    tone: "purple",
   },
   {
     key: "vacancyRate",
     label: "Tỷ lệ trống",
     icon: BarChart3,
-    tone: "bg-orange-100 text-orange-700",
+    tone: "orange",
     suffix: "%",
   },
 ];
@@ -163,33 +164,17 @@ export function FacilityManagement() {
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map(({ key, label, icon: Icon, tone, suffix = "" }) => (
-          <article
+          <DashboardStatCard
             key={key}
-            className="flex min-h-28 items-center gap-4 rounded-2xl border border-[#dbe1ea] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-5"
-          >
-            <span
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tone}`}
-            >
-              <Icon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#647089] sm:text-xs">
-                {label}
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#091426] sm:text-3xl">
-                {facility.stats[key]}
-                {suffix}
-              </p>
-              {key === "totalFacilities" && (
-                <p className="mt-0.5 text-[11px] text-[#8490a3]">
-                  {facility.stats.totalFloors} tầng đang quản lý
-                </p>
-              )}
-            </div>
-          </article>
+            icon={Icon}
+            label={label}
+            value={facility.stats[key]}
+            suffix={suffix}
+            tone={tone}
+            subtitle={key === "totalFacilities" ? `${facility.stats.totalFloors} t\u1ea7ng \u0111ang qu\u1ea3n l\u00fd` : undefined}
+          />
         ))}
       </section>
-
       <section className="rounded-2xl border border-[#dbe1ea] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative flex-1">

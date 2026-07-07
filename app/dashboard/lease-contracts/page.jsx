@@ -28,6 +28,7 @@ import {
 } from "@/services/depositContractsService";
 import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -126,29 +127,6 @@ function StatusBadge({ status }) {
       <span className={`h-2 w-2 rounded-full ${config.dot}`} />
       {config.label}
     </span>
-  );
-}
-
-function KpiCard({ title, value, note, icon: Icon, tone = "blue" }) {
-  const tones = {
-    blue: "text-blue-700 bg-blue-50",
-    amber: "text-amber-700 bg-amber-50",
-    emerald: "text-emerald-700 bg-emerald-50",
-  };
-
-  return (
-    <article className="min-h-[118px] rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#8b909a]">{title}</p>
-          <p className="mt-4 text-2xl font-extrabold tracking-[-0.02em] text-[#102033]">{value}</p>
-        </div>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-md ${tones[tone]}`}>
-          <Icon className="h-5 w-5" />
-        </span>
-      </div>
-      {note && <p className="mt-3 text-sm font-semibold text-[#4160ad]">{note}</p>}
-    </article>
   );
 }
 
@@ -606,9 +584,9 @@ export default function DepositsPage() {
         )}
 
         <section className="grid gap-5 xl:grid-cols-3">
-          <KpiCard icon={WalletCards} title="Tá»•ng sá»‘ tiá»n cá»c" value={formatMoney(totalAmount)} note="Tá»•ng tiá»n cá»c Ä‘Ã£ ghi nháº­n" />
-          <KpiCard icon={LockKeyhole} title="Äang giá»¯ cá»c" value={paidAgreements.length} note="Khoáº£n thu kháº£ dá»¥ng" tone="amber" />
-          <KpiCard icon={ClipboardCheck} title="ÄÃ£ nháº­n phÃ²ng" value={convertedAgreements.length} note="ÄÃ£ chÃ­nh thá»©c nháº­n phÃ²ng" tone="emerald" />
+          <DashboardStatCard icon={WalletCards} label="Tá»•ng sá»‘ tiá»n cá»c" value={formatMoney(totalAmount)} subtitle="Tá»•ng tiá»n cá»c Ä‘Ã£ ghi nháº­n" />
+          <DashboardStatCard icon={LockKeyhole} label="Äang giá»¯ cá»c" value={paidAgreements.length} subtitle="Khoáº£n thu kháº£ dá»¥ng" tone="amber" />
+          <DashboardStatCard icon={ClipboardCheck} label="ÄÃ£ nháº­n phÃ²ng" value={convertedAgreements.length} subtitle="ÄÃ£ chÃ­nh thá»©c nháº­n phÃ²ng" tone="emerald" />
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">

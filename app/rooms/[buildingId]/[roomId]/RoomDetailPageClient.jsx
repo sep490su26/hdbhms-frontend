@@ -31,8 +31,9 @@ import {
   combineAppointmentParts,
   publicCreateViewingCustomer,
 } from "../../../../services/viewingCustomersService";
-import { formatHoldMinutes, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+import { formatHoldCountdown, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
 import { formatDate } from "../../../../lib/dateFormat";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -69,16 +70,6 @@ const REQUIRED_MESSAGES = {
 };
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
-
-function MetricCard({ icon: Icon, label, value }) {
-  return (
-    <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-5 text-center transition hover:border-blue-100 hover:bg-blue-50/50">
-      <Icon className="mx-auto mb-3 h-6 w-6 text-blue-500" />
-      <p className="text-lg font-bold text-[#091426]">{value}</p>
-      <p className="mt-1 text-xs font-medium text-slate-500">{label}</p>
-    </div>
-  );
-}
 
 function DetailSection({ title, children }) {
   return (
@@ -207,13 +198,17 @@ function withDetailDefaults(room) {
 }
 
 function BookingCard({ room }) {
-  const isAvailable = room.status === "available";
-  const isSoonVacant = room.status === "soonVacant";
+  const [remainingMs, setRemainingMs] = useState(Math.max(0, room.holdRemainingMs ?? 0));
+  const hasActiveHold = room.status === "onHold" && remainingMs > 0;
+  const effectiveStatus = room.status === "onHold" && !hasActiveHold ? "available" : room.status;
+  const isAvailable = effectiveStatus === "available";
+  const isSoonVacant = effectiveStatus === "soonVacant";
   const isBookable = isAvailable || isSoonVacant;
-  const isOnHold = room.status === "onHold";
-  const isDeposited = room.status === "deposited";
-  const isOccupied = room.status === "occupied";
-  const holdMinutesLabel = formatHoldMinutes(room.holdRemainingMs ?? 0);
+  const isOnHold = effectiveStatus === "onHold";
+  const isDeposited = effectiveStatus === "deposited";
+  const isOccupied = effectiveStatus === "occupied";
+  const holdCountdownLabel = formatHoldCountdown(remainingMs);
+  const isCountdownActive = room.status === "onHold" && remainingMs > 0;
   const roomLabel = room.roomCode || room.name || room.id;
   const vacantDateLabel = formatShortDate(room.expectedVacantDate);
   const tomorrowDate = getTomorrowDateString();
@@ -227,6 +222,27 @@ function BookingCard({ room }) {
   const [viewingErrors, setViewingErrors] = useState({});
   const [viewingNotice, setViewingNotice] = useState({ type: "", message: "" });
   const [isSubmittingViewing, setIsSubmittingViewing] = useState(false);
+
+  useEffect(() => {
+    const nextRemainingMs = Math.max(0, room.holdRemainingMs ?? 0);
+    const syncTimer = window.setTimeout(() => {
+      setRemainingMs(nextRemainingMs);
+    }, 0);
+
+    return () => window.clearTimeout(syncTimer);
+  }, [room.holdRemainingMs]);
+
+  useEffect(() => {
+    if (!isCountdownActive) {
+      return undefined;
+    }
+
+    const countdownTimer = window.setInterval(() => {
+      setRemainingMs((currentRemainingMs) => Math.max(0, currentRemainingMs - 1000));
+    }, 1000);
+
+    return () => window.clearInterval(countdownTimer);
+  }, [isCountdownActive]);
 
   // Hàm helper lấy class màu sắc theo trạng thái
   const getStatusClass = () => {
@@ -366,7 +382,7 @@ function BookingCard({ room }) {
             <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`} />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
             {isSoonVacant && `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
-            {isOnHold && `Đang giữ chỗ - còn ${holdMinutesLabel}`}
+            {isOnHold && "Đang giữ chỗ"}
             {isOccupied && "Đã thuê - Không còn trống"}
             {isDeposited && "Đã đặt cọc - Không còn trống"}
           </div>
@@ -383,7 +399,7 @@ function BookingCard({ room }) {
             ) : (
               <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : isDeposited ? "border-orange-200 bg-orange-50 text-orange-700" : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}>
-                {isOnHold ? `Phòng đang được giữ chỗ, vui lòng chờ khoảng ${holdMinutesLabel}.` : "Phòng đã được thuê, vui lòng chọn phòng khác."}
+                {isOnHold ? `Phòng đang được giữ chỗ, vui lòng chờ ${holdCountdownLabel}.` : "Phòng đã được thuê, vui lòng chọn phòng khác."}
               </div>
             )}
 
@@ -797,9 +813,9 @@ export function RoomDetailPageClient({ roomId }) {
 
               {/* 3 Khối Thông số */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <MetricCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} />
-                <MetricCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} />
-                <MetricCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} />
+                <DashboardStatCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} tone="blue" />
+                <DashboardStatCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} tone="blue" />
+                <DashboardStatCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} tone="blue" />
               </div>
 
               {/* Các thông tin chi tiết */}

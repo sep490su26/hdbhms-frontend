@@ -1,10 +1,13 @@
 import { ApiError, getAuthToken } from "@/services/identityAccessService";
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 
-function readField(source, key) {
-  if (source && source[key] !== undefined && source[key] !== null) return source[key];
+function readField(source, ...keys) {
+  for (const key of keys) {
+    if (source && source[key] !== undefined && source[key] !== null) return source[key];
+  }
   return undefined;
 }
 
@@ -58,21 +61,21 @@ function normalizeUser(raw = {}) {
 }
 
 function normalizeAttachment(raw = {}) {
-  const fileId = readField(raw, "fileId");
+  const fileId = readField(raw, "fileId", "file_id");
   return {
     id: readField(raw, "id") ?? fileId,
     fileId,
     url: resolveFileUrl(readField(raw, "url") || (fileId ? `/files/download/${fileId}` : "")),
-    mimeType: readField(raw, "mimeType") || "",
+    mimeType: readField(raw, "mimeType", "mime_type") || "",
     name: readField(raw, "name") || "",
     phase: readField(raw, "phase") || "",
-    sortOrder: toNumber(readField(raw, "sortOrder")),
+    sortOrder: toNumber(readField(raw, "sortOrder", "sort_order")),
   };
 }
 
 function splitAttachments(raw = {}) {
-  const beforeAttachments = (readField(raw, "beforeAttachments") || []).map(normalizeAttachment);
-  const afterAttachments = (readField(raw, "afterAttachments") || []).map(normalizeAttachment);
+  const beforeAttachments = (readField(raw, "beforeAttachments", "before_attachments") || []).map(normalizeAttachment);
+  const afterAttachments = (readField(raw, "afterAttachments", "after_attachments") || []).map(normalizeAttachment);
   const allAttachments = (readField(raw, "attachments") || []).map(normalizeAttachment);
   const before = beforeAttachments.length
     ? beforeAttachments
@@ -86,12 +89,12 @@ function splitAttachments(raw = {}) {
 function normalizeEvent(raw = {}) {
   return {
     id: readField(raw, "id"),
-    fromStatus: normalizeStatus(readField(raw, "fromStatus")),
-    toStatus: normalizeStatus(readField(raw, "toStatus")),
+    fromStatus: normalizeStatus(readField(raw, "fromStatus", "from_status")),
+    toStatus: normalizeStatus(readField(raw, "toStatus", "to_status")),
     action: readField(raw, "action") || "",
     note: maintenanceDisplayText(readField(raw, "note") || ""),
-    createdBy: normalizeUser(readField(raw, "createdBy")),
-    createdAt: readField(raw, "createdAt") || "",
+    createdBy: normalizeUser(readField(raw, "createdBy", "created_by")),
+    createdAt: readField(raw, "createdAt", "created_at") || "",
   };
 }
 
@@ -100,9 +103,9 @@ function normalizeReview(raw = {}) {
   return {
     id: readField(raw, "id"),
     rating: toNumber(readField(raw, "rating")),
-    comment: readField(raw, "comment") || "",
+    comment: readField(raw, "comment", "feedback") || "",
     reviewer: normalizeUser(readField(raw, "reviewer")),
-    createdAt: readField(raw, "createdAt") || "",
+    createdAt: readField(raw, "createdAt", "created_at") || "",
   };
 }
 
@@ -111,42 +114,45 @@ export function normalizeTicket(raw = {}) {
   const attachments = splitAttachments(raw);
   return {
     id,
-    ticketCode: readField(raw, "ticketCode") || readField(raw, "code") || `#SC-${id || ""}`,
-    propertyId: readField(raw, "propertyId"),
-    propertyName: readField(raw, "propertyName") || "",
-    roomId: readField(raw, "roomId"),
-    roomCode: readField(raw, "roomCode") || "",
-    roomName: readField(raw, "roomName") || "",
-    ticketScope: normalizeScope(readField(raw, "scope") ?? readField(raw, "ticketScope")),
+    ticketCode: readField(raw, "ticketCode", "ticket_code", "code") || `#SC-${id || ""}`,
+    propertyId: readField(raw, "propertyId", "property_id"),
+    propertyName: readField(raw, "propertyName", "property_name") || "",
+    roomId: readField(raw, "roomId", "room_id"),
+    roomCode: readField(raw, "roomCode", "room_code") || "",
+    roomName: readField(raw, "roomName", "room_name") || "",
+    ticketScope: normalizeScope(readField(raw, "scope", "ticketScope", "ticket_scope")),
     priority: readField(raw, "severity", "priority") || "MEDIUM",
     category: readField(raw, "category") || "OTHER",
     title: maintenanceDisplayText(readField(raw, "title") || "Phiếu sự cố"),
     description: maintenanceDisplayText(readField(raw, "description") || ""),
     status: normalizeStatus(readField(raw, "status")),
-    ticketStatus: normalizeStatus(readField(raw, "ticketStatus") ?? readField(raw, "status")),
-    ticketStatusLabel: readField(raw, "ticketStatusLabel") || "",
-    billingStatus: readField(raw, "billingStatus") || "",
-    billingStatusLabel: readField(raw, "billingStatusLabel") || "",
-    billingPeriod: readField(raw, "billingPeriod") || "",
-    invoiceId: readField(raw, "invoiceId"),
-    invoiceCode: readField(raw, "invoiceCode") || "",
-    invoiceStatus: readField(raw, "invoiceStatus") || "",
-    lineType: readField(raw, "lineType") || "",
-    chargeAmount: toNumber(readField(raw, "chargeAmount")),
-    checkoutUrl: readField(raw, "checkoutUrl") || "",
-    createdBy: normalizeUser(readField(raw, "createdBy")),
-    assignedTo: normalizeUser(readField(raw, "assignedTo")),
-    workerName: readField(raw, "repairmanName") || readField(raw, "workerName") || "",
-    repairmanPhone: readField(raw, "repairmanPhone") || "",
-    repairItems: readField(raw, "repairItems") || "",
-    rootCause: readField(raw, "rootCause") || "",
-    costAmount: toNumber(readField(raw, "actualCost") ?? readField(raw, "costAmount")),
-    costDescription: maintenanceDisplayText(readField(raw, "costDescription") || ""),
-    costResponsibility: readField(raw, "costResponsibility") || "UNDECIDED",
-    rejectionReason: readField(raw, "rejectionReason") || "",
-    createdAt: readField(raw, "createdAt") || "",
-    updatedAt: readField(raw, "updatedAt") || "",
-    completedAt: readField(raw, "completedAt") || "",
+    ticketStatus: normalizeStatus(readField(raw, "ticketStatus", "ticket_status", "status")),
+    ticketStatusLabel: readField(raw, "ticketStatusLabel", "ticket_status_label") || "",
+    billingStatus: readField(raw, "billingStatus", "billing_status") || "",
+    billingStatusLabel: readField(raw, "billingStatusLabel", "billing_status_label") || "",
+    billingPeriod: readField(raw, "billingPeriod", "billing_period") || "",
+    invoiceId: readField(raw, "invoiceId", "invoice_id"),
+    invoiceCode: readField(raw, "invoiceCode", "invoice_code") || "",
+    invoiceStatus: readField(raw, "invoiceStatus", "invoice_status") || "",
+    paymentStatus: readField(raw, "paymentStatus", "payment_status") || "",
+    chargeToTenant: Boolean(readField(raw, "chargeToTenant", "charge_to_tenant")),
+    payer: readField(raw, "payer", "paidBy", "paid_by") || "",
+    lineType: readField(raw, "lineType", "line_type") || "",
+    chargeAmount: toNumber(readField(raw, "chargeAmount", "charge_amount")),
+    checkoutUrl: readField(raw, "checkoutUrl", "checkout_url") || "",
+    createdBy: normalizeUser(readField(raw, "createdBy", "created_by")),
+    assignedTo: normalizeUser(readField(raw, "assignedTo", "assigned_to")),
+    workerName: readField(raw, "repairmanName", "repairman_name", "workerName", "worker_name") || "",
+    repairmanPhone: readField(raw, "repairmanPhone", "repairman_phone") || "",
+    repairItems: readField(raw, "repairItems", "repair_items") || "",
+    rootCause: readField(raw, "rootCause", "root_cause") || "",
+    costAmount: toNumber(readField(raw, "actualCost", "actual_cost", "costAmount", "cost_amount")),
+    costDescription: maintenanceDisplayText(readField(raw, "costDescription", "cost_description") || ""),
+    costResponsibility: readField(raw, "costResponsibility", "cost_responsibility") || "UNDECIDED",
+    rejectionReason: readField(raw, "rejectionReason", "rejection_reason") || "",
+    createdAt: readField(raw, "createdAt", "created_at") || "",
+    updatedAt: readField(raw, "updatedAt", "updated_at") || "",
+    completedAt: readField(raw, "completedAt", "completed_at") || "",
     beforeAttachments: attachments.before,
     afterAttachments: attachments.after,
     attachments: attachments.all,
@@ -235,6 +241,42 @@ export async function createMaintenanceTicket(payload) {
   }));
 }
 
+export async function createInternalMaintenanceTicket(payload) {
+  return normalizeTicket(await request("/maintenance/tickets/internal", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+export async function fetchInternalMaintenanceCosts({ page = 0, size = 10 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
+  const data = await request(`/maintenance/tickets/internal-costs?${params.toString()}`);
+  const rows = readPageItems(data);
+  const items = rows.map((item) => ({
+    ticketId: readField(item, "ticketId", "ticket_id"),
+    ticketCode: readField(item, "ticketCode", "ticket_code") || "",
+    propertyId: readField(item, "propertyId", "property_id"),
+    propertyName: readField(item, "propertyName", "property_name") || "",
+    roomId: readField(item, "roomId", "room_id"),
+    roomCode: readField(item, "roomCode", "room_code") || "",
+    category: readField(item, "category") || "OTHER",
+    ticketStatus: normalizeStatus(readField(item, "ticketStatus", "ticket_status")),
+    amount: toNumber(readField(item, "amount")),
+    payer: readField(item, "payer") || "LANDLORD",
+    billingStatus: readField(item, "billingStatus", "billing_status") || "NO_CHARGE",
+    accountingNote: readField(item, "accountingNote", "accounting_note") || "",
+    recordedAt: readField(item, "recordedAt", "recorded_at"),
+  }));
+  return {
+    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    items,
+  };
+}
+
 export async function createMaintenanceViolation(payload) {
   return request("/maintenance/violations", {
     method: "POST",
@@ -296,8 +338,8 @@ export async function uploadMaintenanceImage(file) {
   form.append("isSensitive", "false");
   const data = await request("/files/upload", { method: "POST", body: form });
   return {
-    fileId: readField(data, "fileId") ?? readField(data, "id"),
+    fileId: readField(data, "fileId", "file_id", "id"),
     url: resolveFileUrl(readField(data, "url") || ""),
-    originalFileName: readField(data, "originalFileName") || file.name,
+    originalFileName: readField(data, "originalFileName", "original_file_name") || file.name,
   };
 }

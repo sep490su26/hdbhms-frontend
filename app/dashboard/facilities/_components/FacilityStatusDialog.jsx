@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { facilityStatusOptions } from "../_data/mockFacilities";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -24,7 +24,6 @@ function getStatusLabel(status) {
     status
   );
 }
-
 function DialogIcon({ type }) {
   const variants = {
     blocked: {

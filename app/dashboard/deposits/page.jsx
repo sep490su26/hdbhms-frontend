@@ -26,6 +26,16 @@ import {
   updateDepositAgreementStatus,
   uploadSignedDepositContractFile,
 } from "@/services/depositContractsService";
+import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -37,7 +47,9 @@ const STATUS_OPTIONS = [
 ];
 
 const MANAGED_DEPOSIT_STATUSES = new Set(STATUS_OPTIONS.map((status) => status.value));
+const MANAGED_DEPOSIT_STATUS_VALUES = ["PAID", "CONFIRMED", "CONVERTED_TO_LEASE", "REFUNDED", "FORFEITED"];
 const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set(["PENDING_PAYMENT", "PAID", "CONFIRMED", "EXTENDED"]);
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
 const STATUS_LABELS = {
   PAID: STATUS_OPTIONS[0],
@@ -53,10 +65,7 @@ function formatMoney(value) {
 }
 
 function formatDate(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleDateString("vi-VN");
+  return formatDisplayDate(value);
 }
 
 function toInputDate(value) {
@@ -68,20 +77,33 @@ function toInputDate(value) {
 }
 
 function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value);
 }
 
 function getAgreementItems(response) {
   return response?.data || response?.content || response?.items || [];
+}
+
+function getAgreementPagination(response) {
+  return {
+    currentPage: Number(response?.currentPage || 1),
+    totalPages: Number(response?.totalPages || 0),
+    pageSize: Number(response?.pageSize || 10),
+    totalElements: Number(response?.totalElements || 0),
+  };
+}
+
+function getVisiblePages(currentPage, totalPages) {
+  if (totalPages <= 0) return [];
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function getDepositStatusFilterValues(statusFilter) {
+  if (statusFilter === "all") return MANAGED_DEPOSIT_STATUS_VALUES;
+  if (statusFilter === "PAID") return ["PAID", "CONFIRMED"];
+  return [statusFilter];
 }
 
 function normalizeSignatureStatusLabel(label, signatureStatus, signedFileId) {
@@ -610,21 +632,32 @@ export default function DepositsPage() {
   const [customerFilter, setCustomerFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [updatingId, setUpdatingId] = useState(null);
   const [uploadingSignedId, setUploadingSignedId] = useState(null);
 
   const loadAgreements = useCallback(async () => {
     try {
       setLoadError("");
-      const response = await fetchDepositAgreements({ size: 200 });
+      const response = await fetchDepositAgreements({
+        page: page - 1,
+        size,
+        statuses: getDepositStatusFilterValues(statusFilter),
+      });
+      const pagination = getAgreementPagination(response);
       const nextAgreements = getAgreementItems(response)
         .map(normalizeAgreement)
         .filter((agreement) => MANAGED_DEPOSIT_STATUSES.has(agreement.status));
       setAgreements(nextAgreements);
+      setTotalElements(pagination.totalElements);
+      setTotalPages(pagination.totalPages);
     } catch (error) {
       setLoadError(error.message || "Không tải được danh sách hợp đồng cọc từ backend.");
     }
-  }, []);
+  }, [page, size, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -650,12 +683,44 @@ export default function DepositsPage() {
       const matchStatus = statusFilter === "all" || item.status === statusFilter;
       const matchFloor = floorFilter === "all" || item.floorLabel === floorFilter;
       return matchCustomer && matchStatus && matchFloor;
+    }).sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
     });
   }, [agreements, customerFilter, floorFilter, statusFilter]);
 
   const paidAgreements = agreements.filter((item) => item.status === "PAID");
   const convertedAgreements = agreements.filter((item) => item.status === "CONVERTED_TO_LEASE");
   const totalAmount = paidAgreements.reduce((sum, item) => sum + item.amount, 0);
+  const visiblePages = useMemo(() => getVisiblePages(page, totalPages), [page, totalPages]);
+  const showingFrom = totalElements === 0 ? 0 : (page - 1) * size + 1;
+  const showingTo = Math.min(page * size, totalElements);
+
+  const goToPage = (nextPage) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    setPage(nextPage);
+  };
+
+  const handlePageSizeChange = (event) => {
+    setSize(Number(event.target.value));
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (event) => {
+    setStatusFilter(event.target.value);
+    setPage(1);
+  };
+
+  const handleCustomerFilterChange = (event) => {
+    setCustomerFilter(event.target.value);
+    setPage(1);
+  };
+
+  const handleFloorFilterChange = (event) => {
+    setFloorFilter(event.target.value);
+    setPage(1);
+  };
 
   const openDetails = async (agreement) => {
     if (!agreement?.id) return;
@@ -799,7 +864,7 @@ export default function DepositsPage() {
 
   return (
     <>
-      <section className="grid gap-6">
+      <section className="w-full min-w-0 flex flex-col gap-6">
         <header>
           <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-[#102033]">Danh sách hợp đồng đặt cọc</h1>
           <p className="mt-2 text-sm font-semibold text-[#6b7280]">
@@ -825,14 +890,14 @@ export default function DepositsPage() {
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] bg-white p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-          <div className="grid gap-4 xl:grid-cols-3 xl:items-end">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             <label className="grid gap-2">
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tên khách hàng</span>
               <span className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b909a]" />
                 <input
                   value={customerFilter}
-                  onChange={(event) => setCustomerFilter(event.target.value)}
+                  onChange={handleCustomerFilterChange}
                   placeholder="Nhập tên khách, SĐT, mã cọc..."
                   className="h-11 w-full rounded-lg border border-[#c4cad6] pl-10 pr-3 text-sm font-semibold text-[#102033] outline-none placeholder:text-[#8b909a] focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
                 />
@@ -842,8 +907,8 @@ export default function DepositsPage() {
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Trạng thái</span>
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                onChange={handleStatusFilterChange}
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Tất cả trạng thái</option>
                 {STATUS_OPTIONS.map((status) => (
@@ -855,8 +920,8 @@ export default function DepositsPage() {
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-[#4b5563]">Tầng</span>
               <select
                 value={floorFilter}
-                onChange={(event) => setFloorFilter(event.target.value)}
-                className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                onChange={handleFloorFilterChange}
+                className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
               >
                 <option value="all">Tất cả tầng</option>
                 {floorOptions.map((floor) => (
@@ -981,9 +1046,106 @@ export default function DepositsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex flex-col gap-3 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-[#5a6678] sm:flex-row sm:items-center sm:justify-between">
-            <span>Hiển thị {filteredAgreements.length} trong tổng số {agreements.length} hợp đồng</span>
-            <span className="rounded-md bg-[#4160ad] px-4 py-2 font-extrabold text-white">1</span>
+          <footer className="flex flex-col gap-4 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-[#5a6678] lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <span>
+                Hiển thị {filteredAgreements.length} dòng trên trang này, bản ghi {showingFrom}-{showingTo} trong tổng số {totalElements} hợp đồng
+              </span>
+              <label className="flex items-center gap-2 text-sm font-bold text-[#102033]">
+                <span>Số dòng/trang</span>
+                <select
+                  value={size}
+                  onChange={handlePageSizeChange}
+                  className="h-10 rounded-lg border border-[#c4cad6] bg-white px-3 text-sm font-bold text-[#102033] outline-none focus:border-[#4160ad] focus:ring-4 focus:ring-[#4160ad]/10"
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <Pagination className="mx-0 w-auto justify-start lg:justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    text="Trước"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goToPage(page - 1);
+                    }}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {visiblePages[0] > 1 && (
+                  <>
+                    <PaginationItem>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === 1}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          goToPage(1);
+                        }}
+                      >
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                    {visiblePages[0] > 2 && (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )}
+                  </>
+                )}
+                {visiblePages.map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink
+                      href="#"
+                      isActive={pageNumber === page}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        goToPage(pageNumber);
+                      }}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                {visiblePages[visiblePages.length - 1] < totalPages && (
+                  <>
+                    {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )}
+                    <PaginationItem>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === totalPages}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          goToPage(totalPages);
+                        }}
+                      >
+                        {totalPages}
+                      </PaginationLink>
+                    </PaginationItem>
+                  </>
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    text="Sau"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goToPage(page + 1);
+                    }}
+                    className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </footer>
         </section>
       </section>

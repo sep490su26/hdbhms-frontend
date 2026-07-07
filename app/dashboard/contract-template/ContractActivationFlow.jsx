@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCheck2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import ContractHandoverSection from "./ContractHandoverSection";
@@ -17,7 +17,7 @@ export default function ContractActivationFlow({
   onActivate,
 }) {
   const contractId = contract?.leaseContractId || contract?.contractId;
-  const currentFileId = contract?.contractFileId ?? null;
+  const leaseSignedFileId = contract?.signedFileId ?? contract?.signed_file_id ?? null;
   const creatingDraft = actionLoading === `draft-${contract?.depositAgreementId}`;
 
   // Handover section is hidden until the user clicks step 3 in the stepper.
@@ -40,11 +40,11 @@ export default function ContractActivationFlow({
 
   useEffect(() => {
     const prev = prevFileIdRef.current;
-    if (prev != null && currentFileId != null && prev !== currentFileId) {
+    if (prev != null && leaseSignedFileId != null && prev !== leaseSignedFileId) {
       setLeaseVersion((v) => v + 1);
     }
-    prevFileIdRef.current = currentFileId;
-  }, [currentFileId]);
+    prevFileIdRef.current = leaseSignedFileId;
+  }, [leaseSignedFileId]);
 
   function handleRequestShowHandover() {
     setShowHandover(true);
@@ -65,7 +65,7 @@ export default function ContractActivationFlow({
 
           {showHandover && (
             <ContractHandoverSection
-              key={`${contractId}-${currentFileId}-${handoverRefreshKey}`}
+              key={`${contractId}-${leaseSignedFileId}-${handoverRefreshKey}`}
               contractId={contractId}
               roomId={contract?.roomId || null}
               roomCode={contract?.roomCode || contract?.room?.roomCode}

@@ -77,7 +77,7 @@ function formatCountdown(remainingMs) {
 }
 
 function resolveExpiresAtMs(checkout) {
-  const parsed = new Date(checkout?.expiresAt || checkout?.expires_at || "").getTime();
+  const parsed = new Date(checkout?.expiresAt || "").getTime();
   return Number.isFinite(parsed) ? parsed : Date.now() + FALLBACK_HOLD_DURATION_MS;
 }
 
@@ -321,7 +321,13 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
   );
 }
 
-export function BatchDepositClient({ initialRooms = [] }) {
+function createDefaultRoomForms(rooms) {
+  return Object.fromEntries(
+    rooms.map((room) => [room.roomId, { occupantCount: 1, coOccupants: [] }]),
+  );
+}
+
+export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomIdsParam = searchParams.get("roomIds") || "";
@@ -331,9 +337,7 @@ export function BatchDepositClient({ initialRooms = [] }) {
   );
   const requestedRoomKey = requestedRoomIds.join(",");
   const [rooms, setRooms] = useState(initialRooms);
-  const [roomForms, setRoomForms] = useState(() => Object.fromEntries(
-    initialRooms.map((room) => [room.roomId, { occupantCount: 1, coOccupants: [] }]),
-  ));
+  const [roomForms, setRoomForms] = useState(() => createDefaultRoomForms(initialRooms));
   const [roomLookup, setRoomLookup] = useState(() => ({
     key: initialRooms.length > 0 ? requestedRoomKey : "",
     error: "",
@@ -360,7 +364,7 @@ export function BatchDepositClient({ initialRooms = [] }) {
   const [unavailableRooms, setUnavailableRooms] = useState([]);
   const [draftReady, setDraftReady] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingPayment, setCancellingPayment] = useState(false);
   const [remainingMs, setRemainingMs] = useState(null);
@@ -378,6 +382,30 @@ export function BatchDepositClient({ initialRooms = [] }) {
     const review = contractReviews[room.roomId];
     return review?.accepted && review.signature === contractSignature(room, form);
   });
+  const initialRoomKey = useMemo(
+    () => initialRooms.map((room) => String(room.roomId)).join(","),
+    [initialRooms],
+  );
+
+  useEffect(() => {
+    const nextRoomIds = new Set(initialRooms.map((room) => String(room.roomId)));
+    setRooms(initialRooms);
+    setRoomForms((current) => ({
+      ...createDefaultRoomForms(initialRooms),
+      ...Object.fromEntries(
+        Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
+      ),
+    }));
+    setContractReviews((current) => Object.fromEntries(
+      Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
+    ));
+    setUnavailableRooms((current) => current.filter((room) => nextRoomIds.has(String(room.roomId))));
+    setActiveContractRoomId((current) => (nextRoomIds.has(String(current)) ? current : null));
+  }, [initialRoomKey, initialRooms]);
+
+  useEffect(() => {
+    setError(initialError);
+  }, [initialError]);
 
   useEffect(() => {
     if (!requestedRoomKey) return undefined;
@@ -439,14 +467,14 @@ export function BatchDepositClient({ initialRooms = [] }) {
 
       // Fill form fields from profile if available, otherwise from draft
       const mappedForm = {
-        fullName: profileData?.person?.full_name || profileData?.person?.fullName || savedForm.fullName || "",
+        fullName: profileData?.person?.fullName || savedForm.fullName || "",
         dob: profileData?.person?.dob || savedForm.dob || "",
         phone: profileData?.person?.phone || savedForm.phone || "",
         email: profileData?.person?.email || savedForm.email || "",
-        idNumber: profileData?.identity_document?.doc_number || profileData?.identityDocument?.docNumber || profileData?.identity_document?.docNumber || savedForm.idNumber || "",
-        idIssueDate: profileData?.identity_document?.issued_date || profileData?.identityDocument?.issuedDate || profileData?.identity_document?.issuedDate || savedForm.idIssueDate || "",
-        idIssuePlace: profileData?.identity_document?.issued_place || profileData?.identityDocument?.issuedPlace || profileData?.identity_document?.issuedPlace || savedForm.idIssuePlace || "",
-        permanentAddress: profileData?.person?.permanent_address || profileData?.person?.permanentAddress || savedForm.permanentAddress || "",
+        idNumber: profileData?.identityDocument?.docNumber || savedForm.idNumber || "",
+        idIssueDate: profileData?.identityDocument?.issuedDate || savedForm.idIssueDate || "",
+        idIssuePlace: profileData?.identityDocument?.issuedPlace || savedForm.idIssuePlace || "",
+        permanentAddress: profileData?.person?.permanentAddress || savedForm.permanentAddress || "",
         expectedMoveInDate: savedForm.expectedMoveInDate || todayValue(1),
         expectedLeaseSignDate: savedForm.expectedLeaseSignDate || todayValue(1),
         paymentCycleMonths: savedForm.paymentCycleMonths || "1",
@@ -480,9 +508,9 @@ export function BatchDepositClient({ initialRooms = [] }) {
 
       // Fetch private files if profile is loaded
       if (profileData) {
-        const frontUrl = profileData.identity_document?.front_file_url || profileData.identityDocument?.frontFileUrl;
-        const backUrl = profileData.identity_document?.back_file_url || profileData.identityDocument?.backFileUrl;
-        const portraitUrl = profileData.person?.portrait_url || profileData.person?.portraitUrl;
+        const frontUrl = profileData.identityDocument?.frontFileUrl;
+        const backUrl = profileData.identityDocument?.backFileUrl;
+        const portraitUrl = profileData.person?.portraitUrl;
 
         if (frontUrl || backUrl || portraitUrl) {
           Promise.all([
@@ -603,12 +631,12 @@ export function BatchDepositClient({ initialRooms = [] }) {
             expectedMoveInDate: form.expectedMoveInDate,
             expectedLeaseSignDate: form.expectedLeaseSignDate,
           });
-          const canBook = Boolean(status?.canBook ?? status?.can_book);
+          const canBook = Boolean(status?.canBook);
           if (canBook) return null;
           return {
             roomId: room.roomId,
             roomCode: room.roomCode,
-            reason: status?.holdStatus ?? status?.hold_status ?? status?.roomStatus ?? status?.room_status,
+            reason: status?.holdStatus ?? status?.roomStatus,
             message: status?.message || `Phòng ${room.roomCode} hiện không thể đặt cọc.`,
           };
         } catch {
@@ -962,13 +990,13 @@ export function BatchDepositClient({ initialRooms = [] }) {
           || {};
         const mappedErrors = Object.entries(apiFieldErrors).reduce((result, [name, message]) => {
           const fieldName = {
-            expected_move_in_date: "expectedMoveInDate",
-            expected_lease_sign_date: "expectedLeaseSignDate",
-            payment_cycle_months: "paymentCycleMonths",
-            id_number: "idNumber",
-            id_issue_date: "idIssueDate",
-            id_issue_place: "idIssuePlace",
-            permanent_address: "permanentAddress",
+            expectedMoveInDate: "expectedMoveInDate",
+            expectedLeaseSignDate: "expectedLeaseSignDate",
+            paymentCycleMonths: "paymentCycleMonths",
+            idNumber: "idNumber",
+            idIssueDate: "idIssueDate",
+            idIssuePlace: "idIssuePlace",
+            permanentAddress: "permanentAddress",
           }[name] || name;
           result[fieldName] = String(message || "Dữ liệu không hợp lệ.");
           return result;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -18,8 +18,8 @@ import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
-import { facilityStatusOptions } from "../_data/mockFacilities";
-import { FacilityFloorPlanDesigner } from "./FacilityFloorPlanDesigner";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { facilityStatusOptions } from "@/services/facilityService";
 
 const statCards = [
   {
@@ -87,27 +87,56 @@ function ToastViewport({ toasts, onDismiss }) {
   );
 }
 
+function FacilityLoadingState() {
+  return (
+    <div className="grid gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-24 animate-pulse rounded-2xl border border-[#dbe1ea] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
+        />
+      ))}
+    </div>
+  );
+}
+
+function FacilityErrorState({ message, onRetry }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <ServerCrash className="mt-0.5 h-5 w-5 shrink-0" />
+        <div>
+          <p className="text-sm font-black">Không thể tải danh sách cơ sở</p>
+          <p className="mt-1 text-sm font-semibold">{message}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+      >
+        Thử lại
+      </button>
+    </div>
+  );
+}
+
 export function FacilityManagement() {
-  const facility = useFacilityManagement();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [designerFacility, setDesignerFacility] = useState(null);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+  const facility = useFacilityManagement({ keyword: query, status: statusFilter, page, size });
 
-  const visibleFacilities = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase("vi");
+  function updateQuery(value) {
+    setQuery(value);
+    setPage(1);
+  }
 
-    return facility.facilities.filter((item) => {
-      const matchesStatus =
-        statusFilter === "ALL" || item.status === statusFilter;
-      const matchesQuery =
-        !normalizedQuery ||
-        [item.name, item.code, item.address].some((value) =>
-          value.toLocaleLowerCase("vi").includes(normalizedQuery),
-        );
-
-      return matchesStatus && matchesQuery;
-    });
-  }, [facility.facilities, query, statusFilter]);
+  function updateStatus(value) {
+    setStatusFilter(value);
+    setPage(1);
+  }
 
   return (
     <>
@@ -167,14 +196,14 @@ export function FacilityManagement() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8490a3]" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => updateQuery(event.target.value)}
               placeholder="Tìm theo tên, mã hoặc địa chỉ cơ sở..."
               className="h-10 w-full rounded-lg border border-[#cbd3df] bg-[#f8fafc] pl-10 pr-4 text-sm font-medium text-[#091426] outline-none transition focus:border-[#091426] focus:bg-white focus:ring-2 focus:ring-[#091426]/10"
             />
           </label>
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(event) => updateStatus(event.target.value)}
             className="h-10 rounded-lg border border-[#cbd3df] bg-white px-3 text-sm font-bold text-[#243047] outline-none focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
             aria-label="Lọc trạng thái cơ sở"
           >
@@ -191,10 +220,21 @@ export function FacilityManagement() {
       </section>
 
       <FacilityList
-        facilities={visibleFacilities}
+        facilities={facility.facilities}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
-        onOpenDesigner={(item) => setDesignerFacility(item)}
+      />
+      <DashboardPagination
+        page={page}
+        size={size}
+        totalElements={facility.pagination.totalElements}
+        totalPages={facility.pagination.totalPages}
+        itemLabel="cơ sở"
+        onPageChange={setPage}
+        onSizeChange={(nextSize) => {
+          setSize(nextSize);
+          setPage(1);
+        }}
       />
       <FacilityFormDialog
         formState={facility.formState}
@@ -213,17 +253,6 @@ export function FacilityManagement() {
         toasts={facility.toasts}
         onDismiss={facility.dismissToast}
       />
-      {designerFacility && (
-  <FacilityFloorPlanDesigner
-    facility={designerFacility}
-    onClose={() => setDesignerFacility(null)}
-    onSave={(updatedFloors) => {
-      facility.updateFacilityFloors(designerFacility.id, updatedFloors); // call APi after
-      setDesignerFacility(null);
-      facility.pushToast("Đã lưu sơ đồ tầng thành công");
-    }}
-  />
-)}
     </>
   );
 }

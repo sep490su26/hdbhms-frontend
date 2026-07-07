@@ -41,6 +41,14 @@ import {
 
 const translateType = (type) => {
     const map = {
+        ROOM_TRANSFER: "Chuyển phòng",
+        MOVE_OUT: "Trả phòng",
+        PERMISSION_ACCESS: "Quyền truy cập",
+        TENANT_PROFILE_ACCESS: "Xem hồ sơ khách thuê",
+        METER_READING_CORRECTION: "Điều chỉnh chỉ số",
+        INVOICE_ADJUSTMENT: "Điều chỉnh hóa đơn",
+        RENT_PRICE_ADJUSTMENT: "Điều chỉnh giá thuê",
+        DEPOSIT_REFUND_REQUEST: "Hoàn cọc",
         TRANSFER: "Chuyển phòng",
         MOVEOUT: "Trả phòng",
         RENEWAL: "Gia hạn HĐ",
@@ -59,6 +67,12 @@ const mapRequestType = (type) => {
         MOVE_OUT: "MOVEOUT",
         CONTRACT_RENEWAL: "RENEWAL",
         CONTRACT_TERMINATION: "TERMINATION",
+        PERMISSION_ACCESS: "PERMISSION_ACCESS",
+        TENANT_PROFILE_ACCESS: "TENANT_PROFILE_ACCESS",
+        METER_READING_CORRECTION: "METER_READING_CORRECTION",
+        INVOICE_ADJUSTMENT: "INVOICE_ADJUSTMENT",
+        RENT_PRICE_ADJUSTMENT: "RENT_PRICE_ADJUSTMENT",
+        DEPOSIT_REFUND_REQUEST: "DEPOSIT_REFUND_REQUEST",
         MAINTENANCE: "MAINTENANCE",
         COMPLAINT: "COMPLAINT",
         ACCESS_REQUEST: "ACCESS",
@@ -85,6 +99,12 @@ const TYPE_CONFIG = {
     MAINTENANCE: { color: "bg-emerald-50", icon: <Wrench className="w-5 h-5 text-emerald-500" />, accent: "emerald" },
     COMPLAINT: { color: "bg-blue-50", icon: <MessageSquareWarning className="w-5 h-5 text-blue-500" />, accent: "blue" },
     ACCESS: { color: "bg-orange-50", icon: <Key className="w-5 h-5 text-orange-500" />, accent: "orange" },
+    PERMISSION_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" />, accent: "gray" },
+    TENANT_PROFILE_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" />, accent: "gray" },
+    METER_READING_CORRECTION: { color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500" />, accent: "cyan" },
+    INVOICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
+    RENT_PRICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
+    DEPOSIT_REFUND_REQUEST: { color: "bg-green-50", icon: <FileCheck2 className="w-5 h-5 text-green-500" />, accent: "green" },
 };
 
 const translateTransferStatus = (status) => {
@@ -589,7 +609,23 @@ export default function ApprovalCenter() {
             setTotalPages(dataRes.totalPages || 1);
 
             if (statsRes) {
-                const colors = { TRANSFER: "#3B82F6", MOVEOUT: "#22C55E", TERMINATION: "#FACC15", MAINTENANCE: "#A855F7", COMPLAINT: "#F472B6", ACCESS: "#9CA3AF", RENEWAL: "#6366F1" };
+                const colors = {
+                    ROOM_TRANSFER: "#3B82F6",
+                    MOVE_OUT: "#22C55E",
+                    PERMISSION_ACCESS: "#9CA3AF",
+                    TENANT_PROFILE_ACCESS: "#9CA3AF",
+                    METER_READING_CORRECTION: "#06B6D4",
+                    INVOICE_ADJUSTMENT: "#6366F1",
+                    RENT_PRICE_ADJUSTMENT: "#6366F1",
+                    DEPOSIT_REFUND_REQUEST: "#22C55E",
+                    TRANSFER: "#3B82F6",
+                    MOVEOUT: "#22C55E",
+                    TERMINATION: "#FACC15",
+                    MAINTENANCE: "#A855F7",
+                    COMPLAINT: "#F472B6",
+                    ACCESS: "#9CA3AF",
+                    RENEWAL: "#6366F1",
+                };
                 const breakdown = (statsRes.breakdown || []).map(b => ({
                     ...b,
                     label: translateType(b.type),
@@ -1335,7 +1371,7 @@ export default function ApprovalCenter() {
                                     </TableRow>
                                 ) : (
                                     data.map((req) => {
-                                        const tc = TYPE_CONFIG[req.requestType] || TYPE_CONFIG.ACCESS;
+                                        const tc = TYPE_CONFIG[mapRequestType(req.requestType)] || TYPE_CONFIG.ACCESS;
                                         return (
                                             <TableRow key={req.id} className="border-slate-100 transition-colors hover:bg-slate-50/60">
                                                 <TableCell className="px-3 py-3 align-top">
@@ -1422,7 +1458,7 @@ export default function ApprovalCenter() {
                                 </div>
                             ) : (
                                 data.map((req) => {
-                                    const tc = TYPE_CONFIG[req.requestType] || TYPE_CONFIG.ACCESS;
+                                    const tc = TYPE_CONFIG[mapRequestType(req.requestType)] || TYPE_CONFIG.ACCESS;
                                     return (
                                         <div key={req.id} className="p-4 space-y-3">
                                             <div className="flex items-start justify-between gap-3">

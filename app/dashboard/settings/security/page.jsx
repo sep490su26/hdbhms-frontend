@@ -268,7 +268,7 @@ export default function SecuritySettingsPage() {
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#091426]" />
               Avoid reusing passwords from other accounts.
             </li>
-            
+
           </ul>
         </aside>
       </section>

@@ -95,7 +95,9 @@ function SectionTitle({ icon: Icon, title, action }) {
 function StatBlock({ label, value }) {
   return (
     <div className="rounded-lg bg-[#eef3ff] px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">
+        {label}
+      </p>
       <p className="mt-1 text-sm font-bold text-[#0f172a]">{value}</p>
     </div>
   );
@@ -106,14 +108,22 @@ function AttachmentTile({ item }) {
     return (
       <div className="flex h-full min-h-[160px] flex-col items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-[#fafbff] p-4 text-center">
         <FileVideo className="h-9 w-9 text-[#6b7280]" />
-        <p className="mt-4 max-w-[160px] break-words text-xs font-semibold text-[#475569]">{item.label}</p>
+        <p className="mt-4 max-w-[160px] break-words text-xs font-semibold text-[#475569]">
+          {item.label}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="relative h-full min-h-[160px] overflow-hidden rounded-lg border border-[#d9e1ef] bg-[#eef2ff]">
-      <Image src={item.src} alt={item.label} fill className="object-cover" sizes="(max-width: 768px) 50vw, 240px" />
+      <Image
+        src={item.src}
+        alt={item.label}
+        fill
+        className="object-cover"
+        sizes="(max-width: 768px) 50vw, 240px"
+      />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f172a]/70 to-transparent px-3 py-3">
         <p className="text-xs font-semibold text-white">{item.label}</p>
       </div>
@@ -142,10 +152,14 @@ function Timeline({ currentIndex }) {
               >
                 {done ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
               </span>
-              {index < timelineBase.length - 1 && <span className="mt-2 h-full w-px bg-white/10" />}
+              {index < timelineBase.length - 1 && (
+                <span className="mt-2 h-full w-px bg-white/10" />
+              )}
             </div>
             <div className="min-w-0 pb-2">
-              <p className={`text-sm font-bold ${active ? "text-white" : done ? "text-slate-100" : "text-slate-400"}`}>
+              <p
+                className={`text-sm font-bold ${active ? "text-white" : done ? "text-slate-100" : "text-slate-400"}`}
+              >
                 {step.label}
               </p>
               <p className="mt-1 text-xs text-slate-400">{step.time}</p>
@@ -171,11 +185,16 @@ function RatingStars() {
 export default function MaintenanceDetailTestPage() {
   const [currentStage, setCurrentStage] = useState(1);
   const [status, setStatus] = useState("Đang xử lý");
-  const [notice, setNotice] = useState("Ticket đã được gắn vào luồng test để bạn kiểm tra UI.");
+  const [notice, setNotice] = useState(
+    "Ticket đã được gắn vào luồng test để bạn kiểm tra UI.",
+  );
 
   const summary = useMemo(
     () => ({
-      totalCost: repairItems.reduce((sum, item) => sum + item.quantity * item.price, 0),
+      totalCost: repairItems.reduce(
+        (sum, item) => sum + item.quantity * item.price,
+        0,
+      ),
       stageLabel: timelineBase[currentStage]?.label || status,
     }),
     [currentStage, status],
@@ -221,7 +240,9 @@ export default function MaintenanceDetailTestPage() {
             </span>
             <div>
               <p className="text-sm font-bold text-[#0f172a]">{notice}</p>
-              <p className="mt-1 text-xs text-[#64748b]">Đồng bộ lần cuối 2 phút trước.</p>
+              <p className="mt-1 text-xs text-[#64748b]">
+                Đồng bộ lần cuối 2 phút trước.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-[#64748b]">
@@ -235,8 +256,12 @@ export default function MaintenanceDetailTestPage() {
             <section className="flex flex-col gap-4 rounded-xl border border-[#d9e1ef] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-black tracking-[-0.02em] text-[#0f172a]">Ticket T-1002</h1>
-                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${progressTone}`}>
+                  <h1 className="text-2xl font-black tracking-[-0.02em] text-[#0f172a]">
+                    Ticket T-1002
+                  </h1>
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${progressTone}`}
+                  >
                     {status}
                   </span>
                 </div>
@@ -273,10 +298,13 @@ export default function MaintenanceDetailTestPage() {
                 <StatBlock label="Vị trí/Phòng" value="P.102 (Tầng 1)" />
               </div>
               <div className="mt-4 rounded-lg bg-[#f8fbff] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">Mô tả</p>
+                <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                  Mô tả
+                </p>
                 <p className="mt-2 text-sm leading-6 text-[#334155]">
-                  Đèn nhấp nháy liên tục ở khu vực phòng khách. Người thuê báo cáo tình trạng này xảy ra thường
-                  xuyên khi bật điều hòa. Có thể do lỏng kết nối từ trần hoặc hỏng chấn lưu LED.
+                  Đèn nhấp nháy liên tục ở khu vực phòng khách. Người thuê báo
+                  cáo tình trạng này xảy ra thường xuyên khi bật điều hòa. Có
+                  thể do lỏng kết nối từ trần hoặc hỏng chấn lưu LED.
                 </p>
               </div>
             </Card>
@@ -304,8 +332,12 @@ export default function MaintenanceDetailTestPage() {
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#eef3ff] text-[#3556a8]">
                   <Camera className="h-6 w-6" />
                 </div>
-                <p className="mt-4 text-sm font-bold text-[#334155]">Chưa có ảnh sau khi sửa chữa</p>
-                <p className="mt-1 text-xs text-[#64748b]">Thêm ảnh hoàn tất để khách thuê dễ đối chiếu.</p>
+                <p className="mt-4 text-sm font-bold text-[#334155]">
+                  Chưa có ảnh sau khi sửa chữa
+                </p>
+                <p className="mt-1 text-xs text-[#64748b]">
+                  Thêm ảnh hoàn tất để khách thuê dễ đối chiếu.
+                </p>
                 <button
                   type="button"
                   className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#c9d4ea] bg-white px-4 py-2 text-sm font-bold text-[#0f172a] hover:bg-[#f7faff]"
@@ -320,20 +352,27 @@ export default function MaintenanceDetailTestPage() {
               <SectionTitle icon={Wrench} title="Chi tiết thực hiện" />
               <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                 <div className="rounded-xl border border-[#e2e8f0] bg-[#fbfcff] p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">Thợ sửa</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                    Thợ sửa
+                  </p>
                   <div className="mt-3 flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-black text-[#1d4ed8]">
                       NV
                     </span>
                     <div>
-                      <p className="text-sm font-bold text-[#0f172a]">Nguyễn Văn A</p>
+                      <p className="text-sm font-bold text-[#0f172a]">
+                        Nguyễn Văn A
+                      </p>
                       <p className="text-xs text-[#64748b]">Thợ điện báo cáo</p>
                     </div>
                   </div>
 
                   <div className="mt-4 divide-y divide-[#e2e8f0]">
                     {repairItems.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between gap-4 py-2 text-sm">
+                      <div
+                        key={item.name}
+                        className="flex items-center justify-between gap-4 py-2 text-sm"
+                      >
                         <span className="text-[#334155]">{item.name}</span>
                         <span className="shrink-0 font-bold text-[#0f172a]">
                           {item.quantity} x {moneyFormat(item.price)}
@@ -344,11 +383,15 @@ export default function MaintenanceDetailTestPage() {
                 </div>
 
                 <div className="rounded-xl bg-[#eef3ff] p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">Tổng chi phí thực tế</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                    Tổng chi phí thực tế
+                  </p>
                   <p className="mt-3 text-4xl font-black tracking-[-0.03em] text-[#163fa3]">
                     {moneyFormat(summary.totalCost)}
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-[#3556a8]">VND</p>
+                  <p className="mt-2 text-sm font-semibold text-[#3556a8]">
+                    VND
+                  </p>
                 </div>
               </div>
             </Card>
@@ -360,7 +403,8 @@ export default function MaintenanceDetailTestPage() {
                   <RatingStars />
                 </div>
                 <p className="mt-4 text-center text-sm italic leading-6 text-[#475569]">
-                  “Khách thuê chưa gửi đánh giá. Yêu cầu đánh giá sẽ được gửi sau khi hoàn tất.”
+                  “Khách thuê chưa gửi đánh giá. Yêu cầu đánh giá sẽ được gửi
+                  sau khi hoàn tất.”
                 </p>
               </div>
             </Card>
@@ -370,7 +414,9 @@ export default function MaintenanceDetailTestPage() {
             <Card className="overflow-hidden bg-[#0f172a] text-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
               <div className="border-b border-white/10 px-5 py-4">
                 <p className="text-sm font-bold">Tiến độ xử lý</p>
-                <p className="mt-1 text-xs text-slate-400">Theo dõi trạng thái ticket theo từng mốc.</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Theo dõi trạng thái ticket theo từng mốc.
+                </p>
               </div>
 
               <div className="px-5 py-5">
@@ -403,7 +449,9 @@ export default function MaintenanceDetailTestPage() {
                   <Clock3 className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-[#0f172a]">Mốc hiện tại</p>
+                  <p className="text-sm font-bold text-[#0f172a]">
+                    Mốc hiện tại
+                  </p>
                   <p className="text-xs text-[#64748b]">{summary.stageLabel}</p>
                 </div>
               </div>

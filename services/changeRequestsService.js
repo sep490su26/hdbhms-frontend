@@ -50,12 +50,22 @@ async function request(path, options = {}) {
     return payload;
 }
 
+function parseRequestPayload(payload) {
+    if (!payload) return {};
+    if (typeof payload === "object") return payload;
+    try {
+        return JSON.parse(payload);
+    } catch {
+        return {};
+    }
+}
+
 export async function fetchChangeRequests(filters = {}) {
     const { page = 0, size = 8, type = "all", status = "all", search = "" } = filters;
-    const params = new URLSearchParams({ 
-        page: String(page), 
-        size: String(size), 
-        sort: "createdAt,desc" 
+    const params = new URLSearchParams({
+        page: String(page),
+        size: String(size),
+        sort: "createdAt,desc"
     });
     
     if (type && type !== "all") {
@@ -72,6 +82,8 @@ export async function fetchChangeRequests(filters = {}) {
         id: r.id,
         requestCode: r.requestCode,
         requestType: r.requestType,
+        targetType: r.targetType,
+        targetId: r.targetId,
         title: r.title,
         description: r.description,
         status: r.status,
@@ -80,7 +92,7 @@ export async function fetchChangeRequests(filters = {}) {
         resolutionNote: r.resolutionNote,
         resolvedAt: r.resolvedAt,
         createdAt: r.createdAt,
-        requestPayload: r.requestPayload,
+        requestPayload: parseRequestPayload(r.requestPayload),
     }));
     
     return {
@@ -104,8 +116,11 @@ export async function fetchChangeRequestStats() {
     };
 }
 
-export async function approveChangeRequest(id) {
-    return await request(`/change-requests/${id}/approve`, { method: "POST" });
+export async function approveChangeRequest(id, durationCode) {
+    return await request(`/change-requests/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify(durationCode ? { durationCode } : {}),
+    });
 }
 
 export async function rejectChangeRequest(id, resolutionNote) {

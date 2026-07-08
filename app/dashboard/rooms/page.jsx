@@ -283,7 +283,7 @@ const STATUS_META = {
     dot: "bg-emerald-500",
     badge:
       "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
-    card: "border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/80 text-emerald-900 dark:text-emerald-300",
+    card: "border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/80 dark:bg-slate-800/80 text-emerald-900 dark:text-emerald-300",
     icon: "text-emerald-600 dark:text-emerald-300",
   },
   OCCUPIED: {
@@ -464,7 +464,7 @@ function FloorSummary({ rooms }) {
       {
         label: "Phòng trống",
         value: count("VACANT"),
-        tone: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        tone: "bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
         icon: BedDouble,
       },
       {

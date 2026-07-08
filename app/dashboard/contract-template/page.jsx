@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   AlertTriangle,
@@ -17,7 +18,6 @@ import {
   Printer,
   RefreshCw,
   Save,
-  Search,
   Upload,
   Users,
   X,
@@ -52,17 +52,18 @@ import { DashboardPagination } from "@/components/dashboard/DashboardPagination"
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const STATUS_FILTERS = [
-  { id: "current", label: "Hợp đồng hiện tại" },
   { id: "all", label: "Tất cả" },
-  { id: "PENDING", label: "Chờ ký / kích hoạt" },
-  { id: "ACTIVE", label: "Đang hiệu lực" },
-  { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
-  { id: "EXPIRED", label: "Hết hạn" },
-  { id: "RENEWED", label: "Đã gia hạn" },
-  { id: "LIQUIDATED", label: "Đã thanh lý" },
+  { id: "PENDING_SIGNATURE", label: "Chờ ký" },
+  { id: "SIGNED", label: "Đã ký" },
+  { id: "OVERDUE", label: "Quá hạn" },
 ];
 
-const HISTORY_FILTER = { id: "history", label: "Lịch sử" };
+const TIME_QUARTERS = [
+  { id: "Q1", label: "Quý 1", months: [1, 2, 3] },
+  { id: "Q2", label: "Quý 2", months: [4, 5, 6] },
+  { id: "Q3", label: "Quý 3", months: [7, 8, 9] },
+  { id: "Q4", label: "Quý 4", months: [10, 11, 12] },
+];
 
 const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "PENDING_SIGNATURE",
@@ -71,13 +72,6 @@ const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "ACTIVE",
   "EXPIRING_SOON",
   "EXPIRED",
-]);
-
-const HISTORY_CONTRACT_WORKFLOWS = new Set([
-  "RENEWED",
-  "LIQUIDATED",
-  "CANCELLED",
-  "AUTO_TERMINATED",
 ]);
 
 const ACTIVATION_FLOW_WORKFLOWS = new Set([
@@ -349,12 +343,6 @@ function isContractShorterThanCycle(startDate, endDate, cycleMonths) {
   return end < minimumEnd;
 }
 
-function normalizeKeyword(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
 function getContractRowKey(item, index) {
   if (item.sourceType === "CONTRACT" && item.contractId)
     return `contract-${item.contractId}`;
@@ -407,6 +395,81 @@ function getWorkflow(item) {
   return "PENDING_SIGNATURE";
 }
 
+function getContractType(item = {}) {
+  return item?.leaseContractId || item?.contractId ? "lease" : "deposit";
+}
+
+function getContractDateValue(item = {}) {
+  return (
+    item.createdAt ||
+    item.created_at ||
+    item.startDate ||
+    item.expectedLeaseSignDate ||
+    item.expectedMoveInDate ||
+    item.depositCreatedAt ||
+    item.updatedAt ||
+    null
+  );
+}
+
+function getContractTimestamp(item = {}) {
+  const timestamp = new Date(getContractDateValue(item) || 0).getTime();
+  if (Number.isFinite(timestamp) && timestamp > 0) return timestamp;
+  return Number(
+    item.leaseContractId || item.depositAgreementId || item.id || 0,
+  );
+}
+
+function getContractYear(item = {}) {
+  const date = new Date(getContractDateValue(item) || "");
+  return Number.isNaN(date.getTime()) ? "" : String(date.getFullYear());
+}
+
+function getContractMonth(item = {}) {
+  const date = new Date(getContractDateValue(item) || "");
+  return Number.isNaN(date.getTime()) ? "" : String(date.getMonth() + 1);
+}
+
+function getContractQuarter(item = {}) {
+  const month = Number(getContractMonth(item));
+  if (!month) return "";
+  return `Q${Math.ceil(month / 3)}`;
+}
+
+function getQuarterForTimeFilter(value) {
+  if (TIME_QUARTERS.some((quarter) => quarter.id === value)) return value;
+  if (String(value || "").startsWith("M")) {
+    const month = Number(String(value).slice(1));
+    return (
+      TIME_QUARTERS.find((quarter) => quarter.months.includes(month))?.id ||
+      "Q1"
+    );
+  }
+  return "Q1";
+}
+
+function getTimeFilterLabel(value) {
+  if (value === "all") return "Cả năm";
+  const quarter = TIME_QUARTERS.find((item) => item.id === value);
+  if (quarter) return quarter.label;
+  if (String(value || "").startsWith("M")) {
+    return `Tháng ${String(value).slice(1)}`;
+  }
+  return "Cả năm";
+}
+
+function isOverdueContract(item = {}) {
+  const workflow = getWorkflow(item);
+  if (workflow === "EXPIRED") return true;
+  if (
+    ["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(workflow)
+  )
+    return false;
+  if (!item.endDate) return false;
+  const end = new Date(`${toDateInputValue(item.endDate)}T23:59:59`);
+  return !Number.isNaN(end.getTime()) && end < new Date();
+}
+
 function getLeaseSignedFileId(item = {}) {
   return (
     item?.signedFileId ??
@@ -440,15 +503,16 @@ function hasSignedHandoverDocument(handover) {
 function matchesStatusFilter(item, statusFilter) {
   const workflow = getWorkflow(item);
   if (statusFilter === "all") return true;
-  if (statusFilter === "current")
-    return CURRENT_CONTRACT_WORKFLOWS.has(workflow);
-  if (statusFilter === "history")
-    return HISTORY_CONTRACT_WORKFLOWS.has(workflow);
-  if (statusFilter === "PENDING") {
-    return ["PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(
-      workflow,
+  if (statusFilter === "PENDING_SIGNATURE") {
+    return ["PENDING_SIGNATURE", "MISSING_FILE"].includes(workflow);
+  }
+  if (statusFilter === "SIGNED") {
+    return (
+      Boolean(getLeaseSignedFileId(item)) ||
+      ["ACTIVE", "EXPIRING_SOON", "PENDING_ACTIVATION"].includes(workflow)
     );
   }
+  if (statusFilter === "OVERDUE") return isOverdueContract(item);
   return (
     workflow === statusFilter ||
     item.status === statusFilter ||
@@ -552,6 +616,7 @@ function InfoValue({ label, value }) {
 }
 
 export default function ContractTemplatePage() {
+  const searchParams = useSearchParams();
   const fileInputRef = useRef(null);
   const [contracts, setContracts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -561,9 +626,12 @@ export default function ContractTemplatePage() {
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("current");
-  const [fileFilter, setFileFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("all");
+  const [timePopoverOpen, setTimePopoverOpen] = useState(false);
+  const [timePanelQuarter, setTimePanelQuarter] = useState("Q1");
+  const [roomFilter, setRoomFilter] = useState("all");
+  const [contractTypeFilter, setContractTypeFilter] = useState("all");
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [termsForm, setTermsForm] = useState(buildTermsForm());
   const [termsError, setTermsError] = useState("");
@@ -585,6 +653,9 @@ export default function ContractTemplatePage() {
   const [size, setSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
+  const [cleanupStep, setCleanupStep] = useState(1);
+  const selectedYear = searchParams.get("year") || "all";
 
   async function loadContracts() {
     setLoading(true);
@@ -649,6 +720,7 @@ export default function ContractTemplatePage() {
         if (workflow === "ACTIVE") acc.active += 1;
         if (workflow === "PENDING_SIGNATURE") acc.pendingSignature += 1;
         if (workflow === "PENDING_ACTIVATION") acc.pendingActivation += 1;
+        if (isOverdueContract(item)) acc.overdue += 1;
         if (!getLeaseSignedFileId(item)) acc.missingFile += 1;
         return acc;
       },
@@ -657,38 +729,65 @@ export default function ContractTemplatePage() {
         pendingSignature: 0,
         pendingActivation: 0,
         active: 0,
+        overdue: 0,
         missingFile: 0,
       },
     );
   }, [contracts]);
 
+  const roomOptions = useMemo(() => {
+    return [
+      ...new Set(contracts.map((item) => item.roomCode).filter(Boolean)),
+    ].sort((a, b) => String(a).localeCompare(String(b), "vi"));
+  }, [contracts]);
+
+  const activeTimeLabel = useMemo(
+    () => getTimeFilterLabel(timeFilter),
+    [timeFilter],
+  );
+
+  const visibleTimeQuarter = useMemo(() => {
+    return (
+      TIME_QUARTERS.find((quarter) => quarter.id === timePanelQuarter) ||
+      TIME_QUARTERS[0]
+    );
+  }, [timePanelQuarter]);
+
   const filteredContracts = useMemo(() => {
-    const search = normalizeKeyword(keyword);
-    return contracts.filter((item) => {
-      const searchable = [
-        item.displayCode,
-        item.contractCode,
-        item.depositCode,
-        item.roomCode,
-        item.propertyName,
-        item.primaryTenantName,
-        item.customerName,
-        item.phone,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    return contracts
+      .filter((item) => {
+        const matchesStatus = matchesStatusFilter(item, statusFilter);
+        const matchesYear =
+          selectedYear === "all" || getContractYear(item) === selectedYear;
+        const contractMonth = getContractMonth(item);
+        const contractQuarter = getContractQuarter(item);
+        const matchesTime =
+          timeFilter === "all" ||
+          contractQuarter === timeFilter ||
+          `M${contractMonth}` === timeFilter;
+        const matchesRoom =
+          roomFilter === "all" || item.roomCode === roomFilter;
+        const matchesContractType =
+          contractTypeFilter === "all" ||
+          getContractType(item) === contractTypeFilter;
 
-      const matchesSearch = !search || searchable.includes(search);
-      const matchesStatus = matchesStatusFilter(item, statusFilter);
-      const matchesFile =
-        fileFilter === "all" ||
-        (fileFilter === "uploaded" && getLeaseSignedFileId(item)) ||
-        (fileFilter === "missing" && !getLeaseSignedFileId(item));
-
-      return matchesSearch && matchesStatus && matchesFile;
-    });
-  }, [contracts, fileFilter, keyword, statusFilter]);
+        return (
+          matchesStatus &&
+          matchesYear &&
+          matchesTime &&
+          matchesRoom &&
+          matchesContractType
+        );
+      })
+      .sort((a, b) => getContractTimestamp(b) - getContractTimestamp(a));
+  }, [
+    contractTypeFilter,
+    contracts,
+    roomFilter,
+    selectedYear,
+    statusFilter,
+    timeFilter,
+  ]);
 
   const mergedSelected = useMemo(() => {
     if (!selected) return null;
@@ -1360,6 +1459,90 @@ export default function ContractTemplatePage() {
     }
   }
 
+  function openTimePopover() {
+    setTimePanelQuarter(getQuarterForTimeFilter(timeFilter));
+    setTimePopoverOpen((current) => !current);
+  }
+
+  function selectTimeFilter(value) {
+    setTimeFilter(value);
+    setTimePanelQuarter(getQuarterForTimeFilter(value));
+    setTimePopoverOpen(false);
+  }
+
+  function handleExportExcel() {
+    const exportScope = [
+      selectedYear === "all" ? "tat-ca-nam" : `nam-${selectedYear}`,
+      timeFilter === "all" ? "tat-ca-thoi-gian" : timeFilter.toLowerCase(),
+      roomFilter === "all" ? "tat-ca-phong" : `phong-${roomFilter}`,
+      contractTypeFilter === "all"
+        ? "tat-ca-loai"
+        : contractTypeFilter === "lease"
+          ? "hop-dong-thue"
+          : "hop-dong-coc",
+    ].join("-");
+    const header = [
+      "Ma HD",
+      "Loai HD",
+      "Phong",
+      "Nguoi ky chinh",
+      "So nguoi",
+      "Ngay bat dau",
+      "Ngay ket thuc",
+      "Gia thue",
+      "Trang thai",
+    ];
+    const rows = filteredContracts.map((item) => [
+      getContractDisplayName(item),
+      getContractType(item) === "lease" ? "Thue" : "Coc",
+      item.roomCode || "",
+      item.primaryTenantName || item.customerName || "",
+      getOccupantsCount(item),
+      formatDate(item.startDate || item.expectedLeaseSignDate),
+      formatDate(item.endDate || item.expectedMoveInDate),
+      formatMoney(item.monthlyRent),
+      getStatusLabel(item),
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "application/vnd.ms-excel;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `danh-sach-hop-dong-${exportScope}.xls`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function openCleanupModal() {
+    setCleanupStep(1);
+    setCleanupModalOpen(true);
+  }
+
+  function closeCleanupModal() {
+    setCleanupModalOpen(false);
+    setCleanupStep(1);
+  }
+
+  function confirmCleanupPreview() {
+    setCleanupStep(2);
+  }
+
+  function confirmCleanupFinal() {
+    setCleanupModalOpen(false);
+    setCleanupStep(1);
+    toast.success(
+      "Đã xác nhận yêu cầu dọn dữ liệu cũ. Backend sẽ xử lý khi endpoint được kết nối.",
+    );
+  }
+
   const isBusy = Boolean(actionLoading);
   const stepperVisible =
     mergedSelected &&
@@ -1383,13 +1566,10 @@ export default function ContractTemplatePage() {
       />
 
       <section className="flex flex-col gap-2">
-        <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-          Quản lý hợp đồng thuê
+        <h1 className="mt-2 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+          Quản lý hợp đồng thuê{" "}
+          {selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời
-          hợp đồng thuê.
-        </p>
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3 xl:gap-4">
@@ -1405,12 +1585,12 @@ export default function ContractTemplatePage() {
           value={summary.pendingSignature}
           tone="amber"
         />
-        <DashboardStatCard
+        {/* <DashboardStatCard
           icon={RefreshCw}
           label="Chờ kích hoạt"
           value={summary.pendingActivation}
           tone="blue"
-        />
+        /> */}
         <DashboardStatCard
           icon={CheckCircle2}
           label="Đang hiệu lực"
@@ -1418,73 +1598,18 @@ export default function ContractTemplatePage() {
           tone="green"
         />
         <DashboardStatCard
+          icon={AlertTriangle}
+          label="Quá hạn"
+          value={summary.overdue}
+          tone="orange"
+          subtitle="Cần xử lý"
+        />
+        <DashboardStatCard
           icon={FileWarning}
           label="Chưa có file"
           value={summary.missingFile}
           tone="red"
         />
-      </section>
-
-      <section className="rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          <label className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
-            <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="Tìm mã HĐ, phòng hoặc người ký..."
-              className="h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-10 pr-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
-            />
-          </label>
-          <label className="relative">
-            <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
-            <select
-              value={fileFilter}
-              onChange={(event) => setFileFilter(event.target.value)}
-              className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-9 pr-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
-            >
-              <option value="all">Tất cả file</option>
-              <option value="uploaded">Đã upload</option>
-              <option value="missing">Chưa upload</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={loadContracts}
-            disabled={loading}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-extrabold text-white transition hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Làm mới
-          </button>
-        </div>
-        <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {STATUS_FILTERS.map((filter) => (
-              <button
-                key={filter.id}
-                type="button"
-                onClick={() => setStatusFilter(filter.id)}
-                className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
-                  statusFilter === filter.id
-                    ? "border-[#1e40af] bg-[#1e40af] dark:bg-[#2563eb] text-white"
-                    : "border-[#d7deea] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-500 dark:text-slate-400 hover:border-[#9ba8ba] hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex justify-end lg:w-[130px] lg:shrink-0">
-            <button
-              type="button"
-              onClick={() => setStatusFilter(HISTORY_FILTER.id)}
-              className="h-11 shrink-0 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-extrabold text-white transition hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
-            >
-              {HISTORY_FILTER.label}
-            </button>
-          </div>
-        </div>
       </section>
 
       {error && (
@@ -1501,13 +1626,159 @@ export default function ContractTemplatePage() {
 
       <section className="overflow-hidden rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
         <header className="border-b border-[#dfe5ef] dark:border-white/10 px-5 py-5 xl:px-8 xl:py-7">
-          <h2 className="text-xl font-extrabold tracking-[-0.01em] text-slate-900 dark:text-white xl:text-2xl">
-            Danh sách hợp đồng
-          </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 xl:text-base">
-            Quản lý hợp đồng thuê, file scan/PDF và trạng thái vòng đời hợp
-            đồng.
-          </p>
+          <div>
+            <h2 className="text-xl font-extrabold tracking-[-0.01em] text-slate-900 dark:text-white xl:text-2xl">
+              Danh sách hợp đồng
+            </h2>
+          </div>
+
+          <div className="mt-3 border-t border-[#edf1f6] pt-4 dark:border-white/10">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {STATUS_FILTERS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setStatusFilter(filter.id)}
+                    className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
+                      statusFilter === filter.id
+                        ? "border-[#1e40af] bg-[#1e40af] text-white dark:bg-[#2563eb]"
+                        : "border-[#d7deea] bg-white text-slate-500 hover:border-[#9ba8ba] hover:text-slate-900 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:text-white"
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={openCleanupModal}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 text-xs font-extrabold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Dọn dữ liệu cũ
+                </button>
+                <button
+                  type="button"
+                  onClick={loadContracts}
+                  disabled={loading}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d1d7e0] bg-white px-4 text-xs font-extrabold text-slate-800 transition hover:bg-[#f8fafc] disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Làm mới
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-xs font-extrabold text-white transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
+                >
+                  <Download className="h-4 w-4" />
+                  Xuất Excel
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex w-full flex-col justify-start gap-3 sm:flex-row">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={openTimePopover}
+                  aria-expanded={timePopoverOpen}
+                  className="inline-flex h-10 w-full min-w-[180px] items-center justify-between gap-3 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-slate-900 outline-none transition hover:border-[#9ba8ba] focus:border-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                >
+                  <span>{activeTimeLabel}</span>
+                  <span className="text-[10px] text-slate-400">
+                    {timePopoverOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+
+                {timePopoverOpen && (
+                  <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-[#dfe5ef] bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-[#0f172a]">
+                    <div className="grid grid-cols-[120px_1fr] gap-3">
+                      <div className="flex flex-col gap-1 border-r border-[#edf1f6] pr-3 dark:border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => selectTimeFilter("all")}
+                          className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                            timeFilter === "all"
+                              ? "bg-[#1e40af] text-white dark:bg-[#2563eb]"
+                              : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                          }`}
+                        >
+                          Cả năm
+                        </button>
+                        {TIME_QUARTERS.map((quarter) => (
+                          <button
+                            key={quarter.id}
+                            type="button"
+                            onMouseEnter={() => setTimePanelQuarter(quarter.id)}
+                            onFocus={() => setTimePanelQuarter(quarter.id)}
+                            onClick={() => selectTimeFilter(quarter.id)}
+                            className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                              timeFilter === quarter.id ||
+                              timePanelQuarter === quarter.id
+                                ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                                : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                          >
+                            {quarter.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {visibleTimeQuarter.months.map((month) => (
+                          <button
+                            key={month}
+                            type="button"
+                            onClick={() => selectTimeFilter(`M${month}`)}
+                            className={`h-9 rounded-lg border px-3 text-left text-xs font-extrabold transition ${
+                              timeFilter === `M${month}`
+                                ? "border-[#1e40af] bg-[#1e40af] text-white dark:border-[#2563eb] dark:bg-[#2563eb]"
+                                : "border-[#edf1f6] bg-white text-slate-600 hover:border-[#9ba8ba] hover:bg-[#f8fafc] hover:text-slate-900 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                          >
+                            Tháng {month}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <label>
+                <span className="sr-only">Lọc theo phòng</span>
+                <select
+                  value={roomFilter}
+                  onChange={(event) => setRoomFilter(event.target.value)}
+                  className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-slate-900 outline-none focus:border-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                >
+                  <option value="all">Lọc theo phòng</option>
+                  {roomOptions.map((roomCode) => (
+                    <option key={roomCode} value={roomCode}>
+                      Phòng {roomCode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="sr-only">Loại hợp đồng</span>
+                <select
+                  value={contractTypeFilter}
+                  onChange={(event) =>
+                    setContractTypeFilter(event.target.value)
+                  }
+                  className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-slate-900 outline-none focus:border-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                >
+                  <option value="all">Tất cả loại HĐ</option>
+                  <option value="lease">Hợp đồng Thuê</option>
+                  <option value="deposit">Hợp đồng Cọc</option>
+                </select>
+              </label>
+            </div>
+          </div>
         </header>
 
         <div className="dashboard-table">
@@ -1515,21 +1786,22 @@ export default function ContractTemplatePage() {
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="min-w-32">Mã HĐ</th>
+                {/* <th className="min-w-24">Loại HĐ</th> */}
                 <th className="min-w-20">Phòng</th>
                 <th className="min-w-40">Người ký chính</th>
-                <th className="min-w-24">Số người</th>
+                {/* <th className="min-w-24">Số người</th> */}
                 <th className="min-w-36">Thời hạn</th>
                 <th className="min-w-32">Giá thuê</th>
-                {/* <th className="min-w-28">File</th> */}
+                <th className="min-w-28">File</th>
                 <th className="min-w-32">Trạng thái</th>
-                <th className="min-w-20 text-center">Xem</th>
+                {/* <th className="min-w-20 text-center">Xem</th> */}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
               {loading && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="py-12 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                   >
                     <span className="inline-flex items-center gap-2">
@@ -1622,6 +1894,17 @@ export default function ContractTemplatePage() {
                         </button>
                       )}
                     </td>
+                    <td data-label="Loại HĐ" className="align-middle">
+                      <span
+                        className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-extrabold ${
+                          getContractType(item) === "lease"
+                            ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300"
+                        }`}
+                      >
+                        {getContractType(item) === "lease" ? "Thuê" : "Cọc"}
+                      </span>
+                    </td>
                     <td data-label="Phòng" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
                         <Home className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 xl:h-4 xl:w-4" />
@@ -1690,7 +1973,7 @@ export default function ContractTemplatePage() {
               {!loading && filteredContracts.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]"
                   >
                     Không có hợp đồng phù hợp với bộ lọc.
@@ -1713,6 +1996,63 @@ export default function ContractTemplatePage() {
           }}
         />
       </section>
+
+      {cleanupModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-4 backdrop-blur-sm"
+          onClick={closeCleanupModal}
+        >
+          <section
+            className="w-full max-w-[520px] rounded-xl bg-white p-6 shadow-2xl dark:bg-[#0f172a]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                  Xác nhận dọn dữ liệu định kỳ
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {cleanupStep === 1
+                    ? "Thao tác này dành cho dữ liệu hợp đồng cũ hơn 2 năm. Vui lòng xác nhận trước khi chuyển sang bước kiểm tra cuối."
+                    : "Bước cuối: bạn chắc chắn muốn gửi yêu cầu xóa dữ liệu cũ? Sau khi backend xử lý, dữ liệu đã xóa sẽ không thể khôi phục."}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300">
+              Bước {cleanupStep}/2 · Chỉ áp dụng cho dữ liệu cũ hơn 2 năm.
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCleanupModal}
+                className="h-10 rounded-lg border border-[#d1d7e0] bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:bg-[#f8fafc] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
+              >
+                Không
+              </button>
+              {cleanupStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={confirmCleanupPreview}
+                  className="h-10 rounded-lg bg-orange-600 px-4 text-sm font-extrabold text-white transition hover:bg-orange-700"
+                >
+                  Có, tiếp tục
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={confirmCleanupFinal}
+                  className="h-10 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white transition hover:bg-red-700"
+                >
+                  Tôi chắc chắn muốn xóa
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {mergedSelected && (
         <div

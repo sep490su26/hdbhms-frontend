@@ -20,7 +20,6 @@ import {
   Moon,
   MoreHorizontal,
   ReceiptText,
-  Search,
   Settings,
   Sun,
   User,
@@ -353,8 +352,14 @@ export function AccessDeniedPage() {
 
 function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [contractYearsOpen, setContractYearsOpen] = useState(true);
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const showText = isExpanded || isHovered || isMobileOpen;
+  const contractYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return [currentYear, currentYear - 1];
+  }, []);
 
   return (
     <>
@@ -444,36 +449,96 @@ function Sidebar({ isOpen, onClose }) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = isNavigationPathActive(pathname, item.path);
+                const isContractItem = item.path === "/dashboard/contract-template";
 
                 return (
                   <PermissionGuard
                     key={item.path}
                     allowedRoles={getAllowedRoles(item)}
                   >
-                    <Link
-                      href={item.path}
-                      onClick={onClose}
-                      aria-current={isActive ? "page" : undefined}
-                      title={showText ? undefined : item.label}
-                      className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                        showText ? "justify-start" : "justify-center"
-                      } ${
-                        isActive
-                          ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
-                          : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-5 w-5 shrink-0 ${
+                    {isContractItem ? (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!showText) {
+                              router.push(item.path);
+                              onClose();
+                              return;
+                            }
+                            setContractYearsOpen((current) => !current);
+                          }}
+                          aria-expanded={contractYearsOpen}
+                          title={showText ? undefined : item.label}
+                          className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            showText ? "justify-start" : "justify-center"
+                          } ${
+                            isActive
+                              ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                              : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
+                          }`}
+                        >
+                          <Icon
+                            className={`h-5 w-5 shrink-0 ${
+                              isActive
+                                ? "text-[#1e40af] dark:text-[#93c5fd]"
+                                : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
+                            }`}
+                          />
+                          {showText && (
+                            <>
+                              <span className="min-w-0 flex-1 truncate text-left">
+                                {item.label}
+                              </span>
+                              <ChevronDown
+                                className={`h-4 w-4 shrink-0 transition-transform ${
+                                  contractYearsOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </>
+                          )}
+                        </button>
+                        {showText && contractYearsOpen && (
+                          <div className="mt-2 flex flex-col gap-1 pl-8">
+                            {contractYears.map((year) => (
+                              <Link
+                                key={year}
+                                href={`${item.path}?year=${year}`}
+                                onClick={onClose}
+                                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-gray-100 hover:text-[#1e40af] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-[#93c5fd]"
+                              >
+                                Năm {year}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Link
+                        href={item.path}
+                        onClick={onClose}
+                        aria-current={isActive ? "page" : undefined}
+                        title={showText ? undefined : item.label}
+                        className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          showText ? "justify-start" : "justify-center"
+                        } ${
                           isActive
-                            ? "text-[#1e40af] dark:text-[#93c5fd]"
-                            : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
+                            ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                            : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
                         }`}
-                      />
-                      {showText && (
-                        <span className="truncate">{item.label}</span>
-                      )}
-                    </Link>
+                      >
+                        <Icon
+                          className={`h-5 w-5 shrink-0 ${
+                            isActive
+                              ? "text-[#1e40af] dark:text-[#93c5fd]"
+                              : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
+                          }`}
+                        />
+                        {showText && (
+                          <span className="truncate">{item.label}</span>
+                        )}
+                      </Link>
+                    )}
                   </PermissionGuard>
                 );
               })}

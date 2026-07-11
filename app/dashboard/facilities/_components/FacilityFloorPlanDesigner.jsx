@@ -291,7 +291,7 @@ function normalizeLayoutPosition(rooms, blocks) {
 function PreviewPanel({ rooms, blocks, onClose }) {
   return (
     <div className="absolute inset-6 z-40 overflow-auto rounded-3xl border bg-[#e9e9e9] p-6 shadow-2xl">
-      <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white p-2 shadow"><X className="h-4 w-4" /></button>
+      <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white dark:bg-[#0f172a] p-2 shadow"><X className="h-4 w-4" /></button>
       <h2 className="mb-4 text-lg font-black text-slate-950">Xem trước sơ đồ</h2>
       <div className="relative min-h-[720px] min-w-[1100px] rounded-2xl bg-white/50">
         {blocks.map((block) => (
@@ -949,11 +949,11 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   };
 
   if (loading) return <div className="grid min-h-[60vh] place-items-center"><LoaderCircle className="h-7 w-7 animate-spin" /></div>;
-  if (error && !data) return <div className="grid min-h-[60vh] place-items-center text-center"><div><p className="font-bold text-rose-700">{error}</p><button onClick={() => { setLoading(true); setError(""); setReloadKey((v) => v + 1); }} className="mt-4 rounded-lg bg-[#091426] px-4 py-2 text-sm font-bold text-white">Thử lại</button></div></div>;
+  if (error && !data) return <div className="grid min-h-[60vh] place-items-center text-center"><div><p className="font-bold text-rose-700 dark:text-rose-300">{error}</p><button onClick={() => { setLoading(true); setError(""); setReloadKey((v) => v + 1); }} className="mt-4 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 py-2 text-sm font-bold text-white">Thử lại</button></div></div>;
 
   return (
-    <section className="fixed inset-0 z-50 flex flex-col bg-[#f8fafc]">
-      <header className="flex min-h-16 items-center justify-between gap-4 border-b bg-white px-4 py-3 sm:px-6">
+    <section className="fixed inset-0 z-50 flex flex-col bg-[#f8fafc] dark:bg-white/5">
+      <header className="flex min-h-16 items-center justify-between gap-4 border-b bg-white dark:bg-[#0f172a] px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => router.push("/dashboard/facilities")} className="rounded-lg p-2 hover:bg-slate-100" aria-label="Quay lại"><ArrowLeft className="h-5 w-5" /></button>
           <div className="min-w-0">
@@ -963,26 +963,26 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {hasUnsavedChanges && <span className="text-xs font-bold text-amber-600">Có thay đổi chưa lưu</span>}
+          {hasUnsavedChanges && <span className="text-xs font-bold text-amber-600 dark:text-yellow-300">Có thay đổi chưa lưu</span>}
           <button type="button" onClick={() => setPreviewOpen((value) => !value)} className="inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-bold"><Eye className="h-4 w-4" />Xem trước sơ đồ</button>
           <button
             type="button"
             onClick={alignCurrentRooms}
             disabled={!selectedFloorId || !currentRooms.length || Boolean(placementActive)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300 transition hover:bg-emerald-100 dark:hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-50"
             title="Căn thẳng phòng"
           >
             <WandSparkles className="h-4 w-4" />
             Căn thẳng phòng
           </button>
-          <button type="button" onClick={save} disabled={saving || !selectedFloorId || (!currentRooms.length && !currentBlocks.length)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Lưu sơ đồ</button>
+          <button type="button" onClick={save} disabled={saving || !selectedFloorId || (!currentRooms.length && !currentBlocks.length)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Lưu sơ đồ</button>
         </div>
       </header>
 
-      {(notice || error) && <div className={`px-6 py-2 text-sm font-bold ${error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{error || notice}</div>}
+      {(notice || error) && <div className={`px-6 py-2 text-sm font-bold ${error ? "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>{error || notice}</div>}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-72 shrink-0 flex-col gap-5 border-r bg-white p-5">
+        <aside className="flex w-72 shrink-0 flex-col gap-5 border-r bg-white dark:bg-[#0f172a] p-5">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase text-slate-500">Chọn tầng thiết kế</span>
@@ -990,7 +990,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
                 type="button"
                 onClick={addFloor}
                 disabled={addingFloor}
-                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 dark:text-blue-300 disabled:opacity-50"
               >
                 {addingFloor && <LoaderCircle className="h-3 w-3 animate-spin" />}
                 + Thêm tầng
@@ -999,14 +999,14 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
             {data?.floors?.length ? (
               <div className="relative mt-2">
                 <Layers3 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                <select value={selectedFloorId} onChange={(event) => changeFloor(event.target.value)} className="h-10 w-full rounded-lg border bg-white pl-9 pr-3 text-sm font-bold">
+                <select value={selectedFloorId} onChange={(event) => changeFloor(event.target.value)} className="h-10 w-full rounded-lg border bg-white dark:bg-[#0f172a] pl-9 pr-3 text-sm font-bold">
                   {data.floors.map((floor) => <option key={floor.id} value={floor.id}>{floor.name}</option>)}
                 </select>
                 <button
                   type="button"
                   onClick={requestDeleteCurrentFloor}
                   disabled={deletingFloor || !selectedFloorId}
-                  className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-xs font-bold text-rose-700 dark:text-rose-300 transition hover:bg-rose-100 dark:hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {deletingFloor ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   Xóa tầng hiện tại
@@ -1021,7 +1021,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
                     type="button"
                     onClick={resetCurrentLayout}
                     disabled={resettingLayout}
-                    className="mt-1 inline-flex w-full items-center justify-center gap-1 text-center text-xs font-bold text-slate-400 underline hover:text-[#091426] disabled:opacity-50"
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1 text-center text-xs font-bold text-slate-400 underline hover:text-slate-900 dark:hover:text-white disabled:opacity-50"
                   >
                     {resettingLayout && <LoaderCircle className="h-3 w-3 animate-spin" />}
                     ↺ Đặt lại bố cục
@@ -1055,7 +1055,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         </aside>
 
         <main
-          className="relative flex-1 overflow-auto bg-[#f1f5f9] p-8"
+          className="relative flex-1 overflow-auto bg-[#f1f5f9] dark:bg-white/5 p-8"
           style={{ backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: `${GRID}px ${GRID}px` }}
           onClick={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -1137,9 +1137,9 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
 
       {floorDeleteConfirmOpen && selectedFloor && (
         <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border bg-white dark:bg-[#0f172a] p-5 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-50 text-rose-600">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-300">
                 <Trash2 className="h-5 w-5" />
               </div>
               <div className="min-w-0">

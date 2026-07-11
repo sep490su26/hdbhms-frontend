@@ -36,15 +36,15 @@ function StatusBadge({ status }) {
 function Modal({ title, children, footer, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
-      <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-          <h2 id="account-modal-title" className="text-lg font-bold text-[#091426]">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-md p-2 text-[#505f76] hover:bg-[#f2f4f6]">
+      <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-4">
+          <h2 id="account-modal-title" className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-md p-2 text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="p-6">{children}</div>
-        {footer && <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>}
+        {footer && <div className="border-t border-[#e2e8f0] dark:border-white/10 px-6 py-4">{footer}</div>}
       </div>
     </div>
   );
@@ -52,8 +52,8 @@ function Modal({ title, children, footer, onClose }) {
 
 function InlineAlert({ tone = "error", children }) {
   const styles = {
-    error: "border-rose-100 bg-rose-50 text-rose-700",
-    success: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    error: "border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    success: "border-emerald-100 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   };
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
 
@@ -176,9 +176,9 @@ export function AccountManagement() {
     <>
       <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#505f76]">Admin Dashboard</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">AccountManagement</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#45474c]">Quản lý tài khoản nhân sự cho vai trò Quản lý và Kế toán trong hệ thống nhà trọ.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">Admin Dashboard</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">AccountManagement</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Quản lý tài khoản nhân sự cho vai trò Quản lý và Kế toán trong hệ thống nhà trọ.</p>
         </div>
       </section>
 
@@ -196,23 +196,23 @@ export function AccountManagement() {
         </section>
       )}
 
-      <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+      <section className="rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
         <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_220px]">
           <label className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Tìm theo họ tên, SĐT hoặc email"
-              className="h-11 w-full rounded-lg border border-[#e2e8f0] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#6b7280] focus:border-[#091426]"
+              className="h-11 w-full rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-10 pr-3 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-500 dark:text-slate-400 focus:border-[#1e40af]"
             />
           </label>
           <label className="relative">
-            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value)}
-              className="h-11 w-full appearance-none rounded-lg border border-[#e2e8f0] bg-white pl-10 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
+              className="h-11 w-full appearance-none rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-10 pr-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
             >
               {accountTypeOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -220,11 +220,11 @@ export function AccountManagement() {
             </select>
           </label>
           <label className="relative">
-            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" />
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-11 w-full appearance-none rounded-lg border border-[#e2e8f0] bg-white pl-10 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
+              className="h-11 w-full appearance-none rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-10 pr-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
             >
               {accountStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -234,14 +234,14 @@ export function AccountManagement() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <div className="flex items-center justify-between gap-4 border-b border-[#e2e8f0] px-5 py-4">
-          <h2 className="font-bold text-[#091426]">Danh sách tài khoản</h2>
-          <span className="rounded-full bg-[#091426] px-3 py-1 text-xs font-bold text-white">{filteredAccounts.length}</span>
+      <section className="overflow-hidden rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <div className="flex items-center justify-between gap-4 border-b border-[#e2e8f0] dark:border-white/10 px-5 py-4">
+          <h2 className="font-bold text-slate-900 dark:text-white">Danh sách tài khoản</h2>
+          <span className="rounded-full bg-[#1e40af] dark:bg-[#2563eb] px-3 py-1 text-xs font-bold text-white">{filteredAccounts.length}</span>
         </div>
         <div className="dashboard-table">
           <table className="w-full text-left text-sm">
-            <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
+            <thead className="bg-[#f7f9fb] dark:bg-white/5 text-xs font-bold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">
               <tr>
                 <th className="px-5 py-4">Họ tên</th>
                 <th className="px-5 py-4">Loại tài khoản</th>
@@ -256,27 +256,27 @@ export function AccountManagement() {
             </thead>
             <tbody>
               {filteredAccounts.map((account) => (
-                <tr key={account.id} className="border-t border-[#e2e8f0] align-top">
+                <tr key={account.id} className="border-t border-[#e2e8f0] dark:border-white/10 align-top">
                   <td data-label="Họ tên" className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d3e4fe] text-xs font-bold text-[#091426]">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d3e4fe] text-xs font-bold text-slate-900 dark:text-white">
                         {account.fullName.slice(0, 1)}
                       </span>
                       <div className="min-w-0">
-                        <p className="font-bold text-[#091426]">{account.fullName}</p>
-                        <p className="text-xs text-[#6b7280]">{account.id}</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{account.fullName}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{account.id}</p>
                       </div>
                     </div>
                   </td>
-                  <td data-label="Loại tài khoản" className="px-5 py-4 font-semibold text-[#191c1e]">{accountTypeLabels[account.accountType]}</td>
-                  <td data-label="SĐT" className="px-5 py-4 text-[#45474c]">{account.phone}</td>
-                  <td data-label="Email" className="break-words px-5 py-4 text-[#45474c]">{account.email}</td>
+                  <td data-label="Loại tài khoản" className="px-5 py-4 font-semibold text-slate-900 dark:text-white">{accountTypeLabels[account.accountType]}</td>
+                  <td data-label="SĐT" className="px-5 py-4 text-slate-600 dark:text-slate-300">{account.phone}</td>
+                  <td data-label="Email" className="break-words px-5 py-4 text-slate-600 dark:text-slate-300">{account.email}</td>
                   <td data-label="Trạng thái" className="px-5 py-4"><StatusBadge status={account.status} /></td>
-                  <td data-label="Ngày tạo" className="px-5 py-4 text-[#45474c]">{account.createdAt}</td>
-                  <td data-label="Đăng nhập gần nhất" className="px-5 py-4 text-[#45474c]">{account.lastLoginAt}</td>
+                  <td data-label="Ngày tạo" className="px-5 py-4 text-slate-600 dark:text-slate-300">{account.createdAt}</td>
+                  <td data-label="Đăng nhập gần nhất" className="px-5 py-4 text-slate-600 dark:text-slate-300">{account.lastLoginAt}</td>
                   <td data-label="Cơ sở phụ trách" className="px-5 py-4">
-                    <span className="inline-flex items-center gap-2 text-[#45474c]">
-                      <Building2 className="h-4 w-4 text-[#6b7280]" />
+                    <span className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <Building2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                       {resolveFacilityName(account.assignedFacility)}
                     </span>
                   </td>
@@ -286,7 +286,7 @@ export function AccountManagement() {
                         <button
                           type="button"
                           onClick={() => openPermissionDialog(account)}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#091426] px-3 text-xs font-bold text-white hover:bg-[#16253a]"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-3 text-xs font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
                         >
                           <ShieldCheck className="h-4 w-4" />
                           Cấp quyền
@@ -295,7 +295,7 @@ export function AccountManagement() {
                       <button
                         type="button"
                         onClick={() => openLockDialog(account)}
-                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-100 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50"
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-100 dark:border-rose-500/20 px-3 text-xs font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                       >
                         <LockKeyhole className="h-4 w-4" />
                         Khóa
@@ -306,7 +306,7 @@ export function AccountManagement() {
               ))}
               {filteredAccounts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm font-semibold text-[#6b7280]">Không có tài khoản phù hợp.</td>
+                  <td colSpan={9} className="px-5 py-10 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">Không có tài khoản phù hợp.</td>
                 </tr>
               )}
             </tbody>
@@ -320,25 +320,25 @@ export function AccountManagement() {
           onClose={() => setPermissionTarget(null)}
           footer={
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button type="button" onClick={() => setPermissionTarget(null)} className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]">Hủy</button>
-              <button type="button" onClick={confirmPermission} className="h-10 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white">Xác nhận cấp quyền</button>
+              <button type="button" onClick={() => setPermissionTarget(null)} className="h-10 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-4 text-sm font-bold text-slate-900 dark:text-white">Hủy</button>
+              <button type="button" onClick={confirmPermission} className="h-10 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white">Xác nhận cấp quyền</button>
             </div>
           }
         >
           <div className="grid gap-4">
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4">
-              <p className="text-sm font-bold text-[#091426]">{permissionTarget.fullName}</p>
-              <p className="mt-1 text-sm text-[#45474c]">{permissionTarget.email}</p>
+            <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-[#f7f9fb] dark:bg-white/5 p-4">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{permissionTarget.fullName}</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{permissionTarget.email}</p>
             </div>
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#091426]">Cơ sở phụ trách</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">Cơ sở phụ trách</span>
               <select
                 value={selectedFacility}
                 onChange={(event) => {
                   setSelectedFacility(event.target.value);
                   setPermissionError("");
                 }}
-                className="h-11 rounded-lg border border-[#c5c6cd] bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
+                className="h-11 rounded-lg border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
               >
                 <option value="">Chọn cơ sở phụ trách</option>
                 {facilityOptions.map((facility) => (
@@ -357,18 +357,18 @@ export function AccountManagement() {
           onClose={() => setLockTarget(null)}
           footer={
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button type="button" onClick={() => setLockTarget(null)} className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]">Hủy</button>
+              <button type="button" onClick={() => setLockTarget(null)} className="h-10 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-4 text-sm font-bold text-slate-900 dark:text-white">Hủy</button>
               <button type="button" onClick={confirmLock} className="h-10 rounded-lg bg-rose-600 px-4 text-sm font-bold text-white hover:bg-rose-700">Xác nhận khóa</button>
             </div>
           }
         >
           <div className="grid gap-4">
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4">
-              <p className="text-sm font-bold text-[#091426]">{lockTarget.fullName}</p>
-              <p className="mt-1 text-sm text-[#45474c]">{accountTypeLabels[lockTarget.accountType]} · {lockTarget.email}</p>
+            <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-[#f7f9fb] dark:bg-white/5 p-4">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{lockTarget.fullName}</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{accountTypeLabels[lockTarget.accountType]} · {lockTarget.email}</p>
             </div>
             <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#091426]">Lý do khóa</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">Lý do khóa</span>
               <textarea
                 value={lockReason}
                 onChange={(event) => {
@@ -376,7 +376,7 @@ export function AccountManagement() {
                   setLockError("");
                 }}
                 rows={4}
-                className="min-h-28 resize-none rounded-lg border border-[#c5c6cd] bg-white px-3 py-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
+                className="min-h-28 resize-none rounded-lg border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 py-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
                 placeholder="Nhập lý do khóa tài khoản"
               />
             </label>

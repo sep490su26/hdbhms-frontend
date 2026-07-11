@@ -51,3 +51,100 @@ export async function markAllNotificationsAsRead() {
     method: "POST",
   });
 }
+
+function normalizeTemplateVariable(item = {}) {
+  return {
+    name: item.name ?? "",
+    required: item.required ?? false,
+  };
+}
+
+export function normalizeNotificationTemplateDefinition(item = {}) {
+  return {
+    eventType: item.eventType ?? "",
+    displayName: item.displayName ?? item.eventType ?? "",
+    description: item.description ?? "",
+    targetType: item.targetType ?? "",
+    allowedChannels: item.allowedChannels ?? [],
+    variables: (item.variables ?? []).map(normalizeTemplateVariable),
+    sampleData: item.sampleData ?? {},
+  };
+}
+
+export function normalizeNotificationTemplate(item = {}) {
+  return {
+    eventType: item.eventType ?? "",
+    displayName: item.displayName ?? item.eventType ?? "",
+    targetType: item.targetType ?? "",
+    channel: item.channel ?? "",
+    source: item.source ?? "DEFAULT",
+    status: item.status ?? "ACTIVE",
+    titleTemplate: item.titleTemplate ?? "",
+    bodyTemplate: item.bodyTemplate ?? "",
+    variables: (item.variables ?? []).map(normalizeTemplateVariable),
+    updatedBy: item.updatedBy ?? null,
+    updatedAt: item.updatedAt ?? null,
+  };
+}
+
+export async function fetchNotificationTemplateDefinitions() {
+  const data = await authenticatedFetch(`${API_BASE_URL}/notification-template-definitions`, {
+    method: "GET",
+  });
+  return (Array.isArray(data) ? data : []).map(normalizeNotificationTemplateDefinition);
+}
+
+export async function fetchNotificationTemplates({ eventType } = {}) {
+  const params = new URLSearchParams();
+  if (eventType) params.set("eventType", eventType);
+
+  const query = params.toString();
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/notification-templates${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  return (Array.isArray(data) ? data : []).map(normalizeNotificationTemplate);
+}
+
+export async function updateNotificationTemplate({
+  eventType,
+  channel,
+  titleTemplate,
+  bodyTemplate,
+  status = "ACTIVE",
+}) {
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/notification-templates/${encodeURIComponent(eventType)}/${encodeURIComponent(channel)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titleTemplate, bodyTemplate, status }),
+    },
+  );
+  return normalizeNotificationTemplate(data);
+}
+
+export async function resetNotificationTemplate({ eventType, channel }) {
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/notification-templates/${encodeURIComponent(eventType)}/${encodeURIComponent(channel)}/reset`,
+    { method: "POST" },
+  );
+  return normalizeNotificationTemplate(data);
+}
+
+export async function previewNotificationTemplate({
+  eventType,
+  channel,
+  titleTemplate,
+  bodyTemplate,
+  data,
+}) {
+  return authenticatedFetch(
+    `${API_BASE_URL}/notification-templates/${encodeURIComponent(eventType)}/${encodeURIComponent(channel)}/preview`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titleTemplate, bodyTemplate, data }),
+    },
+  );
+}

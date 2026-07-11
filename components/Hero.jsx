@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 export function Hero() {
   return (
-    <section className="bg-[#091426] py-16 md:py-24 overflow-hidden">
+    <section className="bg-[#091426] pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center gap-12">
           {/* Content */}
@@ -14,27 +14,22 @@ export function Hero() {
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex-1 space-y-8"
+            className="flex-1 space-y-8 relative z-10"
           >
+            {/* Tích hợp cả 2 thông điệp vào Tiêu đề */}
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
-              Hệ thống quản lý nhà trọ{" "}
+              Nền tảng Quản lý & Đặt phòng{" "}
               <span className="text-white underline decoration-2 underline-offset-8">
                 Hải Đăng
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-brand-text-muted max-w-2xl">
-              Website giúp quản lý thông tin phòng, người thuê và các hoạt động
-              vận hành một cách thuận tiện, đồng thời nâng cao sự chuyên nghiệp
-              và uy tín đối với khách hàng.
+            <p className="text-lg md:text-xl text-slate-400 max-w-2xl">
+              Giải pháp toàn diện giúp khách hàng dễ dàng tìm kiếm, đặt chỗ và
+              thanh toán, đồng thời tối ưu hóa mọi quy trình vận hành, quản lý
+              nội bộ.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button variant="primary" size="lg" className="w-full sm:w-auto rounded-xl shadow-lg">
-                Khám phá
-              </Button>
-              <Button variant="dark" size="lg" className="w-full sm:w-auto rounded-xl border border-white/20">
-                Tìm hiểu
-              </Button>
-            </div>
+
+            {/* Nút Call-to-action */}
           </motion.div>
 
           {/* Image */}

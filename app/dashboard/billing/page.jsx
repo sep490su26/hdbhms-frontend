@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Banknote, History, Loader2, RefreshCw, Save, Search } from "lucide-react";
+import {
+  Banknote,
+  History,
+  Loader2,
+  RefreshCw,
+  Save,
+  Search,
+  X,
+} from "lucide-react";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -29,6 +37,63 @@ const TYPE_LABELS = {
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
 };
 
+const mockInvoices = [
+  {
+    id: "mock-1",
+    invoiceCode: "HD-2026-0001",
+    room: "A101",
+    tenantName: "Nguyễn Minh Anh",
+    month: "07/2026",
+    totalAmount: 3850000,
+    status: "Đã thanh toán",
+  },
+  {
+    id: "mock-2",
+    invoiceCode: "HD-2026-0002",
+    room: "A203",
+    tenantName: "Trần Hoàng Nam",
+    month: "07/2026",
+    totalAmount: 4120000,
+    status: "Chờ thanh toán",
+  },
+  {
+    id: "mock-3",
+    invoiceCode: "HD-2026-0003",
+    room: "B105",
+    tenantName: "Lê Thị Thu Hà",
+    month: "07/2026",
+    totalAmount: 3675000,
+    status: "Quá hạn",
+  },
+  {
+    id: "mock-4",
+    invoiceCode: "HD-2026-0004",
+    room: "B302",
+    tenantName: "Phạm Đức Huy",
+    month: "06/2026",
+    totalAmount: 5290000,
+    status: "Đã thanh toán",
+  },
+  {
+    id: "mock-5",
+    invoiceCode: "HD-2026-0005",
+    room: "C204",
+    tenantName: "Võ Ngọc Linh",
+    month: "07/2026",
+    totalAmount: 2980000,
+    status: "Chờ thanh toán",
+  },
+  {
+    id: "mock-6",
+    invoiceCode: "HD-2026-0006",
+    room: "C310",
+    tenantName: "Đặng Quốc Bảo",
+    month: "06/2026",
+    totalAmount: 4510000,
+    status: "Quá hạn",
+  },
+];
+
 function currentMonth() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -44,6 +109,16 @@ function statusLabel(value) {
 
 function typeLabel(value) {
   return TYPE_LABELS[value] || value || "Khác";
+}
+
+function mockStatusClasses(status) {
+  if (status === "Đã thanh toán") {
+    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
+  }
+  if (status === "Quá hạn") {
+    return "bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20";
+  }
+  return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
 }
 
 function roomKey(room) {
@@ -88,9 +163,14 @@ export default function BillingPage() {
   const [saving, setSaving] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const selectedInvoice = useMemo(
-    () => invoices.find((invoice) => String(invoice.id) === String(selectedInvoiceId)) || null,
+    () =>
+      invoices.find(
+        (invoice) => String(invoice.id) === String(selectedInvoiceId),
+      ) || null,
     [invoices, selectedInvoiceId],
   );
 
@@ -121,11 +201,23 @@ export default function BillingPage() {
     [rooms, paymentForm.propertyId],
   );
 
-  const paymentInvoices = useMemo(() => invoices.filter((invoice) => {
-    if (paymentForm.propertyId && String(invoice.propertyId) !== String(paymentForm.propertyId)) return false;
-    if (paymentForm.roomId && String(invoice.roomId) !== String(paymentForm.roomId)) return false;
-    return true;
-  }), [invoices, paymentForm.propertyId, paymentForm.roomId]);
+  const paymentInvoices = useMemo(
+    () =>
+      invoices.filter((invoice) => {
+        if (
+          paymentForm.propertyId &&
+          String(invoice.propertyId) !== String(paymentForm.propertyId)
+        )
+          return false;
+        if (
+          paymentForm.roomId &&
+          String(invoice.roomId) !== String(paymentForm.roomId)
+        )
+          return false;
+        return true;
+      }),
+    [invoices, paymentForm.propertyId, paymentForm.roomId],
+  );
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -133,9 +225,12 @@ export default function BillingPage() {
     try {
       const data = await fetchBillingInvoices(filters);
       setInvoices(data);
-      setSelectedInvoiceId((current) => (
-        current && data.some((invoice) => String(invoice.id) === String(current)) ? current : ""
-      ));
+      setSelectedInvoiceId((current) =>
+        current &&
+        data.some((invoice) => String(invoice.id) === String(current))
+          ? current
+          : "",
+      );
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách hóa đơn.");
     } finally {
@@ -157,22 +252,32 @@ export default function BillingPage() {
   useEffect(() => {
     if (!selectedInvoice) return;
     const timeoutId = window.setTimeout(() => {
-      const rentLine = selectedInvoice.lines.find((line) => line.lineType === "ROOM_RENT");
-      const propertyId = selectedInvoice.propertyId ? String(selectedInvoice.propertyId) : "";
-      const roomId = selectedInvoice.roomId ? String(selectedInvoice.roomId) : "";
+      const rentLine = selectedInvoice.lines.find(
+        (line) => line.lineType === "ROOM_RENT",
+      );
+      const propertyId = selectedInvoice.propertyId
+        ? String(selectedInvoice.propertyId)
+        : "";
+      const roomId = selectedInvoice.roomId
+        ? String(selectedInvoice.roomId)
+        : "";
       setPaymentForm((current) => ({
         ...current,
         propertyId: propertyId || current.propertyId,
         roomId: roomId || current.roomId,
         invoiceId: selectedInvoice.id || "",
-        amount: selectedInvoice.remainingAmount ? String(selectedInvoice.remainingAmount) : "",
+        amount: selectedInvoice.remainingAmount
+          ? String(selectedInvoice.remainingAmount)
+          : "",
       }));
       setOverrideForm((current) => ({
         ...current,
         propertyId: propertyId || current.propertyId,
         roomId: roomId || current.roomId,
         billingPeriod: selectedInvoice.billingPeriod || current.billingPeriod,
-        overrideMonthlyRent: rentLine?.unitPrice ? String(rentLine.unitPrice) : current.overrideMonthlyRent,
+        overrideMonthlyRent: rentLine?.unitPrice
+          ? String(rentLine.unitPrice)
+          : current.overrideMonthlyRent,
       }));
     }, 0);
     return () => window.clearTimeout(timeoutId);
@@ -185,9 +290,11 @@ export default function BillingPage() {
     setMessage("");
     try {
       const result = await applyRentOverride(overrideForm);
-      setMessage(result?.invoiceApplied
-        ? "Đã điều chỉnh giá và cập nhật hóa đơn tháng đã chọn."
-        : "Đã lưu giá điều chỉnh cho tháng đã chọn.");
+      setMessage(
+        result?.invoiceApplied
+          ? "Đã điều chỉnh giá và cập nhật hóa đơn tháng đã chọn."
+          : "Đã lưu giá điều chỉnh cho tháng đã chọn.",
+      );
       await loadInvoices();
     } catch (saveError) {
       setError(saveError?.message || "Không lưu được giá điều chỉnh.");
@@ -197,14 +304,20 @@ export default function BillingPage() {
   }
 
   function selectPaymentInvoice(invoiceId) {
-    const invoice = invoices.find((item) => String(item.id) === String(invoiceId));
+    const invoice = invoices.find(
+      (item) => String(item.id) === String(invoiceId),
+    );
     if (invoiceId) setSelectedInvoiceId(invoiceId);
     setPaymentForm((current) => ({
       ...current,
-      propertyId: invoice?.propertyId ? String(invoice.propertyId) : current.propertyId,
+      propertyId: invoice?.propertyId
+        ? String(invoice.propertyId)
+        : current.propertyId,
       roomId: invoice?.roomId ? String(invoice.roomId) : current.roomId,
       invoiceId,
-      amount: invoice?.remainingAmount ? String(invoice.remainingAmount) : current.amount,
+      amount: invoice?.remainingAmount
+        ? String(invoice.remainingAmount)
+        : current.amount,
     }));
   }
 
@@ -219,7 +332,13 @@ export default function BillingPage() {
         note: paymentForm.note,
       });
       setMessage("Đã xác nhận thanh toán thủ công.");
-      setPaymentForm({ propertyId: "", roomId: "", invoiceId: "", amount: "", note: "" });
+      setPaymentForm({
+        propertyId: "",
+        roomId: "",
+        invoiceId: "",
+        amount: "",
+        note: "",
+      });
       await loadInvoices();
     } catch (saveError) {
       setError(saveError?.message || "Không xác nhận được thanh toán.");
@@ -228,24 +347,30 @@ export default function BillingPage() {
     }
   }
 
-  const totals = invoices.reduce(
+  const totals = mockInvoices.reduce(
     (acc, invoice) => ({
       total: acc.total + invoice.totalAmount,
-      paid: acc.paid + invoice.paidAmount,
-      remaining: acc.remaining + invoice.remainingAmount,
+      paid:
+        acc.paid +
+        (invoice.status === "Đã thanh toán" ? invoice.totalAmount : 0),
+      remaining:
+        acc.remaining +
+        (invoice.status !== "Đã thanh toán" ? invoice.totalAmount : 0),
     }),
     { total: 0, paid: 0, remaining: 0 },
   );
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 text-[#0f1d33]">
+    <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold">Hóa đơn & Thu tiền</h1>
+        <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+          Hóa đơn & Thu tiền
+        </h1>
         <Link
           href="/dashboard/billing/history"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] px-4 text-sm font-bold text-[#334155]"
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
         >
-          <History className="h-4 w-4" />
+          <History className="h-4 w-4 dark:text-slate-300" />
           Lịch sử thanh toán
         </Link>
       </section>
@@ -253,7 +378,9 @@ export default function BillingPage() {
       {(error || message) && (
         <section
           className={`rounded-lg border px-4 py-3 text-sm font-semibold ${
-            error ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            error
+              ? "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300"
+              : "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
           }`}
         >
           {error || message}
@@ -261,41 +388,63 @@ export default function BillingPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-          <p className="text-xs font-black uppercase text-[#64748b]">Tổng hóa đơn</p>
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Tổng hóa đơn
+          </p>
           <p className="mt-2 text-xl font-black">{formatMoney(totals.total)}</p>
         </div>
-        <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-          <p className="text-xs font-black uppercase text-[#64748b]">Đã thu</p>
-          <p className="mt-2 text-xl font-black text-emerald-700">{formatMoney(totals.paid)}</p>
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Đã thu
+          </p>
+          <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
+            {formatMoney(totals.paid)}
+          </p>
         </div>
-        <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-          <p className="text-xs font-black uppercase text-[#64748b]">Còn lại</p>
-          <p className="mt-2 text-xl font-black text-rose-700">{formatMoney(totals.remaining)}</p>
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Còn lại
+          </p>
+          <p className="mt-2 text-xl font-black text-rose-700 dark:text-rose-300">
+            {formatMoney(totals.remaining)}
+          </p>
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
         <div className="grid gap-3 md:grid-cols-5">
           <label className="grid gap-1 text-sm font-bold">
             Tháng
             <input
               type="month"
               value={filters.billingPeriod}
-              onChange={(event) => setFilters((current) => ({ ...current, billingPeriod: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  billingPeriod: event.target.value,
+                }))
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
             Trạng thái
             <select
               value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  status: event.target.value,
+                }))
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
           </label>
@@ -303,12 +452,19 @@ export default function BillingPage() {
             Loại
             <select
               value={filters.invoiceType}
-              onChange={(event) => setFilters((current) => ({ ...current, invoiceType: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  invoiceType: event.target.value,
+                }))
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
           </label>
@@ -316,16 +472,20 @@ export default function BillingPage() {
             Cơ sở
             <select
               value={filters.propertyId}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                propertyId: event.target.value,
-                roomId: "",
-              }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  propertyId: event.target.value,
+                  roomId: "",
+                }))
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả cơ sở</option>
               {properties.map((property) => (
-                <option key={property.id} value={property.id}>{property.name}</option>
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
               ))}
             </select>
           </label>
@@ -333,8 +493,13 @@ export default function BillingPage() {
             Phòng
             <select
               value={filters.roomId}
-              onChange={(event) => setFilters((current) => ({ ...current, roomId: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  roomId: event.target.value,
+                }))
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả phòng</option>
               {filterRooms.map((room) => (
@@ -345,263 +510,358 @@ export default function BillingPage() {
             </select>
           </label>
         </div>
-        <button
-          type="button"
-          onClick={loadInvoices}
-          className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          Tải hóa đơn
-        </button>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={loadInvoices}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
+          >
+            Tải hóa đơn
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsOverrideModalOpen(true)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+          >
+            ⚙️ Điều chỉnh giá
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsPaymentModalOpen(true)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
+          >
+            💵 Thanh toán thủ công
+          </button>
+        </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_380px]">
-        <div className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
-          {loading ? (
-            <div className="flex min-h-64 items-center justify-center gap-2 text-sm font-bold text-[#64748b]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Đang tải
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="flex min-h-64 items-center justify-center text-sm font-bold text-[#64748b]">
-              Chưa có hóa đơn phù hợp.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead className="bg-[#f2f4f6] text-xs uppercase text-[#64748b]">
-                  <tr>
-                    <th className="px-4 py-3">Hóa đơn</th>
-                    <th className="px-4 py-3">Phòng</th>
-                    <th className="px-4 py-3">Khách thuê</th>
-                    <th className="px-4 py-3">Loại</th>
-                    <th className="px-4 py-3">Trạng thái</th>
-                    <th className="px-4 py-3 text-right">Tổng</th>
-                    <th className="px-4 py-3 text-right">Còn lại</th>
+      <section className="w-full">
+        <div className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-3">Hóa đơn</th>
+                  <th className="px-4 py-3">Phòng</th>
+                  <th className="px-4 py-3">Khách thuê</th>
+                  <th className="px-4 py-3">Tháng</th>
+                  <th className="px-4 py-3">Trạng thái</th>
+                  <th className="px-4 py-3 text-right">Tổng tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mockInvoices.map((invoice) => (
+                  <tr
+                    key={invoice.id}
+                    className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-black">{invoice.invoiceCode}</p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">{invoice.room}</td>
+                    <td className="px-4 py-3">{invoice.tenantName}</td>
+                    <td className="px-4 py-3">{invoice.month}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${mockStatusClasses(invoice.status)}`}
+                      >
+                        {invoice.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-black">
+                      {formatMoney(invoice.totalAmount)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => (
-                    <tr
-                      key={invoice.id}
-                      onClick={() => setSelectedInvoiceId(invoice.id)}
-                      className={`cursor-pointer border-t border-[#e2e8f0] ${
-                        String(selectedInvoiceId) === String(invoice.id) ? "bg-slate-50" : "bg-white"
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-black">{invoice.invoiceCode}</p>
-                        <p className="mt-1 text-xs text-[#64748b]">{invoice.billingPeriod || "Không kỳ"}</p>
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        {invoice.roomCode || "Chưa gán"}
-                        <p className="mt-1 text-xs text-[#64748b]">{invoice.propertyName}</p>
-                      </td>
-                      <td className="px-4 py-3">{invoice.tenantName || "Chưa cập nhật"}</td>
-                      <td className="px-4 py-3">{typeLabel(invoice.invoiceType)}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700">
-                          {statusLabel(invoice.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-black">{formatMoney(invoice.totalAmount)}</td>
-                      <td className="px-4 py-3 text-right font-black text-rose-700">
-                        {formatMoney(invoice.remainingAmount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="grid gap-4">
-          <form onSubmit={submitOverride} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-[#3156b6]" />
-              <h2 className="text-sm font-black">Điều chỉnh giá theo tháng</h2>
-            </div>
-            <div className="grid gap-3">
-              <label className="grid gap-1 text-sm font-bold">
-                Cơ sở
-                <select
-                  required
-                  value={overrideForm.propertyId}
-                  onChange={(event) => setOverrideForm((current) => ({
-                    ...current,
-                    propertyId: event.target.value,
-                    roomId: "",
-                  }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                >
-                  <option value="">Chọn cơ sở</option>
-                  {properties.map((property) => (
-                    <option key={property.id} value={property.id}>{property.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Phòng
-                <select
-                  required
-                  value={overrideForm.roomId}
-                  onChange={(event) => setOverrideForm((current) => ({ ...current, roomId: event.target.value }))}
-                  disabled={!overrideForm.propertyId}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                >
-                  <option value="">{overrideForm.propertyId ? "Chọn phòng" : "Chọn cơ sở trước"}</option>
-                  {overrideRooms.map((room) => (
-                    <option key={roomKey(room)} value={roomKey(room)}>
-                      {room.roomCode || room.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Tháng
-                <input
-                  required
-                  type="month"
-                  value={overrideForm.billingPeriod}
-                  onChange={(event) => setOverrideForm((current) => ({ ...current, billingPeriod: event.target.value }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                />
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Giá điều chỉnh
-                <input
-                  required
-                  min="1"
-                  type="number"
-                  value={overrideForm.overrideMonthlyRent}
-                  onChange={(event) => setOverrideForm((current) => ({ ...current, overrideMonthlyRent: event.target.value }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                />
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Ghi chú
-                <input
-                  value={overrideForm.reason}
-                  onChange={(event) => setOverrideForm((current) => ({ ...current, reason: event.target.value }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                />
-              </label>
-            </div>
-            <button
-              type="submit"
-              disabled={saving === "override"}
-              className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white disabled:opacity-60"
-            >
-              {saving === "override" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Lưu điều chỉnh
-            </button>
-          </form>
-
-          <form onSubmit={submitPayment} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-emerald-700" />
-              <h2 className="text-sm font-black">Xác nhận thanh toán thủ công</h2>
-            </div>
-            <div className="grid gap-3">
-              <label className="grid gap-1 text-sm font-bold">
-                Cơ sở
-                <select
-                  required
-                  value={paymentForm.propertyId}
-                  onChange={(event) => setPaymentForm((current) => ({
-                    ...current,
-                    propertyId: event.target.value,
-                    roomId: "",
-                    invoiceId: "",
-                    amount: "",
-                  }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                >
-                  <option value="">Chọn cơ sở</option>
-                  {properties.map((property) => (
-                    <option key={property.id} value={property.id}>{property.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Phòng
-                <select
-                  required
-                  value={paymentForm.roomId}
-                  onChange={(event) => setPaymentForm((current) => ({
-                    ...current,
-                    roomId: event.target.value,
-                    invoiceId: "",
-                    amount: "",
-                  }))}
-                  disabled={!paymentForm.propertyId}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                >
-                  <option value="">{paymentForm.propertyId ? "Chọn phòng" : "Chọn cơ sở trước"}</option>
-                  {paymentRooms.map((room) => (
-                    <option key={roomKey(room)} value={roomKey(room)}>
-                      {room.roomCode || room.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Hóa đơn
-                <select
-                  required
-                  value={paymentForm.invoiceId}
-                  onChange={(event) => selectPaymentInvoice(event.target.value)}
-                  disabled={!paymentForm.roomId}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                >
-                  <option value="">{paymentForm.roomId ? "Chọn hóa đơn" : "Chọn phòng trước"}</option>
-                  {paymentInvoices.map((invoice) => (
-                    <option key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceCode} - {invoice.roomCode || "Chưa gán"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Số tiền nhận
-                <input
-                  required
-                  min="1"
-                  type="number"
-                  value={paymentForm.amount}
-                  onChange={(event) => setPaymentForm((current) => ({ ...current, amount: event.target.value }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                />
-              </label>
-              <label className="grid gap-1 text-sm font-bold">
-                Ghi chú
-                <input
-                  value={paymentForm.note}
-                  onChange={(event) => setPaymentForm((current) => ({ ...current, note: event.target.value }))}
-                  className="h-10 rounded-lg border border-[#cbd5e1] px-3"
-                />
-              </label>
-            </div>
-            <button
-              type="submit"
-              disabled={saving === "payment"}
-              className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-60"
-            >
-              {saving === "payment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />}
-              Xác nhận đã nhận tiền
-            </button>
-          </form>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
+
+      {isOverrideModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-[#0f172a]">
+            <button
+              type="button"
+              onClick={() => setIsOverrideModalOpen(false)}
+              className="absolute right-4 top-4 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+              aria-label="Đóng"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <form
+              onSubmit={submitOverride}
+              className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4"
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-[#3156b6]" />
+                <h2 className="text-sm font-black">
+                  Điều chỉnh giá theo tháng
+                </h2>
+              </div>
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-sm font-bold">
+                  Cơ sở
+                  <select
+                    required
+                    value={overrideForm.propertyId}
+                    onChange={(event) =>
+                      setOverrideForm((current) => ({
+                        ...current,
+                        propertyId: event.target.value,
+                        roomId: "",
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  >
+                    <option value="">Chọn cơ sở</option>
+                    {properties.map((property) => (
+                      <option key={property.id} value={property.id}>
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Phòng
+                  <select
+                    required
+                    value={overrideForm.roomId}
+                    onChange={(event) =>
+                      setOverrideForm((current) => ({
+                        ...current,
+                        roomId: event.target.value,
+                      }))
+                    }
+                    disabled={!overrideForm.propertyId}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  >
+                    <option value="">
+                      {overrideForm.propertyId
+                        ? "Chọn phòng"
+                        : "Chọn cơ sở trước"}
+                    </option>
+                    {overrideRooms.map((room) => (
+                      <option key={roomKey(room)} value={roomKey(room)}>
+                        {room.roomCode || room.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Tháng
+                  <input
+                    required
+                    type="month"
+                    value={overrideForm.billingPeriod}
+                    onChange={(event) =>
+                      setOverrideForm((current) => ({
+                        ...current,
+                        billingPeriod: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Giá điều chỉnh
+                  <input
+                    required
+                    min="1"
+                    type="number"
+                    value={overrideForm.overrideMonthlyRent}
+                    onChange={(event) =>
+                      setOverrideForm((current) => ({
+                        ...current,
+                        overrideMonthlyRent: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Ghi chú
+                  <input
+                    value={overrideForm.reason}
+                    onChange={(event) =>
+                      setOverrideForm((current) => ({
+                        ...current,
+                        reason: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  />
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={saving === "override"}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {saving === "override" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Lưu điều chỉnh
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-[#0f172a]">
+            <button
+              type="button"
+              onClick={() => setIsPaymentModalOpen(false)}
+              className="absolute right-4 top-4 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+              aria-label="Đóng"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <form
+              onSubmit={submitPayment}
+              className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4"
+            >
+              <div className="mb-4 flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+                <h2 className="text-sm font-black">
+                  Xác nhận thanh toán thủ công
+                </h2>
+              </div>
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-sm font-bold">
+                  Cơ sở
+                  <select
+                    required
+                    value={paymentForm.propertyId}
+                    onChange={(event) =>
+                      setPaymentForm((current) => ({
+                        ...current,
+                        propertyId: event.target.value,
+                        roomId: "",
+                        invoiceId: "",
+                        amount: "",
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  >
+                    <option value="">Chọn cơ sở</option>
+                    {properties.map((property) => (
+                      <option key={property.id} value={property.id}>
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Phòng
+                  <select
+                    required
+                    value={paymentForm.roomId}
+                    onChange={(event) =>
+                      setPaymentForm((current) => ({
+                        ...current,
+                        roomId: event.target.value,
+                        invoiceId: "",
+                        amount: "",
+                      }))
+                    }
+                    disabled={!paymentForm.propertyId}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  >
+                    <option value="">
+                      {paymentForm.propertyId
+                        ? "Chọn phòng"
+                        : "Chọn cơ sở trước"}
+                    </option>
+                    {paymentRooms.map((room) => (
+                      <option key={roomKey(room)} value={roomKey(room)}>
+                        {room.roomCode || room.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Hóa đơn
+                  <select
+                    required
+                    value={paymentForm.invoiceId}
+                    onChange={(event) =>
+                      selectPaymentInvoice(event.target.value)
+                    }
+                    disabled={!paymentForm.roomId}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  >
+                    <option value="">
+                      {paymentForm.roomId ? "Chọn hóa đơn" : "Chọn phòng trước"}
+                    </option>
+                    {paymentInvoices.map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.invoiceCode} - {invoice.roomCode || "Chưa gán"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Số tiền nhận
+                  <input
+                    required
+                    min="1"
+                    type="number"
+                    value={paymentForm.amount}
+                    onChange={(event) =>
+                      setPaymentForm((current) => ({
+                        ...current,
+                        amount: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm font-bold">
+                  Ghi chú
+                  <input
+                    value={paymentForm.note}
+                    onChange={(event) =>
+                      setPaymentForm((current) => ({
+                        ...current,
+                        note: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                  />
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={saving === "payment"}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {saving === "payment" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Banknote className="h-4 w-4" />
+                )}
+                Xác nhận đã nhận tiền
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {selectedInvoice && (
-        <section className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-          <h2 className="text-sm font-black">Chi tiết {selectedInvoice.invoiceCode}</h2>
+        <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <h2 className="text-sm font-black">
+            Chi tiết {selectedInvoice.invoiceCode}
+          </h2>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="overflow-hidden rounded-lg border border-[#e2e8f0]">
+            <div className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#f8fafc] text-xs uppercase text-[#64748b]">
+                <thead className="bg-[#f8fafc] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="px-3 py-2">Khoản</th>
                     <th className="px-3 py-2 text-right">Số tiền</th>
@@ -609,20 +869,29 @@ export default function BillingPage() {
                 </thead>
                 <tbody>
                   {selectedInvoice.lines.map((line) => (
-                    <tr key={line.id || line.description} className="border-t border-[#e2e8f0]">
+                    <tr
+                      key={line.id || line.description}
+                      className="border-t border-[#e2e8f0] dark:border-white/10"
+                    >
                       <td className="px-3 py-2">
-                        <p className="font-bold">{line.description || typeLabel(line.lineType)}</p>
-                        <p className="text-xs text-[#64748b]">{typeLabel(line.lineType)}</p>
+                        <p className="font-bold">
+                          {line.description || typeLabel(line.lineType)}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {typeLabel(line.lineType)}
+                        </p>
                       </td>
-                      <td className="px-3 py-2 text-right font-black">{formatMoney(line.amount)}</td>
+                      <td className="px-3 py-2 text-right font-black">
+                        {formatMoney(line.amount)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="overflow-hidden rounded-lg border border-[#e2e8f0]">
+            <div className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#f8fafc] text-xs uppercase text-[#64748b]">
+                <thead className="bg-[#f8fafc] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="px-3 py-2">Thanh toán</th>
                     <th className="px-3 py-2 text-right">Số tiền</th>
@@ -631,19 +900,35 @@ export default function BillingPage() {
                 <tbody>
                   {selectedInvoice.paymentHistory.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-4 text-sm font-semibold text-[#64748b]" colSpan={2}>
+                      <td
+                        className="px-3 py-4 text-sm font-semibold text-slate-500 dark:text-slate-400"
+                        colSpan={2}
+                      >
                         Chưa có lịch sử thanh toán.
                       </td>
                     </tr>
-                  ) : selectedInvoice.paymentHistory.map((payment) => (
-                    <tr key={payment.id} className="border-t border-[#e2e8f0]">
-                      <td className="px-3 py-2">
-                        <p className="font-bold">{payment.payerName || payment.provider || "Thủ công"}</p>
-                        <p className="text-xs text-[#64748b]">{payment.allocatedAt || payment.confirmedAt}</p>
-                      </td>
-                      <td className="px-3 py-2 text-right font-black">{formatMoney(payment.amount)}</td>
-                    </tr>
-                  ))}
+                  ) : (
+                    selectedInvoice.paymentHistory.map((payment) => (
+                      <tr
+                        key={payment.id}
+                        className="border-t border-[#e2e8f0] dark:border-white/10"
+                      >
+                        <td className="px-3 py-2">
+                          <p className="font-bold">
+                            {payment.payerName ||
+                              payment.provider ||
+                              "Thủ công"}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {payment.allocatedAt || payment.confirmedAt}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2 text-right font-black">
+                          {formatMoney(payment.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

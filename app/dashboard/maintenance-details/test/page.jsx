@@ -71,7 +71,7 @@ function moneyFormat(value) {
 function Card({ children, className = "" }) {
   return (
     <section
-      className={`rounded-xl border border-[#d9e1ef] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}
+      className={`rounded-xl border border-[#d9e1ef] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}
     >
       {children}
     </section>
@@ -85,7 +85,7 @@ function SectionTitle({ icon: Icon, title, action }) {
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e9efff] text-[#3556a8]">
           <Icon className="h-4 w-4" />
         </span>
-        <h2 className="text-base font-bold text-[#0f172a]">{title}</h2>
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">{title}</h2>
       </div>
       {action}
     </div>
@@ -95,10 +95,10 @@ function SectionTitle({ icon: Icon, title, action }) {
 function StatBlock({ label, value }) {
   return (
     <div className="rounded-lg bg-[#eef3ff] px-4 py-3">
-      <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm font-bold text-[#0f172a]">{value}</p>
+      <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{value}</p>
     </div>
   );
 }
@@ -106,9 +106,9 @@ function StatBlock({ label, value }) {
 function AttachmentTile({ item }) {
   if (item.kind === "file") {
     return (
-      <div className="flex h-full min-h-[160px] flex-col items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-[#fafbff] p-4 text-center">
-        <FileVideo className="h-9 w-9 text-[#6b7280]" />
-        <p className="mt-4 max-w-[160px] break-words text-xs font-semibold text-[#475569]">
+      <div className="flex h-full min-h-[160px] flex-col items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#fafbff] dark:bg-white/5 p-4 text-center">
+        <FileVideo className="h-9 w-9 text-slate-500 dark:text-slate-400" />
+        <p className="mt-4 max-w-[160px] break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
           {item.label}
         </p>
       </div>
@@ -116,7 +116,7 @@ function AttachmentTile({ item }) {
   }
 
   return (
-    <div className="relative h-full min-h-[160px] overflow-hidden rounded-lg border border-[#d9e1ef] bg-[#eef2ff]">
+    <div className="relative h-full min-h-[160px] overflow-hidden rounded-lg border border-[#d9e1ef] dark:border-white/10 bg-[#eef2ff]">
       <Image
         src={item.src}
         alt={item.label}
@@ -202,8 +202,8 @@ export default function MaintenanceDetailTestPage() {
 
   const progressTone =
     status === "Đã hoàn tất"
-      ? "bg-emerald-50 text-emerald-700"
-      : "bg-amber-50 text-amber-700";
+      ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      : "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
 
   const advanceProgress = () => {
     setCurrentStage((value) => Math.min(value + 1, timelineBase.length - 1));
@@ -218,34 +218,34 @@ export default function MaintenanceDetailTestPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f7fb] px-4 py-6 text-[#0f172a] sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f4f7fb] dark:bg-white/5 px-4 py-6 text-slate-900 dark:text-white sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1480px] flex-col gap-6">
         <div className="flex items-center justify-between gap-4">
           <Link
             href="/dashboard/maintenance"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#475569] hover:text-[#0f172a]"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             Quay lại danh sách bảo trì
           </Link>
-          <div className="rounded-full bg-[#091426] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white">
+          <div className="rounded-full bg-[#1e40af] dark:bg-[#2563eb] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-white">
             Đường dẫn test
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-xl border border-[#d9e1ef] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(9,20,38,0.05)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-xl border border-[#d9e1ef] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-3 shadow-[0_1px_2px_rgba(9,20,38,0.05)] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e9efff] text-[#3556a8]">
               <BadgeInfo className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-sm font-bold text-[#0f172a]">{notice}</p>
-              <p className="mt-1 text-xs text-[#64748b]">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{notice}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Đồng bộ lần cuối 2 phút trước.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-[#64748b]">
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
             <Clock3 className="h-4 w-4" />
             24/10/2023 · 09:15 AM
           </div>
@@ -253,10 +253,10 @@ export default function MaintenanceDetailTestPage() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid gap-6">
-            <section className="flex flex-col gap-4 rounded-xl border border-[#d9e1ef] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] lg:flex-row lg:items-start lg:justify-between">
+            <section className="flex flex-col gap-4 rounded-xl border border-[#d9e1ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-black tracking-[-0.02em] text-[#0f172a]">
+                  <h1 className="text-2xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">
                     Ticket T-1002
                   </h1>
                   <span
@@ -265,7 +265,7 @@ export default function MaintenanceDetailTestPage() {
                     {status}
                   </span>
                 </div>
-                <p className="mt-2 flex items-center gap-2 text-sm text-[#64748b]">
+                <p className="mt-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                   <Clock3 className="h-4 w-4" />
                   Ngày tạo: 24/10/2023 · 09:15 AM
                 </p>
@@ -275,7 +275,7 @@ export default function MaintenanceDetailTestPage() {
                 <button
                   type="button"
                   onClick={advanceProgress}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c9d4ea] bg-white px-4 text-sm font-bold text-[#0f172a] hover:bg-[#f7faff]"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c9d4ea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f7faff] dark:hover:bg-white/5"
                 >
                   <ChevronRight className="h-4 w-4 rotate-180" />
                   Cập nhật tiến độ
@@ -297,11 +297,11 @@ export default function MaintenanceDetailTestPage() {
                 <StatBlock label="Loại sự cố" value="Điện" />
                 <StatBlock label="Vị trí/Phòng" value="P.102 (Tầng 1)" />
               </div>
-              <div className="mt-4 rounded-lg bg-[#f8fbff] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+              <div className="mt-4 rounded-lg bg-[#f8fbff] dark:bg-white/5 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
                   Mô tả
                 </p>
-                <p className="mt-2 text-sm leading-6 text-[#334155]">
+                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
                   Đèn nhấp nháy liên tục ở khu vực phòng khách. Người thuê báo
                   cáo tình trạng này xảy ra thường xuyên khi bật điều hòa. Có
                   thể do lỏng kết nối từ trần hoặc hỏng chấn lưu LED.
@@ -328,19 +328,19 @@ export default function MaintenanceDetailTestPage() {
 
             <Card className="p-5">
               <SectionTitle icon={Upload} title="Sau khi sửa" />
-              <div className="mt-4 rounded-xl border border-dashed border-[#c9d4ea] bg-[#fbfcff] p-8 text-center">
+              <div className="mt-4 rounded-xl border border-dashed border-[#c9d4ea] dark:border-white/10 bg-[#fbfcff] dark:bg-white/5 p-8 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#eef3ff] text-[#3556a8]">
                   <Camera className="h-6 w-6" />
                 </div>
-                <p className="mt-4 text-sm font-bold text-[#334155]">
+                <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-200">
                   Chưa có ảnh sau khi sửa chữa
                 </p>
-                <p className="mt-1 text-xs text-[#64748b]">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Thêm ảnh hoàn tất để khách thuê dễ đối chiếu.
                 </p>
                 <button
                   type="button"
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#c9d4ea] bg-white px-4 py-2 text-sm font-bold text-[#0f172a] hover:bg-[#f7faff]"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#c9d4ea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f7faff] dark:hover:bg-white/5"
                 >
                   <Upload className="h-4 w-4" />
                   Tải lên ảnh hoàn tất
@@ -351,8 +351,8 @@ export default function MaintenanceDetailTestPage() {
             <Card className="p-5">
               <SectionTitle icon={Wrench} title="Chi tiết thực hiện" />
               <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="rounded-xl border border-[#e2e8f0] bg-[#fbfcff] p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                <div className="rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-[#fbfcff] dark:bg-white/5 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
                     Thợ sửa
                   </p>
                   <div className="mt-3 flex items-center gap-3">
@@ -360,10 +360,10 @@ export default function MaintenanceDetailTestPage() {
                       NV
                     </span>
                     <div>
-                      <p className="text-sm font-bold text-[#0f172a]">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">
                         Nguyễn Văn A
                       </p>
-                      <p className="text-xs text-[#64748b]">Thợ điện báo cáo</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Thợ điện báo cáo</p>
                     </div>
                   </div>
 
@@ -373,8 +373,8 @@ export default function MaintenanceDetailTestPage() {
                         key={item.name}
                         className="flex items-center justify-between gap-4 py-2 text-sm"
                       >
-                        <span className="text-[#334155]">{item.name}</span>
-                        <span className="shrink-0 font-bold text-[#0f172a]">
+                        <span className="text-slate-700 dark:text-slate-200">{item.name}</span>
+                        <span className="shrink-0 font-bold text-slate-900 dark:text-white">
                           {item.quantity} x {moneyFormat(item.price)}
                         </span>
                       </div>
@@ -383,7 +383,7 @@ export default function MaintenanceDetailTestPage() {
                 </div>
 
                 <div className="rounded-xl bg-[#eef3ff] p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#64748b]">
+                  <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
                     Tổng chi phí thực tế
                   </p>
                   <p className="mt-3 text-4xl font-black tracking-[-0.03em] text-[#163fa3]">
@@ -398,11 +398,11 @@ export default function MaintenanceDetailTestPage() {
 
             <Card className="p-5">
               <SectionTitle icon={Star} title="Đánh giá của khách" />
-              <div className="mt-4 rounded-xl bg-[#f3f6ff] p-5">
+              <div className="mt-4 rounded-xl bg-[#f3f6ff] dark:bg-white/5 p-5">
                 <div className="flex items-center justify-center">
                   <RatingStars />
                 </div>
-                <p className="mt-4 text-center text-sm italic leading-6 text-[#475569]">
+                <p className="mt-4 text-center text-sm italic leading-6 text-slate-600 dark:text-slate-300">
                   “Khách thuê chưa gửi đánh giá. Yêu cầu đánh giá sẽ được gửi
                   sau khi hoàn tất.”
                 </p>
@@ -434,14 +434,14 @@ export default function MaintenanceDetailTestPage() {
               </div>
             </Card>
 
-            <div className="mt-4 grid gap-3 rounded-xl border border-[#d9e1ef] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+            <div className="mt-4 grid gap-3 rounded-xl border border-[#d9e1ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e9efff] text-[#3556a8]">
                   <MapPin className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-[#0f172a]">Vị trí</p>
-                  <p className="text-xs text-[#64748b]">P.102 - Tầng 1</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Vị trí</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">P.102 - Tầng 1</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -449,10 +449,10 @@ export default function MaintenanceDetailTestPage() {
                   <Clock3 className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-[#0f172a]">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">
                     Mốc hiện tại
                   </p>
-                  <p className="text-xs text-[#64748b]">{summary.stageLabel}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{summary.stageLabel}</p>
                 </div>
               </div>
             </div>

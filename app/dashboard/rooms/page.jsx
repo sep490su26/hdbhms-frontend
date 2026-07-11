@@ -34,13 +34,34 @@ import { DashboardPagination } from "@/components/dashboard/DashboardPagination"
 const money = new Intl.NumberFormat("vi-VN");
 
 const roomStatus = {
-  occupied: ["Đang thuê", "bg-blue-50 text-blue-800"],
-  available: ["Trống", "bg-emerald-50 text-emerald-700"],
-  maintenance: ["Bảo trì", "bg-red-50 text-red-700"],
-  soonVacant: ["Sắp trống", "bg-orange-50 text-orange-700"],
-  onHolde: ["Đang giữ cọc", "bg-orange-50 text-orange-700"],
-  deposited: ["Đã đặt cọc", "bg-amber-50 text-amber-700"],
-  expired: ["Hết hạn", "bg-purple-50 text-purple-700"],
+  occupied: [
+    "Đang thuê",
+    "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300",
+  ],
+  available: [
+    "Trống",
+    "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  ],
+  maintenance: [
+    "Bảo trì",
+    "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300",
+  ],
+  soonVacant: [
+    "Sắp trống",
+    "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  ],
+  onHolde: [
+    "Đang giữ cọc",
+    "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  ],
+  deposited: [
+    "Đã đặt cọc",
+    "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
+  ],
+  expired: [
+    "Hết hạn",
+    "bg-purple-50 dark:bg-blue-500/10 text-purple-700 dark:text-blue-300",
+  ],
 };
 
 const views = [
@@ -82,14 +103,16 @@ function Modal({ title, children, onClose, footer }) {
       aria-modal="true"
       aria-label={title}
     >
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4">
-          <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="rounded-md p-2 text-[#505f76] hover:bg-[#f2f4f6]"
+            className="rounded-md p-2 text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5"
           >
             <X className="h-5 w-5" />
           </button>
@@ -98,7 +121,9 @@ function Modal({ title, children, onClose, footer }) {
           {children}
         </div>
         {footer && (
-          <div className="border-t border-[#e2e8f0] px-6 py-4">{footer}</div>
+          <div className="border-t border-[#e2e8f0] dark:border-white/10 px-6 py-4">
+            {footer}
+          </div>
         )}
       </div>
     </div>
@@ -112,22 +137,24 @@ function ExportConfirm({ title, filename, description, onClose, onConfirm }) {
       onClose={onClose}
       footer={
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#6b7280]">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             File sẽ được tải về máy:{" "}
-            <span className="font-bold text-[#091426]">{filename}</span>
+            <span className="font-bold text-slate-900 dark:text-white">
+              {filename}
+            </span>
           </p>
           <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-[#091426]"
+              className="h-10 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-4 text-sm font-bold text-slate-900 dark:text-white"
             >
               Hủy
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              className="h-10 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white"
+              className="h-10 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
             >
               Xuất file
             </button>
@@ -136,12 +163,14 @@ function ExportConfirm({ title, filename, description, onClose, onConfirm }) {
       }
     >
       <div className="grid gap-4">
-        <p className="text-sm leading-6 text-[#45474c]">{description}</p>
+        <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {description}
+        </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {["CSV", "Dữ liệu đang lọc", "Tải về máy"].map((item) => (
             <div
               key={item}
-              className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 text-sm font-bold text-[#091426]"
+              className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-[#f7f9fb] dark:bg-white/5 p-4 text-sm font-bold text-slate-900 dark:text-white"
             >
               {item}
             </div>
@@ -168,10 +197,11 @@ function StatusBadge({ value, map }) {
 
 function IconButton({ label, icon: Icon, onClick, tone = "neutral" }) {
   const tones = {
-    neutral: "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]",
-    good: "text-emerald-600 hover:bg-emerald-50",
-    warn: "text-blue-600 hover:bg-blue-50",
-    bad: "text-rose-600 hover:bg-rose-50",
+    neutral:
+      "text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white",
+    good: "text-emerald-600 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10",
+    warn: "text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10",
+    bad: "text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10",
   };
 
   return (
@@ -196,10 +226,10 @@ function PageHeader({
   return (
     <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div>
-        <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">
+        <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">
           {title}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
           {description}
         </p>
       </div>
@@ -207,7 +237,7 @@ function PageHeader({
         <button
           type="button"
           onClick={onAction}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
         >
           <ActionIcon className="h-4 w-4" />
           {actionLabel}
@@ -220,7 +250,7 @@ function PageHeader({
 function Card({ children, className = "" }) {
   return (
     <section
-      className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}
+      className={`rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}
     >
       {children}
     </section>
@@ -229,7 +259,7 @@ function Card({ children, className = "" }) {
 
 function FilterBar({ children }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
       {children}
     </div>
   );
@@ -239,9 +269,9 @@ function SelectPill({ icon: Icon, children }) {
   return (
     <button
       type="button"
-      className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm text-[#191c1e] hover:border-[#091426]"
+      className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm text-slate-900 dark:text-white hover:border-[#1e40af]"
     >
-      {Icon && <Icon className="h-4 w-4 text-[#505f76]" />}
+      {Icon && <Icon className="h-4 w-4 text-slate-600 dark:text-slate-300" />}
       {children}
     </button>
   );
@@ -251,44 +281,50 @@ const STATUS_META = {
   VACANT: {
     label: "Trống",
     dot: "bg-emerald-500",
-    badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    card: "border-emerald-100 bg-emerald-50/80 text-emerald-900",
-    icon: "text-emerald-600",
+    badge:
+      "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
+    card: "border-emerald-100 dark:border-emerald-500/20 bg-emerald-50/80 dark:bg-slate-800/80 text-emerald-900 dark:text-emerald-300",
+    icon: "text-emerald-600 dark:text-emerald-300",
   },
   OCCUPIED: {
     label: "Đang thuê",
     dot: "bg-blue-500",
-    badge: "bg-blue-50 text-blue-700 ring-blue-200",
-    card: "border-blue-100 bg-blue-50/80 text-blue-900",
-    icon: "text-blue-600",
+    badge:
+      "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20",
+    card: "border-blue-100 dark:border-blue-500/20 bg-blue-50/80 text-blue-900 dark:text-blue-300",
+    icon: "text-blue-600 dark:text-blue-300",
   },
   RESERVED: {
     label: "Đang đặt cọc",
     dot: "bg-amber-400",
-    badge: "bg-amber-50 text-amber-700 ring-amber-200",
-    card: "border-amber-100 bg-amber-50/90 text-amber-900",
-    icon: "text-amber-600",
+    badge:
+      "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
+    card: "border-amber-100 dark:border-yellow-500/20 bg-amber-50/90 text-amber-900 dark:text-yellow-300",
+    icon: "text-amber-600 dark:text-yellow-300",
   },
   SOON_VACANT: {
     label: "Sắp trống",
     dot: "bg-orange-500",
-    badge: "bg-orange-50 text-orange-700 ring-orange-200",
-    card: "border-orange-100 bg-orange-50/90 text-orange-900",
-    icon: "text-orange-600",
+    badge:
+      "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20",
+    card: "border-orange-100 dark:border-orange-500/20 bg-orange-50/90 text-orange-900 dark:text-orange-300",
+    icon: "text-orange-600 dark:text-orange-300",
   },
   MAINTENANCE: {
     label: "Bảo trì",
     dot: "bg-red-500",
-    badge: "bg-red-50 text-red-700 ring-red-200",
-    card: "border-red-100 bg-red-50/90 text-red-900",
-    icon: "text-red-600",
+    badge:
+      "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300 ring-red-200 dark:ring-rose-500/20",
+    card: "border-red-100 dark:border-rose-500/20 bg-red-50/90 text-red-900 dark:text-rose-300",
+    icon: "text-red-600 dark:text-rose-300",
   },
   EXPIRED: {
     label: "Hết hạn HĐ",
     dot: "bg-purple-500",
-    badge: "bg-purple-50 text-purple-700 ring-purple-200",
-    card: "border-purple-100 bg-purple-50/90 text-purple-900",
-    icon: "text-purple-600",
+    badge:
+      "bg-purple-50 dark:bg-blue-500/10 text-purple-700 dark:text-blue-300 ring-purple-200 dark:ring-blue-500/20",
+    card: "border-purple-100 dark:border-blue-500/20 bg-purple-50/90 text-purple-900 dark:text-blue-300",
+    icon: "text-purple-600 dark:text-blue-300",
   },
 };
 
@@ -381,7 +417,7 @@ function normalizeApiFloorPlanRoom(apiRoom) {
     image: imageUrls[0] ?? ROOM_PLACEHOLDER_IMAGE,
     images: imageUrls,
     buildingName:
-      apiRoom.propertyName ?? apiRoom.property_name ?? "Hải ĐÄƒng House",
+      apiRoom.propertyName ?? apiRoom.property_name ?? "Hải Đăng House",
     buildingId: apiRoom.propertyId ?? apiRoom.property_id ?? "hai-dang-house",
   };
 }
@@ -402,7 +438,7 @@ function FloorTabs({ activeFloor, floors, onChange }) {
           onClick={() => onChange(floor.id)}
           className={`min-w-0 flex-1 basis-28 rounded-xl px-3 py-3 text-sm font-bold transition sm:flex-none sm:px-5 ${
             activeFloor === floor.id
-              ? "bg-white text-[#091426] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+              ? "bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
               : "text-slate-200 hover:bg-white/10 hover:text-white"
           }`}
         >
@@ -422,31 +458,31 @@ function FloorSummary({ rooms }) {
       {
         label: "Tổng phòng",
         value: rooms.length,
-        tone: "bg-white text-[#091426]",
+        tone: "bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white",
         icon: Home,
       },
       {
         label: "Phòng trống",
         value: count("VACANT"),
-        tone: "bg-emerald-50 text-emerald-700",
+        tone: "bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
         icon: BedDouble,
       },
       {
         label: "Đang thuê",
         value: count("OCCUPIED"),
-        tone: "bg-blue-50 text-blue-700",
+        tone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
         icon: UserRound,
       },
       {
         label: "Đang đặt cọc",
         value: count("RESERVED"),
-        tone: "bg-amber-50 text-amber-700",
+        tone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
         icon: CalendarClock,
       },
       {
         label: "Bảo trì",
         value: count("MAINTENANCE"),
-        tone: "bg-red-50 text-red-700",
+        tone: "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300",
         icon: Wrench,
       },
     ];
@@ -500,7 +536,7 @@ function RoomCard({ room, isSelected, onClick }) {
       aria-label={`Mở thông tin ${room.displayCode}`}
       className={`group flex h-32 min-w-0 flex-col justify-between rounded-2xl border p-4 text-left shadow-[0_14px_28px_rgba(6,16,32,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(6,16,32,0.16)] ${
         meta.card
-      } ${isSelected ? "ring-2 ring-white ring-offset-2 ring-offset-[#091426]" : ""}`}
+      } ${isSelected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1e40af]" : ""}`}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <span
@@ -541,7 +577,7 @@ function RoomGrid({ rooms, selectedRoom, onRoomClick }) {
           Chưa có phòng ở tầng này
         </p>
         <p className="mt-1 max-w-md text-sm text-slate-400">
-          Kiá»ƒm tra lại dữ liệu tầng hoặc đồng bộ danh sách phòng từ backend.
+          Kiểm tra lại dữ liệu tầng hoặc đồng bộ danh sách phòng từ backend.
         </p>
       </div>
     );
@@ -585,7 +621,7 @@ function contractStatusLabel(status) {
 function RentalHistoryPanel({ history, isLoading, error }) {
   if (isLoading) {
     return (
-      <div className="mt-5 rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
+      <div className="mt-5 rounded-3xl border border-white bg-white dark:bg-[#0f172a] p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
         <div className="h-6 w-40 animate-pulse rounded bg-slate-100" />
         <div className="mt-4 space-y-3">
           {[1, 2, 3].map((item) => (
@@ -601,7 +637,7 @@ function RentalHistoryPanel({ history, isLoading, error }) {
 
   if (error) {
     return (
-      <div className="mt-5 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700">
+      <div className="mt-5 rounded-3xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-5 text-sm font-bold text-rose-700 dark:text-rose-300">
         {error}
       </div>
     );
@@ -610,12 +646,12 @@ function RentalHistoryPanel({ history, isLoading, error }) {
   const contracts = history?.contracts || [];
   if (contracts.length === 0) {
     return (
-      <div className="mt-5 rounded-3xl border border-white bg-white p-5 text-center shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
+      <div className="mt-5 rounded-3xl border border-white bg-white dark:bg-[#0f172a] p-5 text-center shadow-[0_16px_40px_rgba(6,16,32,0.08)]">
         <FileText className="mx-auto h-9 w-9 text-slate-400" />
-        <p className="mt-3 text-sm font-black text-[#091426]">
+        <p className="mt-3 text-sm font-black text-slate-900 dark:text-white">
           Chưa có lịch sử thuê
         </p>
-        <p className="mt-1 text-sm text-[#607089]">
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Phòng này chưa có hợp đồng thuê được ghi nhận.
         </p>
       </div>
@@ -629,21 +665,21 @@ function RentalHistoryPanel({ history, isLoading, error }) {
         return (
           <article
             key={contract.contractId || `${contract.contractCode}-${index}`}
-            className="rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]"
+            className="rounded-3xl border border-white bg-white dark:bg-[#0f172a] p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                   {isCurrent ? "Hợp đồng hiện tại" : "Hợp đồng cũ"}
                 </p>
-                <h3 className="mt-1 truncate text-lg font-black text-[#091426]">
+                <h3 className="mt-1 truncate text-lg font-black text-slate-900 dark:text-white">
                   {contract.contractCode || "Chưa có mã HĐ"}
                 </h3>
               </div>
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ring-1 ${
                   isCurrent
-                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"
                     : "bg-slate-50 text-slate-600 ring-slate-200"
                 }`}
               >
@@ -652,55 +688,55 @@ function RentalHistoryPanel({ history, isLoading, error }) {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl bg-[#f7f9fb] p-3">
-                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+              <div className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3">
+                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                   Thời hạn HĐ
                 </p>
-                <p className="mt-1 font-black text-[#091426]">
+                <p className="mt-1 font-black text-slate-900 dark:text-white">
                   {formatDate(contract.startDate)} -{" "}
                   {formatDate(contract.endDate)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-[#f7f9fb] p-3">
-                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+              <div className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3">
+                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                   Ngày tính tiền
                 </p>
-                <p className="mt-1 font-black text-[#091426]">
+                <p className="mt-1 font-black text-slate-900 dark:text-white">
                   {formatDate(contract.rentStartDate)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-[#f7f9fb] p-3">
-                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+              <div className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3">
+                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                   Giá thuê
                 </p>
-                <p className="mt-1 font-black text-[#091426]">
+                <p className="mt-1 font-black text-slate-900 dark:text-white">
                   {formatMoney(contract.monthlyRent || 0)}/tháng
                 </p>
               </div>
-              <div className="rounded-2xl bg-[#f7f9fb] p-3">
-                <p className="text-[10px] font-black uppercase text-[#6b7280]">
+              <div className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3">
+                <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                   Chu kỳ
                 </p>
-                <p className="mt-1 font-black text-[#091426]">
+                <p className="mt-1 font-black text-slate-900 dark:text-white">
                   {formatCycle(contract.paymentCycleMonths)}
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[#e2e8f0] bg-white p-3">
-              <p className="text-[10px] font-black uppercase text-[#6b7280]">
+            <div className="mt-4 rounded-2xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-3">
+              <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                 Người thuê chính
               </p>
-              <p className="mt-1 text-sm font-black text-[#091426]">
+              <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
                 {contract.primaryTenant?.fullName || "Chưa có"}
               </p>
-              <p className="text-xs font-semibold text-[#607089]">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {contract.primaryTenant?.phone || "Chưa có SĐT"}
               </p>
             </div>
 
             <div className="mt-4">
-              <p className="text-[10px] font-black uppercase text-[#6b7280]">
+              <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                 Người ở trong phòng
               </p>
               <div className="mt-2 space-y-2">
@@ -710,24 +746,24 @@ function RentalHistoryPanel({ history, isLoading, error }) {
                       occupant.tenantProfileId ||
                       `${occupant.occupantRole}-${occupant.fullName}-${occupantIndex}`
                     }
-                    className="rounded-2xl bg-[#f7f9fb] p-3 text-sm"
+                    className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3 text-sm"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-black text-[#091426]">
+                        <p className="truncate font-black text-slate-900 dark:text-white">
                           {occupant.fullName || "Chưa có tên"}
                         </p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-[#607089]">
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
                           {occupant.phone || "Chưa có SĐT"}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">
+                      <span className="shrink-0 rounded-full border border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 px-2 py-1 text-[10px] font-black text-indigo-700 dark:text-blue-300">
                         {OCCUPANT_ROLE_LABELS[occupant.occupantRole] ||
                           occupant.occupantRole ||
                           "Chưa rõ"}
                       </span>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold text-[#607089]">
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <span>Vào: {formatDate(occupant.moveInDate)}</span>
                       <span>
                         Rời:{" "}
@@ -742,7 +778,7 @@ function RentalHistoryPanel({ history, isLoading, error }) {
             </div>
 
             {contract.contractFile?.fileId && (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+              <div className="mt-4 rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 p-3 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                 Có file hợp đồng scan/PDF.
               </div>
             )}
@@ -859,13 +895,13 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
         onClick={onClose}
       />
       <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-[#f2f4f6] shadow-2xl sm:max-w-[430px]"
+        className="fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-[#f2f4f6] dark:bg-white/5 shadow-2xl sm:max-w-[430px]"
         role="dialog"
         aria-modal="true"
         aria-label={`Chi tiết ${room.displayCode}`}
       >
-        <div className="shrink-0 overflow-hidden bg-[#091426]">
-          <div className="relative h-56 overflow-hidden bg-[#091426]">
+        <div className="shrink-0 overflow-hidden bg-[#1e40af] dark:bg-[#2563eb]">
+          <div className="relative h-56 overflow-hidden bg-[#1e40af] dark:bg-[#2563eb]">
             <div
               role="img"
               aria-label={detail.name}
@@ -874,7 +910,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                 backgroundImage: `url(${displayActiveImage || ROOM_PLACEHOLDER_IMAGE})`,
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#091426] to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1e40af] to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-5">
               <p className="flex items-center gap-2 text-xs font-bold uppercase text-white/80">
                 <Home className="h-4 w-4" />
@@ -888,7 +924,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
               type="button"
               onClick={onClose}
               aria-label="Đóng"
-              className="absolute right-4 top-4 rounded-full bg-white/90 p-2 text-[#091426] shadow-lg hover:bg-white"
+              className="absolute right-4 top-4 rounded-full bg-white/90 p-2 text-slate-900 dark:text-white shadow-lg hover:bg-white dark:bg-[#0f172a]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -916,7 +952,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-          <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 shadow-[0_8px_24px_rgba(6,16,32,0.06)]">
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-white dark:bg-[#0f172a] p-1 shadow-[0_8px_24px_rgba(6,16,32,0.06)]">
             {[
               ["overview", "Tổng quan"],
               ["history", "Lịch sử thuê"],
@@ -927,8 +963,8 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                 onClick={() => setActiveTab(value)}
                 className={`h-10 rounded-xl text-sm font-black transition ${
                   activeTab === value
-                    ? "bg-[#091426] text-white"
-                    : "text-[#607089] hover:bg-[#f7f9fb] hover:text-[#091426]"
+                    ? "bg-[#1e40af] dark:bg-[#2563eb] text-white"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-[#f7f9fb] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 {label}
@@ -937,14 +973,14 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
           </div>
 
           <div
-            className={`${activeTab === "overview" ? "" : "hidden"} rounded-3xl border border-white bg-white p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]`}
+            className={`${activeTab === "overview" ? "" : "hidden"} rounded-3xl border border-white bg-white dark:bg-[#0f172a] p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-[#6b7280]">
+                <p className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">
                   Mã phòng
                 </p>
-                <p className="truncate text-3xl font-black text-[#091426]">
+                <p className="truncate text-3xl font-black text-slate-900 dark:text-white">
                   {room.displayCode}
                 </p>
               </div>
@@ -980,12 +1016,12 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                 ].map(({ label, value }) => (
                   <div
                     key={label}
-                    className="min-w-0 rounded-2xl bg-[#f7f9fb] p-4"
+                    className="min-w-0 rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-4"
                   >
-                    <p className="truncate text-[10px] font-black uppercase text-[#6b7280]">
+                    <p className="truncate text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                       {label}
                     </p>
-                    <p className="mt-1 truncate text-sm font-black text-[#091426]">
+                    <p className="mt-1 truncate text-sm font-black text-slate-900 dark:text-white">
                       {value}
                     </p>
                   </div>
@@ -998,7 +1034,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                 {room.badges.map((badge) => (
                   <span
                     key={badge}
-                    className="rounded-full bg-[#edf2f7] px-3 py-1 text-xs font-black text-[#334155]"
+                    className="rounded-full bg-[#edf2f7] px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-200"
                   >
                     {badge}
                   </span>
@@ -1006,24 +1042,24 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
               </div>
             )}
 
-            <div className="mt-5 rounded-2xl border border-[#e2e8f0] bg-white p-4">
-              <p className="text-[10px] font-black uppercase text-[#6b7280]">
+            <div className="mt-5 rounded-2xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+              <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                 Ghi chú
               </p>
-              <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
                 {detail.note || "Chưa có ghi chú cho phòng này."}
               </p>
             </div>
 
             {tenant && (
-              <div className="mt-5 rounded-2xl bg-blue-50 p-4">
-                <p className="text-[10px] font-black uppercase text-blue-700">
+              <div className="mt-5 rounded-2xl bg-blue-50 dark:bg-blue-500/10 p-4">
+                <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-300">
                   Khách đang ở
                 </p>
                 <p className="mt-1 truncate text-sm font-black text-blue-950">
                   {tenant.name}
                 </p>
-                <p className="mt-0.5 truncate text-xs font-semibold text-blue-800">
+                <p className="mt-0.5 truncate text-xs font-semibold text-blue-800 dark:text-blue-300">
                   {tenant.phone}
                 </p>
               </div>
@@ -1038,10 +1074,10 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
           )}
         </div>
 
-        <div className="grid gap-3 border-t border-[#dfe5ee] bg-white p-5">
+        <div className="grid gap-3 border-t border-[#dfe5ee] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5">
           <Link
             href={getRoomDetailHref(room)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#091426] px-4 text-sm font-black text-white hover:bg-[#16253a]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-black text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
           >
             <Eye className="h-4 w-4" />
             Xem chi tiết
@@ -1049,7 +1085,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
           {room.status === "VACANT" && (
             <button
               type="button"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] bg-white px-4 text-sm font-black text-[#091426] hover:bg-[#f7f9fb]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f7f9fb] dark:hover:bg-white/5"
             >
               <CalendarClock className="h-4 w-4" />
               Đặt lịch xem phòng
@@ -1058,7 +1094,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
           {canCreateMaintenance && (
             <button
               type="button"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] bg-white px-4 text-sm font-black text-[#091426] hover:bg-[#f7f9fb]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f7f9fb] dark:hover:bg-white/5"
             >
               <Wrench className="h-4 w-4" />
               Tạo phiếu bảo trì
@@ -1098,7 +1134,7 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
       } catch {
         if (isMounted) {
           setRooms([]);
-          setSourceWarning("Không thá»ƒ tải dữ liệu từ API /rooms.");
+          setSourceWarning("Không thể tải dữ liệu từ API /rooms.");
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -1138,11 +1174,11 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[28px] bg-[#091426] p-4 shadow-[0_24px_80px_rgba(3,10,24,0.28)] sm:p-6">
+    <section className="overflow-hidden rounded-[28px] bg-[#1e40af] dark:bg-[#1e40af] p-4 shadow-[0_24px_80px_rgba(3,10,24,0.28)] sm:p-6">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase text-slate-400">
-            Hải ĐÄƒng House
+            Hải Đăng House
           </p>
           <h2 className="mt-2 text-3xl font-black text-white">Sơ đồ phòng</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
@@ -1294,26 +1330,26 @@ function RoomsListPage({ query }) {
           type="button"
           onClick={() => setExportPrompt(true)}
           aria-label="Xuất danh sách phòng"
-          className="ml-auto rounded-lg border border-[#e2e8f0] p-2 text-[#505f76] hover:border-[#091426]"
+          className="ml-auto rounded-lg border border-[#e2e8f0] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]"
         >
           <Download className="h-4 w-4" />
         </button>
         <button
           type="button"
-          className="rounded-lg border border-[#e2e8f0] p-2 text-[#505f76] hover:border-[#091426]"
+          className="rounded-lg border border-[#e2e8f0] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]"
         >
           <Grid3X3 className="h-4 w-4" />
         </button>
       </FilterBar>
 
       {isLoading && (
-        <div className="py-10 text-center font-bold text-[#505f76]">
+        <div className="py-10 text-center font-bold text-slate-600 dark:text-slate-300">
           Đang tải danh sách phòng...
         </div>
       )}
       {isError && (
-        <div className="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
-          Không thá»ƒ tải dữ liệu phòng. Vui lòng thử lại.
+        <div className="mt-4 rounded-lg border border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-4 text-sm font-semibold text-rose-700 dark:text-rose-300">
+          Không thể tải dữ liệu phòng. Vui lòng thử lại.
         </div>
       )}
 
@@ -1321,8 +1357,8 @@ function RoomsListPage({ query }) {
         <Card className="overflow-hidden">
           <div className="dashboard-table">
             <table className="w-full border-collapse text-left">
-              <thead className="bg-[#f2f4f6]">
-                <tr className="text-xs font-bold uppercase tracking-[0.08em] text-[#505f76]">
+              <thead className="bg-[#f2f4f6] dark:bg-white/5">
+                <tr className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">
                   <th className="px-6 py-4">Mã phòng</th>
                   <th className="px-6 py-4">Đặc điểm</th>
                   <th className="px-6 py-4">Tầng</th>
@@ -1336,11 +1372,11 @@ function RoomsListPage({ query }) {
                 {filteredRooms.map((room) => (
                   <tr
                     key={room.room_code}
-                    className="border-t border-[#e2e8f0]"
+                    className="border-t border-[#e2e8f0] dark:border-white/10"
                   >
                     <td
                       data-label="Mã phòng"
-                      className="px-6 py-4 text-sm font-bold text-[#091426]"
+                      className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white"
                     >
                       {room.room_code}
                     </td>
@@ -1351,19 +1387,19 @@ function RoomsListPage({ query }) {
                     </td>
                     <td
                       data-label="Tầng"
-                      className="px-6 py-4 text-sm text-[#45474c]"
+                      className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
                     >
                       {room.floor_name}
                     </td>
                     <td
                       data-label="Diện tích"
-                      className="px-6 py-4 text-sm text-[#45474c]"
+                      className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
                     >
                       {room.area_m2} m²
                     </td>
                     <td
                       data-label="Giá niêm yết"
-                      className="px-6 py-4 text-sm font-semibold text-[#091426]"
+                      className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white"
                     >
                       {formatMoney(room.listed_price)}
                     </td>
@@ -1385,7 +1421,7 @@ function RoomsListPage({ query }) {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-6 py-10 text-center text-sm font-semibold text-[#6b7280]"
+                      className="px-6 py-10 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
                     >
                       Không có phòng nào phù hợp.
                     </td>
@@ -1436,15 +1472,15 @@ export function RoomsManagementContent({
     <section className="grid gap-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e]">
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
             Quản lý Phòng & Tầng
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu
             vực quản trị.
           </p>
         </div>
-        <div className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] bg-white p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
+        <div className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
           {views.map((item) => {
             const Icon = item.icon;
             const isActive = view === item.value;
@@ -1456,8 +1492,8 @@ export function RoomsManagementContent({
                 onClick={() => setView(item.value)}
                 className={`inline-flex min-h-10 min-w-0 flex-1 basis-36 items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-bold transition sm:flex-none sm:px-4 ${
                   isActive
-                    ? "bg-[#091426] text-white shadow-sm"
-                    : "text-[#505f76] hover:bg-[#f2f4f6] hover:text-[#091426]"
+                    ? "bg-[#1e40af] dark:bg-[#2563eb] text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 <Icon className="h-4 w-4" />

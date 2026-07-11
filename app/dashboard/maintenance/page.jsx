@@ -45,18 +45,18 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_META = {
-  PENDING: ["Chờ tiếp nhận", "bg-amber-50 text-amber-800 ring-amber-200"],
-  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-800 ring-blue-200"],
-  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
+  PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
+  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
   WAITING_CONFIRMATION: [
     "Chờ xác nhận",
     "bg-violet-50 text-violet-800 ring-violet-200",
   ],
   COMPLETED: [
     "Hoàn tất xử lý",
-    "bg-emerald-50 text-emerald-800 ring-emerald-200",
+    "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
   ],
-  REJECTED: ["Từ chối", "bg-rose-50 text-rose-800 ring-rose-200"],
+  REJECTED: ["Từ chối", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
   CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
@@ -64,19 +64,19 @@ const BILLING_META = {
   NO_CHARGE: ["Không thu khách", "bg-slate-100 text-slate-700 ring-slate-200"],
   NOT_INVOICED: [
     "Chưa tạo hóa đơn",
-    "bg-amber-50 text-amber-800 ring-amber-200",
+    "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
   ],
-  DRAFT: ["Chờ phát hành", "bg-blue-50 text-blue-800 ring-blue-200"],
+  DRAFT: ["Chờ phát hành", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
   PENDING_PAYMENT: [
     "Chờ thanh toán",
-    "bg-orange-50 text-orange-800 ring-orange-200",
+    "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20",
   ],
   PARTIALLY_PAID: [
     "Thanh toán một phần",
-    "bg-indigo-50 text-indigo-800 ring-indigo-200",
+    "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20",
   ],
-  PAID: ["Đã thanh toán", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
-  OVERDUE: ["Quá hạn", "bg-rose-50 text-rose-800 ring-rose-200"],
+  PAID: ["Đã thanh toán", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
+  OVERDUE: ["Quá hạn", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
   VOIDED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
@@ -192,7 +192,7 @@ function shouldShowBillingStatus(ticket) {
 function Field({ label, children, className = "" }) {
   return (
     <label
-      className={`grid gap-1.5 text-sm font-bold text-[#091426] ${className}`}
+      className={`grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white ${className}`}
     >
       <span>{label}</span>
       {children}
@@ -201,22 +201,22 @@ function Field({ label, children, className = "" }) {
 }
 
 function selectClassName() {
-  return "h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#4166b2] focus:ring-2 focus:ring-[#4166b2]/10";
+  return "h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
 function inputClassName() {
-  return "h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#94a3b8] focus:border-[#4166b2] focus:ring-2 focus:ring-[#4166b2]/10";
+  return "h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
 function textareaClassName() {
-  return "min-h-28 w-full resize-y rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#94a3b8] focus:border-[#4166b2] focus:ring-2 focus:ring-[#4166b2]/10";
+  return "min-h-28 w-full resize-y rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
 function InlineNotice({ type = "info", children }) {
   const tone =
     type === "error"
-      ? "border-rose-200 bg-rose-50 text-rose-800"
-      : "border-amber-200 bg-amber-50 text-amber-900";
+      ? "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
+      : "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-900 dark:text-yellow-300";
   const Icon = type === "error" ? ShieldAlert : AlertCircle;
   return (
     <div
@@ -230,16 +230,16 @@ function InlineNotice({ type = "info", children }) {
 
 function Metric({ label, value, icon: Icon, tone }) {
   return (
-    <article className="min-h-28 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+    <article className="min-h-28 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs font-black uppercase text-[#64748b]">{label}</p>
+        <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">{label}</p>
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}
         >
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-4 truncate text-2xl font-black text-[#091426]">
+      <p className="mt-4 truncate text-2xl font-black text-slate-900 dark:text-white">
         {value}
       </p>
     </article>
@@ -361,13 +361,13 @@ export default function MaintenancePage() {
         label: "Chờ tiếp nhận",
         value: count(["PENDING"]),
         icon: Clock3,
-        tone: "bg-amber-50 text-amber-700",
+        tone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
       },
       {
         label: "Đang xử lý",
         value: count(["ACCEPTED", "IN_PROGRESS"]),
         icon: Wrench,
-        tone: "bg-blue-50 text-blue-700",
+        tone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
       },
       {
         label: "Chờ xác nhận",
@@ -379,7 +379,7 @@ export default function MaintenancePage() {
         label: "Chi phí ghi nhận",
         value: formatMoney(totalCost),
         icon: Check,
-        tone: "bg-emerald-50 text-emerald-700",
+        tone: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
       },
       {
         label: "Chi phí chủ trọ chịu",
@@ -700,10 +700,10 @@ export default function MaintenancePage() {
     <section className="grid gap-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e]">
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
             Báo sự cố & Bảo trì
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn
             tất.
           </p>
@@ -712,7 +712,7 @@ export default function MaintenancePage() {
           <button
             type="button"
             onClick={loadTickets}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-[#091426] hover:bg-[#f8fafc]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
           >
             <RefreshCcw
               className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
@@ -777,7 +777,7 @@ export default function MaintenancePage() {
           <Metric key={item.label} {...item} />
         ))}
       </div>
-      <p className="text-xs font-semibold text-[#64748b]">
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
         Chi phí ghi nhận là tổng chi phí/phạt đã ghi nhận, không đồng nghĩa đã
         thanh toán. Xem badge thanh toán trên từng phiếu để biết trạng thái thu
         tiền.
@@ -789,14 +789,14 @@ export default function MaintenancePage() {
       {isInternalOpen && (
         <form
           onSubmit={handleCreateInternalTicket}
-          className="grid gap-5 rounded-xl border border-teal-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,118,110,0.08)]"
+          className="grid gap-5 rounded-xl border border-teal-200 bg-white dark:bg-[#0f172a] p-5 shadow-[0_8px_30px_rgba(15,118,110,0.08)]"
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">
                 Tạo phiếu bảo trì nội bộ
               </h2>
-              <p className="mt-1 text-sm font-semibold text-[#64748b]">
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và
                 không phát sinh hóa đơn tenant.
               </p>
@@ -930,7 +930,7 @@ export default function MaintenancePage() {
               {internalForm.images.map((file, index) => (
                 <div
                   key={`${file.name}-${index}`}
-                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]"
+                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300"
                 >
                   <span className="line-clamp-2">{file.name}</span>
                   <button
@@ -951,7 +951,7 @@ export default function MaintenancePage() {
                 </div>
               ))}
               {internalForm.images.length < 3 && (
-                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569]">
+                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] dark:bg-white/5 text-xs font-bold text-slate-600 dark:text-slate-300">
                   <ImagePlus className="h-5 w-5" />
                   Ảnh/chứng từ
                   <input
@@ -983,19 +983,19 @@ export default function MaintenancePage() {
       {isViolationOpen && (
         <form
           onSubmit={handleCreateViolation}
-          className="grid gap-5 rounded-lg border border-rose-200 bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
+          className="grid gap-5 rounded-lg border border-rose-200 dark:border-rose-500/20 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">
                 Ghi nhận vi phạm nội quy
               </h2>
-              <p className="mt-1 text-sm font-semibold text-[#64748b]">
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Tách riêng khỏi phiếu sự cố. Reset modem/wifi được ghi nhận là
                 khoản phạt vi phạm nội quy.
               </p>
             </div>
-            <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200">
+            <span className="rounded-full bg-rose-50 dark:bg-rose-500/10 px-3 py-1 text-xs font-black uppercase text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20">
               Phạt vi phạm nội quy
             </span>
           </div>
@@ -1042,7 +1042,7 @@ export default function MaintenancePage() {
               <input
                 value="Ghi nhận ở cấp phòng"
                 disabled
-                className={`${inputClassName()} disabled:bg-[#f8fafc] disabled:text-[#64748b]`}
+                className={`${inputClassName()} disabled:bg-[#f8fafc] disabled:text-slate-500 dark:text-slate-400`}
               />
             </Field>
             <Field label="Ngày ghi nhận">
@@ -1134,7 +1134,7 @@ export default function MaintenancePage() {
               {violationForm.images.map((file, index) => (
                 <div
                   key={`${file.name}-${index}`}
-                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#475569]"
+                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300"
                 >
                   <span className="line-clamp-2">{file.name}</span>
                   <button
@@ -1155,7 +1155,7 @@ export default function MaintenancePage() {
                 </div>
               ))}
               {violationForm.images.length < 3 && (
-                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-xs font-bold text-[#475569] hover:border-[#091426]">
+                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] dark:bg-white/5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-[#1e40af]">
                   <ImagePlus className="h-5 w-5" />
                   Thêm bằng chứng
                   <input
@@ -1184,14 +1184,14 @@ export default function MaintenancePage() {
         </form>
       )}
 
-      <div className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <div className="flex items-center gap-2 text-sm font-black text-[#091426]">
+      <div className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
           <SlidersHorizontal className="h-4 w-4" />
           Bộ lọc
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <label className="relative xl:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
             <input
               value={filters.keyword}
               onChange={(event) => updateFilter("keyword", event.target.value)}
@@ -1277,11 +1277,11 @@ export default function MaintenancePage() {
 
       {error && <InlineNotice type="error">{error}</InlineNotice>}
 
-      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
         <div className="dashboard-table">
           <table className="w-full border-collapse text-left">
-            <thead className="bg-[#f2f4f6]">
-              <tr className="text-xs font-bold uppercase tracking-[0.08em] text-[#505f76]">
+            <thead className="bg-[#f2f4f6] dark:bg-white/5">
+              <tr className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">
                 <th className="px-5 py-4">Phiếu</th>
                 <th className="px-5 py-4">Vị trí</th>
                 <th className="px-5 py-4">Hạng mục</th>
@@ -1296,7 +1296,7 @@ export default function MaintenancePage() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-5 py-12 text-center text-sm font-bold text-[#64748b]"
+                    className="px-5 py-12 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1309,24 +1309,24 @@ export default function MaintenancePage() {
                 tickets.map((ticket) => (
                   <tr
                     key={ticket.id}
-                    className="border-t border-[#e2e8f0] align-top"
+                    className="border-t border-[#e2e8f0] dark:border-white/10 align-top"
                   >
                     <td data-label="Phiếu" className="px-5 py-4">
                       <div className="min-w-0">
                         <Link
                           href={`/dashboard/maintenance/${ticket.id}`}
-                          className="font-black text-[#091426] hover:text-[#3156b6]"
+                          className="font-black text-slate-900 dark:text-white hover:text-[#3156b6]"
                         >
                           {ticket.ticketCode}
                         </Link>
-                        <p className="mt-1 max-w-72 truncate text-sm font-semibold text-[#475569]">
+                        <p className="mt-1 max-w-72 truncate text-sm font-semibold text-slate-600 dark:text-slate-300">
                           {ticket.title || ticket.description}
                         </p>
                       </div>
                     </td>
                     <td
                       data-label="Vị trí"
-                      className="px-5 py-4 text-sm font-semibold text-[#334155]"
+                      className="px-5 py-4 text-sm font-semibold text-slate-700 dark:text-slate-200"
                     >
                       <p>
                         {ticket.roomCode ||
@@ -1334,20 +1334,20 @@ export default function MaintenancePage() {
                           SCOPE_LABELS[ticket.ticketScope] ||
                           ticket.ticketScope}
                       </p>
-                      <p className="mt-1 text-xs text-[#64748b]">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {ticket.propertyName || "Chưa có cơ sở"}
                       </p>
                     </td>
                     <td
                       data-label="Hạng mục"
-                      className="px-5 py-4 text-sm font-bold text-[#334155]"
+                      className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200"
                     >
                       {ticket.ticketScope === "PROPERTY_OPERATION" ? (
                         <span className="inline-flex flex-col gap-1">
                           <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
                             Bảo trì nội bộ
                           </span>
-                          <span className="text-xs font-bold text-[#64748b]">
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                             {CATEGORY_LABELS[ticket.category] ||
                               ticket.category ||
                               "Khác"}
@@ -1355,10 +1355,10 @@ export default function MaintenancePage() {
                         </span>
                       ) : ticket.category === "RULE_VIOLATION" ? (
                         <span className="inline-flex flex-col gap-1">
-                          <span className="inline-flex w-fit rounded-full bg-rose-50 px-2.5 py-1 text-xs font-black text-rose-700 ring-1 ring-rose-200">
+                          <span className="inline-flex w-fit rounded-full bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 text-xs font-black text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20">
                             Vi phạm nội quy
                           </span>
-                          <span className="text-xs font-black text-[#64748b]">
+                          <span className="text-xs font-black text-slate-500 dark:text-slate-400">
                             Reset wifi · Phạt vi phạm nội quy
                           </span>
                         </span>
@@ -1370,7 +1370,7 @@ export default function MaintenancePage() {
                     </td>
                     <td
                       data-label="Mức độ"
-                      className="px-5 py-4 text-sm font-bold text-[#334155]"
+                      className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200"
                     >
                       {PRIORITY_LABELS[ticket.priority] ||
                         ticket.priority ||
@@ -1392,13 +1392,13 @@ export default function MaintenancePage() {
                             <span className="text-xs font-black text-teal-700">
                               Chi phí nội bộ · Chủ trọ chịu
                             </span>
-                            <span className="text-xs font-bold text-[#475569]">
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                               {formatMoney(ticket.costAmount)}
                             </span>
                           </>
                         )}
                         {ticket.invoiceCode && (
-                          <span className="text-xs font-bold text-[#64748b]">
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                             {ticket.invoiceCode}
                           </span>
                         )}
@@ -1406,7 +1406,7 @@ export default function MaintenancePage() {
                     </td>
                     <td
                       data-label="Cập nhật"
-                      className="px-5 py-4 text-sm font-semibold text-[#475569]"
+                      className="px-5 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300"
                     >
                       {formatDateTime(ticket.updatedAt || ticket.createdAt)}
                     </td>
@@ -1414,7 +1414,7 @@ export default function MaintenancePage() {
                       <div className="flex justify-end gap-2">
                         <Link
                           href={`/dashboard/maintenance/${ticket.id}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-[#475569] hover:border-[#091426] hover:text-[#091426]"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
                           aria-label={`Xem ${ticket.ticketCode}`}
                         >
                           <Eye className="h-4 w-4" />
@@ -1425,7 +1425,7 @@ export default function MaintenancePage() {
                               type="button"
                               onClick={() => handleApprove(ticket.id)}
                               disabled={Boolean(actionLoading)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/10 disabled:opacity-60"
                               aria-label="Tiếp nhận"
                             >
                               {actionLoading === `approve-${ticket.id}` ? (
@@ -1438,7 +1438,7 @@ export default function MaintenancePage() {
                               type="button"
                               onClick={() => handleDecline(ticket.id)}
                               disabled={Boolean(actionLoading)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/10 disabled:opacity-60"
                               aria-label="Từ chối"
                             >
                               {actionLoading === `decline-${ticket.id}` ? (
@@ -1457,7 +1457,7 @@ export default function MaintenancePage() {
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-5 py-12 text-center text-sm font-bold text-[#64748b]"
+                    className="px-5 py-12 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                   >
                     Không có phiếu bảo trì phù hợp.
                   </td>

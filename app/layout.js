@@ -1,6 +1,17 @@
+import { Be_Vietnam_Pro, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
+
+const fontSans = Be_Vietnam_Pro({
+  subsets: ["vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+});
+const fontMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata = {
   title: "Hải Đăng – Hệ thống quản lý nhà trọ",
@@ -15,7 +26,7 @@ export default async function RootLayout({ children }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className="h-full antialiased"
+      className={`${fontSans.variable} ${fontMono.variable} h-full antialiased`}
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
         <SiteChrome isWebView={isWebView}>{children}</SiteChrome>

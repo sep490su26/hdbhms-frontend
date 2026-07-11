@@ -145,7 +145,7 @@ export default function TransactionHistoryPage() {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6 text-[#0f1d33]">
+    <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <Link
@@ -180,19 +180,19 @@ export default function TransactionHistoryPage() {
       </section>
 
       {error && (
-        <section className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+        <section className="rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
           {error}
         </section>
       )}
 
-      <form onSubmit={submitFilters} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <form onSubmit={submitFilters} className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
         <div className="grid gap-3 md:grid-cols-4">
           <label className="grid gap-1 text-sm font-bold">
             Phòng
             <select
               value={filters.roomId}
               onChange={(event) => setFilters((current) => ({ ...current, roomId: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả phòng</option>
               {rooms.map((room) => (
@@ -207,7 +207,7 @@ export default function TransactionHistoryPage() {
             <input
               value={filters.tenantName}
               onChange={(event) => setFilters((current) => ({ ...current, tenantName: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
@@ -216,7 +216,7 @@ export default function TransactionHistoryPage() {
               type="date"
               value={filters.fromDate}
               onChange={(event) => setFilters((current) => ({ ...current, fromDate: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
@@ -225,14 +225,14 @@ export default function TransactionHistoryPage() {
               type="date"
               value={filters.toDate}
               onChange={(event) => setFilters((current) => ({ ...current, toDate: event.target.value }))}
-              className="h-10 rounded-lg border border-[#cbd5e1] px-3"
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="submit"
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
           >
             <Search className="h-4 w-4" />
             Lọc giao dịch
@@ -240,7 +240,7 @@ export default function TransactionHistoryPage() {
           <button
             type="button"
             onClick={resetFilters}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] px-4 text-sm font-bold text-[#334155]"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200"
           >
             <RotateCcw className="h-4 w-4" />
             Xóa lọc
@@ -248,20 +248,20 @@ export default function TransactionHistoryPage() {
         </div>
       </form>
 
-      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
+      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]">
         {loading ? (
-          <div className="flex min-h-64 items-center justify-center gap-2 text-sm font-bold text-[#64748b]">
+          <div className="flex min-h-64 items-center justify-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
             <Loader2 className="h-4 w-4 animate-spin" />
             Đang tải
           </div>
         ) : transactions.length === 0 ? (
-          <div className="flex min-h-64 items-center justify-center text-sm font-bold text-[#64748b]">
+          <div className="flex min-h-64 items-center justify-center text-sm font-bold text-slate-500 dark:text-slate-400">
             {emptyMessage}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-[#f2f4f6] text-xs uppercase text-[#64748b]">
+              <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Mã GD</th>
                   <th className="px-4 py-3">Ngày</th>
@@ -274,15 +274,15 @@ export default function TransactionHistoryPage() {
               </thead>
               <tbody>
                 {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="border-t border-[#e2e8f0]">
+                  <tr key={transaction.id} className="border-t border-[#e2e8f0] dark:border-white/10">
                     <td className="px-4 py-3">
                       <p className="font-black">{transaction.transactionCode}</p>
-                      <p className="mt-1 text-xs text-[#64748b]">{transaction.invoiceCode}</p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{transaction.invoiceCode}</p>
                     </td>
                     <td className="px-4 py-3">{formatDateTime(transaction.transactionTime)}</td>
                     <td className="px-4 py-3 font-semibold">
                       {transaction.roomCode || "Chưa gán"}
-                      <p className="mt-1 text-xs text-[#64748b]">{transaction.propertyName}</p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{transaction.propertyName}</p>
                     </td>
                     <td className="px-4 py-3">{transaction.tenantName || transaction.payerName || "Chưa cập nhật"}</td>
                     <td className="px-4 py-3 text-right font-black">{formatMoney(transaction.amount)}</td>

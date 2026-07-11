@@ -33,7 +33,7 @@ function formatDate(value) {
 
 function CompletionBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-[11px] font-bold text-rose-700">
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-700 dark:text-rose-300">
       <AlertCircle className="h-3 w-3" />
       Cập nhật hồ sơ
     </span>
@@ -46,7 +46,7 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <label className="group relative block h-32 w-32 cursor-pointer overflow-hidden rounded-xl border-4 border-[#eceef0] bg-[#d3e4fe]">
+      <label className="group relative block h-32 w-32 cursor-pointer overflow-hidden rounded-xl border-4 border-[#eceef0] dark:border-white/10 bg-[#d3e4fe]">
         {src && !imageFailed ? (
           <Image
             src={src}
@@ -58,7 +58,7 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
             onError={() => setFailedSrc(src)}
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-[#091426]">
+          <span className="flex h-full w-full items-center justify-center text-3xl font-bold text-slate-900 dark:text-white">
             {getInitials(name)}
           </span>
         )}
@@ -84,9 +84,9 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
           }}
         />
       </label>
-      <p className="text-center text-xs text-[#6b7280]">JPG, PNG hoặc WebP. Tối đa 2MB.</p>
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">JPG, PNG hoặc WebP. Tối đa 2MB.</p>
       {missing && <CompletionBadge />}
-      {error && <p className="text-center text-xs font-bold text-rose-700">{error}</p>}
+      {error && <p className="text-center text-xs font-bold text-rose-700 dark:text-rose-300">{error}</p>}
     </div>
   );
 }
@@ -94,7 +94,7 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
 function Field({label, value, missing, editable, error, type = "text", onChange}) {
   return (
     <label className="grid gap-2">
-      <span className="flex min-h-5 items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.05em] text-[#505f76]">
+      <span className="flex min-h-5 items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.05em] text-slate-600 dark:text-slate-300">
         {label}
         {missing && <CompletionBadge />}
       </span>
@@ -106,24 +106,24 @@ function Field({label, value, missing, editable, error, type = "text", onChange}
         aria-invalid={Boolean(error)}
         className={`h-11 w-full rounded-md border px-3 text-sm font-semibold outline-none transition ${
           editable
-            ? "border-[#c5c6cd] bg-white text-[#091426] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
-            : "cursor-default border-[#e0e3e5] bg-[#f2f4f6] text-[#45474c]"
+            ? "border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+            : "cursor-default border-[#e0e3e5] dark:border-white/10 bg-[#f2f4f6] dark:bg-white/5 text-slate-600 dark:text-slate-300"
         } ${error ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100" : ""}`}
       />
-      {error && <span className="text-xs font-bold text-rose-700">{error}</span>}
+      {error && <span className="text-xs font-bold text-rose-700 dark:text-rose-300">{error}</span>}
     </label>
   );
 }
 
 function WorkItem({icon: Icon, label, value, tone}) {
   return (
-    <div className="flex gap-4 rounded-lg bg-[#f7f9fb] p-3">
+    <div className="flex gap-4 rounded-lg bg-[#f7f9fb] dark:bg-white/5 p-3">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}>
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#6b7280]">{label}</p>
-        <p className="mt-1 break-words text-sm font-bold leading-6 text-[#091426]">
+        <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900 dark:text-white">
           {value || "Chưa cập nhật"}
         </p>
       </div>
@@ -160,8 +160,8 @@ function Toast({toast, onDismiss}) {
 function LoadingState() {
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <div className="h-[420px] animate-pulse rounded-xl border border-[#e2e8f0] bg-white" />
-      <div className="h-[420px] animate-pulse rounded-xl border border-[#e2e8f0] bg-white" />
+      <div className="h-[420px] animate-pulse rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]" />
+      <div className="h-[420px] animate-pulse rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]" />
     </section>
   );
 }
@@ -173,8 +173,8 @@ export function ProfilePage() {
     return (
       <>
         <header>
-          <h1 className="text-2xl font-bold text-[#091426]">Hồ sơ của tôi</h1>
-          <p className="mt-1 text-sm text-[#505f76]">Đang tải thông tin cá nhân và công việc...</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Hồ sơ của tôi</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Đang tải thông tin cá nhân và công việc...</p>
         </header>
         <LoadingState />
       </>
@@ -188,8 +188,8 @@ export function ProfilePage() {
     <>
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#091426]">Hồ sơ của tôi</h1>
-          <p className="mt-1 text-sm leading-6 text-[#505f76]">
+          <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">Hồ sơ của tôi</h1>
+          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
             Quản lý thông tin cá nhân và thông tin công việc của bạn.
           </p>
         </div>
@@ -198,7 +198,7 @@ export function ProfilePage() {
 
       {state.loadError && (
         <div
-          className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800"
+          className="flex items-start gap-3 rounded-xl border border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 px-4 py-3 text-sm font-semibold text-amber-800 dark:text-yellow-300"
           role="alert"
         >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -207,14 +207,14 @@ export function ProfilePage() {
       )}
 
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,0.9fr)]">
-        <article className="rounded-xl border border-[#c5c6cd] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
+        <article className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-[#091426]">Thông tin cá nhân</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Thông tin cá nhân</h2>
             {!state.isEditing ? (
               <button
                 type="button"
                 onClick={state.beginEditing}
-                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold text-[#091426] hover:bg-[#f2f4f6]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
               >
                 <Pencil className="h-4 w-4" />
                 Chỉnh sửa
@@ -225,7 +225,7 @@ export function ProfilePage() {
                   type="button"
                   onClick={state.cancelEditing}
                   disabled={state.isSaving}
-                  className="h-9 rounded-lg px-3 text-sm font-bold text-[#505f76] hover:bg-[#f2f4f6] disabled:opacity-50"
+                  className="h-9 rounded-lg px-3 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 disabled:opacity-50"
                 >
                   Hủy
                 </button>
@@ -233,7 +233,7 @@ export function ProfilePage() {
                   type="button"
                   onClick={state.saveProfile}
                   disabled={state.isSaving}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
                 >
                   {state.isSaving
                     ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -275,21 +275,21 @@ export function ProfilePage() {
                   onChange={(event) => state.updateDraft("email", event.target.value)}
                 />
               </div>
-              <p className="sm:col-span-2 text-xs leading-5 text-[#6b7280]">
+              <p className="sm:col-span-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                 Họ tên được đồng bộ từ hồ sơ nhân sự. Bạn có thể cập nhật SĐT, email và ảnh đại diện.
               </p>
             </div>
           </div>
         </article>
 
-        <aside className="rounded-xl border border-[#c5c6cd] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
-          <h2 className="text-xl font-bold text-[#091426]">Thông tin công việc</h2>
+        <aside className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Thông tin công việc</h2>
           <div className="mt-7 grid gap-4">
             <WorkItem
               icon={Building2}
               label="Cơ sở phụ trách"
               value={profile.assignedBranch}
-              tone="bg-blue-100 text-blue-700"
+              tone="bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300"
             />
             <WorkItem
               icon={BriefcaseBusiness}
@@ -301,10 +301,10 @@ export function ProfilePage() {
               icon={CalendarDays}
               label="Ngày bắt đầu làm việc"
               value={formatDate(profile.startDate)}
-              tone="bg-emerald-100 text-emerald-700"
+              tone="bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
             />
           </div>
-          <div className="mt-7 rounded-lg border border-dashed border-[#c5c6cd] bg-[#f2f4f6] p-4 text-xs leading-5 text-[#45474c]">
+          <div className="mt-7 rounded-lg border border-dashed border-[#c5c6cd] dark:border-white/10 bg-[#f2f4f6] dark:bg-white/5 p-4 text-xs leading-5 text-slate-600 dark:text-slate-300">
             <strong>Lưu ý:</strong> Thông tin công việc được thiết lập bởi bộ phận Nhân sự.
             Nếu có sai sót, vui lòng liên hệ Admin hệ thống để cập nhật.
           </div>

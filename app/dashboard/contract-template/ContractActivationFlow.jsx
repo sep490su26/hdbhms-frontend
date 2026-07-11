@@ -74,8 +74,8 @@ export default function ContractActivationFlow({
           )}
         </>
       ) : (
-        <section className="flex items-center gap-3 rounded-xl border border-[#dfe5ef] bg-white px-4 py-6 text-sm font-semibold leading-6 text-[#607089]">
-          <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+        <section className="flex items-center gap-3 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-6 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+          <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-blue-300" />
           Đang tạo hợp đồng thuê từ hợp đồng đặt cọc...
         </section>
       )}

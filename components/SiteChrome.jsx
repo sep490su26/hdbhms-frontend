@@ -5,24 +5,23 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
 export function SiteChrome({ children, isWebView }) {
-    const pathname = usePathname();
-    const isManagementRoute =
-        pathname?.startsWith("/management")
-        || pathname?.startsWith("/viewing-customers")
-        || pathname?.startsWith("/dashboard");
-    const isAuthRoute =
-        pathname?.startsWith("/login")
-        || pathname?.startsWith("/forgot-password");
+  const pathname = usePathname();
+  const isManagementRoute =
+    pathname?.startsWith("/management") ||
+    pathname?.startsWith("/viewing-customers") ||
+    pathname?.startsWith("/dashboard");
+  const isAuthRoute =
+    pathname?.startsWith("/login") || pathname?.startsWith("/forgot-password");
 
-    if (isWebView || isManagementRoute || isAuthRoute) {
-        return <>{children}</>;
-    }
+  if (isWebView || isManagementRoute || isAuthRoute) {
+    return <>{children}</>;
+  }
 
-    return (
-        <>
-            <Navbar />
-            <main className="flex-grow" style={{ paddingTop: 'var(--navbar-height)' }}>{children}</main>
-            <Footer />
-        </>
-    );
+  return (
+    <>
+      <Navbar />
+      <main className="flex-grow">{children}</main>
+      <Footer />
+    </>
+  );
 }

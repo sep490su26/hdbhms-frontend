@@ -101,10 +101,10 @@ const MOCK_PHOTOS = [
 ];
 
 const STATUS_CONFIG = {
-    synced: { label: "Synced", color: "text-green-500", dot: "bg-green-500" },
+    synced: { label: "Synced", color: "text-green-500 dark:text-green-300", dot: "bg-green-500" },
     local: { label: "Local Only", color: "text-orange-400", dot: "bg-orange-400" },
-    error: { label: "Error", color: "text-red-500", dot: "bg-red-500" },
-    pending: { label: "Pending", color: "text-gray-400", dot: "bg-gray-300" },
+    error: { label: "Error", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500" },
+    pending: { label: "Pending", color: "text-slate-400 dark:text-slate-500", dot: "bg-gray-300" },
 };
 
 
@@ -113,11 +113,11 @@ const PER_PAGE = 5;
 function MeterPhoto({ src }) {
     return (
         <div
-            className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 relative group">
+            className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative group">
             {src ? (
                 <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized />
             ) : (
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
                 </svg>
@@ -377,16 +377,16 @@ export default function MeterReadings() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4 mt-2">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-2xl font-bold text-gray-900">Meter Readings - June 2026</h1>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Meter Readings - June 2026</h1>
                         <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">In Progress</span>
+                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">In Progress</span>
                     </div>
-                    <p className="text-sm text-gray-400">Period: 01/06/2026 - 30/06/2026</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500">Period: 01/06/2026 - 30/06/2026</p>
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                     {(pending > 0 || errors > 0) ? (
                         <span
-                            className="text-sm font-medium text-amber-600 flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                            className="text-sm font-medium text-amber-600 dark:text-yellow-300 flex items-center gap-1.5 bg-amber-50 dark:bg-yellow-500/10 px-3 py-2 rounded-lg border border-amber-200 dark:border-yellow-500/20">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
                                 strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -394,7 +394,7 @@ export default function MeterReadings() {
                         </span>
                     ) : (
                         <span
-                            className="text-sm font-medium text-green-600 flex items-center gap-1.5 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                            className="text-sm font-medium text-green-600 dark:text-green-300 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 px-3 py-2 rounded-lg border border-green-200 dark:border-green-500/20">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
                                 strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                             Đã đủ điều kiện chốt kỳ
@@ -410,7 +410,7 @@ export default function MeterReadings() {
                             }
                         }}
                         variant={"default"}
-                        className="flex items-center gap-2 border bg-white hover:bg-gray-50 text-gray-800 border-gray-200 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                        className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                         <LucideEdit className="w-4 h-4" />
                         Bắt đầu nhập
                     </Button>
@@ -425,30 +425,30 @@ export default function MeterReadings() {
 
             {/* Stat cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 my-6">
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Total Rooms</p>
-                    <p className="text-3xl font-bold text-gray-900">{total}</p>
+                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Total Rooms</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white">{total}</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Completed</p>
+                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Completed</p>
                     <div className="flex items-end gap-2">
-                        <p className="text-3xl font-bold text-gray-900">{completed}</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{completed}</p>
                         <span
-                            className="text-base font-semibold text-blue-500 mb-0.5">{total > 0 ? Math.round((completed / total) * 100) : 0}%</span>
+                            className="text-base font-semibold text-blue-500 dark:text-blue-300 mb-0.5">{total > 0 ? Math.round((completed / total) * 100) : 0}%</span>
                     </div>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Pending</p>
+                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Pending</p>
                     <div className="flex items-end gap-2">
-                        <p className="text-3xl font-bold text-gray-900">{pending}</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{pending}</p>
                         <span
                             className="text-base font-semibold text-orange-400 mb-0.5">{total > 0 ? Math.round((pending / total) * 100) : 0}%</span>
                     </div>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Unsynced Changes</p>
+                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Unsynced Changes</p>
                     <div className="flex items-center justify-between">
-                        <p className="text-3xl font-bold text-gray-900">{unsynced}</p>
+                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{unsynced}</p>
                         <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -456,11 +456,11 @@ export default function MeterReadings() {
                         </svg>
                     </div>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">Last Sync</p>
+                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Last Sync</p>
                     <div className="flex items-center justify-between">
-                        <p className="text-xl font-bold text-gray-900">2 mins ago</p>
-                        <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor"
+                        <p className="text-xl font-bold text-slate-900 dark:text-white">2 mins ago</p>
+                        <svg className="w-6 h-6 text-green-500 dark:text-green-300" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -470,12 +470,12 @@ export default function MeterReadings() {
             </div>
 
             {/* Overall progress */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+            <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 mb-6">
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">Tiến độ nhập</span>
-                    <span className="text-sm text-gray-500">{completed} / {total} phòng đã nhập</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tiến độ nhập</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">{completed} / {total} phòng đã nhập</span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-3">
+                <div className="w-full bg-gray-100 dark:bg-white/5 rounded-full h-3">
                     <div className="bg-blue-600 h-3 rounded-full transition-all"
                         style={{ width: `${progress}%` }}></div>
                 </div>
@@ -484,12 +484,12 @@ export default function MeterReadings() {
             {/* Tabs + search */}
             <div className="flex w-full min-w-0 flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
                 <div
-                    className="flex flex-wrap items-center gap-1 md:gap-0 w-full md:w-auto pb-1 md:pb-0 border-b md:border-none border-gray-100">
+                    className="flex flex-wrap items-center gap-1 md:gap-0 w-full md:w-auto pb-1 md:pb-0 border-b md:border-none border-gray-100 dark:border-white/10">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                            className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? "border-blue-600 text-blue-600 dark:text-blue-300" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}
                         >
                             {tab.label}
                         </button>
@@ -497,9 +497,9 @@ export default function MeterReadings() {
                 </div>
                 <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
                     <div className="relative w-full min-w-0 md:w-auto">
-                        <LucideSearch className={"absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"} />
+                        <LucideSearch className={"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4"} />
                         <input
-                            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64"
+                            className="w-full rounded-lg border border-gray-200 dark:border-white/10 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64"
                             placeholder="Tìm phòng..."
                             value={search}
                             onChange={(e) => {
@@ -516,13 +516,13 @@ export default function MeterReadings() {
                     <Accordion type="multiple" defaultValue={defaultAccordionValues} className="w-full space-y-4">
                     {Object.entries(groupedByFloor).map(([floor, floorRooms]) => (
                         <AccordionItem key={floor} value={floor}
-                            className="border border-gray-200 rounded-xl bg-white shadow-sm">
+                            className="border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#0f172a] shadow-sm">
                             <AccordionTrigger
-                                className="px-5 py-4 hover:no-underline hover:bg-gray-50 transition-colors">
+                                className="px-5 py-4 hover:no-underline hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                 <div className="flex items-center gap-3">
-                                    <h3 className="text-lg font-bold text-gray-900">{floor}</h3>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{floor}</h3>
                                     <span
-                                        className="text-xs font-semibold px-2 py-1 rounded-md bg-gray-100 text-gray-600 border border-gray-200">{floorRooms.length} rooms</span>
+                                        className="text-xs font-semibold px-2 py-1 rounded-md bg-gray-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-white/10">{floorRooms.length} rooms</span>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent className="pt-0 pb-0">
@@ -530,36 +530,36 @@ export default function MeterReadings() {
                                 <div className="hidden md:block w-full overflow-x-auto pb-4">
                                     <Table className="w-full text-sm min-w-[900px]">
                                         <TableHeader>
-                                            <TableRow className="bg-gray-50 border-y border-gray-200">
+                                            <TableRow className="bg-gray-50 dark:bg-[#020817] border-y border-gray-200 dark:border-white/10">
                                                 <TableHead
-                                                    className="text-left text-xs font-semibold text-gray-500 px-4 py-3 w-16"
+                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 w-16"
                                                 >Room
                                                 </TableHead>
                                                 <TableHead
-                                                    className="text-left text-xs font-semibold text-gray-500 px-4 py-3 border-b border-gray-100"
+                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
                                                 >Electricity (kWh)
                                                 </TableHead>
                                                 <TableHead
-                                                    className="text-left text-xs font-semibold text-gray-500 px-4 py-3 border-b border-gray-100 border-l border-gray-200"
+                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10 border-l border-gray-200 dark:border-white/10"
                                                 >Water (m³)
                                                 </TableHead>
                                                 <TableHead
-                                                    className="text-left text-xs font-semibold text-gray-500 px-4 py-3 border-l border-gray-200"
+                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                 >Photos
                                                 </TableHead>
                                                 <TableHead
-                                                    className="text-left text-xs font-semibold text-gray-500 px-4 py-3 border-l border-gray-200"
+                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                 >
                                                     <span className="flex items-center gap-1">
                                                         Status
-                                                        <svg className="w-3.5 h-3.5 text-gray-400" fill="none"
+                                                        <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none"
                                                             stroke="currentColor" viewBox="0 0 24 24"><path
                                                                 strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                     </span>
                                                 </TableHead>
                                                 <TableHead
-                                                    className="text-center text-xs font-semibold text-gray-500 px-4 py-3 border-l border-gray-200"
+                                                    className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                 >Actions
                                                 </TableHead>
                                             </TableRow>
@@ -574,16 +574,16 @@ export default function MeterReadings() {
 
                                                 return (
                                                     <TableRow key={room.id}
-                                                        className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
+                                                        className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                         <TableCell
-                                                            className="px-4 py-3 font-semibold text-gray-800">{room.id}</TableCell>
+                                                            className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
 
                                                         {/* Electricity Compact */}
                                                         <TableCell className="px-4 py-3">
                                                             <div className="flex items-center gap-2">
                                                                 <span
-                                                                    className="text-gray-500 w-12 text-right">{room.elecPrev.toLocaleString()}</span>
-                                                                <svg className="w-3.5 h-3.5 text-gray-400 shrink-0"
+                                                                    className="text-slate-500 dark:text-slate-400 w-12 text-right">{room.elecPrev.toLocaleString()}</span>
+                                                                <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0"
                                                                     fill="none" stroke="currentColor"
                                                                     viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round"
@@ -593,24 +593,24 @@ export default function MeterReadings() {
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
+                                                                    className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-14 text-left font-semibold text-xs ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500" : elecUsage === 0 ? "text-gray-400" : "text-green-500"}`}>
+                                                                    className={`w-14 text-left font-semibold text-xs ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {elecUsage === null ? "" : elecUsage < 0 ? `(${elecUsage})` : `(+${elecUsage})`}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
 
                                                         {/* Water Compact */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100">
+                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
                                                             <div className="flex items-center gap-2">
                                                                 <span
-                                                                    className="text-gray-500 w-10 text-right">{room.waterPrev}</span>
-                                                                <svg className="w-3.5 h-3.5 text-gray-400 shrink-0"
+                                                                    className="text-slate-500 dark:text-slate-400 w-10 text-right">{room.waterPrev}</span>
+                                                                <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0"
                                                                     fill="none" stroke="currentColor"
                                                                     viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round"
@@ -620,25 +620,25 @@ export default function MeterReadings() {
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
+                                                                    className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-12 text-left font-semibold text-xs ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500" : waterUsage === 0 ? "text-gray-400" : "text-green-500"}`}>
+                                                                    className={`w-12 text-left font-semibold text-xs ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {waterUsage === null ? "" : waterUsage < 0 ? `(${waterUsage})` : `(+${waterUsage})`}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
 
                                                         {/* Photos */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100">
+                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
                                                             <PhotoGallery
                                                                 photos={MOCK_PHOTOS.slice(0, room.photos)}
                                                                 renderTrigger={(openPhoto) => (
                                                                     <div
-                                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer shadow-sm" : "bg-gray-50 border-transparent text-gray-400"}`}
+                                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white dark:bg-[#0f172a] border-gray-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer shadow-sm" : "bg-gray-50 dark:bg-[#020817] border-transparent text-slate-400 dark:text-slate-500"}`}
                                                                         onClick={() => room.photos > 0 && openPhoto(0)}
                                                                     >
                                                                         <svg className="w-4 h-4" fill="none"
@@ -661,19 +661,19 @@ export default function MeterReadings() {
                                                         </TableCell>
 
                                                         {/* Status */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100">
+                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
                                                             <div className="flex items-start gap-1.5">
                                                                 <span
                                                                     className={`w-2 h-2 rounded-full mt-1 shrink-0 ${st.dot}`}></span>
                                                                 <div>
                                                                     <p className={`text-sm font-semibold ${st.color}`}>{st.label}</p>
                                                                     {room.syncTime &&
-                                                                        <p className="text-xs text-gray-400">{room.syncTime}</p>}
+                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
                                                                     {room.status === "error" &&
                                                                         <p className="text-xs text-red-400">Check
                                                                             reading</p>}
                                                                     {room.status === "local" &&
-                                                                        <p className="text-xs text-gray-400">Not
+                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Not
                                                                             synced</p>}
                                                                 </div>
                                                             </div>
@@ -681,10 +681,10 @@ export default function MeterReadings() {
 
                                                         {/* Actions */}
                                                         <TableCell
-                                                            className="px-4 py-3 border-l border-gray-100 text-center">
+                                                            className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
                                                             <button
                                                                 onClick={() => setFocusRoomId(room.id)}
-                                                                className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+                                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
                                                                 <LucideEdit size={16} />
                                                             </button>
                                                         </TableCell>
@@ -706,10 +706,10 @@ export default function MeterReadings() {
 
                                         return (
                                             <div key={room.id}
-                                                className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative">
+                                                className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm relative">
                                                 <div className="flex justify-between items-start mb-3">
                                                     <div>
-                                                        <h4 className="font-bold text-gray-900 text-lg">{room.id}</h4>
+                                                        <h4 className="font-bold text-slate-900 dark:text-white text-lg">{room.id}</h4>
                                                         <div className="flex items-center gap-1.5 mt-1">
                                                             <span
                                                                 className={`w-2 h-2 rounded-full ${st.dot}`}></span>
@@ -718,42 +718,42 @@ export default function MeterReadings() {
                                                         </div>
                                                     </div>
                                                     <button
-                                                        className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                                                        className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
                                                         <LucideEdit size={18} />
                                                     </button>
                                                 </div>
 
                                                 <div className="space-y-3">
                                                     {/* Electricity */}
-                                                    <div className="bg-gray-50 rounded-lg p-3">
+                                                    <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
                                                         <div
-                                                            className="text-xs font-semibold text-gray-500 mb-2">Electricity
+                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Electricity
                                                             (kWh)
                                                         </div>
                                                         <div
                                                             className="grid grid-cols-3 gap-2 text-sm items-center">
                                                             <div className="flex flex-col">
                                                                 <span
-                                                                    className="text-xs text-gray-400">Previous</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Previous</span>
                                                                 <span
-                                                                    className="font-medium text-gray-700">{room.elecPrev.toLocaleString()}</span>
+                                                                    className="font-medium text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</span>
                                                             </div>
                                                             <div className="flex flex-col items-center">
                                                                 <span
-                                                                    className="text-xs text-gray-400 mb-1">Current</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Current</span>
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
+                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-gray-400">Usage</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Usage</span>
                                                                 <span
-                                                                    className={`font-semibold ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500" : elecUsage === 0 ? "text-gray-400" : "text-green-500"}`}>
+                                                                    className={`font-semibold ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {elecUsage === null ? "—" : elecUsage < 0 ? elecUsage : `+${elecUsage}`}
                                                                 </span>
                                                             </div>
@@ -761,35 +761,35 @@ export default function MeterReadings() {
                                                     </div>
 
                                                     {/* Water */}
-                                                    <div className="bg-gray-50 rounded-lg p-3">
+                                                    <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
                                                         <div
-                                                            className="text-xs font-semibold text-gray-500 mb-2">Water
+                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Water
                                                             (m³)
                                                         </div>
                                                         <div
                                                             className="grid grid-cols-3 gap-2 text-sm items-center">
                                                             <div className="flex flex-col">
                                                                 <span
-                                                                    className="text-xs text-gray-400">Previous</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Previous</span>
                                                                 <span
-                                                                    className="font-medium text-gray-700">{room.waterPrev}</span>
+                                                                    className="font-medium text-slate-700 dark:text-slate-200">{room.waterPrev}</span>
                                                             </div>
                                                             <div className="flex flex-col items-center">
                                                                 <span
-                                                                    className="text-xs text-gray-400 mb-1">Current</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Current</span>
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 text-red-600 focus:ring-red-100" : "border-gray-200 focus:ring-blue-100 text-gray-800"}`}
+                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-gray-400">Usage</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Usage</span>
                                                                 <span
-                                                                    className={`font-semibold ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500" : waterUsage === 0 ? "text-gray-400" : "text-green-500"}`}>
+                                                                    className={`font-semibold ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {waterUsage === null ? "—" : waterUsage}
                                                                 </span>
                                                             </div>
@@ -798,10 +798,10 @@ export default function MeterReadings() {
                                                 </div>
 
                                                 <div
-                                                    className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100">
+                                                    className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
                                                     <div>
                                                         <span
-                                                            className="text-xs font-medium text-gray-500 mb-1 block">Photos</span>
+                                                            className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Photos</span>
                                                         <PhotoGallery
                                                             photos={MOCK_PHOTOS.slice(0, room.photos)}
                                                             renderTrigger={(openPhoto) => (
@@ -817,14 +817,14 @@ export default function MeterReadings() {
                                                                                     src={MOCK_PHOTOS[1].src} />}
                                                                             {room.photos > 2 && (
                                                                                 <div
-                                                                                    className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-semibold text-gray-500 hover:bg-gray-200 transition-colors">
+                                                                                    className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-gray-200 transition-colors">
                                                                                     +{room.photos - 2}
                                                                                 </div>
                                                                             )}
                                                                         </>
                                                                     ) : (
                                                                         <span
-                                                                            className="text-gray-400 text-xs italic">Không có</span>
+                                                                            className="text-slate-400 dark:text-slate-500 text-xs italic">Không có</span>
                                                                     )}
                                                                 </div>
                                                             )}
@@ -832,11 +832,11 @@ export default function MeterReadings() {
                                                     </div>
                                                     <div className="text-right">
                                                         {room.syncTime &&
-                                                            <p className="text-xs text-gray-400">{room.syncTime}</p>}
+                                                            <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
                                                         {room.status === "error" &&
                                                             <p className="text-xs text-red-400">Check reading</p>}
                                                         {room.status === "local" &&
-                                                            <p className="text-xs text-gray-400">Not synced</p>}
+                                                            <p className="text-xs text-slate-400 dark:text-slate-500">Not synced</p>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -853,7 +853,7 @@ export default function MeterReadings() {
             {/* Footer */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-8">
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1.5"><span
                             className="w-2 h-2 rounded-full bg-green-500"></span>Synced</span>
                         <span className="flex items-center gap-1.5"><span
@@ -889,12 +889,12 @@ export default function MeterReadings() {
                                 <DialogHeader>
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
-                                <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 mb-2" ref={horizontalScrollRef}>
+                                <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 dark:border-white/10 mb-2" ref={horizontalScrollRef}>
                                     {filtered.map(r => (
                                         <button
                                             key={r.id}
                                             onClick={() => setFocusRoomId(r.id)}
-                                            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-gray-200'}`}
                                         >
                                             {r.id}
                                         </button>
@@ -904,26 +904,26 @@ export default function MeterReadings() {
                                     {/* Electricity */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                                            <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                                                 Điện (kWh)
                                             </h4>
                                             {elecUsage !== null && elecUsage < 0 && (
                                                 <span
-                                                    className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded">⚠ Không hợp lệ</span>
+                                                    className="text-xs font-medium text-red-500 dark:text-rose-300 bg-red-50 dark:bg-rose-500/10 px-2 py-1 rounded">⚠ Không hợp lệ</span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                                <p className="text-xs text-gray-500 mb-1">Số cũ</p>
-                                                <p className="font-semibold text-gray-700">{room.elecPrev.toLocaleString()}</p>
+                                            <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Số cũ</p>
+                                                <p className="font-semibold text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</p>
                                             </div>
-                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100">
-                                                <p className="text-xs text-blue-600 mb-1 font-medium">Số mới</p>
+                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
+                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
                                                     min="0"
-                                                    className="w-full bg-white text-base border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.elecCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                     placeholder="Nhập..."
@@ -935,26 +935,26 @@ export default function MeterReadings() {
                                     {/* Water */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                                            <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full bg-blue-400"></div>
                                                 Nước (m³)
                                             </h4>
                                             {waterUsage !== null && waterUsage < 0 && (
                                                 <span
-                                                    className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded">⚠ Không hợp lệ</span>
+                                                    className="text-xs font-medium text-red-500 dark:text-rose-300 bg-red-50 dark:bg-rose-500/10 px-2 py-1 rounded">⚠ Không hợp lệ</span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                                <p className="text-xs text-gray-500 mb-1">Số cũ</p>
-                                                <p className="font-semibold text-gray-700">{room.waterPrev}</p>
+                                            <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Số cũ</p>
+                                                <p className="font-semibold text-slate-700 dark:text-slate-200">{room.waterPrev}</p>
                                             </div>
-                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100">
-                                                <p className="text-xs text-blue-600 mb-1 font-medium">Số mới</p>
+                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
+                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
                                                     min="0"
-                                                    className="w-full bg-white text-base border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
+                                                    className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.waterCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                     placeholder="Nhập..."
@@ -965,7 +965,7 @@ export default function MeterReadings() {
 
                                     <div className="pt-2">
                                         {capturedPhotos[room.id] ? (
-                                            <div className="relative h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                            <div className="relative h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#020817]">
                                                 <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" fill sizes="(max-width: 768px) 100vw, 320px" className="object-contain bg-black/5" unoptimized />
                                                 <button
                                                     onClick={() => {

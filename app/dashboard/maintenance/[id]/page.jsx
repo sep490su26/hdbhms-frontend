@@ -32,12 +32,12 @@ import {
 import { getAuthToken } from "@/services/identityAccessService";
 
 const STATUS_META = {
-  PENDING: ["Chờ tiếp nhận", "bg-amber-50 text-amber-800 ring-amber-200"],
-  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 text-blue-800 ring-blue-200"],
-  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 text-indigo-800 ring-indigo-200"],
+  PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
+  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
   WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 text-emerald-800 ring-emerald-200"],
-  REJECTED: ["Từ chối", "bg-rose-50 text-rose-800 ring-rose-200"],
+  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
+  REJECTED: ["Từ chối", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
 };
 
 const CATEGORY_LABELS = {
@@ -165,17 +165,17 @@ function StatusBadge({ status }) {
 function BillingBadge({ status, label, billingPeriod }) {
   const normalized = String(status || "").toUpperCase();
   const tone = normalized === "DRAFT"
-    ? "bg-blue-50 text-blue-800 ring-blue-200"
+    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"
     : normalized === "SCHEDULED"
-      ? "bg-cyan-50 text-cyan-800 ring-cyan-200"
+      ? "bg-cyan-50 dark:bg-blue-500/10 text-cyan-800 dark:text-blue-300 ring-cyan-200 dark:ring-blue-500/20"
       : normalized === "SCHEDULE_FAILED"
-        ? "bg-rose-50 text-rose-800 ring-rose-200"
+        ? "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"
     : normalized === "PENDING_PAYMENT" || normalized === "ISSUED"
-      ? "bg-orange-50 text-orange-800 ring-orange-200"
+      ? "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20"
       : normalized === "PAID"
-        ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
+        ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"
         : normalized === "OVERDUE"
-          ? "bg-rose-50 text-rose-800 ring-rose-200"
+          ? "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"
           : "bg-slate-100 text-slate-700 ring-slate-200";
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${tone}`}>
@@ -185,16 +185,16 @@ function BillingBadge({ status, label, billingPeriod }) {
 }
 
 function inputClassName() {
-  return "h-11 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#94a3b8] focus:border-[#4166b2] focus:ring-2 focus:ring-[#4166b2]/10";
+  return "h-11 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
 function textareaClassName() {
-  return "min-h-28 resize-y rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold text-[#091426] outline-none placeholder:text-[#94a3b8] focus:border-[#4166b2] focus:ring-2 focus:ring-[#4166b2]/10";
+  return "min-h-28 resize-y rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
 function Field({ label, children }) {
   return (
-    <label className="grid gap-1.5 text-sm font-bold text-[#091426]">
+    <label className="grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
       <span>{label}</span>
       {children}
     </label>
@@ -203,8 +203,8 @@ function Field({ label, children }) {
 
 function Notice({ type = "info", children }) {
   const tone = type === "error"
-    ? "border-rose-200 bg-rose-50 text-rose-800"
-    : "border-amber-200 bg-amber-50 text-amber-900";
+    ? "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
+    : "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-900 dark:text-yellow-300";
   return (
     <div className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${tone}`}>
       <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -215,9 +215,9 @@ function Notice({ type = "info", children }) {
 
 function InfoItem({ label, value }) {
   return (
-    <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
-      <p className="text-[11px] font-black uppercase text-[#64748b]">{label}</p>
-      <p className="mt-1 break-words text-sm font-bold text-[#091426]">{value || "Chưa có"}</p>
+    <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 p-4">
+      <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 break-words text-sm font-bold text-slate-900 dark:text-white">{value || "Chưa có"}</p>
     </div>
   );
 }
@@ -226,8 +226,8 @@ function AttachmentGrid({ title, attachments }) {
   return (
     <section className="grid gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-black text-[#091426]">{title}</h2>
-        <span className="text-xs font-bold text-[#64748b]">{attachments.length} ảnh</span>
+        <h2 className="text-base font-black text-slate-900 dark:text-white">{title}</h2>
+        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{attachments.length} ảnh</span>
       </div>
       {attachments.length > 0 ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,140px),1fr))] gap-3">
@@ -240,7 +240,7 @@ function AttachmentGrid({ title, attachments }) {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+        <div className="rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
           Chưa có ảnh.
         </div>
       )}
@@ -295,16 +295,16 @@ function AuthorizedAttachmentLink({ attachment, title }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="group relative block h-36 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]"
+      className="group relative block h-36 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5"
     >
       {failed ? (
-        <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-[#64748b]">
+        <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
           Không tải được ảnh.
         </div>
       ) : objectUrl ? (
         <Image src={objectUrl} alt={attachment.name || title} fill sizes="240px" className="object-cover transition group-hover:scale-[1.02]" unoptimized />
       ) : (
-        <div className="grid h-36 place-items-center text-xs font-bold text-[#64748b]">
+        <div className="grid h-36 place-items-center text-xs font-bold text-slate-500 dark:text-slate-400">
           Đang tải ảnh...
         </div>
       )}
@@ -315,7 +315,7 @@ function AuthorizedAttachmentLink({ attachment, title }) {
 function Timeline({ events }) {
   if (!events.length) {
     return (
-      <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center text-sm font-semibold text-[#64748b]">
+      <div className="rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
         Chưa có nhật ký xử lý.
       </div>
     );
@@ -324,15 +324,15 @@ function Timeline({ events }) {
   return (
     <ol className="grid gap-3">
       {events.map((event) => (
-        <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+        <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-black text-[#091426]">{formatActionLabel(event.action)}</p>
-              <p className="mt-1 text-sm font-semibold leading-6 text-[#475569]">{event.note || "Không có ghi chú."}</p>
+              <p className="text-sm font-black text-slate-900 dark:text-white">{formatActionLabel(event.action)}</p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{event.note || "Không có ghi chú."}</p>
             </div>
-            <span className="shrink-0 text-xs font-bold text-[#64748b]">{formatDateTime(event.createdAt)}</span>
+            <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">{formatDateTime(event.createdAt)}</span>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-[#64748b]">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
             {event.fromStatus && <StatusBadge status={event.fromStatus} />}
             {event.fromStatus && event.toStatus && <span>→</span>}
             {event.toStatus && <StatusBadge status={event.toStatus} />}
@@ -502,8 +502,8 @@ export default function MaintenanceTicketDetailPage() {
 
   if (isLoading) {
     return (
-      <section className="flex min-h-[360px] items-center justify-center rounded-lg border border-[#e2e8f0] bg-white">
-        <span className="inline-flex items-center gap-2 text-sm font-bold text-[#64748b]">
+      <section className="flex min-h-[360px] items-center justify-center rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]">
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
           <Loader2 className="h-4 w-4 animate-spin" />
           Đang tải chi tiết phiếu...
         </span>
@@ -513,7 +513,7 @@ export default function MaintenanceTicketDetailPage() {
 
   if (!ticket) {
     return (
-      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-6">
+      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-6">
         <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
           <ArrowLeft className="h-4 w-4" />
           Quay lại danh sách
@@ -537,10 +537,10 @@ export default function MaintenanceTicketDetailPage() {
             Danh sách bảo trì
           </Link>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-black text-[#091426]">{ticket.ticketCode}</h1>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white">{ticket.ticketCode}</h1>
             <StatusBadge status={ticket.status} />
           </div>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#475569]">{ticket.title || ticket.description}</p>
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{ticket.title || ticket.description}</p>
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2">
@@ -559,7 +559,7 @@ export default function MaintenanceTicketDetailPage() {
                   type="button"
                   onClick={handleDecline}
                   disabled={Boolean(actionLoading)}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 px-4 text-sm font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/10 disabled:opacity-60"
                 >
                   {actionLoading === "decline" ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                   Từ chối
@@ -571,7 +571,7 @@ export default function MaintenanceTicketDetailPage() {
                 type="button"
                 onClick={handleStartProgress}
                 disabled={Boolean(actionLoading)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
               >
                 {actionLoading === "progress" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
                 Bắt đầu xử lý
@@ -605,10 +605,10 @@ export default function MaintenanceTicketDetailPage() {
         <section className="grid gap-4 rounded-lg border border-teal-200 bg-teal-50/50 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">Chi phí bảo trì nội bộ</h2>
-              <p className="mt-1 text-sm font-semibold text-[#64748b]">Khoản này do chủ trọ chịu, chỉ dùng để thống kê chi phí vận hành.</p>
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">Chi phí bảo trì nội bộ</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Khoản này do chủ trọ chịu, chỉ dùng để thống kê chi phí vận hành.</p>
             </div>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">Không thu khách</span>
+            <span className="rounded-full bg-white dark:bg-[#0f172a] px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">Không thu khách</span>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             <InfoItem label="Người chịu phí" value="Chủ trọ" />
@@ -619,9 +619,9 @@ export default function MaintenanceTicketDetailPage() {
         </section>
       )}
 
-      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <h2 className="text-lg font-black text-[#091426]">Thông tin sự cố</h2>
-        <p className="rounded-lg bg-[#f8fafc] p-4 text-sm font-semibold leading-6 text-[#334155]">{ticket.description}</p>
+      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <h2 className="text-lg font-black text-slate-900 dark:text-white">Thông tin sự cố</h2>
+        <p className="rounded-lg bg-[#f8fafc] dark:bg-white/5 p-4 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{ticket.description}</p>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InfoItem label="Người tạo" value={ticket.createdBy?.phone || ticket.createdBy?.email || "Chưa có"} />
           <InfoItem label="Người xử lý" value={ticket.workerName || ticket.assignedTo?.phone || ticket.assignedTo?.email || "Chưa phân công"} />
@@ -640,26 +640,26 @@ export default function MaintenanceTicketDetailPage() {
       </div>
 
       {canManage && ticket.status === "IN_PROGRESS" && (
-        <form onSubmit={handleComplete} className="grid gap-5 rounded-lg border border-[#d8dee8] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <form onSubmit={handleComplete} className="grid gap-5 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300">
               <Wrench className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-lg font-black text-[#091426]">Hoàn tất xử lý</h2>
-              <p className="text-sm font-semibold text-[#64748b]">Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.</p>
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">Hoàn tất xử lý</h2>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.</p>
             </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="Người sửa">
               <div className="relative">
-                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                 <input value={completeForm.repairmanName} onChange={(event) => updateCompleteForm("repairmanName", event.target.value)} className={`${inputClassName()} w-full pl-9`} placeholder="Tên thợ hoặc nhân sự" />
               </div>
             </Field>
             <Field label="Số điện thoại">
               <div className="relative">
-                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748b]" />
+                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                 <input value={completeForm.repairmanPhone} onChange={(event) => updateCompleteForm("repairmanPhone", event.target.value)} className={`${inputClassName()} w-full pl-9`} placeholder="SĐT liên hệ" />
               </div>
             </Field>
@@ -715,7 +715,7 @@ export default function MaintenanceTicketDetailPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap gap-3">
               {completeForm.images.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc]">
+                <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5">
                   <Image src={URL.createObjectURL(file)} alt={file.name} fill sizes="80px" className="object-cover" unoptimized />
                   <button
                     type="button"
@@ -728,7 +728,7 @@ export default function MaintenanceTicketDetailPage() {
                 </div>
               ))}
               {((ticket.afterAttachments?.length || 0) + completeForm.images.length) < 3 && (
-                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] text-[#475569] hover:border-[#091426]">
+                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]">
                   <ImagePlus className="h-6 w-6" />
                   <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
                 </label>
@@ -737,7 +737,7 @@ export default function MaintenanceTicketDetailPage() {
             <button
               type="submit"
               disabled={Boolean(actionLoading)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
               Xác nhận hoàn tất
@@ -747,10 +747,10 @@ export default function MaintenanceTicketDetailPage() {
       )}
 
       {(ticket.status === "WAITING_CONFIRMATION" || ticket.status === "COMPLETED") && (
-        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
           <div className="flex items-center gap-3">
-            <Clock3 className="h-5 w-5 text-[#64748b]" />
-            <h2 className="text-lg font-black text-[#091426]">Kết quả xử lý</h2>
+            <Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">Kết quả xử lý</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <InfoItem label="Người sửa" value={ticket.workerName} />
@@ -764,17 +764,17 @@ export default function MaintenanceTicketDetailPage() {
       )}
 
       {shouldShowIncidentalPayment && (
-        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-black text-[#091426]">Thanh toán phát sinh</h2>
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">Thanh toán phát sinh</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <BillingBadge
                   status={ticket.billingStatus || ticket.invoiceStatus}
                   label={ticket.billingStatusLabel}
                   billingPeriod={ticket.billingPeriod}
                 />
-                {ticket.invoiceCode && <span className="text-sm font-bold text-[#64748b]">{ticket.invoiceCode}</span>}
+                {ticket.invoiceCode && <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{ticket.invoiceCode}</span>}
               </div>
             </div>
             {canManage && ticket.invoiceStatus === "DRAFT" && (
@@ -782,7 +782,7 @@ export default function MaintenanceTicketDetailPage() {
                 type="button"
                 onClick={handleIssueInvoice}
                 disabled={Boolean(actionLoading)}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-bold text-white hover:bg-[#16253a] disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
               >
                 {actionLoading === "issue-invoice" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Phát hành hóa đơn
@@ -795,7 +795,7 @@ export default function MaintenanceTicketDetailPage() {
             </Notice>
           )}
           {ticket.invoiceStatus && ticket.invoiceStatus !== "DRAFT" && (
-            <p className="text-sm font-semibold text-[#475569]">
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
               Hóa đơn đã phát hành mới được hiển thị trên mobile tenant và mới có thể thanh toán qua QR/PayOS.
             </p>
           )}
@@ -803,20 +803,20 @@ export default function MaintenanceTicketDetailPage() {
       )}
 
       {ticket.review && (
-        <section className="rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-black text-[#091426]">Đánh giá khách thuê</h2>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-black text-amber-800">
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">Đánh giá khách thuê</h2>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-yellow-500/10 px-3 py-1 text-sm font-black text-amber-800 dark:text-yellow-300">
               <Star className="h-4 w-4 fill-current" />
               {ticket.review.rating}/5
             </span>
           </div>
-          <p className="mt-3 text-sm font-semibold leading-6 text-[#475569]">{ticket.review.comment || "Không có nhận xét."}</p>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{ticket.review.comment || "Không có nhận xét."}</p>
         </section>
       )}
 
-      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <h2 className="text-lg font-black text-[#091426]">Nhật ký xử lý</h2>
+      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+        <h2 className="text-lg font-black text-slate-900 dark:text-white">Nhật ký xử lý</h2>
         <Timeline events={ticket.events} />
       </section>
     </section>

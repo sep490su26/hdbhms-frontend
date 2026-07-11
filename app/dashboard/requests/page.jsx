@@ -13,21 +13,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-    Pagination,
-    PaginationContent,
-    PaginationEllipsis,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
     TransferRequestDetail,
@@ -558,10 +558,10 @@ function RequestDetailContent({ req }) {
 }
 
 export default function ApprovalCenter() {
-    const [typeFilter, setTypeFilter] = useState("All Types");
-    const [statusFilter, setStatusFilter] = useState("Pending");
-    const [search, setSearch] = useState("");
-    const [page, setPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [statusFilter, setStatusFilter] = useState("Pending");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
     const [data, setData] = useState([]);
     const [stats, setStats] = useState({ breakdown: [], pendingCount: 0, approvedCount: 0, rejectedCount: 0, totalCount: 0 });
@@ -2342,5 +2342,5 @@ export default function ApprovalCenter() {
                 </div>
             )}
         </div>
-    );
+  );
 }

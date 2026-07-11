@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -47,17 +47,18 @@ import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTim
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_FILTERS = [
-  { id: "current", label: "Hợp đồng hiện tại" },
   { id: "all", label: "Tất cả" },
-  { id: "PENDING", label: "Chờ ký / kích hoạt" },
-  { id: "ACTIVE", label: "Đang hiệu lực" },
-  { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
-  { id: "EXPIRED", label: "Hết hạn" },
-  { id: "RENEWED", label: "Đã gia hạn" },
-  { id: "LIQUIDATED", label: "Đã thanh lý" },
+  { id: "PENDING_SIGNATURE", label: "Chờ ký" },
+  { id: "SIGNED", label: "Đã ký" },
+  { id: "OVERDUE", label: "Quá hạn" },
 ];
 
-const HISTORY_FILTER = { id: "history", label: "Lịch sử" };
+const TIME_QUARTERS = [
+  { id: "Q1", label: "Quý 1", months: [1, 2, 3] },
+  { id: "Q2", label: "Quý 2", months: [4, 5, 6] },
+  { id: "Q3", label: "Quý 3", months: [7, 8, 9] },
+  { id: "Q4", label: "Quý 4", months: [10, 11, 12] },
+];
 
 const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "PENDING_SIGNATURE",
@@ -66,13 +67,6 @@ const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "ACTIVE",
   "EXPIRING_SOON",
   "EXPIRED",
-]);
-
-const HISTORY_CONTRACT_WORKFLOWS = new Set([
-  "RENEWED",
-  "LIQUIDATED",
-  "CANCELLED",
-  "AUTO_TERMINATED",
 ]);
 
 const ACTIVATION_FLOW_WORKFLOWS = new Set([
@@ -458,16 +452,23 @@ function StatusBadge({ item }) {
   const workflow = getWorkflow(item);
   const label = getStatusLabel(item);
   const classes = {
-    ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    EXPIRING_SOON: "border-amber-200 bg-amber-50 text-amber-700",
-    PENDING_ACTIVATION: "border-blue-200 bg-blue-50 text-blue-700",
-    MISSING_FILE: "border-red-200 bg-red-50 text-red-700",
-    PENDING_SIGNATURE: "border-amber-200 bg-amber-50 text-amber-700",
+    ACTIVE:
+      "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    EXPIRING_SOON:
+      "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
+    PENDING_ACTIVATION:
+      "border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    MISSING_FILE:
+      "border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300",
+    PENDING_SIGNATURE:
+      "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
     LIQUIDATED: "border-slate-200 bg-slate-50 text-slate-600",
     EXPIRED: "border-slate-200 bg-slate-50 text-slate-600",
-    RENEWED: "border-blue-200 bg-blue-50 text-blue-700",
+    RENEWED:
+      "border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
     CANCELLED: "border-slate-200 bg-slate-50 text-slate-500",
-    TERMINATION_PENDING: "border-orange-200 bg-orange-50 text-orange-700",
+    TERMINATION_PENDING:
+      "border-orange-200 dark:border-orange-500/20 bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300",
   };
   const Icon = workflow === "ACTIVE" ? CheckCircle2 : workflow === "PENDING_ACTIVATION" ? RefreshCw : AlertTriangle;
 
@@ -505,7 +506,7 @@ function DetailCard({ title, icon: Icon, action, className = "", children }) {
   return (
     <section className={`rounded-xl border border-[#dfe5ef] bg-[#fbfbfe] p-4 xl:p-5 ${className}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-[#091426] xl:text-xl">
+        <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-slate-900 dark:text-white xl:text-xl">
           <Icon className="h-4 w-4 xl:h-5 xl:w-5" />
           {title}
         </h3>
@@ -526,6 +527,7 @@ function InfoValue({ label, value }) {
 }
 
 export default function ContractTemplatePage() {
+  const searchParams = useSearchParams();
   const fileInputRef = useRef(null);
   const [contracts, setContracts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -535,9 +537,12 @@ export default function ContractTemplatePage() {
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("current");
-  const [fileFilter, setFileFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("all");
+  const [timePopoverOpen, setTimePopoverOpen] = useState(false);
+  const [timePanelQuarter, setTimePanelQuarter] = useState("Q1");
+  const [roomFilter, setRoomFilter] = useState("all");
+  const [contractTypeFilter, setContractTypeFilter] = useState("all");
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [termsForm, setTermsForm] = useState(buildTermsForm());
   const [termsError, setTermsError] = useState("");
@@ -559,6 +564,9 @@ export default function ContractTemplatePage() {
   const [size, setSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
+  const [cleanupStep, setCleanupStep] = useState(1);
+  const selectedYear = searchParams.get("year") || "all";
 
   const loadContracts = useCallback(async () => {
     setLoading(true);
@@ -621,6 +629,7 @@ export default function ContractTemplatePage() {
         if (workflow === "ACTIVE") acc.active += 1;
         if (workflow === "PENDING_SIGNATURE") acc.pendingSignature += 1;
         if (workflow === "PENDING_ACTIVATION") acc.pendingActivation += 1;
+        if (isOverdueContract(item)) acc.overdue += 1;
         if (!getLeaseSignedFileId(item)) acc.missingFile += 1;
         return acc;
       },
@@ -628,33 +637,59 @@ export default function ContractTemplatePage() {
     );
   }, [contracts]);
 
+  const roomOptions = useMemo(() => {
+    return [
+      ...new Set(contracts.map((item) => item.roomCode).filter(Boolean)),
+    ].sort((a, b) => String(a).localeCompare(String(b), "vi"));
+  }, [contracts]);
+
+  const activeTimeLabel = useMemo(
+    () => getTimeFilterLabel(timeFilter),
+    [timeFilter],
+  );
+
+  const visibleTimeQuarter = useMemo(() => {
+    return (
+      TIME_QUARTERS.find((quarter) => quarter.id === timePanelQuarter) ||
+      TIME_QUARTERS[0]
+    );
+  }, [timePanelQuarter]);
+
   const filteredContracts = useMemo(() => {
-    const search = normalizeKeyword(keyword);
-    return contracts.filter((item) => {
-      const searchable = [
-        item.displayCode,
-        item.contractCode,
-        item.depositCode,
-        item.roomCode,
-        item.propertyName,
-        item.primaryTenantName,
-        item.customerName,
-        item.phone,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    return contracts
+      .filter((item) => {
+        const matchesStatus = matchesStatusFilter(item, statusFilter);
+        const matchesYear =
+          selectedYear === "all" || getContractYear(item) === selectedYear;
+        const contractMonth = getContractMonth(item);
+        const contractQuarter = getContractQuarter(item);
+        const matchesTime =
+          timeFilter === "all" ||
+          contractQuarter === timeFilter ||
+          `M${contractMonth}` === timeFilter;
+        const matchesRoom =
+          roomFilter === "all" || item.roomCode === roomFilter;
+        const matchesContractType =
+          contractTypeFilter === "all" ||
+          getContractType(item) === contractTypeFilter;
 
-      const matchesSearch = !search || searchable.includes(search);
-      const matchesStatus = matchesStatusFilter(item, statusFilter);
-      const matchesFile =
-        fileFilter === "all" ||
-        (fileFilter === "uploaded" && getLeaseSignedFileId(item)) ||
-        (fileFilter === "missing" && !getLeaseSignedFileId(item));
-
-      return matchesSearch && matchesStatus && matchesFile;
-    });
-  }, [contracts, fileFilter, keyword, statusFilter]);
+        return (
+          matchesStatus &&
+          matchesYear &&
+          matchesTime &&
+          matchesRoom &&
+          matchesContractType
+        );
+      })
+      .sort((a, b) => getContractTimestamp(b) - getContractTimestamp(a));
+  }, [
+    contractTypeFilter,
+    contracts,
+    roomFilter,
+    selectedYear,
+    statusFilter,
+    timeFilter,
+  ]);
 
   const mergedSelected = useMemo(() => {
     if (!selected) return null;
@@ -1224,6 +1259,90 @@ export default function ContractTemplatePage() {
     }
   }
 
+  function openTimePopover() {
+    setTimePanelQuarter(getQuarterForTimeFilter(timeFilter));
+    setTimePopoverOpen((current) => !current);
+  }
+
+  function selectTimeFilter(value) {
+    setTimeFilter(value);
+    setTimePanelQuarter(getQuarterForTimeFilter(value));
+    setTimePopoverOpen(false);
+  }
+
+  function handleExportExcel() {
+    const exportScope = [
+      selectedYear === "all" ? "tat-ca-nam" : `nam-${selectedYear}`,
+      timeFilter === "all" ? "tat-ca-thoi-gian" : timeFilter.toLowerCase(),
+      roomFilter === "all" ? "tat-ca-phong" : `phong-${roomFilter}`,
+      contractTypeFilter === "all"
+        ? "tat-ca-loai"
+        : contractTypeFilter === "lease"
+          ? "hop-dong-thue"
+          : "hop-dong-coc",
+    ].join("-");
+    const header = [
+      "Ma HD",
+      "Loai HD",
+      "Phong",
+      "Nguoi ky chinh",
+      "So nguoi",
+      "Ngay bat dau",
+      "Ngay ket thuc",
+      "Gia thue",
+      "Trang thai",
+    ];
+    const rows = filteredContracts.map((item) => [
+      getContractDisplayName(item),
+      getContractType(item) === "lease" ? "Thue" : "Coc",
+      item.roomCode || "",
+      item.primaryTenantName || item.customerName || "",
+      getOccupantsCount(item),
+      formatDate(item.startDate || item.expectedLeaseSignDate),
+      formatDate(item.endDate || item.expectedMoveInDate),
+      formatMoney(item.monthlyRent),
+      getStatusLabel(item),
+    ]);
+    const csv = [header, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "application/vnd.ms-excel;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `danh-sach-hop-dong-${exportScope}.xls`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function openCleanupModal() {
+    setCleanupStep(1);
+    setCleanupModalOpen(true);
+  }
+
+  function closeCleanupModal() {
+    setCleanupModalOpen(false);
+    setCleanupStep(1);
+  }
+
+  function confirmCleanupPreview() {
+    setCleanupStep(2);
+  }
+
+  function confirmCleanupFinal() {
+    setCleanupModalOpen(false);
+    setCleanupStep(1);
+    toast.success(
+      "Đã xác nhận yêu cầu dọn dữ liệu cũ. Backend sẽ xử lý khi endpoint được kết nối.",
+    );
+  }
+
   const isBusy = Boolean(actionLoading);
   const stepperVisible = mergedSelected && !isRoomTransferManagedContract(mergedSelected) && (
     ["DRAFT", "PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(getWorkflow(mergedSelected)) ||
@@ -1235,8 +1354,9 @@ export default function ContractTemplatePage() {
       <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileSelected} />
 
       <section className="flex flex-col gap-2">
-        <h1 className="text-2xl font-extrabold tracking-[-0.01em] text-[#091426] xl:text-3xl">
-          Quản lý hợp đồng thuê
+        <h1 className="mt-2 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+          Quản lý hợp đồng thuê{" "}
+          {selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}
         </h1>
         <p className="max-w-3xl text-sm leading-6 text-[#505f76]">
           Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời hợp đồng thuê.
@@ -1313,13 +1433,13 @@ export default function ContractTemplatePage() {
       </section>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+        <div className="rounded-xl border border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-4 py-3 text-sm font-bold text-red-700 dark:text-rose-300">
           {error}
         </div>
       )}
 
       {actionMessage && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-300">
           {actionMessage}
         </div>
       )}
@@ -1334,17 +1454,18 @@ export default function ContractTemplatePage() {
 
         <div className="dashboard-table">
           <table className="w-full table-auto text-left text-[12px] xl:text-sm [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
-            <thead className="bg-[#f7f9fe] text-[10px] font-extrabold uppercase tracking-[0.03em] text-[#6b7280] xl:text-xs">
+            <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="min-w-32">Mã HĐ</th>
+                {/* <th className="min-w-24">Loại HĐ</th> */}
                 <th className="min-w-20">Phòng</th>
                 <th className="min-w-40">Người ký chính</th>
-                <th className="min-w-24">Số người</th>
+                {/* <th className="min-w-24">Số người</th> */}
                 <th className="min-w-36">Thời hạn</th>
                 <th className="min-w-32">Giá thuê</th>
                 <th className="min-w-28">File</th>
                 <th className="min-w-32">Trạng thái</th>
-                <th className="min-w-20 text-center">Xem</th>
+                {/* <th className="min-w-20 text-center">Xem</th> */}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
@@ -1363,21 +1484,21 @@ export default function ContractTemplatePage() {
                 filteredContracts.map((item, index) => (
                   <tr
                     key={getContractRowKey(item, index)}
-                    className="bg-white transition hover:bg-[#f8fbff]"
+                    className="bg-white dark:bg-[#0f172a] transition hover:bg-[#f8fbff] dark:hover:bg-white/5"
                   >
                     <td data-label="Mã HĐ" className="align-middle">
-                      <p className="font-extrabold leading-5 text-[#091426]">
+                      <p className="font-extrabold leading-5 text-slate-900 dark:text-white">
                         {getContractDisplayName(item)}
                       </p>
                       {!item.leaseContractId && item.depositCode && (
-                        <p className="mt-1 text-[11px] font-semibold text-[#607089] xl:text-xs">
+                        <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 xl:text-xs">
                           Mã cọc: {item.depositCode}
                         </p>
                       )}
                       <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">{item.propertyName || "Chưa có cơ sở"}</p>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {getWorkflow(item) === "RENEWED" && (
-                          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">
+                          <span className="rounded-full border border-blue-200 dark:border-blue-500/20 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 dark:text-blue-300">
                             Hợp đồng cũ
                           </span>
                         )}
@@ -1401,7 +1522,7 @@ export default function ContractTemplatePage() {
                               displayCode: item.renewedContractCode,
                             });
                           }}
-                          className="mt-2 block text-left text-[11px] font-bold text-blue-700 hover:underline xl:text-xs"
+                          className="mt-2 block text-left text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:underline xl:text-xs"
                         >
                           Xem HĐ mới {item.renewedContractCode || `#${item.renewedContractId}`}
                         </button>
@@ -1420,15 +1541,26 @@ export default function ContractTemplatePage() {
                               displayCode: item.previousContractCode,
                             });
                           }}
-                          className="mt-2 block text-left text-[11px] font-bold text-[#607089] hover:text-blue-700 hover:underline xl:text-xs"
+                          className="mt-2 block text-left text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline xl:text-xs"
                         >
                           Hợp đồng trước: {item.previousContractCode || `#${item.previousContractId}`}
                         </button>
                       )}
                     </td>
+                    <td data-label="Loại HĐ" className="align-middle">
+                      <span
+                        className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-extrabold ${
+                          getContractType(item) === "lease"
+                            ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300"
+                        }`}
+                      >
+                        {getContractType(item) === "lease" ? "Thuê" : "Cọc"}
+                      </span>
+                    </td>
                     <td data-label="Phòng" className="align-middle">
-                      <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
-                        <Home className="h-3.5 w-3.5 shrink-0 text-[#9aa3b2] xl:h-4 xl:w-4" />
+                      <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
+                        <Home className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 xl:h-4 xl:w-4" />
                         {item.roomCode || "-"}
                       </span>
                     </td>
@@ -1436,8 +1568,8 @@ export default function ContractTemplatePage() {
                       <p className="font-extrabold leading-5 text-[#091426]">{item.primaryTenantName || item.customerName || "Chưa có"}</p>
                     </td>
                     <td data-label="Số người" className="align-middle">
-                      <span className="inline-flex items-center gap-1 font-extrabold text-[#091426]">
-                        <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500 xl:h-4 xl:w-4" />
+                      <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
+                        <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-blue-300 xl:h-4 xl:w-4" />
                         {getOccupantsCount(item)} người
                       </span>
                     </td>
@@ -1462,7 +1594,7 @@ export default function ContractTemplatePage() {
                             event.stopPropagation();
                             selectContract(item);
                           }}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d1d7e0] bg-white px-3 text-xs font-extrabold text-[#091426] shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] xl:h-10 xl:text-sm"
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-xs font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10 xl:text-sm"
                         >
                           {needsActivationFlow(item) ? (
                             <FileCheck2 className="h-3.5 w-3.5" />
@@ -1499,6 +1631,63 @@ export default function ContractTemplatePage() {
           }}
         />
       </section>
+
+      {cleanupModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-4 backdrop-blur-sm"
+          onClick={closeCleanupModal}
+        >
+          <section
+            className="w-full max-w-[520px] rounded-xl bg-white p-6 shadow-2xl dark:bg-[#0f172a]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                  Xác nhận dọn dữ liệu định kỳ
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {cleanupStep === 1
+                    ? "Thao tác này dành cho dữ liệu hợp đồng cũ hơn 2 năm. Vui lòng xác nhận trước khi chuyển sang bước kiểm tra cuối."
+                    : "Bước cuối: bạn chắc chắn muốn gửi yêu cầu xóa dữ liệu cũ? Sau khi backend xử lý, dữ liệu đã xóa sẽ không thể khôi phục."}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300">
+              Bước {cleanupStep}/2 · Chỉ áp dụng cho dữ liệu cũ hơn 2 năm.
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCleanupModal}
+                className="h-10 rounded-lg border border-[#d1d7e0] bg-white px-4 text-sm font-extrabold text-slate-700 transition hover:bg-[#f8fafc] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
+              >
+                Không
+              </button>
+              {cleanupStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={confirmCleanupPreview}
+                  className="h-10 rounded-lg bg-orange-600 px-4 text-sm font-extrabold text-white transition hover:bg-orange-700"
+                >
+                  Có, tiếp tục
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={confirmCleanupFinal}
+                  className="h-10 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white transition hover:bg-red-700"
+                >
+                  Tôi chắc chắn muốn xóa
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {mergedSelected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4" onClick={() => { setSelected(null); setIsEditingTerms(false); setTermsFieldErrors({}); setTermsError(""); }}>
@@ -2112,7 +2301,7 @@ export default function ContractTemplatePage() {
               <button
                 type="button"
                 onClick={() => setRenewModalOpen(false)}
-                className="rounded-lg p-2 text-[#607089] hover:bg-[#f3f6fa]"
+                className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-[#f3f6fa] dark:hover:bg-white/5"
                 aria-label="Đóng modal tái ký"
               >
                 <X className="h-5 w-5" />
@@ -2190,17 +2379,17 @@ export default function ContractTemplatePage() {
               </div>
 
               {renewError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 sm:col-span-2">
+                <div className="rounded-lg border border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-3 py-2 text-sm font-bold text-red-700 dark:text-rose-300 sm:col-span-2">
                   {renewError}
                 </div>
               )}
             </div>
 
-            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] px-5 py-4">
+            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] dark:border-white/10 px-5 py-4">
               <button
                 type="button"
                 onClick={() => setRenewModalOpen(false)}
-                className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold"
+                className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-extrabold"
               >
                 Hủy
               </button>
@@ -2208,7 +2397,7 @@ export default function ContractTemplatePage() {
                 type="button"
                 onClick={handleRenewContract}
                 disabled={isBusy}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-extrabold text-white disabled:opacity-60"
               >
                 {actionLoading === `renew-${mergedSelected.leaseContractId}` && (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -2231,7 +2420,7 @@ export default function ContractTemplatePage() {
               <button
                 type="button"
                 onClick={() => setIntentionModalOpen(false)}
-                className="rounded-lg p-2 text-[#607089] hover:bg-[#f3f6fa]"
+                className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-[#f3f6fa] dark:hover:bg-white/5"
                 aria-label="Đóng modal ý định khách"
               >
                 <X className="h-5 w-5" />
@@ -2239,7 +2428,9 @@ export default function ContractTemplatePage() {
             </header>
             <div className="grid gap-4 px-5 py-5">
               <label className="grid gap-1.5">
-                <span className="text-sm font-bold text-[#34445c]">Ý định</span>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Ý định
+                </span>
                 <select
                   value={intentionForm.intention}
                   onChange={(event) => {
@@ -2252,7 +2443,7 @@ export default function ContractTemplatePage() {
                         : "",
                     }));
                   }}
-                  className="h-11 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold"
+                  className="h-11 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold"
                 >
                   {TENANT_INTENTION_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -2269,7 +2460,7 @@ export default function ContractTemplatePage() {
                     value={intentionForm.expectedMoveOutDate}
                     onChange={(event) => setIntentionForm((current) => ({ ...current, expectedMoveOutDate: event.target.value }))}
                     required
-                    className="h-11 rounded-lg border border-[#cbd5e1] px-3 text-sm font-semibold"
+                    className="h-11 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3 text-sm font-semibold"
                   />
                 </label>
               )}
@@ -2283,16 +2474,16 @@ export default function ContractTemplatePage() {
                 />
               </label>
               {intentionError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+                <div className="rounded-lg border border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-3 py-2 text-sm font-bold text-red-700 dark:text-rose-300">
                   {intentionError}
                 </div>
               )}
             </div>
-            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] px-5 py-4">
+            <footer className="flex justify-end gap-3 border-t border-[#dfe5ef] dark:border-white/10 px-5 py-4">
               <button
                 type="button"
                 onClick={() => setIntentionModalOpen(false)}
-                className="h-10 rounded-lg border border-[#cbd5e1] px-4 text-sm font-extrabold"
+                className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-extrabold"
               >
                 Hủy
               </button>

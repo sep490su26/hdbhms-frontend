@@ -1313,10 +1313,10 @@ export default function ApprovalCenter() {
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
                                     >
-                                        <option>Pending</option>
-                                        <option>Approved</option>
-                                        <option>Rejected</option>
-                                        <option>All</option>
+                                        <option value="Pending">Đang chờ</option>
+                                        <option value="Approved">Đã duyệt</option>
+                                        <option value="Rejected">Đã từ chối</option>
+                                        <option value="All">Tất cả</option>
                                     </select>
                                 </div>
 

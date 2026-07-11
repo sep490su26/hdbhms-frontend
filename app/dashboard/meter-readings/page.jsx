@@ -288,7 +288,7 @@ export default function UtilityManagement() {
 
   return (
     <div className="w-full min-w-0 overflow-x-hidden bg-gray-50 font-sans text-slate-900 dark:bg-[#020817] dark:text-slate-100">
-      <div className="flex w-full min-w-0 flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-5 sm:gap-6">
         {/* Page header */}
         <DashboardPageHeader
           title="Nhập điện nước hàng tháng"
@@ -349,9 +349,9 @@ export default function UtilityManagement() {
         />
 
         {/* Current period card */}
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0f172a] sm:p-5 lg:p-6">
           {!currentPeriod ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center dark:border-white/10 dark:bg-[#111827]">
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-5 text-center dark:border-white/10 dark:bg-[#111827] sm:p-8">
               <h3 className="font-semibold text-slate-900 dark:text-white">
                 Chưa có kỳ ghi chỉ số đang hoạt động
               </h3>
@@ -496,8 +496,8 @@ export default function UtilityManagement() {
           )}
         </div>
         {/* History table */}
-        <div className="mb-5 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
-          <div className="border-b border-gray-100 px-5 py-4 dark:border-white/10">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+          <div className="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-5">
             <h2 className="font-semibold text-slate-800 dark:text-white">
               Lịch sử các kỳ ghi chỉ số
             </h2>
@@ -507,25 +507,25 @@ export default function UtilityManagement() {
               <Table className="min-w-[800px]">
                 <TableHeader>
                   <TableRow className="border-b border-gray-100 bg-gray-50 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/5">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Kỳ ghi chỉ số
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Thời gian
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Trạng thái
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Tiến độ
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Phòng đã nhập
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Cảnh báo
                     </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <TableHead className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Thao tác
                     </TableHead>
                   </TableRow>
@@ -542,7 +542,7 @@ export default function UtilityManagement() {
                         key={h.period}
                         className="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
                       >
-                        <TableCell className="py-3.5">
+                        <TableCell className="px-5 py-4">
                           {h.isCurrent ? (
                             <span className="font-semibold text-blue-600 dark:text-blue-300">
                               {h.period}
@@ -554,17 +554,17 @@ export default function UtilityManagement() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="py-3.5 text-slate-500 dark:text-slate-400">
+                        <TableCell className="px-5 py-4 text-slate-500 dark:text-slate-400">
                           {formatTime(h.startDate, h.endDate)}
                         </TableCell>
-                        <TableCell className="py-3.5">
+                        <TableCell className="px-5 py-4">
                           <span
                             className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-lg ${st.bg}`}
                           >
                             {st.label}
                           </span>
                         </TableCell>
-                        <TableCell className="py-3.5">
+                        <TableCell className="px-5 py-4">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-10">
                               {prog}%
@@ -577,17 +577,17 @@ export default function UtilityManagement() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="py-3.5 text-slate-600 dark:text-slate-300">
+                        <TableCell className="px-5 py-4 text-slate-600 dark:text-slate-300">
                           {h.completedRooms} / {h.totalRooms}
                         </TableCell>
-                        <TableCell className="py-3.5">
+                        <TableCell className="px-5 py-4">
                           <span
                             className={`text-sm font-semibold ${h.anomalyCount > 0 ? "text-orange-500 dark:text-orange-300" : "text-slate-400 dark:text-slate-500"}`}
                           >
                             {h.anomalyCount}
                           </span>
                         </TableCell>
-                        <TableCell className="py-3.5">
+                        <TableCell className="px-5 py-4">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() =>
@@ -608,7 +608,7 @@ export default function UtilityManagement() {
               </Table>
             </div>
             {/* Card List cho Mobile */}
-            <div className="md:hidden flex flex-col p-4 gap-4">
+            <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 md:hidden">
               {paginatedHistory.map((h) => {
                 const st = STATUS_MAP[h.status] || STATUS_MAP.DRAFT;
                 const prog =
@@ -618,7 +618,7 @@ export default function UtilityManagement() {
                 return (
                   <div
                     key={h.period}
-                    className="border border-gray-200 dark:border-white/10 rounded-xl p-4 bg-gray-50/50"
+                    className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 dark:border-white/10 sm:p-4"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -689,7 +689,7 @@ export default function UtilityManagement() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="py-4 border-t border-gray-100 dark:border-white/10">
+              <div className="border-t border-gray-100 px-3 py-4 dark:border-white/10 sm:px-4">
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
@@ -743,9 +743,9 @@ export default function UtilityManagement() {
           </div>
         </div>
         {/* Bottom: Hướng dẫn + Ghi chú */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Hướng dẫn nhanh */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-[#0f172a]">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0f172a] sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <svg
                 className="w-4 h-4 text-slate-500 dark:text-slate-400"

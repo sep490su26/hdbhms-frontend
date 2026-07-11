@@ -18,6 +18,7 @@ import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { facilityStatusOptions } from "@/services/facilityService";
@@ -146,25 +147,20 @@ export function FacilityManagement() {
 
   return (
     <>
-      <section className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Quản lý cơ sở
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi cấu trúc cơ sở, tầng và phòng; cập nhật trạng thái vận hành
-            với kiểm soát hợp đồng và công nợ.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={facility.openCreateForm}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] hover:shadow-md"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm cơ sở mới
-        </button>
-      </section>
+      <DashboardPageHeader
+        title="Quản lý cơ sở"
+        description="Theo dõi cấu trúc cơ sở, tầng và phòng; cập nhật trạng thái vận hành với kiểm soát hợp đồng và công nợ."
+        actions={
+          <button
+            type="button"
+            onClick={facility.openCreateForm}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] hover:shadow-md"
+          >
+            <Plus className="h-4 w-4" />
+            Thêm cơ sở mới
+          </button>
+        }
+      />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map(({ key, label, icon: Icon, tone, suffix = "" }) => (

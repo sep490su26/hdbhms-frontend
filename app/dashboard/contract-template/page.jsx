@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CalendarDays,
@@ -53,6 +54,7 @@ const STATUS_FILTERS = [
   { id: "SIGNED", label: "Đã ký" },
   { id: "OVERDUE", label: "Quá hạn" },
 ];
+const HISTORY_FILTER = { id: "history", label: "Lịch sử" };
 
 const TIME_QUARTERS = [
   { id: "Q1", label: "Quý 1", months: [1, 2, 3] },
@@ -68,6 +70,15 @@ const CURRENT_CONTRACT_WORKFLOWS = new Set([
   "ACTIVE",
   "EXPIRING_SOON",
   "EXPIRED",
+]);
+
+const HISTORY_CONTRACT_WORKFLOWS = new Set([
+  "LIQUIDATED",
+  "RENEWED",
+  "CANCELLED",
+  "AUTO_TERMINATED",
+  "TERMINATION_PENDING",
+  "ENDED",
 ]);
 
 const ACTIVATION_FLOW_WORKFLOWS = new Set([
@@ -368,6 +379,76 @@ function getWorkflow(item) {
   return "PENDING_SIGNATURE";
 }
 
+function getContractType(item = {}) {
+  return item?.leaseContractId || item?.contractId ? "lease" : "deposit";
+}
+
+function getContractDateValue(item = {}) {
+  return (
+    item.createdAt ||
+    item.created_at ||
+    item.startDate ||
+    item.expectedLeaseSignDate ||
+    item.expectedMoveInDate ||
+    item.depositCreatedAt ||
+    item.updatedAt ||
+    null
+  );
+}
+
+function getContractTimestamp(item = {}) {
+  const timestamp = new Date(getContractDateValue(item) || 0).getTime();
+  if (Number.isFinite(timestamp) && timestamp > 0) return timestamp;
+  return Number(item.leaseContractId || item.depositAgreementId || item.id || 0);
+}
+
+function getContractYear(item = {}) {
+  const date = new Date(getContractDateValue(item) || "");
+  return Number.isNaN(date.getTime()) ? "" : String(date.getFullYear());
+}
+
+function getContractMonth(item = {}) {
+  const date = new Date(getContractDateValue(item) || "");
+  return Number.isNaN(date.getTime()) ? "" : String(date.getMonth() + 1);
+}
+
+function getContractQuarter(item = {}) {
+  const month = Number(getContractMonth(item));
+  if (!month) return "";
+  return `Q${Math.ceil(month / 3)}`;
+}
+
+function getQuarterForTimeFilter(value) {
+  if (TIME_QUARTERS.some((quarter) => quarter.id === value)) return value;
+  if (String(value || "").startsWith("M")) {
+    const month = Number(String(value).slice(1));
+    return (
+      TIME_QUARTERS.find((quarter) => quarter.months.includes(month))?.id ||
+      "Q1"
+    );
+  }
+  return "Q1";
+}
+
+function getTimeFilterLabel(value) {
+  if (value === "all") return "Cả năm";
+  const quarter = TIME_QUARTERS.find((item) => item.id === value);
+  if (quarter) return quarter.label;
+  if (String(value || "").startsWith("M")) {
+    return `Tháng ${String(value).slice(1)}`;
+  }
+  return "Cả năm";
+}
+
+function isOverdueContract(item = {}) {
+  const workflow = getWorkflow(item);
+  if (workflow === "EXPIRED") return true;
+  if (HISTORY_CONTRACT_WORKFLOWS.has(workflow)) return false;
+  if (!item.endDate) return false;
+  const end = new Date(`${toDateInputValue(item.endDate)}T23:59:59`);
+  return !Number.isNaN(end.getTime()) && end < new Date();
+}
+
 function isRoomTransferManagedContract(item) {
   return Boolean(item?.transferRequestId);
 }
@@ -422,9 +503,16 @@ function matchesStatusFilter(item, statusFilter) {
   if (statusFilter === "all") return true;
   if (statusFilter === "current") return CURRENT_CONTRACT_WORKFLOWS.has(workflow);
   if (statusFilter === "history") return HISTORY_CONTRACT_WORKFLOWS.has(workflow);
-  if (statusFilter === "PENDING") {
+  if (statusFilter === "PENDING" || statusFilter === "PENDING_SIGNATURE") {
     return ["PENDING_SIGNATURE", "MISSING_FILE", "PENDING_ACTIVATION"].includes(workflow);
   }
+  if (statusFilter === "SIGNED") {
+    return (
+      Boolean(getLeaseSignedFileId(item)) ||
+      ["ACTIVE", "EXPIRING_SOON", "PENDING_ACTIVATION"].includes(workflow)
+    );
+  }
+  if (statusFilter === "OVERDUE") return isOverdueContract(item);
   return workflow === statusFilter || item.status === statusFilter || item.contractStatus === statusFilter;
 }
 
@@ -538,6 +626,8 @@ export default function ContractTemplatePage() {
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [fileFilter, setFileFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [timePopoverOpen, setTimePopoverOpen] = useState(false);
@@ -673,19 +763,42 @@ export default function ContractTemplatePage() {
         const matchesContractType =
           contractTypeFilter === "all" ||
           getContractType(item) === contractTypeFilter;
+        const normalizedKeyword = normalizeKeyword(keyword);
+        const matchesKeyword =
+          !normalizedKeyword ||
+          [
+            getContractDisplayName(item),
+            item.contractCode,
+            item.displayCode,
+            item.depositCode,
+            item.roomCode,
+            item.primaryTenantName,
+            item.customerName,
+          ]
+            .map(normalizeKeyword)
+            .some((value) => value.includes(normalizedKeyword));
+        const hasFile = Boolean(getLeaseSignedFileId(item));
+        const matchesFile =
+          fileFilter === "all" ||
+          (fileFilter === "uploaded" && hasFile) ||
+          (fileFilter === "missing" && !hasFile);
 
         return (
           matchesStatus &&
           matchesYear &&
           matchesTime &&
           matchesRoom &&
-          matchesContractType
+          matchesContractType &&
+          matchesKeyword &&
+          matchesFile
         );
       })
       .sort((a, b) => getContractTimestamp(b) - getContractTimestamp(a));
   }, [
     contractTypeFilter,
     contracts,
+    fileFilter,
+    keyword,
     roomFilter,
     selectedYear,
     statusFilter,

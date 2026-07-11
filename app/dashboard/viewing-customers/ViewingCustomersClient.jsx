@@ -32,6 +32,7 @@ import {
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const emptyForm = {
@@ -841,40 +842,36 @@ export default function ViewingCustomersClient() {
               {errorMessage}
             </div>
           )}
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-                Danh sách khách xem phòng
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <select
-                value={filters.propertyId}
-                onChange={(event) =>
-                  updateFilter("propertyId", event.target.value)
-                }
-                className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white shadow-sm outline-none focus:border-[#1e40af] sm:w-auto"
-              >
-                <option value="all">Tất cả cơ sở</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
-              >
-                <Plus className="h-4 w-4" />
-                Thêm khách xem
-              </button>
-            </div>
-          </section>
+          <DashboardPageHeader
+            title="Danh sách khách xem phòng"
+            description="Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng."
+            actions={
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <select
+                  value={filters.propertyId}
+                  onChange={(event) =>
+                    updateFilter("propertyId", event.target.value)
+                  }
+                  className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white shadow-sm outline-none focus:border-[#1e40af] sm:w-auto"
+                >
+                  <option value="all">Tất cả cơ sở</option>
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Thêm khách xem
+                </button>
+              </div>
+            }
+          />
 
           <section className="mt-7 grid gap-5 md:grid-cols-3">
             <DashboardStatCard

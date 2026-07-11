@@ -9,7 +9,6 @@ import {
   Building2,
   CheckCheck,
   ChevronDown,
-  CircleHelp,
   FileCheck2,
   FileText,
   Gauge,
@@ -330,7 +329,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               <User className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Edit profile
+              Chỉnh sửa hồ sơ
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -342,19 +341,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               <UserCog className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Account settings
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="rounded-lg p-0 focus:bg-transparent"
-          >
-            <Link
-              href="/dashboard/requests"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
-            >
-              <CircleHelp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Support
+              Tùy chọn cá nhân
             </Link>
           </DropdownMenuItem>
         </div>
@@ -370,7 +357,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
           ) : (
             <LogOut className="h-5 w-5 text-slate-500 dark:text-slate-400" />
           )}
-          <span>{isLoggingOut ? "Signing out..." : "Sign out"}</span>
+          <span>{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

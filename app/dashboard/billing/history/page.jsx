@@ -158,6 +158,7 @@ export default function TransactionHistoryPage() {
         <div className="mt-2">
           <DashboardPageHeader
             title="Lịch sử thanh toán"
+            description="Tra cứu và xuất lịch sử giao dịch đã ghi nhận trong hệ thống."
             actions={
               <div className="flex flex-wrap gap-2">
                 <button

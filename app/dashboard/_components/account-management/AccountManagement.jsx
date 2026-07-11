@@ -21,6 +21,7 @@ import {
   facilityOptions,
   initialEmployeeAccounts,
 } from "./data";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 function StatusBadge({ status }) {
@@ -174,13 +175,11 @@ export function AccountManagement() {
 
   return (
     <>
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">Admin Dashboard</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">AccountManagement</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Quản lý tài khoản nhân sự cho vai trò Quản lý và Kế toán trong hệ thống nhà trọ.</p>
-        </div>
-      </section>
+      <DashboardPageHeader
+        eyebrow="Admin Dashboard"
+        title="AccountManagement"
+        description="Quản lý tài khoản nhân sự cho vai trò Quản lý và Kế toán trong hệ thống nhà trọ."
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard icon={UsersRound} label="Tổng nhân sự" value={metrics.total} />

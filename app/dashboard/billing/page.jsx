@@ -365,6 +365,7 @@ export default function BillingPage() {
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
         title="Hóa đơn & Thu tiền"
+        description="Theo dõi hóa đơn phòng, ghi nhận thanh toán thủ công và quản lý các khoản còn phải thu."
         actions={
           <Link
             href="/dashboard/billing/history"

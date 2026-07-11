@@ -27,7 +27,7 @@ export const navigation = [
     { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText },
     { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
     { path: "/dashboard/notification-templates", label: "Template thông báo", icon: BellRing },
-    { path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards },
+    { path: "/dashboard/finance", label: "Báo cáo doanh thu", icon: WalletCards },
     { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings },
 ];
 

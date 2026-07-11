@@ -147,7 +147,7 @@ const navigation = [
   },
   {
     path: "/dashboard/finance",
-    label: "Báo cáo tài chính",
+    label: "Báo cáo doanh thu",
     icon: WalletCards,
     permissionKey: "finance",
   },
@@ -770,109 +770,120 @@ function Topbar({
                 <Moon className="h-5 w-5" />
               )}
             </button>
-            <DropdownMenu
-              modal={false}
-              open={isNotificationOpen}
-              onOpenChange={(open) => {
-                setNotificationOpen(open);
-                if (open) loadNotifications({ silent: notifications.length > 0 });
-              }}
-            >
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Notifications"
-                  className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            {user ? (
+              <>
+                <DropdownMenu
+                  modal={false}
+                  open={isNotificationOpen}
+                  onOpenChange={(open) => {
+                    setNotificationOpen(open);
+                    if (open) loadNotifications({ silent: notifications.length > 0 });
+                  }}
                 >
-                  <Bell className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-900">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                sideOffset={12}
-                className="w-[360px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-800 dark:bg-[#1a2231]"
-              >
-                <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">
-                      Thông báo
-                    </p>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {unreadCount > 0 ? `${unreadCount} chưa đọc` : "Không có thông báo mới"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleMarkAllNotificationsRead}
-                    disabled={!unreadCount}
-                    title="Đánh dấu tất cả đã đọc"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5"
-                  >
-                    <CheckCheck className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="max-h-[360px] overflow-y-auto p-2">
-                  {isLoadingNotifications && notifications.length === 0 ? (
-                    <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-gray-500 dark:text-gray-400">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang tải thông báo...
-                    </div>
-                  ) : notificationError ? (
-                    <div className="px-4 py-8 text-center text-sm font-semibold text-rose-600">
-                      {notificationError}
-                    </div>
-                  ) : notifications.length === 0 ? (
-                    <div className="px-4 py-8 text-center">
-                      <Inbox className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600" />
-                      <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
-                        Chưa có thông báo.
-                      </p>
-                    </div>
-                  ) : (
-                    notifications.map((notification) => (
-                      <DropdownMenuItem
-                        key={notification.id}
-                        onClick={() => handleNotificationClick(notification)}
-                        className="cursor-pointer items-start gap-3 rounded-lg px-3 py-3 focus:bg-gray-50 dark:focus:bg-white/5"
-                      >
-                        <span
-                          className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                            notification.isRead ? "bg-gray-300 dark:bg-gray-600" : "bg-orange-500"
-                          }`}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">
-                            {notification.title || "Thông báo"}
-                          </span>
-                          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-500 dark:text-gray-400">
-                            {notification.body || "Có cập nhật mới cần xem."}
-                          </span>
-                          {notification.createdAt && (
-                            <span className="mt-2 block text-[11px] font-semibold text-gray-400">
-                              {formatNotificationTime(notification.createdAt)}
-                            </span>
-                          )}
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Notifications"
+                      className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                    >
+                      <Bell className="h-5 w-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-900">
+                          {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
-              {ROLE_LABELS[user?.role] || "Quản lý"}
-            </span>
-            <UserMenu
-              user={user}
-              onLogout={onLogout}
-              isLoggingOut={isLoggingOut}
-            />
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={12}
+                    className="w-[360px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-800 dark:bg-[#1a2231]"
+                  >
+                    <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">
+                          Thông báo
+                        </p>
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {unreadCount > 0 ? `${unreadCount} chưa đọc` : "Không có thông báo mới"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleMarkAllNotificationsRead}
+                        disabled={!unreadCount}
+                        title="Đánh dấu tất cả đã đọc"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5"
+                      >
+                        <CheckCheck className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="max-h-[360px] overflow-y-auto p-2">
+                      {isLoadingNotifications && notifications.length === 0 ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải thông báo...
+                        </div>
+                      ) : notificationError ? (
+                        <div className="px-4 py-8 text-center text-sm font-semibold text-rose-600">
+                          {notificationError}
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <Inbox className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600" />
+                          <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                            Chưa có thông báo.
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <DropdownMenuItem
+                            key={notification.id}
+                            onClick={() => handleNotificationClick(notification)}
+                            className="cursor-pointer items-start gap-3 rounded-lg px-3 py-3 focus:bg-gray-50 dark:focus:bg-white/5"
+                          >
+                            <span
+                              className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                notification.isRead ? "bg-gray-300 dark:bg-gray-600" : "bg-orange-500"
+                              }`}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">
+                                {notification.title || "Thông báo"}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                {notification.body || "Có cập nhật mới cần xem."}
+                              </span>
+                              {notification.createdAt && (
+                                <span className="mt-2 block text-[11px] font-semibold text-gray-400">
+                                  {formatNotificationTime(notification.createdAt)}
+                                </span>
+                              )}
+                            </span>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
+                  {ROLE_LABELS[user.role] || "Quản lý"}
+                </span>
+                <UserMenu
+                  user={user}
+                  onLogout={onLogout}
+                  isLoggingOut={isLoggingOut}
+                />
+              </>
+            ) : (
+              <Link
+                href="/login?redirect=%2Fdashboard%2Ffinance"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-bold text-white transition hover:bg-[#3641f5]"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -893,8 +904,12 @@ function DashboardLayoutShell({ children }) {
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
+  const allowedRoles = permissionKey
+    ? SECTION_PERMISSIONS[permissionKey] || []
+    : [];
+  const isPublicRoute = pathname?.startsWith("/dashboard/finance");
   const isAllowed = permissionKey
-    ? canAccessRole(effectiveRole, SECTION_PERMISSIONS[permissionKey] || [])
+    ? canAccessRole(effectiveRole, allowedRoles)
     : false;
 
   useEffect(() => {
@@ -932,7 +947,7 @@ function DashboardLayoutShell({ children }) {
 
   useEffect(() => {
     if (!hasHydratedAuth) return;
-    if (!user) {
+    if (!user && !isPublicRoute) {
       if (isLoggingOut) return;
       const redirect = pathname
         ? `?redirect=${encodeURIComponent(pathname)}`
@@ -950,6 +965,7 @@ function DashboardLayoutShell({ children }) {
     hasHydratedAuth,
     isAllowed,
     isLoggingOut,
+    isPublicRoute,
     pathname,
     router,
     user,

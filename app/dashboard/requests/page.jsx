@@ -38,6 +38,7 @@ import {
     ComplaintRequestDetail,
     AccessRequestDetail,
 } from "./_components/RequestTypeDetails";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const translateType = (type) => {
     const map = {
@@ -1241,19 +1242,21 @@ export default function ApprovalCenter() {
     return (
         <div className="bg-[#f8fafc] font-sans">
             <div className="mx-auto w-full max-w-[1600px] space-y-6">
-                <section className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-3xl font-bold tracking-[-0.02em] text-slate-900">Quản lý yêu cầu</h1>
+                <DashboardPageHeader
+                    title={
+                        <span className="flex items-center gap-2">
+                            Quản lý yêu cầu
                             <Info className="h-5 w-5 text-slate-400" />
-                        </div>
-                        <p className="mt-3 max-w-2xl text-base text-slate-500">Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê.</p>
-                    </div>
-                    <Button className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Tạo yêu cầu mới
-                    </Button>
-                </section>
+                        </span>
+                    }
+                    description="Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê."
+                    actions={
+                        <Button className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Tạo yêu cầu mới
+                        </Button>
+                    }
+                />
             <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_240px] 2xl:items-start">
                 {/* LEFT: main content */}
                 <div className="min-w-0 space-y-4">

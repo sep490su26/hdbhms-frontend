@@ -30,6 +30,7 @@ import {
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import { getAuthToken } from "@/services/identityAccessService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const STATUS_META = {
   PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
@@ -530,20 +531,22 @@ export default function MaintenanceTicketDetailPage() {
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
-            <ArrowLeft className="h-4 w-4" />
-            Danh sách bảo trì
-          </Link>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white">{ticket.ticketCode}</h1>
-            <StatusBadge status={ticket.status} />
-          </div>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{ticket.title || ticket.description}</p>
-        </div>
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
+      <div>
+        <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
+          <ArrowLeft className="h-4 w-4" />
+          Danh sách bảo trì
+        </Link>
+        <DashboardPageHeader
+          className="mt-4"
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              {ticket.ticketCode}
+              <StatusBadge status={ticket.status} />
+            </span>
+          }
+          description={ticket.title || ticket.description}
+          actions={canManage ? (
+            <div className="flex flex-wrap gap-2">
             {ticket.status === "PENDING" && (
               <>
                 <button
@@ -588,8 +591,9 @@ export default function MaintenanceTicketDetailPage() {
                 Xác nhận hoàn tất
               </button>
             )}
-          </div>
-        )}
+            </div>
+          ) : null}
+        />
       </div>
 
       {error && <Notice type="error">{error}</Notice>}

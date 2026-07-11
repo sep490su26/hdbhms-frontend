@@ -25,6 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const NAV_ITEMS = [
   { icon: "grid", label: "Tổng quan" },
@@ -289,67 +290,63 @@ export default function UtilityManagement() {
     <div className="w-full min-w-0 overflow-x-hidden bg-gray-50 font-sans text-slate-900 dark:bg-[#020817] dark:text-slate-100">
       <div className="flex w-full min-w-0 flex-col gap-6">
         {/* Page header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-              Nhập điện nước hàng tháng
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              Quản lý ghi chỉ số điện nước hàng tháng
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {!currentPeriod && canStartCurrentPeriod && (
-              <button
-                onClick={handleStartBatch}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        <DashboardPageHeader
+          title="Nhập điện nước hàng tháng"
+          description="Quản lý ghi chỉ số điện nước hàng tháng"
+          actions={
+            <div className="flex items-center gap-3">
+              {!currentPeriod && canStartCurrentPeriod && (
+                <button
+                  onClick={handleStartBatch}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Bắt đầu kỳ ghi tháng này
-              </button>
-            )}
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Bắt đầu kỳ ghi tháng này
+                </button>
+              )}
 
-            {!currentPeriod && !canStartCurrentPeriod && (
-              <div className="px-4 py-2 rounded-xl bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 border border-amber-200 dark:border-yellow-500/20 text-sm font-medium">
-                Kỳ ghi mới mở từ ngày {nextOpenDate}
-              </div>
-            )}
+              {!currentPeriod && !canStartCurrentPeriod && (
+                <div className="px-4 py-2 rounded-xl bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 border border-amber-200 dark:border-yellow-500/20 text-sm font-medium">
+                  Kỳ ghi mới mở từ ngày {nextOpenDate}
+                </div>
+              )}
 
-            {currentPeriod && (
-              <button
-                onClick={() => router.push("/dashboard/meter-readings/batch")}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {currentPeriod && (
+                <button
+                  onClick={() => router.push("/dashboard/meter-readings/batch")}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M14 5l7 7m0 0l-7 7m7-7H3"
-                  />
-                </svg>
-                Tiếp tục nhập
-              </button>
-            )}
-          </div>
-        </div>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14 5l7 7m0 0l-7 7m7-7H3"
+                    />
+                  </svg>
+                  Tiếp tục nhập
+                </button>
+              )}
+            </div>
+          }
+        />
 
         {/* Current period card */}
         <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-[#0f172a]">

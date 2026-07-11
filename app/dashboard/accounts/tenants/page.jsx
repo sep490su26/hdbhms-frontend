@@ -20,6 +20,7 @@ import {
   sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const ALL_VALUE = "Tất cả";
@@ -500,26 +501,21 @@ export default function AccountsPage() {
 
   return (
     <div className="grid gap-7 text-[#0f1d33]">
-      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-[#3d4759]"></div>
-          <h1 className="text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">
-            Quản lý tài khoản khách thuê
-          </h1>
-          <p className="mt-2 text-sm text-[#526179]">
-            Cấp tài khoản mobile cho người thuê trong hợp đồng thuê đang ACTIVE.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
-        </button>
-      </section>
+      <DashboardPageHeader
+        title="Quản lý tài khoản khách thuê"
+        description="Cấp tài khoản mobile cho người thuê trong hợp đồng thuê đang ACTIVE."
+        actions={
+          <button
+            type="button"
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Làm mới
+          </button>
+        }
+      />
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
         <MetricCard

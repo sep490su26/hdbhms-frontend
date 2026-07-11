@@ -31,6 +31,7 @@ import {
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
@@ -1509,25 +1510,20 @@ export default function TenantsPage() {
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6">
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Hồ sơ khách thuê
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và
-            người ở cùng.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadProfiles}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Làm mới
-        </button>
-      </section>
+      <DashboardPageHeader
+        title="Hồ sơ khách thuê"
+        description="Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và người ở cùng."
+        actions={
+          <button
+            type="button"
+            onClick={loadProfiles}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Làm mới
+          </button>
+        }
+      />
 
       <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

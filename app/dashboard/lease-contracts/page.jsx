@@ -29,6 +29,7 @@ import {
 import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -565,12 +566,10 @@ export default function DepositsPage() {
   return (
     <>
       <section className="w-full min-w-0 flex flex-col gap-6">
-        <header>
-          <h1 className="text-3xl font-extrabold tracking-[-0.02em] text-slate-900 dark:text-white">Danh sách hợp đồng đặt cọc</h1>
-          <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-            Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng.
-          </p>
-        </header>
+        <DashboardPageHeader
+          title="Danh sách hợp đồng đặt cọc"
+          description="Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng."
+        />
 
         {loadError && (
           <div className="rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-4 text-sm font-bold text-rose-700 dark:text-rose-300">

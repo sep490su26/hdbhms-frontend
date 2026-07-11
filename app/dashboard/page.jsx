@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { getDashboardOverview } from "@/services/dashboardService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 function SummaryCard({ icon: Icon, label, value, loading }) {
   return (
@@ -104,25 +105,21 @@ export default function DashboardPage() {
   const floors = data?.floorEfficiencies ?? [];
   return (
     <div className="w-full min-w-0 flex flex-col gap-6 text-slate-900 dark:text-white">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Dashboard tổng quan
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Số liệu phòng được tổng hợp trực tiếp từ hệ thống.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadDashboard}
-          disabled={loading}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
-        </button>
-      </section>
+      <DashboardPageHeader
+        title="Dashboard tổng quan"
+        description="Số liệu phòng được tổng hợp trực tiếp từ hệ thống."
+        actions={
+          <button
+            type="button"
+            onClick={loadDashboard}
+            disabled={loading}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Làm mới
+          </button>
+        }
+      />
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-5">
         <SummaryCard

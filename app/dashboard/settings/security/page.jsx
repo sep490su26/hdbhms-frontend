@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {changeCurrentUserPassword} from "@/services/identityAccessService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const INITIAL_VALUES = {
   currentPassword: "",
@@ -162,10 +163,10 @@ export default function SecuritySettingsPage() {
           Back to settings
         </Link>
         <div className="mt-5">
-          <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">Security & Password</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Update your password to keep your account secure.
-          </p>
+          <DashboardPageHeader
+            title="Security & Password"
+            description="Update your password to keep your account secure."
+          />
         </div>
       </header>
 

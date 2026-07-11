@@ -16,6 +16,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { formatDateTime } from "@/lib/dateFormat";
 import {
@@ -409,17 +410,11 @@ export default function StaffAccountsPage() {
 
   return (
     <div className="grid gap-7 text-[#0f1d33]">
-      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-[-0.02em] text-[#0f1d33]">
-            Quản lý tài khoản nhân viên
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#526179]">
-            Tạo và quản lý tài khoản web cho quản lý, kế toán; kiểm soát role,
-            trạng thái đăng nhập và chuẩn bị gán cơ sở phụ trách.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+      <DashboardPageHeader
+        title="Quản lý tài khoản nhân viên"
+        description="Tạo và quản lý tài khoản web cho quản lý, kế toán; kiểm soát role, trạng thái đăng nhập và chuẩn bị gán cơ sở phụ trách."
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={loadUsers}
@@ -442,8 +437,9 @@ export default function StaffAccountsPage() {
             <UserPlus className="h-4 w-4" />
             Tạo tài khoản nhân viên
           </button>
-        </div>
-      </section>
+          </div>
+        }
+      />
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
         <MetricCard icon={UsersRound} label="Tổng nhân viên" value={metrics.total} />

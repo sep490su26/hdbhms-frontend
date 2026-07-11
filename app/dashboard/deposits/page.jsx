@@ -40,6 +40,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -1130,14 +1131,10 @@ export default function DepositsPage() {
   return (
     <>
       <section className="w-full min-w-0 flex flex-col gap-6">
-        <header>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Danh sách hợp đồng đặt cọc
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng.
-          </p>
-        </header>
+        <DashboardPageHeader
+          title="Danh sách hợp đồng đặt cọc"
+          description="Quản lý và theo dõi các khoản đặt cọc giữ chỗ của khách hàng."
+        />
 
         {loadError && (
           <div className="rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-4 text-sm font-bold text-rose-700 dark:text-rose-300">

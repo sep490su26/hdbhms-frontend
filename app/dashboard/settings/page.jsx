@@ -2,17 +2,15 @@
 
 import { Settings } from "lucide-react";
 
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+
 export default function SettingsPage() {
   return (
     <div className="grid gap-6 text-slate-900 dark:text-white">
-      <section>
-        <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-          Cấu hình hệ thống
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Quản lý đơn giá điện, nước và phí dịch vụ từ dữ liệu hệ thống.
-        </p>
-      </section>
+      <DashboardPageHeader
+        title="Cấu hình hệ thống"
+        description="Quản lý đơn giá điện, nước và phí dịch vụ từ dữ liệu hệ thống."
+      />
 
       <section className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-6 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eef3fb] text-[#3156b6]">

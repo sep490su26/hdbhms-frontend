@@ -11,6 +11,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -362,18 +363,18 @@ export default function BillingPage() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
-      <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-          Hóa đơn & Thu tiền
-        </h1>
-        <Link
-          href="/dashboard/billing/history"
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
-        >
-          <History className="h-4 w-4 dark:text-slate-300" />
-          Lịch sử thanh toán
-        </Link>
-      </section>
+      <DashboardPageHeader
+        title="Hóa đơn & Thu tiền"
+        actions={
+          <Link
+            href="/dashboard/billing/history"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
+          >
+            <History className="h-4 w-4 dark:text-slate-300" />
+            Lịch sử thanh toán
+          </Link>
+        }
+      />
 
       {(error || message) && (
         <section

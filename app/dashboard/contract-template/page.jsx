@@ -44,6 +44,7 @@ import ContractPrintWizard from "./ContractPrintWizard";
 import ContractWorkflowStepper from "./ContractWorkflowStepper";
 import { toast } from "sonner";
 import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_FILTERS = [
@@ -1353,15 +1354,10 @@ export default function ContractTemplatePage() {
     <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
       <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileSelected} />
 
-      <section className="flex flex-col gap-2">
-        <h1 className="mt-2 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-          Quản lý hợp đồng thuê{" "}
-          {selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}
-        </h1>
-        <p className="max-w-3xl text-sm leading-6 text-[#505f76]">
-          Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời hợp đồng thuê.
-        </p>
-      </section>
+      <DashboardPageHeader
+        title={`Quản lý hợp đồng thuê ${selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}`}
+        description="Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời hợp đồng thuê."
+      />
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3 xl:gap-4">
         <StatCard label="Tổng" value={summary.total} tone="dark" />

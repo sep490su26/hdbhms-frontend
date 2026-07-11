@@ -32,6 +32,7 @@ import {
   fetchViewingProperties,
   fetchViewingRooms,
 } from "@/services/viewingCustomersService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const STATUS_OPTIONS = [
@@ -698,17 +699,11 @@ export default function MaintenancePage() {
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Báo sự cố & Bảo trì
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn
-            tất.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
+      <DashboardPageHeader
+        title="Báo sự cố & Bảo trì"
+        description="Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất."
+        actions={
+          <div className="flex flex-wrap gap-3">
           <button
             type="button"
             onClick={loadTickets}
@@ -769,8 +764,9 @@ export default function MaintenancePage() {
               {isViolationOpen ? "Đóng vi phạm" : "Ghi nhận vi phạm"}
             </button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-4">
         {metrics.map((item) => (

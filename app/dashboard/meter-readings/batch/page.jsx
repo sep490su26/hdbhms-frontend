@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PhotoGallery } from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const SAMPLE_PHOTOS = [
     {
@@ -374,53 +375,51 @@ export default function MeterReadings() {
                 </BreadcrumbList>
             </Breadcrumb>
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4 mt-2">
-                <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Meter Readings - June 2026</h1>
-                        <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">In Progress</span>
-                    </div>
-                    <p className="text-sm text-slate-400 dark:text-slate-500">Period: 01/06/2026 - 30/06/2026</p>
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                    {(pending > 0 || errors > 0) ? (
-                        <span
-                            className="text-sm font-medium text-amber-600 dark:text-yellow-300 flex items-center gap-1.5 bg-amber-50 dark:bg-yellow-500/10 px-3 py-2 rounded-lg border border-amber-200 dark:border-yellow-500/20">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                                strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                            {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
+            <div className="mb-4 mt-2">
+                <DashboardPageHeader
+                    title={
+                        <span className="flex items-center gap-3">
+                            Meter Readings - June 2026
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">In Progress</span>
                         </span>
-                    ) : (
-                        <span
-                            className="text-sm font-medium text-green-600 dark:text-green-300 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 px-3 py-2 rounded-lg border border-green-200 dark:border-green-500/20">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                                strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            Đã đủ điều kiện chốt kỳ
-                        </span>
-                    )}
-                    <Button
-                        onClick={() => {
-                            const firstPending = filtered.find(r => r.status === "pending" || !r.status);
-                            if (firstPending) {
-                                setFocusRoomId(firstPending.id);
-                            } else if (filtered.length > 0) {
-                                setFocusRoomId(filtered[0].id);
-                            }
-                        }}
-                        variant={"default"}
-                        className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                        <LucideEdit className="w-4 h-4" />
-                        Bắt đầu nhập
-                    </Button>
-                    <Button
-                        onClick={handleSaveAll}
-                        disabled={saving || loading || (pending > 0 || errors > 0)}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        {saving ? "Đang lưu..." : "Lưu tất cả"}
-                    </Button>
-                </div>
+                    }
+                    description="Period: 01/06/2026 - 30/06/2026"
+                    actions={
+                        <div className="flex items-center gap-3 mt-1">
+                            {(pending > 0 || errors > 0) ? (
+                                <span className="text-sm font-medium text-amber-600 dark:text-yellow-300 flex items-center gap-1.5 bg-amber-50 dark:bg-yellow-500/10 px-3 py-2 rounded-lg border border-amber-200 dark:border-yellow-500/20">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
+                                </span>
+                            ) : (
+                                <span className="text-sm font-medium text-green-600 dark:text-green-300 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 px-3 py-2 rounded-lg border border-green-200 dark:border-green-500/20">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    Đã đủ điều kiện chốt kỳ
+                                </span>
+                            )}
+                            <Button
+                                onClick={() => {
+                                    const firstPending = filtered.find(r => r.status === "pending" || !r.status);
+                                    if (firstPending) {
+                                        setFocusRoomId(firstPending.id);
+                                    } else if (filtered.length > 0) {
+                                        setFocusRoomId(filtered[0].id);
+                                    }
+                                }}
+                                variant={"default"}
+                                className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                <LucideEdit className="w-4 h-4" />
+                                Bắt đầu nhập
+                            </Button>
+                            <Button
+                                onClick={handleSaveAll}
+                                disabled={saving || loading || (pending > 0 || errors > 0)}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                {saving ? "Đang lưu..." : "Lưu tất cả"}
+                            </Button>
+                        </div>
+                    }
+                />
             </div>
 
             {/* Stat cards */}

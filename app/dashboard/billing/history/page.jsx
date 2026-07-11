@@ -16,6 +16,7 @@ import {
   downloadTransactionHistoryExport,
   fetchTransactionHistory,
 } from "@/services/transactionService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -146,38 +147,42 @@ export default function TransactionHistoryPage() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
-      <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <Link
-            href="/dashboard/billing"
-            className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Hóa đơn & Thu tiền
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold">Lịch sử thanh toán</h1>
+      <div>
+        <Link
+          href="/dashboard/billing"
+          className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Hóa đơn & Thu tiền
+        </Link>
+        <div className="mt-2">
+          <DashboardPageHeader
+            title="Lịch sử thanh toán"
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => exportFile("excel")}
+                  disabled={Boolean(exporting)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {exporting === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                  Xuất Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportFile("pdf")}
+                  disabled={Boolean(exporting)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {exporting === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  Xuất PDF
+                </button>
+              </div>
+            }
+          />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => exportFile("excel")}
-            disabled={Boolean(exporting)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {exporting === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-            Xuất Excel
-          </button>
-          <button
-            type="button"
-            onClick={() => exportFile("pdf")}
-            disabled={Boolean(exporting)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white disabled:opacity-60"
-          >
-            {exporting === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            Xuất PDF
-          </button>
-        </div>
-      </section>
+      </div>
 
       {error && (
         <section className="rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-700 dark:text-rose-300">

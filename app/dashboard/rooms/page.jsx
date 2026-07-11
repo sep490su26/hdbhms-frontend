@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import {
   ROOM_PLACEHOLDER_IMAGE,
+  normalizeApiRoom,
   normalizeRoomImages,
   statusCopy,
 } from "@/services/roomsService";
@@ -29,6 +30,7 @@ import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
 import { authenticatedFetch } from "@/services/identityAccessService";
 import { fetchManagementRoomRentalHistory } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const money = new Intl.NumberFormat("vi-VN");
@@ -224,26 +226,22 @@ function PageHeader({
   onAction,
 }) {
   return (
-    <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">
-          {title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          {description}
-        </p>
-      </div>
-      {actionLabel && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
-        >
-          <ActionIcon className="h-4 w-4" />
-          {actionLabel}
-        </button>
-      )}
-    </section>
+    <DashboardPageHeader
+      title={title}
+      description={description}
+      actions={
+        actionLabel ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
+          >
+            <ActionIcon className="h-4 w-4" />
+            {actionLabel}
+          </button>
+        ) : null
+      }
+    />
   );
 }
 
@@ -357,6 +355,20 @@ function formatRoomCode(code) {
   return rawCode.toUpperCase().startsWith("P")
     ? rawCode.toUpperCase()
     : `P${rawCode}`;
+}
+
+function getRoomRowKey(room, index) {
+  const identity = [
+    room.id ?? room.roomId ?? room.room_id,
+    room.propertyId ?? room.property_id,
+    room.floorId ?? room.floor_id ?? room.floor ?? room.floor_name,
+    room.roomCode ?? room.room_code ?? room.code ?? room.name,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join("-");
+
+  return identity ? `room-${identity}-${index}` : `room-${index}`;
 }
 
 function readPageRows(payload) {
@@ -1267,9 +1279,12 @@ function RoomsListPage({ query }) {
         const data = await authenticatedFetch(
           `/rooms?page=${page - 1}&size=${size}`,
         );
-        setApiRooms(data?.data ?? []);
+        const rows = readPageRows(data).map((room) => normalizeApiRoom(room));
+        setApiRooms(rows);
         setTotalPages(data?.totalPages ?? data?.total_pages ?? 1);
-        setTotalElements(data?.totalElements ?? data?.total_elements ?? 0);
+        setTotalElements(
+          data?.totalElements ?? data?.total_elements ?? rows.length,
+        );
         setIsSuccess(true);
       } catch (error) {
         setIsError(true);
@@ -1282,9 +1297,17 @@ function RoomsListPage({ query }) {
   const filteredRooms = apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();
-    return (
-      room.id.toLowerCase().includes(q) || room.floor.toLowerCase().includes(q)
-    );
+    const searchableText = [
+      room.id,
+      room.roomCode,
+      room.name,
+      room.floor,
+      room.floorName,
+      room.buildingName,
+    ]
+      .map((value) => String(value ?? "").toLowerCase())
+      .join(" ");
+    return searchableText.includes(q);
   });
 
   // Export to CSV
@@ -1369,43 +1392,43 @@ function RoomsListPage({ query }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map((room) => (
+                {filteredRooms.map((room, index) => (
                   <tr
-                    key={room.room_code}
+                    key={getRoomRowKey(room, index)}
                     className="border-t border-[#e2e8f0] dark:border-white/10"
                   >
                     <td
                       data-label="Mã phòng"
                       className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white"
                     >
-                      {room.room_code}
+                      {room.roomCode || room.id}
                     </td>
                     <td data-label="Đặc điểm" className="px-6 py-4">
                       <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[#3c475a]">
-                        Dành cho {room.max_occupants} người ở
+                        Dành cho {room.maxPeople ?? room.maxOccupants ?? 0} người ở
                       </span>
                     </td>
                     <td
                       data-label="Tầng"
                       className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
                     >
-                      {room.floor_name}
+                      {room.floor}
                     </td>
                     <td
                       data-label="Diện tích"
                       className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
                     >
-                      {room.area_m2} m²
+                      {room.area} m²
                     </td>
                     <td
                       data-label="Giá niêm yết"
                       className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white"
                     >
-                      {formatMoney(room.listed_price)}
+                      {formatMoney(room.listedPrice)}
                     </td>
                     <td data-label="Trạng thái" className="px-6 py-4">
                       <StatusBadge
-                        value={room.current_status}
+                        value={room.status}
                         map={roomStatus}
                       />
                     </td>
@@ -1470,39 +1493,34 @@ export function RoomsManagementContent({
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Quản lý Phòng & Tầng
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu
-            vực quản trị.
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
-          {views.map((item) => {
-            const Icon = item.icon;
-            const isActive = view === item.value;
+      <DashboardPageHeader
+        title="Quản lý Phòng & Tầng"
+        description="Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu vực quản trị."
+        actions={
+          <div className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
+            {views.map((item) => {
+              const Icon = item.icon;
+              const isActive = view === item.value;
 
-            return (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setView(item.value)}
-                className={`inline-flex min-h-10 min-w-0 flex-1 basis-36 items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-bold transition sm:flex-none sm:px-4 ${
-                  isActive
-                    ? "bg-[#1e40af] dark:bg-[#2563eb] text-white shadow-sm"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setView(item.value)}
+                  className={`inline-flex min-h-10 min-w-0 flex-1 basis-36 items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-bold transition sm:flex-none sm:px-4 ${
+                    isActive
+                      ? "bg-[#1e40af] dark:bg-[#2563eb] text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
 
       {view === "floor-map" ? (
         <FloorPlanPage activeRole={activeRole} />

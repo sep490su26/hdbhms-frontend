@@ -6,6 +6,7 @@ import { Building2, CircleDollarSign, Loader2, Wrench } from "lucide-react";
 import { fetchInternalMaintenanceCosts } from "@/services/maintenanceService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -88,15 +89,10 @@ export default function FinancePage() {
 
   return (
     <div className="w-full min-w-0 flex flex-col gap-6 text-slate-900 dark:text-white">
-      <section>
-        <h1 className="text-2xl font-bold tracking-[-0.01em]">
-          Báo cáo Tài chính
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Theo dõi chi phí bảo trì nội bộ từ dữ liệu hệ
-          thống.
-        </p>
-      </section>
+      <DashboardPageHeader
+        title="Báo cáo Tài chính"
+        description="Theo dõi chi phí bảo trì nội bộ từ dữ liệu hệ thống."
+      />
 
       <section className="grid gap-4 md:grid-cols-2">
         <article className="rounded-xl border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5">

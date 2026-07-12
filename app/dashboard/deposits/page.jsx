@@ -101,7 +101,7 @@ const STATUS_LABELS = {
 };
 
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} đ`;
+  return `${money.format(Number(value || 0))} VNĐ`;
 }
 
 function formatDate(value) {

@@ -32,11 +32,11 @@ const periodOptions = {
 };
 
 function formatCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))}đ`;
+  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
 }
 
 function formatCompactCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))}đ`;
+  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
 }
 
 function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inverse = false }) {

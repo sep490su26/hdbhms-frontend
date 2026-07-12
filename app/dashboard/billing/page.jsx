@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   Banknote,
   CheckCircle2,
   History,
@@ -20,6 +21,7 @@ import {
   applyRentOverride,
   confirmManualPayment,
   fetchBillingInvoices,
+  sendOverdueInvoiceWarning,
 } from "@/services/billingService";
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
 
@@ -43,63 +45,6 @@ const TYPE_LABELS = {
   DEPOSIT: "Đặt cọc",
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
 };
-
-const mockInvoices = [
-  {
-    id: "mock-1",
-    invoiceCode: "HD-2026-0001",
-    room: "A101",
-    tenantName: "Nguyễn Minh Anh",
-    month: "07/2026",
-    totalAmount: 3850000,
-    status: "Đã thanh toán",
-  },
-  {
-    id: "mock-2",
-    invoiceCode: "HD-2026-0002",
-    room: "A203",
-    tenantName: "Trần Hoàng Nam",
-    month: "07/2026",
-    totalAmount: 4120000,
-    status: "Chờ thanh toán",
-  },
-  {
-    id: "mock-3",
-    invoiceCode: "HD-2026-0003",
-    room: "B105",
-    tenantName: "Lê Thị Thu Hà",
-    month: "07/2026",
-    totalAmount: 3675000,
-    status: "Quá hạn",
-  },
-  {
-    id: "mock-4",
-    invoiceCode: "HD-2026-0004",
-    room: "B302",
-    tenantName: "Phạm Đức Huy",
-    month: "06/2026",
-    totalAmount: 5290000,
-    status: "Đã thanh toán",
-  },
-  {
-    id: "mock-5",
-    invoiceCode: "HD-2026-0005",
-    room: "C204",
-    tenantName: "Võ Ngọc Linh",
-    month: "07/2026",
-    totalAmount: 2980000,
-    status: "Chờ thanh toán",
-  },
-  {
-    id: "mock-6",
-    invoiceCode: "HD-2026-0006",
-    room: "C310",
-    tenantName: "Đặng Quốc Bảo",
-    month: "06/2026",
-    totalAmount: 4510000,
-    status: "Quá hạn",
-  },
-];
 
 function currentMonth() {
   const date = new Date();
@@ -144,7 +89,7 @@ function vietnameseDateToBillingPeriod(value) {
 }
 
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} đ`;
+  return `${money.format(Number(value || 0))} VNĐ`;
 }
 
 function statusLabel(value) {
@@ -155,14 +100,32 @@ function typeLabel(value) {
   return TYPE_LABELS[value] || value || "Khác";
 }
 
-function mockStatusClasses(status) {
-  if (status === "Đã thanh toán") {
+function invoiceStatusClasses(status) {
+  if (status === "PAID") {
     return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
   }
-  if (status === "Quá hạn") {
+  if (status === "OVERDUE") {
     return "bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20";
   }
+  if (status === "PARTIALLY_PAID") {
+    return "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20";
+  }
+  if (status === "VOIDED") {
+    return "bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-400 dark:ring-white/10";
+  }
   return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
+}
+
+function isPendingInvoice(invoice) {
+  return invoice?.status === "ISSUED";
+}
+
+function isExpiredInvoice(invoice) {
+  if (!invoice || Number(invoice.remainingAmount || 0) <= 0) return false;
+  if (invoice.status === "OVERDUE") return true;
+  if (!invoice.dueDate) return false;
+  const dueDate = new Date(invoice.dueDate);
+  return !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < Date.now();
 }
 
 function roomKey(room) {
@@ -188,6 +151,9 @@ export default function BillingPage() {
   });
   const [billingPeriodText, setBillingPeriodText] = useState(() =>
     billingPeriodToVietnameseDate(currentMonth()),
+  );
+  const [overrideBillingPeriodText, setOverrideBillingPeriodText] = useState(
+    () => billingPeriodToVietnameseDate(currentMonth()),
   );
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -251,6 +217,7 @@ export default function BillingPage() {
   const paymentInvoices = useMemo(
     () =>
       invoices.filter((invoice) => {
+        if (!isPendingInvoice(invoice)) return false;
         if (
           paymentForm.propertyId &&
           String(invoice.propertyId) !== String(paymentForm.propertyId)
@@ -326,6 +293,11 @@ export default function BillingPage() {
           ? String(rentLine.unitPrice)
           : current.overrideMonthlyRent,
       }));
+      if (selectedInvoice.billingPeriod) {
+        setOverrideBillingPeriodText(
+          billingPeriodToVietnameseDate(selectedInvoice.billingPeriod),
+        );
+      }
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [selectedInvoice]);
@@ -368,6 +340,38 @@ export default function BillingPage() {
     }));
   }
 
+  function openManualPayment(invoice) {
+    if (!invoice) return;
+    setSelectedInvoiceId(invoice.id || "");
+    setPaymentForm({
+      propertyId: invoice.propertyId ? String(invoice.propertyId) : "",
+      roomId: invoice.roomId ? String(invoice.roomId) : "",
+      invoiceId: invoice.id || "",
+      amount: invoice.remainingAmount ? String(invoice.remainingAmount) : "",
+      note: "",
+    });
+    setIsPaymentModalOpen(true);
+  }
+
+  async function sendOverdueWarning(invoice) {
+    if (!invoice?.id) return;
+    setSaving(`warning-${invoice.id}`);
+    setError("");
+    setMessage("");
+    try {
+      const result = await sendOverdueInvoiceWarning(invoice.id);
+      setMessage(
+        result?.recipientCount
+          ? `Đã gửi cảnh báo thanh toán quá hạn cho ${result.recipientCount} khách thuê.`
+          : "Không tìm thấy khách thuê đang nhận thông báo cho phòng này.",
+      );
+    } catch (warningError) {
+      setError(warningError?.message || "Không gửi được cảnh báo thanh toán quá hạn.");
+    } finally {
+      setSaving("");
+    }
+  }
+
   async function submitPayment(event) {
     event.preventDefault();
     setSaving("payment");
@@ -386,6 +390,7 @@ export default function BillingPage() {
         amount: "",
         note: "",
       });
+      setIsPaymentModalOpen(false);
       await loadInvoices();
     } catch (saveError) {
       setError(saveError?.message || "Không xác nhận được thanh toán.");
@@ -418,15 +423,39 @@ export default function BillingPage() {
     );
   }
 
-  const totals = mockInvoices.reduce(
+  function updateOverrideBillingPeriodText(value) {
+    const nextText = formatVietnameseDateInput(value);
+    setOverrideBillingPeriodText(nextText);
+
+    if (!nextText.trim()) {
+      setOverrideForm((current) => ({ ...current, billingPeriod: "" }));
+      return;
+    }
+
+    const nextPeriod = vietnameseDateToBillingPeriod(nextText);
+    if (nextPeriod) {
+      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
+    }
+  }
+
+  function normalizeOverrideBillingPeriodText() {
+    if (!overrideBillingPeriodText.trim()) return;
+
+    const nextPeriod = vietnameseDateToBillingPeriod(overrideBillingPeriodText);
+    const normalizedPeriod = nextPeriod || overrideForm.billingPeriod;
+    setOverrideBillingPeriodText(
+      billingPeriodToVietnameseDate(normalizedPeriod),
+    );
+    if (nextPeriod) {
+      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
+    }
+  }
+
+  const totals = invoices.reduce(
     (acc, invoice) => ({
-      total: acc.total + invoice.totalAmount,
-      paid:
-        acc.paid +
-        (invoice.status === "Đã thanh toán" ? invoice.totalAmount : 0),
-      remaining:
-        acc.remaining +
-        (invoice.status !== "Đã thanh toán" ? invoice.totalAmount : 0),
+      total: acc.total + Number(invoice.totalAmount || 0),
+      paid: acc.paid + Number(invoice.paidAmount || 0),
+      remaining: acc.remaining + Number(invoice.remainingAmount || 0),
     }),
     { total: 0, paid: 0, remaining: 0 },
   );
@@ -632,11 +661,11 @@ export default function BillingPage() {
             </div>
           </div>
           <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 dark:bg-white/5 dark:text-slate-300">
-            {mockInvoices.length} hóa đơn
+            {invoices.length} hóa đơn
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-left text-sm">
+          <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Hóa đơn</th>
@@ -645,32 +674,92 @@ export default function BillingPage() {
                 <th className="px-4 py-3">Tháng</th>
                 <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3 text-right">Tổng tiền</th>
+                <th className="px-4 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {mockInvoices.map((invoice) => (
-                <tr
-                  key={invoice.id}
-                  className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
-                >
-                  <td className="px-4 py-3">
-                    <p className="font-black">{invoice.invoiceCode}</p>
-                  </td>
-                  <td className="px-4 py-3 font-semibold">{invoice.room}</td>
-                  <td className="px-4 py-3">{invoice.tenantName}</td>
-                  <td className="px-4 py-3">{invoice.month}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${mockStatusClasses(invoice.status)}`}
-                    >
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-black">
-                    {formatMoney(invoice.totalAmount)}
+              {loading ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
+                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                    Đang tải hóa đơn...
                   </td>
                 </tr>
-              ))}
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
+                    Chưa có hóa đơn phù hợp với bộ lọc.
+                  </td>
+                </tr>
+              ) : (
+                invoices.map((invoice) => (
+                  <tr
+                    key={invoice.id}
+                    onClick={() => setSelectedInvoiceId(invoice.id || "")}
+                    className={`cursor-pointer border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5 ${
+                      String(selectedInvoiceId) === String(invoice.id) ? "bg-blue-50/60 dark:bg-blue-500/10" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-black">{invoice.invoiceCode}</p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {typeLabel(invoice.invoiceType)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">{invoice.roomCode || "Chưa gán"}</td>
+                    <td className="px-4 py-3">{invoice.tenantName || "Chưa có"}</td>
+                    <td className="px-4 py-3">{billingPeriodToVietnameseDate(invoice.billingPeriod) || invoice.billingPeriod}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${invoiceStatusClasses(invoice.status)}`}
+                      >
+                        {statusLabel(invoice.status)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-black">
+                      {formatMoney(invoice.totalAmount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        {isPendingInvoice(invoice) && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openManualPayment(invoice);
+                            }}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-700"
+                          >
+                            <Banknote className="h-3.5 w-3.5" />
+                            Xác nhận
+                          </button>
+                        )}
+                        {isExpiredInvoice(invoice) && (
+                          <button
+                            type="button"
+                            disabled={saving === `warning-${invoice.id}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              sendOverdueWarning(invoice);
+                            }}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
+                          >
+                            {saving === `warning-${invoice.id}` ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                            )}
+                            Cảnh báo
+                          </button>
+                        )}
+                        {!isPendingInvoice(invoice) && !isExpiredInvoice(invoice) && (
+                          <span className="text-xs font-semibold text-slate-400">-</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -750,13 +839,13 @@ export default function BillingPage() {
                   Tháng
                   <input
                     required
-                    type="month"
-                    value={overrideForm.billingPeriod}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="vd: 01/07/2026"
+                    value={overrideBillingPeriodText}
+                    onBlur={normalizeOverrideBillingPeriodText}
                     onChange={(event) =>
-                      setOverrideForm((current) => ({
-                        ...current,
-                        billingPeriod: event.target.value,
-                      }))
+                      updateOverrideBillingPeriodText(event.target.value)
                     }
                     className={FORM_CONTROL_CLASS}
                   />

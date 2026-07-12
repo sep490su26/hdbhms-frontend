@@ -76,7 +76,7 @@ const formatYear = (value) => {
 const formatMoney = (value) => {
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0
-    ? `${moneyFormatter.format(amount)} đ`
+    ? `${moneyFormatter.format(amount)} VNĐ`
     : "Chưa cập nhật";
 };
 

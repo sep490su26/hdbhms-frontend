@@ -295,10 +295,10 @@ function buildPrintableHtml({form, handover, assets}) {
 
     <p class="section-title">3. Thông tin thuê phòng</p>
     <p class="indent">Bên A đồng ý cho bên B thuê phòng <b>${e(form.roomCode || "..........")}</b> tại <b>${e(form.propertyAddress || form.propertyName || "..........")}</b>.</p>
-    <p class="indent">Giá thuê: <span class="line">${e(formatMoney(form.monthlyRent))}</span> đ/tháng.</p>
-    <p class="indent">Tiền cọc: <span class="line">${e(formatMoney(form.depositAmount))}</span> đ.</p>
+    <p class="indent">Giá thuê: <span class="line">${e(formatMoney(form.monthlyRent))}</span> VNĐ/tháng.</p>
+    <p class="indent">Tiền cọc: <span class="line">${e(formatMoney(form.depositAmount))}</span> VNĐ.</p>
     <p class="indent">Hợp đồng có giá trị từ ngày <span class="line">${e(formatDate(form.startDate))}</span> đến ngày <span class="line">${e(formatDate(form.endDate))}</span>.</p>
-    <p class="indent">Bên B thanh toán cho bên A ${e(form.paymentCycleMonths || "..........")} tháng/lần, tương đương <span class="line">${e(formatMoney(Number(form.monthlyRent || 0) * Number(form.paymentCycleMonths || 0)))}</span> đ.</p>
+    <p class="indent">Bên B thanh toán cho bên A ${e(form.paymentCycleMonths || "..........")} tháng/lần, tương đương <span class="line">${e(formatMoney(Number(form.monthlyRent || 0) * Number(form.paymentCycleMonths || 0)))}</span> VNĐ.</p>
 
     <p class="section-title">4. Bàn giao phòng</p>
     <p class="indent">Ngày bàn giao: <span class="line">${e(formatDate(handover.handoverDate))}</span></p>
@@ -707,7 +707,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         <PrintLine label="Bên A" value={OWNER_INFO.fullName}/>
                                         <PrintLine label="Bên B" value={form.tenantName}/>
                                         <PrintLine label="Phòng" value={form.roomCode}/>
-                                        <PrintLine label="Giá thuê" value={`${formatMoney(form.monthlyRent)} đ/tháng`}/>
+                                        <PrintLine label="Giá thuê" value={`${formatMoney(form.monthlyRent)} VNĐ/tháng`}/>
                                         <PrintLine label="Từ ngày" value={formatDate(form.startDate)}/>
                                         <PrintLine label="Đến ngày" value={formatDate(form.endDate)}/>
                                         <PrintLine label="Ngày bàn giao" value={formatDate(handover.handoverDate)}/>

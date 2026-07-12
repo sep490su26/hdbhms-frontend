@@ -51,7 +51,7 @@ function hasFilters(filters) {
 }
 
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} đ`;
+  return `${money.format(Number(value || 0))} VNĐ`;
 }
 
 function formatDateTime(value) {

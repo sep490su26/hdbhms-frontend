@@ -32,6 +32,10 @@ const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
 const ALL_FLOORS_VALUE = "all";
 const DEFAULT_FACILITY_ID = "default_id";
 
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
+}
+
 /**
  * @typedef {"empty" | "rented" | "available" | "occupied" | "soonVacant" | "maintenance" | "expired"} RoomStatus
  *
@@ -198,7 +202,7 @@ function floorPlanStatusStyle(status) {
 
 function FloorPlanRoomBox({ room, isSelected, onSelect }) {
   const { box, dot } = floorPlanStatusStyle(room.status);
-  const priceShort = room.price ? `${(room.price / 1000000).toFixed(1)}M` : "—";
+  const priceShort = room.price ? formatMoney(room.price) : "—";
 
   return (
     <button
@@ -218,7 +222,7 @@ function FloorPlanRoomBox({ room, isSelected, onSelect }) {
         <span className="text-[10px] font-medium leading-tight opacity-60">
           {room.area}m²
         </span>
-        <span className="text-[11px] font-semibold leading-tight">
+        <span className="text-[10px] font-semibold leading-tight">
           {priceShort}
         </span>
       </div>
@@ -1717,7 +1721,6 @@ function RoomDetail({ room, onClose }) {
             <p className="text-xl font-extrabold text-white">
               {room.priceLabel}
             </p>
-            <p className="text-xs text-white/60">VND/tháng</p>
           </div>
         </div>
       </div>
@@ -2352,7 +2355,7 @@ export default function RoomsClient({
             </p>
             <p className="mt-1 text-xs font-bold text-emerald-300">
               Tổng tiền cọc:{" "}
-              {(selectedRooms.length * 2000).toLocaleString("vi-VN")} ₫
+              {(selectedRooms.length * 2000).toLocaleString("vi-VN")} VNĐ
             </p>
           </div>
           <div className="mt-3 flex gap-2 sm:mt-0">

@@ -218,7 +218,7 @@ function readHandoverDate(handover) {
 
 function formatVnd(value) {
     const amount = Number(value || 0);
-    return `${amount.toLocaleString("vi-VN")} đ`;
+    return `${amount.toLocaleString("vi-VN")} VNĐ`;
 }
 
 function formatReading(value) {

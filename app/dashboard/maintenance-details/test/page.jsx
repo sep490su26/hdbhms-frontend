@@ -66,7 +66,7 @@ const repairItems = [
 ];
 
 function moneyFormat(value) {
-  return new Intl.NumberFormat("vi-VN").format(value);
+  return `${new Intl.NumberFormat("vi-VN").format(value)} VNĐ`;
 }
 
 function Card({ children, className = "" }) {
@@ -390,9 +390,6 @@ export default function MaintenanceDetailTestPage() {
                   </p>
                   <p className="mt-3 text-4xl font-black tracking-[-0.03em] text-[#163fa3]">
                     {moneyFormat(summary.totalCost)}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-[#3556a8]">
-                    VND
                   </p>
                 </div>
               </div>

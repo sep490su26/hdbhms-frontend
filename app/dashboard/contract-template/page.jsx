@@ -208,11 +208,9 @@ function formatIdentityNumber(value) {
 function formatMoney(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "Chưa có";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
+  return `${new Intl.NumberFormat("vi-VN", {
     maximumFractionDigits: 0,
-  }).format(number);
+  }).format(number)} VNĐ`;
 }
 
 function formatOptionalMoney(value) {

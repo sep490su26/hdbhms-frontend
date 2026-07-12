@@ -139,7 +139,7 @@ function RevenueTooltip({ active, payload }) {
     <div className="rounded-lg border border-[#dfe5f0] bg-white px-3 py-2 text-xs shadow-lg">
       <p className="font-bold text-[#102039]">{item.label}</p>
       <p className="mt-1 font-semibold text-[#315ac8]">
-        {formatMoney(item.amount)} VND
+        {formatMoney(item.amount)} VNĐ
       </p>
     </div>
   );
@@ -467,7 +467,7 @@ export default function DashboardPage() {
           icon={HandCoins}
           label="Doanh thu tháng"
           value={loading ? "..." : formatMoney(overview?.currentMonthRevenue)}
-          suffix="VND"
+          suffix="VNĐ"
           badge={`${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth}%`}
         />
         <StatCard
@@ -490,7 +490,7 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           label="Tổng công nợ"
           value={loading ? "..." : formatNumber(overview?.totalDebtAmount)}
-          suffix="VND"
+          suffix="VNĐ"
           note={
             debtWarningRoomCount
               ? `${formatNumber(debtWarningRoomCount)} phòng vượt ngưỡng`

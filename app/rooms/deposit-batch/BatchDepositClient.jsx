@@ -65,7 +65,7 @@ function todayValue(offsetDays = 0) {
 }
 
 function formatMoney(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+  return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
 }
 
 function normalizePhone(value) {
@@ -1131,7 +1131,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   if (checkout) {
     const paymentUnavailable = terminalError || paymentExpired || isSessionExpired;
     const paymentRooms = checkout.rooms || rooms;
-    const totalAmountLabel = `${Number(checkout.totalAmount || 0).toLocaleString("vi-VN")} VND`;
+    const totalAmountLabel = `${Number(checkout.totalAmount || 0).toLocaleString("vi-VN")} VNĐ`;
     const roomCodesLabel = paymentRooms.map((room) => room.roomCode).filter(Boolean).join(", ");
     const manualTransferAvailable = Boolean(
       checkout.bankShortName
@@ -1222,7 +1222,9 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                                 </div>
                                 {roomPrice > 0 ? (
                                   <p className="whitespace-nowrap text-right">
-                                    <strong className="text-[#006c49]">{(roomPrice / 1_000_000).toFixed(1)}M</strong>
+                                    <strong className="text-[#006c49]">
+                                      {formatMoney(roomPrice)}
+                                    </strong>
                                     <span className="text-xs text-[#45474c]"> /tháng</span>
                                   </p>
                                 ) : null}
@@ -1473,7 +1475,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                           </div>
                           <p className="whitespace-nowrap text-right">
                             <strong className="text-[#00966d]">
-                              {(Number(room.listedPrice || room.price || 0) / 1_000_000).toFixed(1)}M
+                              {formatMoney(room.listedPrice || room.price)}
                             </strong>
                             <span className="text-xs text-[#45474c]"> /tháng</span>
                           </p>

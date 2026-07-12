@@ -111,11 +111,9 @@ function isFineRule(rule) {
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
+  return `${new Intl.NumberFormat("vi-VN", {
     maximumFractionDigits: 0,
-  }).format(Number(value || 0));
+  }).format(Number(value || 0))} VNĐ`;
 }
 
 export default function RulesClient() {

@@ -62,7 +62,7 @@ const categoryMeta = {
 };
 
 function formatCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))}đ`;
+  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
 }
 
 function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note }) {

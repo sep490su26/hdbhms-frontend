@@ -369,10 +369,6 @@ function BookingCard({ room }) {
             <p className="text-3xl font-black text-[#006c49]">
               {room.priceLabel}
             </p>
-
-            <span className="text-sm font-semibold text-slate-500">
-              VND/tháng
-            </span>
           </div>
         </div>
 

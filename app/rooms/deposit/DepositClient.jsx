@@ -45,6 +45,10 @@ import DateInput from "../../../components/DateInput";
 import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
+}
+
 const resolvePaymentExpiresAtMs = (paymentIntent) => {
   const expiresAt = paymentIntent?.expiresAt ?? paymentIntent?.expires_at;
   if (!expiresAt) return null;
@@ -869,7 +873,9 @@ function RoomSummary({ room }) {
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-bold text-[#091426]">Phòng {room.id}</h2>
           <p className="whitespace-nowrap text-right">
-            <span className="text-xl font-bold text-[#006c49]">{(room.price / 1000000).toFixed(1)}M</span>
+            <span className="text-xl font-bold text-[#006c49]">
+              {formatMoney(room.price)}
+            </span>
             <span className="text-sm text-[#45474c]"> /tháng</span>
           </p>
         </div>
@@ -1738,8 +1744,8 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   const hasManualTransferDetails = Boolean(bankName && accountNumber && accountName);
   const depositAmount = paymentIntent?.amount ?? paymentIntent?.depositAmount ?? paymentIntent?.deposit_amount;
   const depositAmountLabel = Number(depositAmount) > 0
-    ? `${Number(depositAmount).toLocaleString("vi-VN")} VND`
-    : `${room.depositLabel} VND`;
+    ? `${Number(depositAmount).toLocaleString("vi-VN")} VNĐ`
+    : room.depositLabel;
   const [expiresAtMs] = useState(() => resolvePaymentExpiresAtMs(paymentIntent) ?? Date.now() + ROOM_HOLD_DURATION_MS);
   const [remainingMs, setRemainingMs] = useState(() => Math.max(0, expiresAtMs - Date.now()));
   const [qrDataUrl, setQrDataUrl] = useState("");

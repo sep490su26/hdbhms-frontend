@@ -134,7 +134,7 @@ function formatDateTime(value) {
 
 function formatMoney(value) {
   const amount = Number(value || 0);
-  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} đ`;
+  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} VNĐ`;
 }
 
 function formatMoneyInput(value) {

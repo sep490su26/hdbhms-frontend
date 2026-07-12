@@ -17,5 +17,5 @@ export function InfoField({ label, value, icon }) {
 
 export function formatMoney(val) {
     if (val == null) return "--";
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    return `${new Intl.NumberFormat("vi-VN").format(val)} VNĐ`;
 }

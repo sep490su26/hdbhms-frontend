@@ -46,7 +46,7 @@ import { SidebarProvider, useSidebar } from "./_contexts/SidebarContext";
 import { ThemeProvider, useTheme } from "./_contexts/ThemeContext";
 import { PermissionGuard } from "./_components/PermissionGuard";
 import { ProtectedRoute } from "./_components/ProtectedRoute";
-import { ROLE_LABELS, SECTION_PERMISSIONS, canAccessRole } from "./_lib/rbac";
+import { ROLE_LABELS, ROLES, SECTION_PERMISSIONS, canAccessRole } from "./_lib/rbac";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -197,6 +197,20 @@ function getAllowedRoles(item) {
   return SECTION_PERMISSIONS[item.permissionKey] || [];
 }
 
+function getVisibleNavigation(role) {
+  if (role !== ROLES.OWNER) return navigation;
+  return navigation.filter((item) => item.path !== "/dashboard/rooms");
+}
+
+function isOwnerRoomsRoute(role, pathname, propertyId) {
+  return (
+    role === ROLES.OWNER &&
+    !propertyId &&
+    (pathname === "/dashboard/rooms" ||
+      pathname?.startsWith("/dashboard/rooms/"))
+  );
+}
+
 function isNavigationPathActive(pathname, path) {
   if (path === "/dashboard") {
     return pathname === path;
@@ -230,7 +244,7 @@ function getPermissionKeyForPath(pathname) {
 }
 
 function getFirstAllowedPath(role) {
-  const item = navigation.find((navItem) =>
+  const item = getVisibleNavigation(role).find((navItem) =>
     canAccessRole(role, getAllowedRoles(navItem)),
   );
   return item?.children?.[0]?.path || item?.path || "/dashboard";
@@ -402,7 +416,7 @@ export function AccessDeniedPage() {
   );
 }
 
-function Sidebar({ isOpen, onClose }) {
+function Sidebar({ isOpen, onClose, role }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -410,6 +424,7 @@ function Sidebar({ isOpen, onClose }) {
   const [openGroups, setOpenGroups] = useState({});
   const queryString = searchParams.toString();
   const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
+  const visibleNavigation = useMemo(() => getVisibleNavigation(role), [role]);
 
   return (
     <>
@@ -496,7 +511,7 @@ function Sidebar({ isOpen, onClose }) {
               {showText ? "Menu" : <MoreHorizontal className="h-5 w-5" />}
             </h2>
             <ul className="flex flex-col gap-4">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 const hasChildren = Array.isArray(item.children) && item.children.length > 0;
                 const isActive =
@@ -900,6 +915,7 @@ function Topbar({
 
 function DashboardLayoutShell({ children }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, refreshUser, isLoadingUser, logout } = useAuth();
   const { isExpanded, isHovered, isMobileOpen, toggleMobileSidebar } =
@@ -908,6 +924,8 @@ function DashboardLayoutShell({ children }) {
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const effectiveRole = user?.role || "";
+  const routePropertyId =
+    searchParams.get("propertyId") || searchParams.get("facilityId") || "";
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
@@ -962,6 +980,10 @@ function DashboardLayoutShell({ children }) {
       router.replace(`/login${redirect}`);
       return;
     }
+    if (isOwnerRoomsRoute(effectiveRole, pathname, routePropertyId)) {
+      router.replace("/dashboard/facilities");
+      return;
+    }
     if (!activeNavigationItem) return;
     if (!isAllowed) {
       router.replace(getFirstAllowedPath(effectiveRole));
@@ -974,6 +996,7 @@ function DashboardLayoutShell({ children }) {
     isLoggingOut,
     isPublicRoute,
     pathname,
+    routePropertyId,
     router,
     user,
   ]);
@@ -1004,6 +1027,7 @@ function DashboardLayoutShell({ children }) {
     <DashboardLayoutProvider value={contextValue}>
       <div className="dashboard-shell min-h-screen w-full overflow-x-hidden bg-gray-50 text-slate-900 dark:bg-[#020817] dark:text-white lg:flex">
         <Sidebar
+          role={effectiveRole}
           isOpen={isMobileOpen}
           onClose={() => {
             if (isMobileOpen) {

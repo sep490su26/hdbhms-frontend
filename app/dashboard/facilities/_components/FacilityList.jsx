@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
@@ -8,10 +8,11 @@ import {
   ChevronDown,
   ChevronRight,
   DoorOpen,
+  Eye,
+  LayoutGrid,
   Layers3,
   MapPin,
   Pencil,
-  LayoutGrid
 } from "lucide-react";
 import {
   FACILITY_STATUS,
@@ -58,6 +59,18 @@ function StatusBadge({ status }) {
     </span>
   );
 }
+
+function getFacilityRoomsHref(facility) {
+  const params = new URLSearchParams({
+    from: "facilities",
+    propertyId: String(facility.id),
+  });
+
+  if (facility.name) params.set("facilityName", facility.name);
+
+  return `/dashboard/rooms?${params.toString()}`;
+}
+
 function FacilityTree({ facility }) {
   if (facility.floors.length === 0) {
     return (
@@ -168,14 +181,14 @@ function MobileFacilityCard({
         </div>
         <div className="mt-4 grid gap-2">
           <Link
-            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+            href={getFacilityRoomsHref(facility)}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Thiết kế sơ đồ
+            <Eye className="h-3.5 w-3.5" />
+            Xem chi tiết
           </Link>
          
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => onEdit(facility)}
@@ -184,6 +197,13 @@ function MobileFacilityCard({
               <Pencil className="h-3.5 w-3.5" />
               Chỉnh sửa
             </button>
+            <Link
+              href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Sơ đồ
+            </Link>
             <button
               type="button"
               onClick={onToggle}
@@ -216,6 +236,17 @@ export function FacilityList({
   const [expandedIds, setExpandedIds] = useState(
     () => new Set([facilities[0]?.id].filter(Boolean)),
   );
+
+  useEffect(() => {
+    const firstFacilityId = facilities[0]?.id;
+    if (!firstFacilityId) return;
+    const visibleIds = new Set(facilities.map((facility) => facility.id));
+
+    setExpandedIds((current) => {
+      if ([...current].some((id) => visibleIds.has(id))) return current;
+      return new Set([firstFacilityId]);
+    });
+  }, [facilities]);
 
   const toggleFacility = (id) => {
     setExpandedIds((current) => {
@@ -336,14 +367,20 @@ export function FacilityList({
                           <Link
                             href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
                             className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            title="Thiết kế sơ đồ tầng"
+                            title="Chỉnh sửa sơ đồ tầng"
+                            aria-label={`Chỉnh sửa sơ đồ tầng ${facility.name}`}
                           >
                             <LayoutGrid className="h-4 w-4" />
                           </Link>
+                          <Link
+                            href={getFacilityRoomsHref(facility)}
+                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                            title="Xem chi tiết tầng/phòng"
+                            aria-label={`Xem chi tiết ${facility.name}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
                         </div>
-                      </td>
-                      <td>
-                        
                       </td>
                     </tr>
                     {expanded && (

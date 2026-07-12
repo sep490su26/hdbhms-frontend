@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   BedDouble,
@@ -32,6 +33,13 @@ import { fetchManagementRoomRentalHistory } from "@/services/leaseContractsServi
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -72,7 +80,7 @@ const views = [
 ];
 
 function formatMoney(value) {
-  return `${money.format(value)} đ`;
+  return `${money.format(value)} VNĐ`;
 }
 
 function formatDate(value) {
@@ -215,6 +223,30 @@ function IconButton({ label, icon: Icon, onClick, tone = "neutral" }) {
     >
       <Icon className="h-4 w-4" />
     </button>
+  );
+}
+
+function RoomsBreadcrumb({ facilityName }) {
+  return (
+    <Breadcrumb className="-mb-3">
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/dashboard/facilities">Quản lý cơ sở</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {facilityName ? (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {facilityName}
+              </span>
+            </BreadcrumbItem>
+          </>
+        ) : null}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
@@ -1118,7 +1150,11 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
   );
 }
 
-function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
+function FloorPlanPage({
+  tenantList = [],
+  activeRole = "owner",
+  propertyId = "1",
+}) {
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sourceWarning, setSourceWarning] = useState("");
@@ -1132,7 +1168,9 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
       try {
         setIsLoading(true);
         setSourceWarning("");
-        const data = await authenticatedFetch("/rooms?propertyId=1&size=200");
+        const data = await authenticatedFetch(
+          `/rooms?propertyId=${encodeURIComponent(propertyId || "1")}&size=200`,
+        );
         const normalizedRooms = readPageRows(data)
           .map(normalizeApiFloorPlanRoom)
           .sort((a, b) => Number(a.roomCode) - Number(b.roomCode));
@@ -1158,7 +1196,7 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [propertyId]);
 
   const activeFloorRooms = useMemo(
     () => rooms.filter((room) => room.floorNumber === activeFloor),
@@ -1259,7 +1297,7 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
   );
 }
 
-function RoomsListPage({ query }) {
+function RoomsListPage({ query, propertyId }) {
   const [exportPrompt, setExportPrompt] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1276,9 +1314,13 @@ function RoomsListPage({ query }) {
     const fetchStaffRooms = async () => {
       try {
         setIsLoading(true);
-        const data = await authenticatedFetch(
-          `/rooms?page=${page - 1}&size=${size}`,
-        );
+        const params = new URLSearchParams({
+          page: String(page - 1),
+          size: String(size),
+        });
+        if (propertyId) params.set("propertyId", String(propertyId));
+
+        const data = await authenticatedFetch(`/rooms?${params.toString()}`);
         const rows = readPageRows(data).map((room) => normalizeApiRoom(room));
         setApiRooms(rows);
         setTotalPages(data?.totalPages ?? data?.total_pages ?? 1);
@@ -1293,7 +1335,7 @@ function RoomsListPage({ query }) {
       }
     };
     fetchStaffRooms();
-  }, [page, size]);
+  }, [page, propertyId, size]);
   const filteredRooms = apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();
@@ -1488,11 +1530,15 @@ export function RoomsManagementContent({
   initialView = "floor-map",
   query = "",
   activeRole = "owner",
+  propertyId,
+  fromFacilities = false,
+  facilityName = "",
 }) {
   const [view, setView] = useState(initialView);
 
   return (
     <section className="grid gap-6">
+      {fromFacilities ? <RoomsBreadcrumb facilityName={facilityName} /> : null}
       <DashboardPageHeader
         title="Quản lý Phòng & Tầng"
         description="Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu vực quản trị."
@@ -1523,9 +1569,9 @@ export function RoomsManagementContent({
       />
 
       {view === "floor-map" ? (
-        <FloorPlanPage activeRole={activeRole} />
+        <FloorPlanPage activeRole={activeRole} propertyId={propertyId} />
       ) : (
-        <RoomsListPage query={query} />
+        <RoomsListPage query={query} propertyId={propertyId} />
       )}
     </section>
   );
@@ -1533,6 +1579,19 @@ export function RoomsManagementContent({
 
 export default function RoomsPage() {
   const { query, activeRole } = useDashboardLayout();
+  const searchParams = useSearchParams();
+  const propertyId =
+    searchParams.get("propertyId") || searchParams.get("facilityId") || "";
+  const fromFacilities = searchParams.get("from") === "facilities";
+  const facilityName = searchParams.get("facilityName") || "";
 
-  return <RoomsManagementContent query={query} activeRole={activeRole} />;
+  return (
+    <RoomsManagementContent
+      query={query}
+      activeRole={activeRole}
+      propertyId={propertyId}
+      fromFacilities={fromFacilities}
+      facilityName={facilityName}
+    />
+  );
 }

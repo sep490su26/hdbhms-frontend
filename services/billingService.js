@@ -102,3 +102,9 @@ export async function confirmManualPayment(invoiceId, payload) {
     invoice: normalizeInvoice(data?.invoice || {}),
   };
 }
+
+export async function sendOverdueInvoiceWarning(invoiceId) {
+  return authenticatedFetch(`${API_BASE_URL}/admin/invoices/${encodeURIComponent(invoiceId)}/overdue-warning`, {
+    method: "POST",
+  });
+}

@@ -122,7 +122,7 @@ export async function fetchLatestReadings(roomId) {
       `${BASE}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`,
     );
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
+    if (error instanceof ApiError || error?.isApiError) return null;
     throw error;
   }
 }

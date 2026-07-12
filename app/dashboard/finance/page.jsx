@@ -51,7 +51,7 @@ function SummaryCard({ label, value, note, color, trend }) {
     <article className="relative min-h-[112px] overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm">
       <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color }} />
       <p className="max-w-[120px] text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">{label}</p>
-      <p className="mt-2 text-2xl font-black text-[#0f1d33]">{formatCompact(value)}</p>
+      <p className="mt-2 text-2xl font-black text-[#0f1d33]">{formatCurrency(value)}</p>
       <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${trend ? "text-emerald-600" : "text-[#5f6b7c]"}`}>
         {trend && <TrendingUp className="h-3 w-3" />}
         {note}

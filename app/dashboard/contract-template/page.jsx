@@ -467,7 +467,8 @@ function needsActivationFlow(item) {
   if (!item) return false;
   if (isRoomTransferManagedContract(item)) return false;
   if (!item.leaseContractId && item.depositAgreementId) return true;
-  return Boolean(item.leaseContractId && ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item)));
+  if (!item.leaseContractId) return false;
+  return ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item));
 }
 
 function getTransferContractNotice(item) {
@@ -526,7 +527,7 @@ function FileBadge({ item }) {
   const Icon = uploaded ? FileCheck2 : FileWarning;
   return (
     <span
-      className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${uploaded
+      className={`inline-flex w-max items-center justify-center gap-1 rounded-full border px-2.5 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${uploaded
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
         : "border-red-200 bg-red-50 text-red-700"
         }`}
@@ -1503,6 +1504,102 @@ export default function ContractTemplatePage() {
               <option value="missing">Chưa upload</option>
             </select>
           </label>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={openTimePopover}
+              aria-expanded={timePopoverOpen}
+              className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none transition hover:border-[#9ba8ba] focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+            >
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <CalendarDays className="h-4 w-4 shrink-0 text-[#8a98af]" />
+                <span className="truncate">{activeTimeLabel}</span>
+              </span>
+              <span className="text-xs text-[#8a98af]">
+                {timePopoverOpen ? "Thu gọn" : "Mở"}
+              </span>
+            </button>
+
+            {timePopoverOpen && (
+              <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-[#dfe5ef] bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-[#0f172a]">
+                <div className="grid grid-cols-[120px_1fr] gap-3">
+                  <div className="flex flex-col gap-1 border-r border-[#edf1f6] pr-3 dark:border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => selectTimeFilter("all")}
+                      className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                        timeFilter === "all"
+                          ? "bg-[#091426] text-white"
+                          : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                      }`}
+                    >
+                      Cả năm
+                    </button>
+                    {TIME_QUARTERS.map((quarter) => (
+                      <button
+                        key={quarter.id}
+                        type="button"
+                        onMouseEnter={() => setTimePanelQuarter(quarter.id)}
+                        onFocus={() => setTimePanelQuarter(quarter.id)}
+                        onClick={() => selectTimeFilter(quarter.id)}
+                        className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                          timeFilter === quarter.id ||
+                          timePanelQuarter === quarter.id
+                            ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                            : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                        }`}
+                      >
+                        {quarter.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {visibleTimeQuarter.months.map((month) => (
+                      <button
+                        key={month}
+                        type="button"
+                        onClick={() => selectTimeFilter(`M${month}`)}
+                        className={`h-9 rounded-lg border px-3 text-left text-xs font-extrabold transition ${
+                          timeFilter === `M${month}`
+                            ? "border-[#091426] bg-[#091426] text-white"
+                            : "border-[#edf1f6] bg-white text-slate-600 hover:border-[#9ba8ba] hover:bg-[#f8fafc] hover:text-slate-900 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                        }`}
+                      >
+                        Tháng {month}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <label>
+            <span className="sr-only">Lọc theo phòng</span>
+            <select
+              value={roomFilter}
+              onChange={(event) => setRoomFilter(event.target.value)}
+              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+            >
+              <option value="all">Tất cả phòng</option>
+              {roomOptions.map((roomCode) => (
+                <option key={roomCode} value={roomCode}>
+                  Phòng {roomCode}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">Loại hợp đồng</span>
+            <select
+              value={contractTypeFilter}
+              onChange={(event) => setContractTypeFilter(event.target.value)}
+              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+            >
+              <option value="all">Tất cả loại HĐ</option>
+              <option value="lease">Hợp đồng thuê</option>
+              <option value="deposit">Hợp đồng cọc</option>
+            </select>
+          </label>
           <button
             type="button"
             onClick={loadContracts}
@@ -1539,6 +1636,29 @@ export default function ContractTemplatePage() {
             </button>
           </div>
         </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-semibold text-[#607089]">
+            {selectedYear === "all" ? "Tất cả năm" : `Năm ${selectedYear}`} · {activeTimeLabel}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={openCleanupModal}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 text-xs font-extrabold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Dọn dữ liệu cũ
+            </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-xs font-extrabold text-white transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
+            >
+              <Download className="h-4 w-4" />
+              Xuất Excel
+            </button>
+          </div>
+        </div>
       </section>
 
       {error && (
@@ -1561,26 +1681,46 @@ export default function ContractTemplatePage() {
           </p>
         </header>
 
-        <div className="dashboard-table">
-          <table className="w-full table-auto text-left text-[12px] xl:text-sm [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
+        <div
+          className="dashboard-table dashboard-table--scroll contract-management-table custom-scrollbar"
+          style={{
+            maxHeight: "calc(100vh - 320px)",
+            minHeight: 260,
+            overflowX: "scroll",
+            overflowY: "auto",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <table
+            className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2.5 [&_td]:py-4 xl:[&_td]:px-3 xl:[&_td]:py-4 [&_th]:px-2.5 [&_th]:py-3 xl:[&_th]:px-3 xl:[&_th]:py-3"
+            style={{ minWidth: 1240, width: 1240 }}
+          >
+            <colgroup>
+              <col className="w-[240px]" />
+              <col className="w-[85px]" />
+              <col className="w-[170px]" />
+              <col className="w-[145px]" />
+              <col className="w-[160px]" />
+              <col className="w-[140px]" />
+              <col className="w-[170px]" />
+              <col className="w-[130px]" />
+            </colgroup>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
-                <th className="min-w-32">Mã HĐ</th>
-                {/* <th className="min-w-24">Loại HĐ</th> */}
-                <th className="min-w-20">Phòng</th>
-                <th className="min-w-40">Người ký chính</th>
-                {/* <th className="min-w-24">Số người</th> */}
-                <th className="min-w-36">Thời hạn</th>
-                <th className="min-w-32">Giá thuê</th>
-                <th className="min-w-28">File</th>
-                <th className="min-w-32">Trạng thái</th>
-                {/* <th className="min-w-20 text-center">Xem</th> */}
+                <th className="!pl-5">Mã HĐ</th>
+                <th>Phòng</th>
+                <th>Người ký chính</th>
+                <th>Thời hạn</th>
+                <th>Giá thuê</th>
+                <th>File</th>
+                <th>Trạng thái</th>
+                <th className="contract-management-table__action !pl-2 !pr-5 text-center xl:!pl-3 xl:!pr-6">Xem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
               {loading && (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-sm font-bold text-[#607089]">
+                  <td colSpan={8} className="py-12 text-center text-sm font-bold text-[#607089]">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Đang tải dữ liệu hợp đồng...
@@ -1595,7 +1735,7 @@ export default function ContractTemplatePage() {
                     key={getContractRowKey(item, index)}
                     className="bg-white dark:bg-[#0f172a] transition hover:bg-[#f8fbff] dark:hover:bg-white/5"
                   >
-                    <td data-label="Mã HĐ" className="align-middle">
+                    <td data-label="Mã HĐ" className="!pl-5 align-middle xl:!pl-6">
                       <p className="font-extrabold leading-5 text-slate-900 dark:text-white">
                         {getContractDisplayName(item)}
                       </p>
@@ -1656,17 +1796,6 @@ export default function ContractTemplatePage() {
                         </button>
                       )}
                     </td>
-                    <td data-label="Loại HĐ" className="align-middle">
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-extrabold ${
-                          getContractType(item) === "lease"
-                            ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300"
-                            : "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300"
-                        }`}
-                      >
-                        {getContractType(item) === "lease" ? "Thuê" : "Cọc"}
-                      </span>
-                    </td>
                     <td data-label="Phòng" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
                         <Home className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 xl:h-4 xl:w-4" />
@@ -1675,12 +1804,6 @@ export default function ContractTemplatePage() {
                     </td>
                     <td data-label="Người ký chính" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{item.primaryTenantName || item.customerName || "Chưa có"}</p>
-                    </td>
-                    <td data-label="Số người" className="align-middle">
-                      <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
-                        <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500 dark:text-blue-300 xl:h-4 xl:w-4" />
-                        {getOccupantsCount(item)} người
-                      </span>
                     </td>
                     <td data-label="Thời hạn" className="align-middle">
                       <p className="font-semibold leading-5 text-[#091426]">{formatDate(item.startDate || item.expectedLeaseSignDate)}</p>
@@ -1695,7 +1818,7 @@ export default function ContractTemplatePage() {
                     <td data-label="Trạng thái" className="align-middle">
                       <StatusBadge item={item} />
                     </td>
-                    <td data-label="Xem" className="text-center align-middle">
+                    <td data-label="Xem" className="contract-management-table__action !pl-2 !pr-5 text-center align-middle xl:!pl-3 xl:!pr-6">
                       <div className="flex items-center justify-center">
                         <button
                           type="button"
@@ -1703,14 +1826,14 @@ export default function ContractTemplatePage() {
                             event.stopPropagation();
                             selectContract(item);
                           }}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-xs font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10 xl:text-sm"
+                          className="inline-flex h-9 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-1.5 text-xs font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10"
                         >
                           {needsActivationFlow(item) ? (
                             <FileCheck2 className="h-3.5 w-3.5" />
                           ) : (
                             <Eye className="h-3.5 w-3.5" />
                           )}
-                          {needsActivationFlow(item) ? "Kích hoạt hợp đồng" : "Xem hợp đồng"}
+                          {needsActivationFlow(item) ? "Kích hoạt" : "Xem chi tiết"}
                         </button>
                       </div>
                     </td>
@@ -1719,7 +1842,7 @@ export default function ContractTemplatePage() {
 
               {!loading && filteredContracts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
+                  <td colSpan={8} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
                     Không có hợp đồng phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -1800,7 +1923,7 @@ export default function ContractTemplatePage() {
 
       {mergedSelected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4" onClick={() => { setSelected(null); setIsEditingTerms(false); setTermsFieldErrors({}); setTermsError(""); }}>
-          <section className="max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <section className="custom-scrollbar max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="relative bg-[#05091d] px-5 py-7 text-white xl:px-7 xl:py-8">
               <button
                 type="button"
@@ -1829,7 +1952,7 @@ export default function ContractTemplatePage() {
               </div>
             </header>
 
-            <div className="grid gap-4 px-5 xl:gap-5 xl:px-7 lg:grid-cols-2">
+            <div className="grid gap-4 px-5 py-5 xl:gap-5 xl:px-7 lg:grid-cols-2">
               {getTransferContractNotice(mergedSelected) && (
                 <div className="lg:col-span-2 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
@@ -1884,7 +2007,7 @@ export default function ContractTemplatePage() {
 
               <DetailCard title="Thông tin phòng" icon={Home}>
                 {isEditingTerms ? (
-                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
                     <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
                     <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
                     <label className="grid min-w-0 gap-1.5">
@@ -1941,7 +2064,7 @@ export default function ContractTemplatePage() {
                     />
                   </div>
                 ) : (
-                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
                     <InfoValue label="Cơ sở" value={mergedSelected.propertyName || mergedSelected.property?.name} />
                     <InfoValue label="Phòng" value={mergedSelected.roomCode || mergedSelected.room?.roomCode} />
                     <InfoValue label="Giá thuê/tháng" value={formatOptionalMoney(mergedSelected.monthlyRent)} />
@@ -1987,7 +2110,7 @@ export default function ContractTemplatePage() {
               >
                 {isEditingTerms ? (
                   <div className="mt-5">
-                    <div className="grid grid-cols-2 gap-3 xl:gap-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:gap-4">
                       <InfoValue
                         label="Mã hợp đồng"
                         value={getContractDisplayName(mergedSelected)}
@@ -2108,7 +2231,7 @@ export default function ContractTemplatePage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
                     <InfoValue
                       label="Mã hợp đồng"
                       value={getContractDisplayName(mergedSelected)}
@@ -2141,7 +2264,7 @@ export default function ContractTemplatePage() {
               </DetailCard>
 
               <DetailCard title="Người ở trong hợp đồng" icon={Users} className="lg:col-span-2">
-                <div className="dashboard-table mt-5 rounded-lg border border-[#dfe5ef] bg-white">
+                <div className="dashboard-table custom-scrollbar mt-5 rounded-lg border border-[#dfe5ef] bg-white">
                   <table className="w-full table-auto text-left">
                     <thead className="bg-[#f7f9fe] text-[11px] font-bold uppercase tracking-[0.04em] text-[#6b7280] xl:text-xs">
                       <tr>
@@ -2197,7 +2320,7 @@ export default function ContractTemplatePage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-4 xl:gap-5">
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
                   <InfoValue label="Tổng số người" value={`${getOccupantsCount(mergedSelected, details)} người`} />
                   <InfoValue label="Giá thuê" value={formatMoney(mergedSelected.monthlyRent)} />
                 </div>

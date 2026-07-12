@@ -47,6 +47,7 @@ import {
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const emptyForm = {
   fullName: "",

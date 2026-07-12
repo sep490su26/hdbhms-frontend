@@ -198,9 +198,9 @@ export default function ContractHandoverSection({
         setWaterReading(prev => prev === "" && watValue != null ? String(watValue) : prev);
         if (watDate) setWaterReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? watDate : prev);
       })
-      .catch((err) => {
+      .catch(() => {
         if (signal?.aborted) return;
-        console.error("Failed to fetch latest readings:", err);
+        // Latest readings only prefill the form; users can still enter them manually.
       });
   }, [roomId]);
 

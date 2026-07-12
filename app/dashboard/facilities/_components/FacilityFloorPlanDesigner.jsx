@@ -13,7 +13,7 @@ import {
   normalizeOrientation,
 } from "./FloorPlanItem";
 import { alignRoomItems } from "./floorPlanAlign";
-import { createFloor, createRoom, deleteFloor as deleteFloorRequest, deleteRoom as deleteRoomRequest } from "@/services/floorRoomService";
+import { createFloor, createRoom, deleteFloor as deleteFloorRequest, deleteRoom as deleteRoomRequest, updateRoomPrice } from "@/services/floorRoomService";
 import { fetchFloorPlanDesignerData } from "@/services/floorPlanDesignerService";
 import { fetchAdminFloorPlan, saveAdminFloorPlan } from "@/services/floorPlanService";
 
@@ -46,6 +46,18 @@ const BLOCK_TYPES = {
 function areaFromSize(width, height) {
   const area = (Number(width) / AREA_SCALE) * (Number(height) / AREA_SCALE);
   return Number.isFinite(area) ? Number(area.toFixed(1)) : DEFAULT_ROOM_AREA_SQM;
+}
+
+function roomPriceValue(room) {
+  const parsed = Number(valueOf(room, "listedPrice", "listed_price", "price"));
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+function parseMoneyValue(value) {
+  const digits = String(value ?? "").replace(/[^\d]/g, "");
+  if (!digits) return 0;
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function clampRoomSize(size) {
@@ -162,6 +174,7 @@ function layoutFromSavedItems(floor, savedItems) {
         doors: Array.isArray(metadata.doors) ? metadata.doors : [],
         windows: Array.isArray(metadata.windows) ? metadata.windows : [],
         areaSqm: Number(metadata.areaSqm ?? valueOf(item, "area")) || areaFromSize(width, height),
+        listedPrice: Number(room.listedPrice ?? room.listed_price ?? metadata.listedPrice) || 0,
       });
       return;
     }
@@ -333,8 +346,11 @@ function FloatingToolbar({
   isRoom,
   placementMode,
   areaInputValue,
+  priceInputValue,
   onAreaInputChange,
+  onPriceInputChange,
   onAreaSubmit,
+  onPriceSubmit,
   onRotate,
   onStartPlacement,
   onFinishPlacement,
@@ -346,7 +362,8 @@ function FloatingToolbar({
 
   return (
     <div
-      className="absolute left-1/2 top-0 z-30 flex -translate-x-1/2 -translate-y-[calc(100%+8px)] items-center gap-1 rounded-[10px] bg-slate-950/90 px-2 py-1 text-white shadow-xl"
+      className="absolute left-1/2 top-0 z-30 flex -translate-x-1/2 -translate-y-[calc(100%+8px)] flex-wrap items-center justify-center gap-1 rounded-[10px] bg-slate-950/90 px-2 py-1 text-white shadow-xl"
+      style={{ maxWidth: "min(720px, calc(100vw - 3rem))" }}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
@@ -392,6 +409,27 @@ function FloatingToolbar({
                 />
                 <span className="text-xs font-bold">m²</span>
                 <button type="submit" className="grid h-8 w-8 place-items-center rounded-md hover:bg-white/15" title="Áp dụng">
+                  <Check className="h-4 w-4" />
+                </button>
+              </form>
+              <form
+                className="flex items-center gap-1"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onPriceSubmit();
+                }}
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={priceInputValue}
+                  onChange={(event) => onPriceInputChange(event.target.value)}
+                  placeholder="Giá thuê"
+                  className="h-8 w-24 rounded-md border border-white/20 bg-white/95 px-2 text-xs font-semibold text-slate-950 outline-none"
+                />
+                <span className="text-xs font-bold">đ/tháng</span>
+                <button type="submit" className="grid h-8 w-8 place-items-center rounded-md hover:bg-white/15" title="Áp dụng giá thuê">
                   <Check className="h-4 w-4" />
                 </button>
               </form>
@@ -469,6 +507,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const [placementMode, setPlacementMode] = useState(null);
   const [placementTargetId, setPlacementTargetId] = useState(null);
   const [areaInputValue, setAreaInputValue] = useState("");
+  const [priceInputValue, setPriceInputValue] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [floorDeleteConfirmOpen, setFloorDeleteConfirmOpen] = useState(false);
 
@@ -526,6 +565,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setPlacementMode(null);
     setPlacementTargetId(null);
     setAreaInputValue("");
+    setPriceInputValue("");
     setResettingLayout(true);
     setHasUnsavedChanges(true);
     try {
@@ -607,12 +647,35 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setHasUnsavedChanges(true);
   };
 
+  const updateRoomPriceLocally = (roomId, listedPrice) => {
+    const patch = { listedPrice };
+    setLayouts((current) => ({
+      ...current,
+      [selectedFloorId]: (current[selectedFloorId] ?? []).map((room) =>
+        String(room.id) === String(roomId) ? { ...room, ...patch } : room
+      ),
+    }));
+    setData((current) => current ? ({
+      ...current,
+      floors: (current.floors ?? []).map((floor) => ({
+        ...floor,
+        rooms: (floor.rooms ?? []).map((room) =>
+          String(room.id) === String(roomId) ? { ...room, ...patch } : room
+        ),
+      })),
+    }) : current);
+  };
+
   const selectItem = (item) => {
     setSelectedItemId(item.id);
     setPlacementMode(null);
     setPlacementTargetId(null);
     if (String(item.type ?? "ROOM").toUpperCase() === "ROOM") {
       setAreaInputValue(areaFromSize(item.width, item.height));
+      setPriceInputValue(roomPriceValue(item) ? String(roomPriceValue(item)) : "");
+    } else {
+      setAreaInputValue("");
+      setPriceInputValue("");
     }
   };
 
@@ -621,6 +684,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setPlacementMode(null);
     setPlacementTargetId(null);
     setAreaInputValue("");
+    setPriceInputValue("");
   };
 
   const changeFloor = (floorId) => {
@@ -629,6 +693,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setPlacementMode(null);
     setPlacementTargetId(null);
     setAreaInputValue("");
+    setPriceInputValue("");
     setFloorDeleteConfirmOpen(false);
   };
 
@@ -662,6 +727,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setPlacementMode(null);
       setPlacementTargetId(null);
       setAreaInputValue("");
+      setPriceInputValue("");
       setHasUnsavedChanges(false);
       setNotice(`Đã thêm ${nextFloor.name ?? floorName}.`);
     } catch (createError) {
@@ -712,6 +778,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setPlacementMode(null);
       setPlacementTargetId(null);
       setAreaInputValue("");
+      setPriceInputValue("");
       setHasUnsavedChanges(false);
       setFloorDeleteConfirmOpen(false);
       setNotice(`Đã xóa ${selectedFloor.name}.`);
@@ -802,6 +869,20 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setAreaInputValue(actualArea);
   };
 
+  const applyRoomPrice = async () => {
+    if (!selectedRoom) return;
+    const price = parseMoneyValue(priceInputValue);
+    setError("");
+    try {
+      await updateRoomPrice(selectedRoom.id, price);
+      updateRoomPriceLocally(selectedRoom.id, price);
+      setPriceInputValue(price ? String(price) : "");
+      setNotice("Đã cập nhật giá thuê phòng.");
+    } catch (priceError) {
+      setError(priceError?.message || "Không thể cập nhật giá thuê phòng.");
+    }
+  };
+
   const removeSelectedItem = async () => {
     if (selectedRoom) {
       setError("");
@@ -824,6 +905,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         setSelectedItemId("");
         setPlacementMode(null);
         setPlacementTargetId(null);
+        setAreaInputValue("");
+        setPriceInputValue("");
         setNotice(`Đã xóa phòng ${selectedRoom.roomCode ?? selectedRoom.room_code ?? selectedRoom.name}.`);
       } catch (deleteError) {
         setError(deleteError?.message || "Không thể xóa phòng.");
@@ -886,6 +969,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setHasUnsavedChanges(true);
       setSelectedItemId(createdRoom.id);
       setAreaInputValue(areaFromSize(placedRoom.width, placedRoom.height));
+      setPriceInputValue("");
       setNotice(`Đã thêm phòng ${placedRoom.roomCode ?? placedRoom.room_code ?? roomCode}.`);
     } catch (createError) {
       setError(createError?.message || "Không thể thêm phòng mới.");
@@ -916,6 +1000,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setPlacementMode(null);
     setPlacementTargetId(null);
     setAreaInputValue("");
+    setPriceInputValue("");
     setError("");
     setNotice("Đã căn thẳng các phòng. Bấm Lưu sơ đồ để lưu thay đổi.");
     setHasUnsavedChanges(true);
@@ -1117,8 +1202,11 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
                   isRoom
                   placementMode={placementTargetId === room.id ? placementMode : null}
                   areaInputValue={areaInputValue}
+                  priceInputValue={priceInputValue}
                   onAreaInputChange={setAreaInputValue}
+                  onPriceInputChange={setPriceInputValue}
                   onAreaSubmit={applyArea}
+                  onPriceSubmit={applyRoomPrice}
                   onRotate={rotateSelectedItem}
                   onStartPlacement={startPlacement}
                   onFinishPlacement={finishPlacement}

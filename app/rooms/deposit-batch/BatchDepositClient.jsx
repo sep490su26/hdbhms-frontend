@@ -44,6 +44,7 @@ import {
 import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
 import { previewDepositContract } from "../../../services/depositContractsService";
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
 
 const DEPOSIT_PER_ROOM = 2000;
@@ -130,15 +131,19 @@ function validateField(name, value, form = {}) {
   return "";
 }
 
-function TextField({ label, required, error, ...props }) {
+function TextField({ label, required, error, type, placeholder, ...props }) {
+  const InputComponent = type === "date" ? DateInput : "input";
+
   return (
     <label className="grid gap-2 text-sm font-bold text-slate-700">
       <span>
         {label}
         {required ? <span className="text-rose-600"> *</span> : null}
       </span>
-      <input
+      <InputComponent
         required={required}
+        type={type === "date" ? undefined : type}
+        placeholder={type === "date" ? placeholder || "dd/mm/yyyy" : placeholder}
         {...props}
         aria-invalid={error ? "true" : "false"}
         className={`h-12 w-full rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition ${error

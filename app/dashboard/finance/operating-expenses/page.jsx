@@ -25,6 +25,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -126,28 +127,29 @@ export default function OperatingExpensesPage() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5 text-[#0f1d33]">
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h1 className="text-3xl font-black tracking-[-0.02em]">Báo cáo Chi phí vận hành</h1>
-          <nav className="mt-3 flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-            <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-            <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
-            <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
-          </nav>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
-            {Object.entries(periodOptions).map(([key, item]) => (
-              <button key={key} type="button" onClick={() => setPeriodType(key)} className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}>{item.label}</button>
-            ))}
+      <DashboardPageHeader
+        title="Báo cáo Chi phí vận hành"
+        description="Theo dõi chi phí vận hành theo kỳ, hạng mục và chứng từ phát sinh."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
+              {Object.entries(periodOptions).map(([key, item]) => (
+                <button key={key} type="button" onClick={() => setPeriodType(key)} className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}>{item.label}</button>
+              ))}
+            </div>
+            <label className="relative">
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
+              <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]" />
+            </label>
+            <button type="button" onClick={exportReport} className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a]"><Download className="h-4 w-4" />Xuất báo cáo</button>
           </div>
-          <label className="relative">
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
-            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]" />
-          </label>
-          <button type="button" onClick={exportReport} className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a]"><Download className="h-4 w-4" />Xuất báo cáo</button>
-        </div>
-      </header>
+        }
+      />
+      <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+        <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
+        <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
+        <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
+      </nav>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" note={`+${formatCurrency(4.9 * factor)} so với tháng trước`} />

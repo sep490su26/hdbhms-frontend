@@ -72,6 +72,14 @@ export async function deleteRoom(roomId) {
   });
 }
 
+export async function updateRoomPrice(roomId, listedPrice) {
+  const price = Math.max(0, Math.round(numberValue(listedPrice)));
+  return authenticatedFetch(
+    `${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/price?listedPrice=${encodeURIComponent(price)}`,
+    { method: "PATCH" },
+  );
+}
+
 export async function fetchRooms(propertyId, floorId) {
   const params = new URLSearchParams({ propertyId: String(propertyId), size: "500" });
   if (floorId) params.set("floorId", String(floorId));

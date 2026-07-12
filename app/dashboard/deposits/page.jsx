@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  Ban,
+  CalendarDays,
   ClipboardCheck,
   Download,
   Eye,
   FileText,
   ImageIcon,
+  Loader2,
   LockKeyhole,
   Upload,
   Search,
@@ -30,15 +34,7 @@ import {
   formatDate as formatDisplayDate,
   formatDateTime as formatDisplayDateTime,
 } from "@/lib/dateFormat";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
@@ -77,18 +73,20 @@ const MANAGED_DEPOSIT_STATUSES = new Set(
 const MANAGED_DEPOSIT_STATUS_VALUES = [
   "PAID",
   "CONFIRMED",
+  "EXTENDED",
   "CONVERTED_TO_LEASE",
   "REFUNDED",
   "FORFEITED",
 ];
+MANAGED_DEPOSIT_STATUSES.add("EXTENDED");
+const SIGNING_ACTION_STATUSES = new Set(["PAID", "CONFIRMED", "EXTENDED"]);
+const FORFEIT_OVERDUE_DAYS = 7;
 const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set([
   "PENDING_PAYMENT",
   "PAID",
   "CONFIRMED",
   "EXTENDED",
 ]);
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
-
 const STATUS_LABELS = {
   PAID: STATUS_OPTIONS[0],
   CONFIRMED: STATUS_OPTIONS[0],
@@ -118,6 +116,99 @@ function toInputDate(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function formatInputDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayInputDate() {
+  return formatInputDate(new Date());
+}
+
+function parseInputDate(value) {
+  const input = toInputDate(value);
+  if (!input) return null;
+  const [year, month, day] = input.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function addDaysToInputDate(value, days) {
+  const date = parseInputDate(value) || new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return formatInputDate(date);
+}
+
+function maxInputDate(first, second) {
+  const a = toInputDate(first);
+  const b = toInputDate(second);
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
+function getSigningOverdueDays(agreement) {
+  const dueDate = parseInputDate(agreement?.expectedLeaseSignDate);
+  if (!dueDate) return 0;
+  const today = parseInputDate(todayInputDate());
+  return Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / 86400000));
+}
+
+function isWaitingForSigning(agreement) {
+  return (
+    SIGNING_ACTION_STATUSES.has(agreement?.status) &&
+    agreement?.signatureStatus !== "SIGNED"
+  );
+}
+
+function canExtendSigningDate(agreement) {
+  return isWaitingForSigning(agreement) && getSigningOverdueDays(agreement) > 0;
+}
+
+function canForfeitDeposit(agreement) {
+  return (
+    isWaitingForSigning(agreement) &&
+    getSigningOverdueDays(agreement) >= FORFEIT_OVERDUE_DAYS
+  );
+}
+
+function getSigningStatusMeta(agreement) {
+  if (agreement?.signatureStatus === "SIGNED") {
+    return {
+      label: agreement.signatureStatusLabel || "Đã ký",
+      className: "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    };
+  }
+  if (isWaitingForSigning(agreement) && getSigningOverdueDays(agreement) > 0) {
+    return {
+      label: "Quá hạn",
+      className: "bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    };
+  }
+  return {
+    label: agreement?.signatureStatusLabel || "Chờ ký",
+    className: "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300",
+  };
+}
+
+function SigningStatusBadge({ agreement }) {
+  const meta = getSigningStatusMeta(agreement);
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${meta.className}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+function getDefaultExtendedSignDate(agreement) {
+  return maxInputDate(
+    addDaysToInputDate(todayInputDate(), 1),
+    addDaysToInputDate(agreement?.expectedLeaseSignDate, 7),
+  );
+}
+
 function formatDateTime(value) {
   return formatDisplayDateTime(value);
 }
@@ -133,13 +224,6 @@ function getAgreementPagination(response) {
     pageSize: Number(response?.pageSize || 10),
     totalElements: Number(response?.totalElements || 0),
   };
-}
-
-function getVisiblePages(currentPage, totalPages) {
-  if (totalPages <= 0) return [];
-  const start = Math.max(1, currentPage - 2);
-  const end = Math.min(totalPages, currentPage + 2);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
 function getDepositStatusFilterValues(statusFilter) {
@@ -197,6 +281,10 @@ function normalizeAgreement(item) {
       item.expectedLeaseSignDate || item.expected_lease_sign_date || null,
     expectedMoveInDate:
       item.expectedMoveInDate || item.expected_move_in_date || null,
+    depositExpiresAt: item.depositExpiresAt || item.deposit_expires_at || null,
+    extensionCount: Number(item.extensionCount ?? item.extension_count ?? 0),
+    maxExtensions: Number(item.maxExtensions ?? item.max_extensions ?? 1),
+    forfeitureReason: item.forfeitureReason || item.forfeiture_reason || "",
     contractFileId: item.contractFileId || item.contract_file_id || null,
     contractDownloadUrl:
       item.contractDownloadUrl || item.contract_download_url || null,
@@ -707,7 +795,7 @@ function DetailModal({
                         <button
                           type="button"
                           onClick={() => onDownloadSignedContract(agreement)}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] dark:border-white/10 px-4 text-sm font-extrabold text-slate-900 dark:text-white hover:bg-[#f4f7fb] dark:hover:bg-white/5"
+                          className="hidden"
                         >
                           <Download className="h-4 w-4" />
                           Tải về
@@ -761,7 +849,10 @@ function DetailModal({
                 </section>
               </section>
 
-              <aside className="h-fit rounded-xl border border-[#d7dde8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
+              <aside className="h-fit rounded-xl border border-[#d7dde8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)] [&>div:nth-of-type(1)]:hidden [&>p:nth-of-type(2)]:hidden">
+                <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+                  Thao tác
+                </p>
                 <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
                   Trạng thái hiện tại
                 </p>
@@ -817,7 +908,7 @@ function DetailModal({
                   <button
                     type="button"
                     onClick={() => onDownloadContract(agreement)}
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] dark:border-white/10 px-4 text-sm font-extrabold text-slate-900 dark:text-white hover:bg-[#f4f7fb] dark:hover:bg-white/5"
+                    className="hidden"
                   >
                     <Download className="h-4 w-4" />
                     Tải PDF bản nháp
@@ -832,6 +923,90 @@ function DetailModal({
               </aside>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExtensionDateModal({
+  agreement,
+  value,
+  saving,
+  error,
+  onChange,
+  onClose,
+  onSubmit,
+}) {
+  if (!agreement) return null;
+  const overdueDays = getSigningOverdueDays(agreement);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl dark:bg-[#0f172a]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#1e40af] dark:text-[#93c5fd]">
+              Gia hạn ngày ký
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold text-slate-900 dark:text-white">
+              {agreement.depositCode}
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+              Hợp đồng đã quá hạn ký {overdueDays} ngày. Chọn ngày ký mới để cập nhật lại lịch hẹn.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-slate-600 hover:bg-[#eef3fb] dark:text-slate-300"
+            aria-label="Đóng"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-xs font-bold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">
+            Ngày ký mới
+          </span>
+          <input
+            type="date"
+            min={todayInputDate()}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className="h-11 w-full rounded-lg border border-[#c4cad6] px-3 text-sm font-bold text-slate-900 outline-none focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+          />
+        </label>
+
+        {error && (
+          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-slate-900 hover:bg-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={saving}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
+            Lưu gia hạn
+          </button>
         </div>
       </div>
     </div>
@@ -853,6 +1028,7 @@ export default function DepositsPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [updatingId, setUpdatingId] = useState(null);
   const [uploadingSignedId, setUploadingSignedId] = useState(null);
+  const [extensionModal, setExtensionModal] = useState(null);
 
   const loadAgreements = useCallback(async () => {
     try {
@@ -913,31 +1089,16 @@ export default function DepositsPage() {
       });
   }, [agreements, customerFilter, floorFilter, statusFilter]);
 
+  const overdueAgreements = agreements.filter(canExtendSigningDate);
+  const forfeitableAgreements = agreements.filter(canForfeitDeposit);
   const paidAgreements = agreements.filter((item) => item.status === "PAID");
   const convertedAgreements = agreements.filter(
     (item) => item.status === "CONVERTED_TO_LEASE",
   );
-  const totalAmount = paidAgreements.reduce(
+  const totalAmount = agreements.reduce(
     (sum, item) => sum + item.amount,
     0,
   );
-  const visiblePages = useMemo(
-    () => getVisiblePages(page, totalPages),
-    [page, totalPages],
-  );
-  const showingFrom = totalElements === 0 ? 0 : (page - 1) * size + 1;
-  const showingTo = Math.min(page * size, totalElements);
-
-  const goToPage = (nextPage) => {
-    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
-    setPage(nextPage);
-  };
-
-  const handlePageSizeChange = (event) => {
-    setSize(Number(event.target.value));
-    setPage(1);
-  };
-
   const handleStatusFilterChange = (event) => {
     setStatusFilter(event.target.value);
     setPage(1);
@@ -1012,6 +1173,100 @@ export default function DepositsPage() {
     setSelectedAgreement(merged);
     setNotice("Đã cập nhật thông tin hợp đồng cọc và tạo lại file PDF.");
     return merged;
+  };
+
+  const openExtensionModal = (agreement) => {
+    setExtensionModal({
+      agreement,
+      expectedLeaseSignDate: getDefaultExtendedSignDate(agreement),
+      saving: false,
+      error: "",
+    });
+  };
+
+  const handleConfirmExtendSigningDate = async () => {
+    if (!extensionModal?.agreement?.id) return;
+    const agreement = extensionModal.agreement;
+    const expectedLeaseSignDate = toInputDate(extensionModal.expectedLeaseSignDate);
+    if (!expectedLeaseSignDate) {
+      setExtensionModal((current) => ({
+        ...current,
+        error: "Vui lòng chọn ngày ký mới.",
+      }));
+      return;
+    }
+    if (expectedLeaseSignDate < todayInputDate()) {
+      setExtensionModal((current) => ({
+        ...current,
+        error: "Ngày ký mới không được là ngày quá khứ.",
+      }));
+      return;
+    }
+
+    setExtensionModal((current) => ({ ...current, saving: true, error: "" }));
+    setNotice("");
+    try {
+      const latestDetails = await fetchDepositAgreementDetails(agreement.id);
+      const latestAgreement = mergeAgreement(agreement, latestDetails);
+      const permanentAddress =
+        latestAgreement.depositorPermanentAddress ||
+        valueOf(latestDetails, "depositorPermanentAddress", "depositor_permanent_address");
+      if (!permanentAddress) {
+        throw new Error("Hợp đồng cọc chưa có địa chỉ thường trú để cập nhật ngày ký.");
+      }
+      const expectedMoveInDate = maxInputDate(
+        latestAgreement.expectedMoveInDate,
+        expectedLeaseSignDate,
+      );
+      const details = await updateDepositAgreementManagementInfo(agreement.id, {
+        depositorPhone: latestAgreement.depositorPhone,
+        permanentAddress,
+        expectedLeaseSignDate,
+        expectedMoveInDate,
+      });
+      const merged = mergeAgreement(latestAgreement, details);
+      setAgreements((current) =>
+        current.map((item) => (item.id === agreement.id ? merged : item)),
+      );
+      if (selectedAgreement?.id === agreement.id) {
+        setSelectedAgreement(merged);
+      }
+      setExtensionModal(null);
+      setNotice("Đã gia hạn ngày ký hợp đồng cọc.");
+    } catch (error) {
+      setExtensionModal((current) => ({
+        ...current,
+        saving: false,
+        error: error.message || "Không thể gia hạn ngày ký hợp đồng cọc.",
+      }));
+    }
+  };
+
+  const handleForfeitDeposit = async (agreement) => {
+    if (!agreement?.id || !canForfeitDeposit(agreement)) return;
+    const overdueDays = getSigningOverdueDays(agreement);
+    const confirmed = window.confirm(
+      `Xác nhận mất cọc cho ${agreement.depositCode}? Hợp đồng đã quá hạn ký ${overdueDays} ngày.`,
+    );
+    if (!confirmed) return;
+
+    setUpdatingId(`forfeit-${agreement.id}`);
+    setNotice("");
+    try {
+      const details = await updateDepositAgreementStatus(agreement.id, "FORFEITED");
+      const merged = mergeAgreement(agreement, details);
+      setAgreements((current) =>
+        current.map((item) => (item.id === agreement.id ? merged : item)),
+      );
+      if (selectedAgreement?.id === agreement.id) {
+        setSelectedAgreement(merged);
+      }
+      setNotice("Đã ghi nhận mất cọc và mở lại phòng.");
+    } catch (error) {
+      setNotice(error.message || "Không thể ghi nhận mất cọc.");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const handleOpenContract = async (agreement) => {
@@ -1149,6 +1404,28 @@ export default function DepositsPage() {
 
         <section className="grid gap-5 xl:grid-cols-3">
           <DashboardStatCard
+            icon={ClipboardCheck}
+            label="Tổng hợp đồng cọc"
+            value={totalElements || agreements.length}
+            subtitle="Theo bộ lọc hiện tại"
+          />
+          <DashboardStatCard
+            icon={WalletCards}
+            label="Tổng số tiền cọc"
+            value={formatMoney(totalAmount)}
+            subtitle="Tổng tiền cọc đã ghi nhận"
+          />
+          <DashboardStatCard
+            icon={AlertTriangle}
+            label="Quá hạn ký"
+            value={overdueAgreements.length}
+            subtitle={`${forfeitableAgreements.length} quá hạn từ ${FORFEIT_OVERDUE_DAYS} ngày`}
+            tone="amber"
+          />
+        </section>
+
+        <section className="hidden">
+          <DashboardStatCard
             icon={WalletCards}
             label="Tổng số tiền cọc"
             value={formatMoney(totalAmount)}
@@ -1171,7 +1448,7 @@ export default function DepositsPage() {
         </section>
 
         <section className="rounded-lg border border-[#d7dde8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_10px_22px_rgba(9,20,38,0.06)]">
-          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(180px,1fr)] [&>label:nth-child(2)]:hidden">
             <label className="grid gap-2">
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">
                 Tên khách hàng
@@ -1225,7 +1502,7 @@ export default function DepositsPage() {
 
         <section className="overflow-hidden rounded-lg border border-[#d7dde8] bg-white shadow-[0_10px_22px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] dark:shadow-none">
           <div className="dashboard-table">
-            <table className="w-full border-collapse text-left">
+            <table className="w-full border-collapse text-left [&_td:nth-child(6)]:hidden [&_th:nth-child(6)]:hidden">
               <thead>
                 <tr className="border-b border-[#cdd5e1] bg-[#eef4ff] text-xs font-extrabold uppercase tracking-[0.08em] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                   <th className="px-5 py-4">Phòng</th>
@@ -1242,7 +1519,7 @@ export default function DepositsPage() {
                 {filteredAgreements.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={7}
                       className="px-5 py-10 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                     >
                       Không có hợp đồng đặt cọc phù hợp.
@@ -1326,9 +1603,8 @@ export default function DepositsPage() {
                         </select>
                       </td>
                       <td data-label="Ký HĐ cọc" className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${agreement.signatureStatus === "SIGNED" ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 text-slate-700"}`}
-                        >
+                        <SigningStatusBadge agreement={agreement} />
+                        <span className="hidden">
                           {agreement.signatureStatusLabel ||
                             (agreement.signatureStatus === "SIGNED"
                               ? "Đã ký"
@@ -1353,10 +1629,37 @@ export default function DepositsPage() {
                           >
                             <FileText className="h-5 w-5" />
                           </button>
+                          {canExtendSigningDate(agreement) && (
+                            <button
+                              type="button"
+                              onClick={() => openExtensionModal(agreement)}
+                              className="rounded-full p-2 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                              aria-label={`Gia hạn ngày ký ${agreement.depositCode}`}
+                              title="Gia hạn ngày ký"
+                            >
+                              <CalendarDays className="h-5 w-5" />
+                            </button>
+                          )}
+                          {canForfeitDeposit(agreement) && (
+                            <button
+                              type="button"
+                              onClick={() => handleForfeitDeposit(agreement)}
+                              disabled={updatingId === `forfeit-${agreement.id}`}
+                              className="rounded-full p-2 text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                              aria-label={`Mất cọc ${agreement.depositCode}`}
+                              title={`Mất cọc khi quá hạn từ ${FORFEIT_OVERDUE_DAYS} ngày`}
+                            >
+                              {updatingId === `forfeit-${agreement.id}` ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <Ban className="h-5 w-5" />
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDownloadContract(agreement)}
-                            className="rounded-full p-2 text-slate-900 dark:text-white hover:bg-[#eef4ff]"
+                            className="hidden"
                             aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
                           >
                             <Download className="h-5 w-5" />
@@ -1397,115 +1700,18 @@ export default function DepositsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex flex-col gap-4 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <span>
-                Hiển thị {filteredAgreements.length} dòng trên trang này, bản
-                ghi {showingFrom}-{showingTo} trong tổng số {totalElements} hợp
-                đồng
-              </span>
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                <span>Số dòng/trang</span>
-                <select
-                  value={size}
-                  onChange={handlePageSizeChange}
-                  className="h-10 rounded-lg border border-[#c4cad6] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10"
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <Pagination className="mx-0 w-auto justify-start lg:justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    text="Trước"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      goToPage(page - 1);
-                    }}
-                    className={
-                      page <= 1 ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-                {visiblePages[0] > 1 && (
-                  <>
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={page === 1}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          goToPage(1);
-                        }}
-                      >
-                        1
-                      </PaginationLink>
-                    </PaginationItem>
-                    {visiblePages[0] > 2 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-                  </>
-                )}
-                {visiblePages.map((pageNumber) => (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      href="#"
-                      isActive={pageNumber === page}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToPage(pageNumber);
-                      }}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                {visiblePages[visiblePages.length - 1] < totalPages && (
-                  <>
-                    {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={page === totalPages}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          goToPage(totalPages);
-                        }}
-                      >
-                        {totalPages}
-                      </PaginationLink>
-                    </PaginationItem>
-                  </>
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    text="Sau"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      goToPage(page + 1);
-                    }}
-                    className={
-                      page >= totalPages ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </footer>
+          <DashboardPagination
+            page={page}
+            size={size}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            itemLabel="hợp đồng"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+          />
         </section>
       </section>
 
@@ -1519,6 +1725,21 @@ export default function DepositsPage() {
         onDownloadSignedContract={handleDownloadSignedContract}
         onUploadSignedFile={handleUploadSignedFile}
         onSaveManagementInfo={handleSaveManagementInfo}
+      />
+      <ExtensionDateModal
+        agreement={extensionModal?.agreement}
+        value={extensionModal?.expectedLeaseSignDate || ""}
+        saving={Boolean(extensionModal?.saving)}
+        error={extensionModal?.error || ""}
+        onChange={(expectedLeaseSignDate) =>
+          setExtensionModal((current) => ({
+            ...current,
+            expectedLeaseSignDate,
+            error: "",
+          }))
+        }
+        onClose={() => setExtensionModal(null)}
+        onSubmit={handleConfirmExtendSigningDate}
       />
     </>
   );

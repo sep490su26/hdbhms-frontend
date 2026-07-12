@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -120,28 +121,29 @@ export default function IncomeExpenseReportPage() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-5 text-[#0f1d33]">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-[-0.02em]">Báo cáo thu chi tổng hợp</h1>
-          <nav className="mt-3 flex items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-            <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-            <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
-            <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
-          </nav>
-        </div>
-        <div className="inline-flex h-10 self-start rounded-lg bg-[#edf2fb] p-1">
-          {Object.entries(periodOptions).map(([key, item]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setPeriodType(key)}
-              className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm" : "text-[#5f6b7c]"}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </header>
+      <DashboardPageHeader
+        title="Báo cáo thu chi tổng hợp"
+        description="Đối chiếu doanh thu, chi phí và lợi nhuận theo kỳ báo cáo."
+        actions={
+          <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
+            {Object.entries(periodOptions).map(([key, item]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPeriodType(key)}
+                className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm" : "text-[#5f6b7c]"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+      <nav className="flex items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+        <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
+        <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
+        <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
+      </nav>
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard

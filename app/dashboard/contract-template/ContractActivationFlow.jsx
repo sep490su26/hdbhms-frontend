@@ -20,8 +20,7 @@ export default function ContractActivationFlow({
   const leaseSignedFileId = contract?.signedFileId ?? contract?.signed_file_id ?? null;
   const creatingDraft = actionLoading === `draft-${contract?.depositAgreementId}`;
 
-  // Handover section is hidden until the user clicks step 3 in the stepper.
-  const [showHandover, setShowHandover] = useState(false);
+  const [showHandoverRequested, setShowHandoverRequested] = useState(false);
 
   // Incremented every time the signed lease file changes (re-upload).
   // The stepper uses this to invalidate handover completion state,
@@ -46,8 +45,10 @@ export default function ContractActivationFlow({
     prevFileIdRef.current = leaseSignedFileId;
   }, [leaseSignedFileId]);
 
+  const showHandover = showHandoverRequested || Boolean(leaseSignedFileId);
+
   function handleRequestShowHandover() {
-    setShowHandover(true);
+    setShowHandoverRequested(true);
   }
 
   return (
@@ -63,15 +64,14 @@ export default function ContractActivationFlow({
             leaseVersion={leaseVersion}
           />
 
-          {showHandover && (
-            <ContractHandoverSection
-              key={`${contractId}-${leaseSignedFileId}-${handoverRefreshKey}`}
-              contractId={contractId}
-              roomId={contract?.roomId || null}
-              roomCode={contract?.roomCode || contract?.room?.roomCode}
-              onSaved={onHandoverSaved}
-            />
-          )}
+          <ContractHandoverSection
+            key={`${contractId}-${leaseSignedFileId}-${handoverRefreshKey}`}
+            contractId={contractId}
+            roomId={contract?.roomId || null}
+            roomCode={contract?.roomCode || contract?.room?.roomCode}
+            readonly={!showHandover && !leaseSignedFileId}
+            onSaved={onHandoverSaved}
+          />
         </>
       ) : (
         <section className="flex items-center gap-3 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-6 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">

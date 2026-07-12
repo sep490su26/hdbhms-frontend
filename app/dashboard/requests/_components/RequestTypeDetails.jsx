@@ -1,4 +1,4 @@
-import { MapPin, Calendar, DollarSign, ArrowRightLeft, FileText, Wallet, User } from "lucide-react";
+import { MapPin, Calendar, DollarSign, ArrowRightLeft, FileText, Wallet, User, Gauge } from "lucide-react";
 import { InfoField, formatMoney } from "./RequestDetailFields";
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && value !== "");
@@ -148,6 +148,45 @@ export function ComplaintRequestDetail({ payload }) {
             )}
             {(payload.priority || payload.complaintPriority || payload.complaint_priority) && (
                 <InfoField label="Độ ưu tiên" value={payload.priority || payload.complaintPriority || payload.complaint_priority} />
+            )}
+        </div>
+    );
+}
+
+export function MeterReadingCorrectionRequestDetail({ payload }) {
+    if (!payload) return null;
+
+    const lineType = firstValue(payload.lineType, payload.line_type, payload.meterType, payload.meter_type);
+    const utilityLabel = lineType === "ELECTRICITY"
+        ? "Điện"
+        : lineType === "WATER"
+            ? "Nước"
+            : lineType;
+    const previousValue = firstValue(payload.previousValue, payload.previous_value);
+    const currentValue = firstValue(payload.currentValue, payload.current_value);
+    const reportedValue = firstValue(payload.reportedCurrentValue, payload.reported_current_value);
+    const usageAmount = firstValue(payload.usageAmount, payload.usage_amount);
+
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Mã hóa đơn" value={firstValue(payload.invoiceCode, payload.invoice_code)} icon={<FileText className="w-4 h-4" />} />
+                <InfoField label="Phòng" value={firstValue(payload.roomCode, payload.room_code)} icon={<MapPin className="w-4 h-4" />} />
+                <InfoField label="Kỳ hóa đơn" value={firstValue(payload.billingPeriod, payload.billing_period)} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Loại chỉ số" value={utilityLabel} icon={<Gauge className="w-4 h-4" />} />
+                <InfoField label="Chỉ số cũ" value={previousValue == null ? null : String(previousValue)} />
+                <InfoField label="Chỉ số quản lý nhập" value={currentValue == null ? null : String(currentValue)} />
+                <InfoField label="Chỉ số khách báo" value={reportedValue == null ? null : String(reportedValue)} />
+                <InfoField label="Sản lượng tính tiền" value={usageAmount == null ? null : String(usageAmount)} />
+                <InfoField label="Đơn giá" value={payload.unitPrice == null ? null : formatMoney(payload.unitPrice)} icon={<DollarSign className="w-4 h-4" />} />
+                <InfoField label="Thành tiền dòng này" value={payload.lineAmount == null ? null : formatMoney(payload.lineAmount)} icon={<DollarSign className="w-4 h-4" />} />
+            </div>
+
+            {(payload.description || payload.reason) && (
+                <div className="rounded-xl bg-cyan-50 p-4">
+                    <p className="mb-1 text-sm font-semibold text-cyan-700">Nội dung khách gửi</p>
+                    <p className="whitespace-pre-wrap text-sm text-cyan-700">{payload.description || payload.reason}</p>
+                </div>
             )}
         </div>
     );

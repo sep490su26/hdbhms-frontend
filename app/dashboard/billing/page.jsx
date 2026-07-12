@@ -4,14 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Banknote,
+  CheckCircle2,
   History,
   Loader2,
+  ReceiptText,
   RefreshCw,
   Save,
-  Search,
+  SlidersHorizontal,
+  WalletCards,
   X,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -20,6 +24,8 @@ import {
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
 
 const money = new Intl.NumberFormat("vi-VN");
+const FORM_CONTROL_CLASS =
+  "h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white";
 
 const STATUS_LABELS = {
   DRAFT: "Nháp",
@@ -100,6 +106,43 @@ function currentMonth() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function billingPeriodToVietnameseDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{1,2})/);
+  if (!match) return "";
+  return `01/${match[2].padStart(2, "0")}/${match[1]}`;
+}
+
+function formatVietnameseDateInput(value) {
+  const text = String(value || "").replace(/[^\d/]/g, "").slice(0, 10);
+  if (text.includes("/")) return text;
+  const digits = text.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function vietnameseDateToBillingPeriod(value) {
+  const match = String(value || "")
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 function formatMoney(value) {
   return `${money.format(Number(value || 0))} đ`;
 }
@@ -143,6 +186,9 @@ export default function BillingPage() {
     propertyId: "",
     roomId: "",
   });
+  const [billingPeriodText, setBillingPeriodText] = useState(() =>
+    billingPeriodToVietnameseDate(currentMonth()),
+  );
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
@@ -348,6 +394,30 @@ export default function BillingPage() {
     }
   }
 
+  function updateBillingPeriodText(value) {
+    const nextText = formatVietnameseDateInput(value);
+    setBillingPeriodText(nextText);
+
+    if (!nextText.trim()) {
+      setFilters((current) => ({ ...current, billingPeriod: "" }));
+      return;
+    }
+
+    const nextPeriod = vietnameseDateToBillingPeriod(nextText);
+    if (nextPeriod) {
+      setFilters((current) => ({ ...current, billingPeriod: nextPeriod }));
+    }
+  }
+
+  function normalizeBillingPeriodText() {
+    if (!billingPeriodText.trim()) return;
+
+    const nextPeriod = vietnameseDateToBillingPeriod(billingPeriodText);
+    setBillingPeriodText(
+      billingPeriodToVietnameseDate(nextPeriod || filters.billingPeriod),
+    );
+  }
+
   const totals = mockInvoices.reduce(
     (acc, invoice) => ({
       total: acc.total + invoice.totalAmount,
@@ -390,44 +460,50 @@ export default function BillingPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Tổng hóa đơn
-          </p>
-          <p className="mt-2 text-xl font-black">{formatMoney(totals.total)}</p>
-        </div>
-        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Đã thu
-          </p>
-          <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
-            {formatMoney(totals.paid)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Còn lại
-          </p>
-          <p className="mt-2 text-xl font-black text-rose-700 dark:text-rose-300">
-            {formatMoney(totals.remaining)}
-          </p>
-        </div>
+        <DashboardStatCard
+          icon={ReceiptText}
+          label="Tổng hóa đơn"
+          value={formatMoney(totals.total)}
+          tone="blue"
+          subtitle="Tổng giá trị trong kỳ"
+        />
+        <DashboardStatCard
+          icon={CheckCircle2}
+          label="Đã thu"
+          value={formatMoney(totals.paid)}
+          tone="emerald"
+          subtitle="Khoản đã ghi nhận"
+        />
+        <DashboardStatCard
+          icon={WalletCards}
+          label="Còn lại"
+          value={formatMoney(totals.remaining)}
+          tone="rose"
+          subtitle="Khoản cần tiếp tục thu"
+        />
       </section>
 
-      <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+            <SlidersHorizontal className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white">Bộ lọc hóa đơn</h2>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Lọc theo kỳ, trạng thái, cơ sở và phòng.</p>
+          </div>
+        </div>
         <div className="grid gap-3 md:grid-cols-5">
           <label className="grid gap-1 text-sm font-bold">
             Tháng
             <input
-              type="month"
-              value={filters.billingPeriod}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  billingPeriod: event.target.value,
-                }))
-              }
-              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+              type="text"
+              inputMode="numeric"
+              placeholder="vd: 01/07/2026"
+              value={billingPeriodText}
+              onBlur={normalizeBillingPeriodText}
+              onChange={(event) => updateBillingPeriodText(event.target.value)}
+              className={FORM_CONTROL_CLASS}
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
@@ -440,7 +516,7 @@ export default function BillingPage() {
                   status: event.target.value,
                 }))
               }
-              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+              className={FORM_CONTROL_CLASS}
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -460,7 +536,7 @@ export default function BillingPage() {
                   invoiceType: event.target.value,
                 }))
               }
-              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+              className={FORM_CONTROL_CLASS}
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(TYPE_LABELS).map(([value, label]) => (
@@ -481,7 +557,7 @@ export default function BillingPage() {
                   roomId: "",
                 }))
               }
-              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+              className={FORM_CONTROL_CLASS}
             >
               <option value="">Tất cả cơ sở</option>
               {properties.map((property) => (
@@ -501,7 +577,7 @@ export default function BillingPage() {
                   roomId: event.target.value,
                 }))
               }
-              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+              className={FORM_CONTROL_CLASS}
             >
               <option value="">Tất cả phòng</option>
               {filterRooms.map((room) => (
@@ -518,6 +594,7 @@ export default function BillingPage() {
             onClick={loadInvoices}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
           >
+            <RefreshCw className="h-4 w-4" />
             Tải hóa đơn
           </button>
           <button
@@ -525,59 +602,77 @@ export default function BillingPage() {
             onClick={() => setIsOverrideModalOpen(true)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
           >
-            ⚙️ Điều chỉnh giá
+            <SlidersHorizontal className="h-4 w-4" />
+            Điều chỉnh giá
           </button>
           <button
             type="button"
             onClick={() => setIsPaymentModalOpen(true)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
           >
-            💵 Thanh toán thủ công
+            <Banknote className="h-4 w-4" />
+            Thanh toán thủ công
           </button>
         </div>
       </section>
 
-      <section className="w-full">
-        <div className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
-                <tr>
-                  <th className="px-4 py-3">Hóa đơn</th>
-                  <th className="px-4 py-3">Phòng</th>
-                  <th className="px-4 py-3">Khách thuê</th>
-                  <th className="px-4 py-3">Tháng</th>
-                  <th className="px-4 py-3">Trạng thái</th>
-                  <th className="px-4 py-3 text-right">Tổng tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockInvoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-black">{invoice.invoiceCode}</p>
-                    </td>
-                    <td className="px-4 py-3 font-semibold">{invoice.room}</td>
-                    <td className="px-4 py-3">{invoice.tenantName}</td>
-                    <td className="px-4 py-3">{invoice.month}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${mockStatusClasses(invoice.status)}`}
-                      >
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-black">
-                      {formatMoney(invoice.totalAmount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+              <ReceiptText className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                Danh sách hóa đơn
+              </h2>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Theo dõi trạng thái thu tiền theo từng phòng.
+              </p>
+            </div>
           </div>
+          <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 dark:bg-white/5 dark:text-slate-300">
+            {mockInvoices.length} hóa đơn
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[880px] text-left text-sm">
+            <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
+              <tr>
+                <th className="px-4 py-3">Hóa đơn</th>
+                <th className="px-4 py-3">Phòng</th>
+                <th className="px-4 py-3">Khách thuê</th>
+                <th className="px-4 py-3">Tháng</th>
+                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3 text-right">Tổng tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mockInvoices.map((invoice) => (
+                <tr
+                  key={invoice.id}
+                  className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
+                >
+                  <td className="px-4 py-3">
+                    <p className="font-black">{invoice.invoiceCode}</p>
+                  </td>
+                  <td className="px-4 py-3 font-semibold">{invoice.room}</td>
+                  <td className="px-4 py-3">{invoice.tenantName}</td>
+                  <td className="px-4 py-3">{invoice.month}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${mockStatusClasses(invoice.status)}`}
+                    >
+                      {invoice.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-black">
+                    {formatMoney(invoice.totalAmount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -615,7 +710,7 @@ export default function BillingPage() {
                         roomId: "",
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   >
                     <option value="">Chọn cơ sở</option>
                     {properties.map((property) => (
@@ -637,7 +732,7 @@ export default function BillingPage() {
                       }))
                     }
                     disabled={!overrideForm.propertyId}
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   >
                     <option value="">
                       {overrideForm.propertyId
@@ -663,7 +758,7 @@ export default function BillingPage() {
                         billingPeriod: event.target.value,
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -679,7 +774,7 @@ export default function BillingPage() {
                         overrideMonthlyRent: event.target.value,
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -692,7 +787,7 @@ export default function BillingPage() {
                         reason: event.target.value,
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   />
                 </label>
               </div>
@@ -749,7 +844,7 @@ export default function BillingPage() {
                         amount: "",
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   >
                     <option value="">Chọn cơ sở</option>
                     {properties.map((property) => (
@@ -773,7 +868,7 @@ export default function BillingPage() {
                       }))
                     }
                     disabled={!paymentForm.propertyId}
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   >
                     <option value="">
                       {paymentForm.propertyId
@@ -796,7 +891,7 @@ export default function BillingPage() {
                       selectPaymentInvoice(event.target.value)
                     }
                     disabled={!paymentForm.roomId}
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   >
                     <option value="">
                       {paymentForm.roomId ? "Chọn hóa đơn" : "Chọn phòng trước"}
@@ -821,7 +916,7 @@ export default function BillingPage() {
                         amount: event.target.value,
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -834,7 +929,7 @@ export default function BillingPage() {
                         note: event.target.value,
                       }))
                     }
-                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
+                    className={FORM_CONTROL_CLASS}
                   />
                 </label>
               </div>

@@ -16,16 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Edit3 } from "lucide-react";
 
 const NAV_ITEMS = [
   { icon: "grid", label: "Tổng quan" },
@@ -185,7 +178,7 @@ export default function UtilityManagement() {
   const [nextOpenDate, setNextOpenDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const router = useRouter();
 
   useEffect(() => {
@@ -687,59 +680,18 @@ export default function UtilityManagement() {
               })}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="border-t border-gray-100 px-3 py-4 dark:border-white/10 sm:px-4">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage - 1);
-                        }}
-                        className={
-                          currentPage === 1
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                      />
-                    </PaginationItem>
-
-                    {[...Array(totalPages)].map((_, i) => (
-                      <PaginationItem key={i + 1}>
-                        <PaginationLink
-                          href="#"
-                          isActive={currentPage === i + 1}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(i + 1);
-                          }}
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage + 1);
-                        }}
-                        className={
-                          currentPage === totalPages
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
+            <DashboardPagination
+              page={currentPage}
+              size={itemsPerPage}
+              totalElements={history.length}
+              totalPages={totalPages}
+              itemLabel="kỳ ghi chỉ số"
+              onPageChange={handlePageChange}
+              onSizeChange={(nextSize) => {
+                setItemsPerPage(nextSize);
+                setCurrentPage(1);
+              }}
+            />
           </div>
         </div>
         {/* Bottom: Hướng dẫn + Ghi chú */}
@@ -771,52 +723,31 @@ export default function UtilityManagement() {
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-1">
               {[
-                { num: "1", label: "Tạo kỳ ghi chỉ số", icon: "📋" },
-                { num: "2", label: "Nhập chỉ số", icon: "✏️" },
-                { num: "3", label: "Chốt kỳ", icon: "✅" },
-                { num: "4", label: "Tính tiêu thụ & tạo hóa đơn", icon: "📊" },
-              ].map((step, i) => (
-                <div key={step.num} className="flex items-center gap-1 flex-1">
-                  <div className="flex flex-col items-center text-center flex-1">
-                    <div className="w-10 h-10 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 rounded-xl flex items-center justify-center text-lg mb-1.5">
-                      {step.icon}
+                { num: "1", label: "Tạo kỳ ghi chỉ số", icon: ClipboardList },
+                { num: "2", label: "Nhập chỉ số", icon: Edit3 },
+                { num: "3", label: "Chốt kỳ", icon: CheckCircle2 },
+                { num: "4", label: "Tính tiêu thụ & tạo hóa đơn", icon: BarChart3 },
+              ].map((step, i) => {
+                const StepIcon = step.icon;
+                return (
+                  <div key={step.num} className="flex items-center gap-1 flex-1">
+                    <div className="flex flex-col items-center text-center flex-1">
+                      <div className="mb-1.5 flex h-10 w-10 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                        <StepIcon className="h-5 w-5" />
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                        {step.num}. {step.label}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                      {step.num}. {step.label}
-                    </p>
+                    {i < 3 && (
+                      <ChevronRight className="hidden h-4 w-4 shrink-0 text-gray-300 sm:block" />
+                    )}
+                    {i < 3 && (
+                      <ChevronDown className="my-1 block h-4 w-4 shrink-0 text-gray-300 sm:hidden" />
+                    )}
                   </div>
-                  {i < 3 && (
-                    <svg
-                      className="hidden sm:block w-4 h-4 text-gray-300 shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  )}
-                  {i < 3 && (
-                    <svg
-                      className="block sm:hidden w-4 h-4 text-gray-300 shrink-0 my-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

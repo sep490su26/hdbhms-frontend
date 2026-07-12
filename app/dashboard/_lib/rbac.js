@@ -33,6 +33,7 @@ export const SECTION_PERMISSIONS = {
   contract: [ROLES.OWNER],
   finance: [ROLES.PUBLIC, ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT],
   settings: [ROLES.OWNER],
+  notificationTemplates: [ROLES.OWNER],
   requests: [ROLES.OWNER, ROLES.MANAGER],
   facilities: [ROLES.OWNER, ROLES.MANAGER],
 };

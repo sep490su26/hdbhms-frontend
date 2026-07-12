@@ -32,8 +32,10 @@ import {
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import DateInput from "@/components/DateInput";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const emptyForm = {
   fullName: "",
@@ -264,8 +266,7 @@ function ViewingModal({
               </select>
             </Field>
             <Field label="Ngày hẹn xem *">
-              <input
-                type="date"
+              <DateInput
                 min={minDate}
                 value={form.appointmentDate}
                 onChange={(event) =>
@@ -336,18 +337,8 @@ function TrashModal({
   onRestore,
   onForceDelete,
   onPageChange,
+  onSizeChange,
 }) {
-  const from =
-    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.size + 1;
-  const to =
-    pagination.total === 0
-      ? 0
-      : Math.min(from + rows.length - 1, pagination.total);
-  const pages = Array.from(
-    { length: pagination.totalPages },
-    (_, index) => index + 1,
-  ).slice(0, 5);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
@@ -460,29 +451,15 @@ function TrashModal({
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-[#d9dde5] dark:border-white/10 px-4 py-4 text-xs text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            {pagination.total === 0
-              ? "Không có khách xem phòng nào trong thùng rác"
-              : `Đang hiển thị ${from} đến ${to} của ${pagination.total} khách`}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            {pages.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => onPageChange(page)}
-                className={`flex h-8 w-8 items-center justify-center rounded border text-xs font-bold ${
-                  page === pagination.page
-                    ? "border-[#1e40af] bg-[#1e40af] dark:bg-[#2563eb] text-white"
-                    : "border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-          </div>
-        </div>
+        <DashboardPagination
+          page={pagination.page}
+          size={pagination.size}
+          totalElements={pagination.total}
+          totalPages={pagination.totalPages}
+          itemLabel="khách xem phòng trong thùng rác"
+          onPageChange={onPageChange}
+          onSizeChange={onSizeChange}
+        />
       </div>
     </div>
   );
@@ -539,7 +516,8 @@ function NoteModal({ customer, onClose }) {
 }
 
 export default function ViewingCustomersClient() {
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
+  const [trashPageSize, setTrashPageSize] = useState(10);
   const [customers, setCustomers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [filterRooms, setFilterRooms] = useState([]);
@@ -566,7 +544,7 @@ export default function ViewingCustomersClient() {
   const [trashRows, setTrashRows] = useState([]);
   const [trashPagination, setTrashPagination] = useState({
     page: 1,
-    size: pageSize,
+    size: trashPageSize,
     total: 0,
     totalPages: 0,
   });
@@ -615,7 +593,7 @@ export default function ViewingCustomersClient() {
   }, [filters.propertyId]);
 
   const loadCustomers = useCallback(
-    async (nextPage = 1) => {
+    async (nextPage = 1, nextSize = pageSize) => {
       try {
         const selectedRoom = filterRooms.find(
           (r) => String(r.id) === String(filters.roomId),
@@ -628,7 +606,7 @@ export default function ViewingCustomersClient() {
           fetchViewingCustomers({
             filters: apiFilters,
             page: nextPage,
-            size: pageSize,
+            size: nextSize,
           }),
           fetchViewingCustomerStats(), // API now ignores filters for internal total counting
         ]);
@@ -644,12 +622,12 @@ export default function ViewingCustomersClient() {
   );
 
   const loadTrash = useCallback(
-    async (nextPage = 1) => {
+    async (nextPage = 1, nextSize = trashPageSize) => {
       try {
         const data = await fetchViewingCustomerTrash({
           filters,
           page: nextPage,
-          size: pageSize,
+          size: nextSize,
         });
         setTrashRows(data.items);
         setTrashPagination(data);
@@ -658,7 +636,7 @@ export default function ViewingCustomersClient() {
         setErrorMessage(getViewingCustomerErrorMessage(error));
       }
     },
-    [filters, pageSize],
+    [filters, trashPageSize],
   );
 
   useEffect(() => {
@@ -822,17 +800,6 @@ export default function ViewingCustomersClient() {
     }
   };
 
-  const pageFrom =
-    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.size + 1;
-  const pageTo =
-    pagination.total === 0
-      ? 0
-      : Math.min(pageFrom + customers.length - 1, pagination.total);
-  const pageNumbers = Array.from(
-    { length: pagination.totalPages },
-    (_, index) => index + 1,
-  ).slice(0, 5);
-
   return (
     <>
       <div className="w-full min-w-0 flex flex-col gap-6">
@@ -933,8 +900,7 @@ export default function ViewingCustomersClient() {
                 ))}
               </select>
               <span className="font-semibold text-slate-900 dark:text-white">Thời gian:</span>
-              <input
-                type="date"
+              <DateInput
                 value={filters.fromDate}
                 onChange={(event) =>
                   updateFilter("fromDate", event.target.value)
@@ -942,8 +908,7 @@ export default function ViewingCustomersClient() {
                 className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
               />
               <span>đến</span>
-              <input
-                type="date"
+              <DateInput
                 value={filters.toDate}
                 onChange={(event) => updateFilter("toDate", event.target.value)}
                 className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
@@ -1079,51 +1044,18 @@ export default function ViewingCustomersClient() {
               </table>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-[#d9dde5] dark:border-white/10 px-4 py-4 text-xs text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                {pagination.total === 0
-                  ? "Không có khách xem phòng nào"
-                  : `Đang hiển thị ${pageFrom} đến ${pageTo} của ${pagination.total} khách`}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    loadCustomers(Math.max(1, pagination.page - 1))
-                  }
-                  disabled={pagination.page <= 1}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5 disabled:opacity-40"
-                >
-                  {"<"}
-                </button>
-                {pageNumbers.map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => loadCustomers(page)}
-                    className={`flex h-8 w-8 items-center justify-center rounded border text-xs font-bold ${
-                      page === pagination.page
-                        ? "border-[#1e40af] bg-[#1e40af] dark:bg-[#2563eb] text-white"
-                        : "border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    loadCustomers(
-                      Math.min(pagination.totalPages, pagination.page + 1),
-                    )
-                  }
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5 disabled:opacity-40"
-                >
-                  {">"}
-                </button>
-              </div>
-            </div>
+            <DashboardPagination
+              page={pagination.page}
+              size={pagination.size}
+              totalElements={pagination.total}
+              totalPages={pagination.totalPages}
+              itemLabel="khách xem phòng"
+              onPageChange={loadCustomers}
+              onSizeChange={(nextSize) => {
+                setPageSize(nextSize);
+                loadCustomers(1, nextSize);
+              }}
+            />
           </section>
         </div>
       </div>
@@ -1155,6 +1087,10 @@ export default function ViewingCustomersClient() {
           onRestore={restoreCustomer}
           onForceDelete={forceDeleteCustomer}
           onPageChange={loadTrash}
+          onSizeChange={(nextSize) => {
+            setTrashPageSize(nextSize);
+            loadTrash(1, nextSize);
+          }}
         />
       )}
 

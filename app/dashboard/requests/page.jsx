@@ -20,15 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import {
     TransferRequestDetail,
     MoveoutRequestDetail,
@@ -36,6 +28,7 @@ import {
     TerminationRequestDetail,
     MaintenanceRequestDetail,
     ComplaintRequestDetail,
+    MeterReadingCorrectionRequestDetail,
     AccessRequestDetail,
 } from "./_components/RequestTypeDetails";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
@@ -373,10 +366,12 @@ const TYPE_DETAIL_COMPONENTS = {
     MAINTENANCE: MaintenanceRequestDetail,
     COMPLAINT: ComplaintRequestDetail,
     ACCESS: AccessRequestDetail,
+    METER_READING_CORRECTION: MeterReadingCorrectionRequestDetail,
 };
 
 function parseRequestPayload(rawPayload) {
     if (!rawPayload) return null;
+    if (typeof rawPayload === "object") return rawPayload;
     try {
         return JSON.parse(rawPayload);
     } catch {
@@ -563,6 +558,7 @@ export default function ApprovalCenter() {
   const [statusFilter, setStatusFilter] = useState("Pending");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
 
     const [data, setData] = useState([]);
     const [stats, setStats] = useState({ breakdown: [], pendingCount: 0, approvedCount: 0, rejectedCount: 0, totalCount: 0 });
@@ -602,7 +598,7 @@ export default function ApprovalCenter() {
         try {
             const apiStatus = statusFilter === "All" ? undefined : statusFilter;
             const [dataRes, statsRes] = await Promise.all([
-                fetchChangeRequests({ page: page - 1, size: 8, type: typeFilter === "All Types" ? undefined : typeFilter, status: apiStatus, search }),
+                fetchChangeRequests({ page: page - 1, size, type: typeFilter === "All Types" ? undefined : typeFilter, status: apiStatus, search }),
                 fetchChangeRequestStats()
             ]);
             setData(dataRes.requests || []);
@@ -645,7 +641,7 @@ export default function ApprovalCenter() {
         } finally {
             setLoading(false);
         }
-    }, [page, search, statusFilter, typeFilter]);
+    }, [page, search, size, statusFilter, typeFilter]);
 
     const handleApprove = async (id) => {
         setActionLoading(`approve-${id}`);
@@ -1507,48 +1503,19 @@ export default function ApprovalCenter() {
                         </div>
                     </div>
 
-                    {totalPages > 1 && (
-                        <div className="flex flex-col gap-4 rounded-b-3xl border-t border-slate-100 bg-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                                <span>Hiển thị 1 - {Math.min(page * 8, total)} trong tổng số {total} yêu cầu</span>
-                                <div className="flex items-center gap-2">
-                                    <span>Hiển thị</span>
-                                    <div className="rounded-xl border border-slate-200 px-3 py-2 text-slate-700">10</div>
-                                    <span>mục/trang</span>
-                                </div>
-                            </div>
-                            <Pagination className="mx-0 w-auto">
-                                <PaginationContent>
-                                    <PaginationItem>
-                                        <PaginationPrevious
-                                            href="#"
-                                            onClick={(e) => { e.preventDefault(); setPage(Math.max(1, page - 1)); }}
-                                            className={page === 1 ? "pointer-events-none opacity-50" : ""}
-                                        />
-                                    </PaginationItem>
-                                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
-                                        <PaginationItem key={p}>
-                                            <PaginationLink
-                                                href="#"
-                                                isActive={p === page}
-                                                onClick={(e) => { e.preventDefault(); setPage(p); }}
-                                            >
-                                                {p}
-                                            </PaginationLink>
-                                        </PaginationItem>
-                                    ))}
-                                    {totalPages > 5 && <PaginationItem><PaginationEllipsis /></PaginationItem>}
-                                    <PaginationItem>
-                                        <PaginationNext
-                                            href="#"
-                                            onClick={(e) => { e.preventDefault(); setPage(Math.min(totalPages, page + 1)); }}
-                                            className={page === totalPages ? "pointer-events-none opacity-50" : ""}
-                                        />
-                                    </PaginationItem>
-                                </PaginationContent>
-                            </Pagination>
-                        </div>
-                    )}
+                    <DashboardPagination
+                        page={page}
+                        size={size}
+                        totalElements={total}
+                        totalPages={totalPages}
+                        itemLabel="yêu cầu"
+                        className="rounded-b-3xl"
+                        onPageChange={setPage}
+                        onSizeChange={(nextSize) => {
+                            setSize(nextSize);
+                            setPage(1);
+                        }}
+                    />
                 </div>
 
                 <div className="min-w-0 space-y-5">

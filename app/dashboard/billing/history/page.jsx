@@ -16,6 +16,7 @@ import {
   downloadTransactionHistoryExport,
   fetchTransactionHistory,
 } from "@/services/transactionService";
+import DateInput from "@/components/DateInput";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const money = new Intl.NumberFormat("vi-VN");
@@ -218,8 +219,7 @@ export default function TransactionHistoryPage() {
           </label>
           <label className="grid gap-1 text-sm font-bold">
             Từ ngày
-            <input
-              type="date"
+            <DateInput
               value={filters.fromDate}
               onChange={(event) => setFilters((current) => ({ ...current, fromDate: event.target.value }))}
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
@@ -227,8 +227,7 @@ export default function TransactionHistoryPage() {
           </label>
           <label className="grid gap-1 text-sm font-bold">
             Đến ngày
-            <input
-              type="date"
+            <DateInput
               value={filters.toDate}
               onChange={(event) => setFilters((current) => ({ ...current, toDate: event.target.value }))}
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"

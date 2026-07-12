@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Armchair,
   Bell,
+  BellRing,
   Building2,
   CheckCheck,
   ChevronDown,
@@ -52,6 +53,15 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "@/services/notificationsService";
+
+const currentContractYear = new Date().getFullYear();
+const contractYearChildren = [
+  { path: "/dashboard/contract-management", label: "Tất cả năm" },
+  ...[currentContractYear, currentContractYear - 1].map((year) => ({
+    path: `/dashboard/contract-management?year=${year}`,
+    label: `Năm ${year}`,
+  })),
+];
 
 const navigation = [
   {
@@ -133,16 +143,23 @@ const navigation = [
     permissionKey: "deposits",
   },
   {
-    path: "/dashboard/contract-template",
+    path: "/dashboard/contract-management",
     label: "Quản lý hợp đồng",
     icon: FileText,
     permissionKey: "contract",
+    children: contractYearChildren,
   },
   {
     path: "/dashboard/requests",
     label: "Quản lý yêu cầu",
     icon: Inbox,
     permissionKey: "requests",
+  },
+  {
+    path: "/dashboard/notification-templates",
+    label: "Quản lý thông báo",
+    icon: BellRing,
+    permissionKey: "notificationTemplates",
   },
   {
     path: "/dashboard/finance",
@@ -387,9 +404,12 @@ export function AccessDeniedPage() {
 
 function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const showText = isExpanded || isHovered || isMobileOpen;
   const [openGroups, setOpenGroups] = useState({});
+  const queryString = searchParams.toString();
+  const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
 
   return (
     <>
@@ -547,10 +567,10 @@ function Sidebar({ isOpen, onClose }) {
                       {hasChildren && isGroupOpen ? (
                         <ul className="mt-2 grid gap-1 border-l border-gray-200 pl-5 dark:border-gray-800">
                           {item.children.map((child) => {
-                            const childActive = isNavigationPathActive(
-                              pathname,
-                              child.path,
-                            );
+                            const childActive =
+                              child.path === currentHref ||
+                              (!queryString &&
+                                isNavigationPathActive(pathname, child.path));
 
                             return (
                               <li key={child.path}>

@@ -148,3 +148,52 @@ export async function previewNotificationTemplate({
     },
   );
 }
+
+function normalizeBroadcastResult(item = {}) {
+  return {
+    scopeType: item.scopeType ?? "",
+    roles: item.roles ?? [],
+    channels: item.channels ?? [],
+    recipientCount: Number(item.recipientCount ?? 0),
+    outboxCount: Number(item.outboxCount ?? 0),
+  };
+}
+
+function broadcastPayload({
+  scopeType,
+  scopeIds = [],
+  roles = [],
+  channels = [],
+  title,
+  body,
+}) {
+  return {
+    scopeType,
+    scopeIds: scopeIds.map(Number).filter((item) => Number.isFinite(item) && item > 0),
+    roles,
+    channels,
+    title,
+    body,
+  };
+}
+
+export async function previewNotificationBroadcastRecipients(payload) {
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/notification-broadcasts/preview-recipients`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(broadcastPayload(payload)),
+    },
+  );
+  return normalizeBroadcastResult(data);
+}
+
+export async function sendNotificationBroadcast(payload) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/notification-broadcasts/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(broadcastPayload(payload)),
+  });
+  return normalizeBroadcastResult(data);
+}

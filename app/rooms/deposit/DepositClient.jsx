@@ -41,6 +41,7 @@ import {
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CameraCapture from "../../../components/CameraCapture";
+import DateInput from "../../../components/DateInput";
 import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 
@@ -179,7 +180,25 @@ const getMaxDepositScheduleDateString = () => getDateStringWithOffset(MAX_DEPOSI
 
 const normalizeDateInputString = (value) => {
   const text = String(value || "").trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const displayMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const match = isoMatch || displayMatch;
+  if (!match) return "";
+
+  const year = Number(isoMatch ? match[1] : match[3]);
+  const month = Number(isoMatch ? match[2] : match[2]);
+  const day = Number(isoMatch ? match[3] : match[1]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return "";
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 };
 
 const addDaysToDateString = (value, days) => {
@@ -421,6 +440,7 @@ const DEPOSIT_DRAFT_FIELDS = [
   "coOccupant2FullName",
   "coOccupant2Phone",
 ];
+const DEPOSIT_DATE_FIELDS = new Set(["birthDate", "idIssueDate", "contractDate", "moveInDate"]);
 const DepositFormErrorContext = createContext({
   errors: {},
   setError: () => { },
@@ -460,7 +480,10 @@ const writeDepositDraftCookie = (draft) => {
   if (!canUseDocumentCookie()) return;
 
   const safeDraft = DEPOSIT_DRAFT_FIELDS.reduce((nextDraft, fieldName) => {
-    nextDraft[fieldName] = String(draft[fieldName] || "");
+    const value = String(draft[fieldName] || "");
+    nextDraft[fieldName] = DEPOSIT_DATE_FIELDS.has(fieldName)
+      ? normalizeDateInputString(value) || value
+      : value;
     return nextDraft;
   }, {});
   const hasValue = Object.values(safeDraft).some((value) => value.trim());
@@ -484,7 +507,10 @@ const buildDepositDraftFromForm = (form) => {
 
   const formData = new FormData(form);
   const draft = DEPOSIT_DRAFT_FIELDS.reduce((nextDraft, fieldName) => {
-    nextDraft[fieldName] = String(formData.get(fieldName) || "");
+    const value = String(formData.get(fieldName) || "");
+    nextDraft[fieldName] = DEPOSIT_DATE_FIELDS.has(fieldName)
+      ? normalizeDateInputString(value) || value
+      : value;
     return nextDraft;
   }, {});
   const occupantCount = Number(draft.occupantCount || 1);
@@ -502,6 +528,10 @@ const buildDepositDraftFromForm = (form) => {
 const collectDepositFormData = (form) => {
   const formData = new FormData(form);
   const data = Object.fromEntries(formData);
+  DEPOSIT_DATE_FIELDS.forEach((fieldName) => {
+    const value = String(data[fieldName] || "");
+    data[fieldName] = normalizeDateInputString(value) || value.trim();
+  });
   const occupantCount = Number(data.occupantCount || 1);
   if (occupantCount < 2) {
     data.coOccupant1FullName = "";
@@ -521,15 +551,21 @@ const normalizePhoneValue = (value) => {
 };
 
 const validateDepositValue = (name, value, scheduleWindow = null) => {
-  const normalizedValue = String(value || "").trim();
+  const rawValue = String(value || "").trim();
+  const isDateField = DEPOSIT_DATE_FIELDS.has(name);
+  const normalizedValue = isDateField ? normalizeDateInputString(rawValue) : rawValue;
   const todayDate = getTodayDateString();
   const maxScheduleDate = scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
   const minScheduleDate = scheduleWindow?.minDate || todayDate;
   const isSoonVacantSchedule = Boolean(scheduleWindow?.isSoonVacant && scheduleWindow?.expectedVacantDate);
   const expectedVacantDateLabel = formatDateForMessage(scheduleWindow?.expectedVacantDate);
 
-  if (name !== "email" && !normalizedValue) {
+  if (name !== "email" && !rawValue) {
     return REQUIRED_DEPOSIT_MESSAGES[name] || "";
+  }
+
+  if (isDateField && rawValue && !normalizedValue) {
+    return "Vui lòng nhập ngày theo định dạng dd/mm/yyyy.";
   }
 
   if (name === "fullName" && !FULL_NAME_PATTERN.test(normalizedValue)) {
@@ -663,6 +699,7 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
   const { errors: formErrors, setError } = useContext(DepositFormErrorContext);
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
+  const isDateInput = type === "date";
 
   const handleChange = (event) => {
     const message = validateValue(name, event.target.value);
@@ -684,22 +721,40 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
         {label}
         {required && <span className="text-rose-600"> *</span>}
       </span>
-      <input
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        required={required}
-        min={min}
-        max={max}
-        defaultValue={defaultValue}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        aria-invalid={displayError ? "true" : "false"}
-        className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
-          ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-          : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-          }`}
-      />
+      {isDateInput ? (
+        <DateInput
+          name={name}
+          min={min}
+          max={max}
+          required={required}
+          defaultValue={defaultValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder="dd/mm/yyyy"
+          aria-invalid={displayError ? "true" : "false"}
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
+            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+            }`}
+        />
+      ) : (
+        <input
+          name={name}
+          type={type}
+          placeholder={placeholder}
+          required={required}
+          min={min}
+          max={max}
+          defaultValue={defaultValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={displayError ? "true" : "false"}
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
+            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+            }`}
+        />
+      )}
       {displayError && <span className="text-xs font-medium text-rose-600">{displayError}</span>}
     </label>
   );
@@ -1172,8 +1227,12 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
         }
       });
 
-      const birthDate = extractedValues.birthDate || formRef.current?.elements?.namedItem("birthDate")?.value || "";
-      const idIssueDate = extractedValues.idIssueDate || formRef.current?.elements?.namedItem("idIssueDate")?.value || "";
+      const birthDate = normalizeDateInputString(
+        extractedValues.birthDate || formRef.current?.elements?.namedItem("birthDate")?.value,
+      );
+      const idIssueDate = normalizeDateInputString(
+        extractedValues.idIssueDate || formRef.current?.elements?.namedItem("idIssueDate")?.value,
+      );
       if (birthDate && idIssueDate && idIssueDate <= birthDate) {
         nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
       }
@@ -1353,7 +1412,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
               <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
               <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
               <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-              <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" defaultValue={savedDraft.idIssueDate} />
+              <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.idIssueDate} />
               <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
               <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
             </div>

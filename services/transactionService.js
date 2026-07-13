@@ -67,6 +67,19 @@ function extractFilenameFromContentDisposition(headerValue) {
   return filenameMatch?.[1]?.trim().replace(/^"|"$/g, "") || "";
 }
 
+function buildExportFallbackFilename(format) {
+  if (format === "excel" || format === "xlsx") {
+    const date = new Date();
+    const formattedDate = [
+      String(date.getDate()).padStart(2, "0"),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      date.getFullYear(),
+    ].join("-");
+    return `Danh sách hóa đơn ${formattedDate}.xlsx`;
+  }
+  return "lich-su-thanh-toan.pdf";
+}
+
 export function normalizeTransaction(raw = {}) {
   return {
     id: read(raw, "id"),
@@ -129,7 +142,7 @@ export async function downloadTransactionHistoryExport(filters = {}, format = "e
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename || `lich-su-thanh-toan.${format === "pdf" ? "pdf" : "xlsx"}`;
+  link.download = filename || buildExportFallbackFilename(format);
   document.body.appendChild(link);
   link.click();
   link.remove();

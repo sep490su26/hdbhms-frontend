@@ -99,3 +99,14 @@ test("billing API helpers send numeric override and manual payment payloads", as
   assert.deepEqual(calls[1].body, { amount: 500000, payerName: "Cash", note: "received" });
   assert.equal(payment.invoice.remainingAmount, 2700000);
 });
+
+test("billing page renders API invoices without legacy mock room codes", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/billing/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /invoices\.map\(\(invoice\) =>/);
+  assert.match(source, /displayRoomCode\(invoice\.roomCode\)/);
+  assert.doesNotMatch(source, /mockInvoices|A101|A203|B105|B302|C204|C310/);
+});

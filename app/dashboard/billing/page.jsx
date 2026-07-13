@@ -8,7 +8,6 @@ import {
   Loader2,
   RefreshCw,
   Save,
-  Search,
   X,
 } from "lucide-react";
 import {
@@ -37,63 +36,6 @@ const TYPE_LABELS = {
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
 };
 
-const mockInvoices = [
-  {
-    id: "mock-1",
-    invoiceCode: "HD-2026-0001",
-    room: "A101",
-    tenantName: "Nguyễn Minh Anh",
-    month: "07/2026",
-    totalAmount: 3850000,
-    status: "Đã thanh toán",
-  },
-  {
-    id: "mock-2",
-    invoiceCode: "HD-2026-0002",
-    room: "A203",
-    tenantName: "Trần Hoàng Nam",
-    month: "07/2026",
-    totalAmount: 4120000,
-    status: "Chờ thanh toán",
-  },
-  {
-    id: "mock-3",
-    invoiceCode: "HD-2026-0003",
-    room: "B105",
-    tenantName: "Lê Thị Thu Hà",
-    month: "07/2026",
-    totalAmount: 3675000,
-    status: "Quá hạn",
-  },
-  {
-    id: "mock-4",
-    invoiceCode: "HD-2026-0004",
-    room: "B302",
-    tenantName: "Phạm Đức Huy",
-    month: "06/2026",
-    totalAmount: 5290000,
-    status: "Đã thanh toán",
-  },
-  {
-    id: "mock-5",
-    invoiceCode: "HD-2026-0005",
-    room: "C204",
-    tenantName: "Võ Ngọc Linh",
-    month: "07/2026",
-    totalAmount: 2980000,
-    status: "Chờ thanh toán",
-  },
-  {
-    id: "mock-6",
-    invoiceCode: "HD-2026-0006",
-    room: "C310",
-    tenantName: "Đặng Quốc Bảo",
-    month: "06/2026",
-    totalAmount: 4510000,
-    status: "Quá hạn",
-  },
-];
-
 function currentMonth() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -111,14 +53,32 @@ function typeLabel(value) {
   return TYPE_LABELS[value] || value || "Khác";
 }
 
-function mockStatusClasses(status) {
-  if (status === "Đã thanh toán") {
+function invoiceStatusClasses(status) {
+  if (status === "PAID") {
     return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
   }
-  if (status === "Quá hạn") {
+  if (status === "OVERDUE") {
     return "bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20";
   }
+  if (status === "VOIDED") {
+    return "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-500/10 dark:text-slate-300 dark:ring-slate-500/20";
+  }
+  if (status === "PARTIALLY_PAID") {
+    return "bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20";
+  }
   return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
+}
+
+function formatBillingPeriod(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || ""));
+  return match ? `${match[2]}/${match[1]}` : value || "-";
+}
+
+function displayRoomCode(value) {
+  const code = String(value || "").trim();
+  if (!code) return "Chưa gán";
+  if (/^p\d+$/i.test(code)) return `P${code.slice(1)}`;
+  return /^\d+$/.test(code) ? `P${code}` : code;
 }
 
 function roomKey(room) {
@@ -126,7 +86,7 @@ function roomKey(room) {
 }
 
 function roomLabel(room) {
-  return `${room.propertyName ? `${room.propertyName} - ` : ""}${room.roomCode || room.name}`;
+  return `${room.propertyName ? `${room.propertyName} - ` : ""}${displayRoomCode(room.roomCode || room.name)}`;
 }
 
 function roomsForProperty(rooms, propertyId) {
@@ -347,15 +307,11 @@ export default function BillingPage() {
     }
   }
 
-  const totals = mockInvoices.reduce(
+  const totals = invoices.reduce(
     (acc, invoice) => ({
       total: acc.total + invoice.totalAmount,
-      paid:
-        acc.paid +
-        (invoice.status === "Đã thanh toán" ? invoice.totalAmount : 0),
-      remaining:
-        acc.remaining +
-        (invoice.status !== "Đã thanh toán" ? invoice.totalAmount : 0),
+      paid: acc.paid + invoice.paidAmount,
+      remaining: acc.remaining + invoice.remainingAmount,
     }),
     { total: 0, paid: 0, remaining: 0 },
   );
@@ -550,7 +506,22 @@ export default function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockInvoices.map((invoice) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
+                      <span className="inline-flex items-center gap-2 font-bold">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải hóa đơn...
+                      </span>
+                    </td>
+                  </tr>
+                ) : invoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-slate-500 dark:text-slate-400">
+                      Không có hóa đơn phù hợp với bộ lọc.
+                    </td>
+                  </tr>
+                ) : invoices.map((invoice) => (
                   <tr
                     key={invoice.id}
                     className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
@@ -558,14 +529,16 @@ export default function BillingPage() {
                     <td className="px-4 py-3">
                       <p className="font-black">{invoice.invoiceCode}</p>
                     </td>
-                    <td className="px-4 py-3 font-semibold">{invoice.room}</td>
-                    <td className="px-4 py-3">{invoice.tenantName}</td>
-                    <td className="px-4 py-3">{invoice.month}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {displayRoomCode(invoice.roomCode)}
+                    </td>
+                    <td className="px-4 py-3">{invoice.tenantName || "Chưa cập nhật"}</td>
+                    <td className="px-4 py-3">{formatBillingPeriod(invoice.billingPeriod)}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${mockStatusClasses(invoice.status)}`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${invoiceStatusClasses(invoice.status)}`}
                       >
-                        {invoice.status}
+                        {statusLabel(invoice.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-black">
@@ -644,7 +617,7 @@ export default function BillingPage() {
                     </option>
                     {overrideRooms.map((room) => (
                       <option key={roomKey(room)} value={roomKey(room)}>
-                        {room.roomCode || room.name}
+                        {displayRoomCode(room.roomCode || room.name)}
                       </option>
                     ))}
                   </select>
@@ -780,7 +753,7 @@ export default function BillingPage() {
                     </option>
                     {paymentRooms.map((room) => (
                       <option key={roomKey(room)} value={roomKey(room)}>
-                        {room.roomCode || room.name}
+                        {displayRoomCode(room.roomCode || room.name)}
                       </option>
                     ))}
                   </select>
@@ -801,7 +774,7 @@ export default function BillingPage() {
                     </option>
                     {paymentInvoices.map((invoice) => (
                       <option key={invoice.id} value={invoice.id}>
-                        {invoice.invoiceCode} - {invoice.roomCode || "Chưa gán"}
+                        {invoice.invoiceCode} - {displayRoomCode(invoice.roomCode)}
                       </option>
                     ))}
                   </select>

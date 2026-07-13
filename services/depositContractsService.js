@@ -167,7 +167,7 @@ export async function previewDepositContract(metadata) {
   return readEnvelope(response, "Không thể tạo bản xem trước hợp đồng đặt cọc.");
 }
 
-export async function fetchDepositAgreements({ page = 0, size = 10, status, statuses } = {}) {
+export async function fetchDepositAgreements({ page = 1, size = 10, status, statuses, search, floorId } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
@@ -176,12 +176,28 @@ export async function fetchDepositAgreements({ page = 0, size = 10, status, stat
   if (Array.isArray(statuses)) {
     statuses.filter(Boolean).forEach((nextStatus) => params.append("statuses", nextStatus));
   }
+  if (search?.trim()) params.set("q", search.trim());
+  if (floorId) params.set("floorId", String(floorId));
 
   const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements?${params.toString()}`, {
     method: "GET",
   });
 
   return readEnvelope(response, "Không thể tải danh sách hợp đồng cọc.");
+}
+
+export async function fetchDepositDashboardSummary() {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/summary`, {
+    method: "GET",
+  });
+  return readEnvelope(response, "Không thể tải thống kê hợp đồng cọc.");
+}
+
+export async function fetchDepositFilterOptions() {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/filter-options`, {
+    method: "GET",
+  });
+  return readEnvelope(response, "Không thể tải bộ lọc hợp đồng cọc.");
 }
 
 export async function fetchDepositAgreementDetails(depositAgreementId) {
@@ -229,6 +245,33 @@ export async function updateDepositAgreementManagementInfo(depositAgreementId, p
   });
 
   return readEnvelope(response, "Không thể cập nhật thông tin hợp đồng cọc.");
+}
+
+export async function recordDepositContact(depositAgreementId, payload) {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/contact-events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return readEnvelope(response, "Không thể ghi nhận kết quả liên hệ khách.");
+}
+
+export async function extendDepositAgreement(depositAgreementId, payload) {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/extensions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return readEnvelope(response, "Không thể gia hạn khoản cọc.");
+}
+
+export async function forfeitDepositAgreement(depositAgreementId, payload) {
+  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/forfeit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return readEnvelope(response, "Không thể xử lý mất cọc.");
 }
 
 export async function fetchDepositContractFile(depositAgreementId) {

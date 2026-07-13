@@ -18,6 +18,8 @@ return {
   fetchDepositContractFile,
   fetchDepositContractBlob,
   buildDepositContractDocumentFilename,
+  fetchDepositAgreements,
+  forfeitDepositAgreement,
 };`,
   );
 
@@ -152,4 +154,77 @@ test("contract workflow deposit action downloads instead of opening blob preview
   assert.match(source, /await downloadDepositContractPdf\(depositAgreementId, buildDepositContractDocumentFilename\(contractDetails\)\);/);
   assert.doesNotMatch(source, /await openDepositContractPdf\(depositAgreementId\);/);
   assert.match(source, /Đã tải PDF hợp đồng đặt cọc\. Vui lòng in và ký\./);
+});
+
+test("fetchDepositAgreements sends one-based page and filters to backend pagination", async () => {
+  const { fetchDepositAgreements } = loadDepositContractsService();
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  let requestedUrl = "";
+
+  globalThis.window = { localStorage: { getItem: () => "token" } };
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({ code: 0, data: { data: [], currentPage: 2 } }),
+    };
+  };
+
+  try {
+    await fetchDepositAgreements({
+      page: 2,
+      size: 20,
+      statuses: ["PAID", "EXTENDED"],
+      search: "Nguyen Van A",
+      floorId: 4,
+    });
+    const url = new URL(requestedUrl);
+    assert.equal(url.searchParams.get("page"), "2");
+    assert.equal(url.searchParams.get("size"), "20");
+    assert.deepEqual(url.searchParams.getAll("statuses"), ["PAID", "EXTENDED"]);
+    assert.equal(url.searchParams.get("q"), "Nguyen Van A");
+    assert.equal(url.searchParams.get("floorId"), "4");
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.window = originalWindow;
+  }
+});
+
+test("deposits page forwards its one-based page without subtracting one", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/deposits/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /fetchDepositAgreements\(\{\s*page,/);
+  assert.doesNotMatch(source, /page:\s*page\s*-\s*1/);
+});
+
+test("forfeitDepositAgreement uses the guarded lifecycle endpoint with a reason", async () => {
+  const { forfeitDepositAgreement } = loadDepositContractsService();
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  let request = null;
+
+  globalThis.window = { localStorage: { getItem: () => "token" } };
+  globalThis.fetch = async (url, options) => {
+    request = { url: String(url), options };
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({ code: 0, data: { status: "FORFEITED" } }),
+    };
+  };
+
+  try {
+    await forfeitDepositAgreement(42, { reason: "Khong lien lac duoc" });
+    assert.equal(request.url, "https://api.test/api/v1/deposit-agreements/42/forfeit");
+    assert.equal(request.options.method, "POST");
+    assert.deepEqual(JSON.parse(request.options.body), { reason: "Khong lien lac duoc" });
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.window = originalWindow;
+  }
 });

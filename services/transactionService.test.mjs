@@ -18,6 +18,7 @@ function loadTransactionService({ authenticatedFetch = async () => ({}), fetchTo
     "readPageItems",
     `${source}
 return {
+  buildExportFallbackFilename,
   normalizeTransaction,
   fetchTransactionHistory,
   fetchTransactionHistoryExportFile,
@@ -39,6 +40,16 @@ return {
     (payload) => (Array.isArray(payload?.data) ? payload.data : []),
   );
 }
+
+test("buildExportFallbackFilename uses the invoice-list filename for Excel", () => {
+  const { buildExportFallbackFilename } = loadTransactionService();
+
+  assert.match(
+    buildExportFallbackFilename("excel"),
+    /^Danh sách hóa đơn \d{2}-\d{2}-\d{4}\.xlsx$/,
+  );
+  assert.equal(buildExportFallbackFilename("pdf"), "lich-su-thanh-toan.pdf");
+});
 
 test("fetchTransactionHistory sends filters and normalizes rows", async () => {
   const calls = [];

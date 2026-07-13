@@ -66,6 +66,9 @@ const formatTime = (startDate, endDate) => {
   return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
 };
 
+const formatCurrentReadingPeriod = (date = new Date()) =>
+  `${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+
 function NavIcon({ type, className = "w-5 h-5" }) {
   const p = {
     className,
@@ -247,11 +250,7 @@ export default function UtilityManagement() {
   const handleStartBatch = async () => {
     try {
       const periodToStart =
-        dashboard?.currentPeriod ||
-        new Date().toLocaleDateString("en-GB", {
-          month: "2-digit",
-          year: "numeric",
-        });
+        dashboard?.currentPeriod?.readingPeriod || formatCurrentReadingPeriod();
       await startBatchReading(periodToStart, 1);
       router.push(`/dashboard/meter-readings/batch?period=${periodToStart}`);
     } catch (error) {
@@ -274,10 +273,14 @@ export default function UtilityManagement() {
     return (
       <div className="w-full bg-gray-50 text-slate-900 dark:bg-[#020817] dark:text-slate-100">
         <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
-          <DashboardPageHeader
-            title="Nhập điện nước hàng tháng"
-            description="Quản lý ghi chỉ số điện nước hàng tháng"
-          />
+          <header>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Nhập điện nước hàng tháng
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              Quản lý ghi chỉ số điện nước hàng tháng
+            </p>
+          </header>
           <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm dark:border-red-500/20 dark:bg-[#0f172a]">
             <p className="text-sm font-semibold text-red-600 dark:text-red-300">
               {errorMessage}

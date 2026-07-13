@@ -29,6 +29,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PhotoGallery } from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
+import {
+    calculateMeterUsage,
+    normalizeMeterReadingRoom,
+} from "./meterReadingBatchMapper";
 
 const SAMPLE_PHOTOS = [
     {
@@ -153,17 +157,7 @@ export default function MeterReadings() {
                 if (fetchedBatchId) setBatchId(fetchedBatchId);
                 console.log("Fetched batchId:", fetchedBatchId);
                 if (res.rooms) {
-                    const mappedRooms = res.rooms.map(r => ({
-                        id: r.room_code,
-                        roomId: r.room_id,
-                        elecPrev: r.electricity_previous || 0,
-                        elecCurr: r.electricity_current,
-                        waterPrev: r.water_previous || 0,
-                        waterCurr: r.water_current,
-                        status: r.status || "pending",
-                        syncTime: r.sync_time ? new Date(r.sync_time).toLocaleString() : null,
-                        photos: r.photos_count || 0
-                    }));
+                    const mappedRooms = res.rooms.map(normalizeMeterReadingRoom);
                     setRooms(mappedRooms);
                 }
             }
@@ -536,14 +530,14 @@ export default function MeterReadings() {
                                         </TableHeader>
                                         <TableBody>
                                             {floorRooms.map((room) => {
-                                                const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
-                                                const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                                const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
+                                                const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
                                                 const isElecError = elecUsage !== null && elecUsage < 0;
                                                 const isWaterError = waterUsage !== null && waterUsage < 0;
                                                 const st = STATUS_CONFIG[room.status];
 
                                                 return (
-                                                    <TableRow key={room.id}
+                                                    <TableRow key={room.key}
                                                         className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                         <TableCell
                                                             className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
@@ -666,14 +660,14 @@ export default function MeterReadings() {
                                 {/* Mobile Card List View */}
                                 <div className="flex flex-col gap-4 p-2 md:hidden w-full overflow-x-auto pb-4">
                                     {floorRooms.map((room) => {
-                                        const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
-                                        const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                        const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
+                                        const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
                                         const isElecError = elecUsage !== null && elecUsage < 0;
                                         const isWaterError = waterUsage !== null && waterUsage < 0;
                                         const st = STATUS_CONFIG[room.status];
 
                                         return (
-                                            <div key={room.id}
+                                            <div key={room.key}
                                                 className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm relative">
                                                 <div className="flex justify-between items-start mb-3">
                                                     <div>
@@ -847,8 +841,8 @@ export default function MeterReadings() {
                         const room = rooms.find(r => r.id === focusRoomId);
                         if (!room) return null;
 
-                        const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
-                        const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                        const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
+                        const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
 
                         return (
                             <>

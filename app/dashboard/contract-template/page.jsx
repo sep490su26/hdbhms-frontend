@@ -1822,11 +1822,6 @@ export default function ContractTemplatePage() {
                       <p className="font-extrabold leading-5 text-slate-900 dark:text-white">
                         {getContractDisplayName(item)}
                       </p>
-                      {!item.leaseContractId && item.depositCode && (
-                        <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 xl:text-xs">
-                          Mã cọc: {item.depositCode}
-                        </p>
-                      )}
                       <p className="mt-1 text-[11px] text-[#7b8495] xl:text-xs">
                         {item.propertyName || "Chưa có cơ sở"}
                       </p>
@@ -2088,12 +2083,6 @@ export default function ContractTemplatePage() {
               <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
                 {getContractDisplayName(mergedSelected)}
               </h2>
-              {!mergedSelected.leaseContractId &&
-                mergedSelected.depositCode && (
-                  <p className="mt-2 text-sm font-semibold text-slate-300">
-                    Mã cọc: {mergedSelected.depositCode}
-                  </p>
-                )}
               <div className="mt-4">
                 <StatusBadge item={mergedSelected} />
               </div>

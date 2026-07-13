@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClipboardCheck,
+  CalendarClock,
+  CircleAlert,
   Download,
-  Eye,
   FileText,
   ImageIcon,
   LockKeyhole,
-  Upload,
   Search,
+  PhoneCall,
   UserRound,
   WalletCards,
   X,
@@ -18,13 +19,15 @@ import {
   downloadDepositContractPdf,
   fetchDepositAgreementDetails,
   fetchDepositAgreements,
-  downloadSignedDepositContractPdf,
+  fetchDepositDashboardSummary,
+  fetchDepositFilterOptions,
   fetchDepositAssetObjectUrl,
   openDepositContractPdf,
-  openSignedDepositContractPdf,
   updateDepositAgreementManagementInfo,
   updateDepositAgreementStatus,
-  uploadSignedDepositContractFile,
+  recordDepositContact,
+  extendDepositAgreement,
+  forfeitDepositAgreement,
 } from "@/services/depositContractsService";
 import {
   formatDate as formatDisplayDate,
@@ -49,6 +52,12 @@ const STATUS_OPTIONS = [
     label: "Đã đặt cọc",
     pill: "bg-amber-100 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300",
     dot: "bg-amber-500",
+  },
+  {
+    value: "EXTENDED",
+    label: "Đã gia hạn",
+    pill: "bg-cyan-100 dark:bg-cyan-500/10 text-cyan-800 dark:text-cyan-300",
+    dot: "bg-cyan-600",
   },
   {
     value: "CONVERTED_TO_LEASE",
@@ -76,6 +85,7 @@ const MANAGED_DEPOSIT_STATUSES = new Set(
 const MANAGED_DEPOSIT_STATUS_VALUES = [
   "PAID",
   "CONFIRMED",
+  "EXTENDED",
   "CONVERTED_TO_LEASE",
   "REFUNDED",
   "FORFEITED",
@@ -87,13 +97,22 @@ const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set([
   "EXTENDED",
 ]);
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
+const ACTIVE_DEPOSIT_STATUSES = new Set(["PAID", "CONFIRMED", "EXTENDED"]);
+const ACTIVE_PAGE_CLASS =
+  "border-slate-400 bg-slate-200 text-slate-900 shadow-none hover:bg-slate-300 hover:text-slate-950 dark:border-slate-500 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600";
+const INACTIVE_PAGE_CLASS =
+  "border-transparent bg-transparent text-slate-600 shadow-none hover:bg-slate-200 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white";
+const STATUS_UPDATE_OPTIONS = STATUS_OPTIONS.filter((status) =>
+  ["CONVERTED_TO_LEASE", "REFUNDED"].includes(status.value),
+);
 
 const STATUS_LABELS = {
   PAID: STATUS_OPTIONS[0],
   CONFIRMED: STATUS_OPTIONS[0],
-  CONVERTED_TO_LEASE: STATUS_OPTIONS[1],
-  REFUNDED: STATUS_OPTIONS[2],
-  FORFEITED: STATUS_OPTIONS[3],
+  EXTENDED: STATUS_OPTIONS[1],
+  CONVERTED_TO_LEASE: STATUS_OPTIONS[2],
+  REFUNDED: STATUS_OPTIONS[3],
+  FORFEITED: STATUS_OPTIONS[4],
   CANCELLED: {
     label: "Đã hủy",
     pill: "bg-slate-100 text-slate-700",
@@ -119,6 +138,36 @@ function toInputDate(value) {
 
 function formatDateTime(value) {
   return formatDisplayDateTime(value);
+}
+
+function isDateReached(value) {
+  if (!value) return false;
+  return String(value).slice(0, 10) <= new Date().toISOString().slice(0, 10);
+}
+
+function contactOutcomeLabel(outcome) {
+  if (outcome === "REACHED") return "Đã liên hệ được";
+  if (outcome === "UNREACHABLE") return "Không liên lạc được";
+  return "Chưa ghi nhận liên hệ";
+}
+
+function getDepositTrackingState(agreement) {
+  if (agreement.status === "CONVERTED_TO_LEASE") {
+    return { label: "Đã nhận phòng", className: "bg-blue-100 text-blue-700" };
+  }
+  if (agreement.status === "REFUNDED") {
+    return { label: "Đã hoàn cọc", className: "bg-emerald-100 text-emerald-700" };
+  }
+  if (agreement.status === "FORFEITED") {
+    return { label: "Đã xử lý mất cọc", className: "bg-slate-100 text-slate-700" };
+  }
+  if (agreement.contactRequired) {
+    return { label: "Cần liên hệ", className: "bg-amber-100 text-amber-800" };
+  }
+  if (ACTIVE_DEPOSIT_STATUSES.has(agreement.status) && agreement.overdueDays > 0) {
+    return { label: `Quá hạn ${agreement.overdueDays} ngày`, className: "bg-rose-100 text-rose-700" };
+  }
+  return { label: "Đang theo dõi", className: "bg-slate-100 text-slate-700" };
 }
 
 function getAgreementItems(response) {
@@ -164,6 +213,7 @@ function normalizeAgreement(item) {
   const rawStatus = String(item.status || "").toUpperCase();
   const status = rawStatus === "CONFIRMED" ? "PAID" : rawStatus;
   const roomCode = item.roomCode || item.room_code || "";
+  const floorName = item.floorName || item.floor_name || "";
   const signedFileId = item.signedFileId || item.signed_file_id || null;
   const signatureStatus =
     item.signatureStatus ||
@@ -173,9 +223,10 @@ function normalizeAgreement(item) {
     id: item.id ?? item.depositAgreementId ?? item.deposit_agreement_id,
     depositCode: item.depositCode || item.deposit_code || `DC-${item.id}`,
     roomCode,
-    floorLabel: roomCode
+    floorId: item.floorId ?? item.floor_id ?? null,
+    floorLabel: floorName || (roomCode
       ? `Tầng ${String(roomCode).charAt(0)}`
-      : "Chưa rõ tầng",
+      : "Chưa rõ tầng"),
     propertyName: item.propertyName || item.property_name || "Nhà trọ Hải Đăng",
     depositorFullName:
       item.depositorFullName || item.depositor_full_name || "Khách đặt cọc",
@@ -220,6 +271,19 @@ function normalizeAgreement(item) {
       item.canViewSignedFile ??
       item.can_view_signed_file ??
       Boolean(signedFileId),
+    extensionCount: Number(item.extensionCount ?? item.extension_count ?? 0),
+    maxExtensions: Number(item.maxExtensions ?? item.max_extensions ?? 1),
+    depositExpiresAt: item.depositExpiresAt || item.deposit_expires_at || null,
+    forfeitureDecisionDate:
+      item.forfeitureDecisionDate || item.forfeiture_decision_date || null,
+    overdueDays: Number(item.overdueDays ?? item.overdue_days ?? 0),
+    latestContactOutcome:
+      item.latestContactOutcome || item.latest_contact_outcome || "",
+    lastContactedAt: item.lastContactedAt || item.last_contacted_at || null,
+    lastContactNote: item.lastContactNote || item.last_contact_note || "",
+    contactRequired: Boolean(item.contactRequired ?? item.contact_required),
+    canExtend: Boolean(item.canExtend ?? item.can_extend),
+    canForfeit: Boolean(item.canForfeit ?? item.can_forfeit),
   };
 }
 
@@ -334,10 +398,10 @@ function DetailModal({
   onClose,
   onOpenContract,
   onDownloadContract,
-  onOpenSignedContract,
-  onDownloadSignedContract,
-  onUploadSignedFile,
   onSaveManagementInfo,
+  onRecordContact,
+  onExtend,
+  onForfeit,
 }) {
   const safeAgreement = agreement || {};
   const details = safeAgreement.details || safeAgreement;
@@ -373,6 +437,10 @@ function DetailModal({
   const canEditManagementInfo = MANAGEMENT_INFO_EDITABLE_STATUSES.has(
     safeAgreement.status,
   );
+  const canEditSchedule = safeAgreement.status === "PENDING_PAYMENT";
+  const canRecordContact =
+    MANAGEMENT_INFO_EDITABLE_STATUSES.has(safeAgreement.status) &&
+    isDateReached(expectedMoveInDate);
   const formDefaults = useMemo(
     () => ({
       depositorPhone: safeAgreement.depositorPhone || "",
@@ -389,13 +457,9 @@ function DetailModal({
   );
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingSigned, setIsUploadingSigned] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState(null);
   const activeForm = form || formDefaults;
-  const hasSignedFile = Boolean(
-    safeAgreement.signedFileId || safeAgreement.signedFileDownloadUrl,
-  );
 
   if (!agreement) return null;
 
@@ -409,16 +473,18 @@ function DetailModal({
       return "Số điện thoại phải bắt đầu bằng 0 và có đúng 10 chữ số.";
     if (!activeForm.permanentAddress.trim())
       return "Địa chỉ không được để trống.";
-    if (!activeForm.expectedLeaseSignDate)
-      return "Vui lòng chọn ngày ký hợp đồng dự kiến.";
-    if (activeForm.expectedLeaseSignDate < today)
-      return "Ngày ký hợp đồng dự kiến không được là ngày quá khứ.";
-    if (!activeForm.expectedMoveInDate)
-      return "Vui lòng chọn ngày vào ở dự kiến.";
-    if (activeForm.expectedMoveInDate < today)
-      return "Ngày vào ở dự kiến không được là ngày quá khứ.";
-    if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate)
-      return "Ngày vào ở dự kiến không được trước ngày ký hợp đồng dự kiến.";
+    if (canEditSchedule) {
+      if (!activeForm.expectedLeaseSignDate)
+        return "Vui lòng chọn ngày ký hợp đồng dự kiến.";
+      if (activeForm.expectedLeaseSignDate < today)
+        return "Ngày ký hợp đồng dự kiến không được là ngày quá khứ.";
+      if (!activeForm.expectedMoveInDate)
+        return "Vui lòng chọn ngày vào ở dự kiến.";
+      if (activeForm.expectedMoveInDate < today)
+        return "Ngày vào ở dự kiến không được là ngày quá khứ.";
+      if (activeForm.expectedMoveInDate < activeForm.expectedLeaseSignDate)
+        return "Ngày vào ở dự kiến không được trước ngày ký hợp đồng dự kiến.";
+    }
     return "";
   };
   const handleSave = async () => {
@@ -446,24 +512,6 @@ function DetailModal({
       setIsSaving(false);
     }
   };
-  const handleSignedFileChange = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    setIsUploadingSigned(true);
-    setFormError("");
-    try {
-      await onUploadSignedFile(agreement, file);
-    } catch (error) {
-      setFormError(
-        error.message || "Không thể upload bản hợp đồng đặt cọc đã ký.",
-      );
-    } finally {
-      setIsUploadingSigned(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
@@ -562,7 +610,7 @@ function DetailModal({
                     label="Ngày xác nhận"
                     value={formatDateTime(agreement.confirmedAt)}
                   />
-                  {isEditing ? (
+                  {isEditing && canEditSchedule ? (
                     <label className="rounded-lg bg-[#f7f9fc] dark:bg-white/5 p-4">
                       <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
                         Ngày ký HĐ dự kiến
@@ -586,7 +634,7 @@ function DetailModal({
                       value={formatDate(expectedLeaseSignDate)}
                     />
                   )}
-                  {isEditing ? (
+                  {isEditing && canEditSchedule ? (
                     <label className="rounded-lg bg-[#f7f9fc] dark:bg-white/5 p-4">
                       <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
                         Ngày vào ở dự kiến
@@ -654,110 +702,6 @@ function DetailModal({
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-[#d7dde8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_12px_28px_rgba(9,20,38,0.06)]">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="max-w-2xl">
-                      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[#1e40af] dark:text-[#93c5fd]">
-                        Hợp đồng đặt cọc đã ký
-                      </p>
-                      <h3 className="mt-1 text-2xl font-extrabold tracking-[-0.02em] text-slate-900 dark:text-white">
-                        {hasSignedFile ? "Đã upload bản đã ký" : "Chờ ký"}
-                      </h3>
-                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-                        File sau ký là bản chính thức để quản lý và khách thuê
-                        xem/tải. Bản nháp vẫn có ở cụm thao tác bên phải để in
-                        trước khi ký trực tiếp.
-                      </p>
-                    </div>
-                    <span
-                      className={`w-fit rounded-full px-3 py-1 text-xs font-extrabold ${hasSignedFile ? "bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 text-slate-700"}`}
-                    >
-                      {safeAgreement.signatureStatusLabel ||
-                        (hasSignedFile ? "Đã ký" : "Chờ ký")}
-                    </span>
-                  </div>
-
-                  {hasSignedFile ? (
-                    <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                      <div>
-                        <DetailField
-                          label="Tên file"
-                          value={
-                            safeAgreement.signedFileName ||
-                            "Bản hợp đồng đặt cọc đã ký"
-                          }
-                        />
-                      </div>
-                      <div>
-                        <DetailField
-                          label="Ngày ký/upload"
-                          value={formatDateTime(safeAgreement.signedAt)}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row">
-                        <button
-                          type="button"
-                          onClick={() => onOpenSignedContract(agreement)}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#102033] px-4 text-sm font-extrabold text-white hover:bg-[#1c2f4a]"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Xem file đã ký
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDownloadSignedContract(agreement)}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] dark:border-white/10 px-4 text-sm font-extrabold text-slate-900 dark:text-white hover:bg-[#f4f7fb] dark:hover:bg-white/5"
-                        >
-                          <Download className="h-4 w-4" />
-                          Tải về
-                        </button>
-                        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c4cad6] dark:border-white/10 px-4 text-sm font-extrabold text-slate-900 dark:text-white hover:bg-[#f4f7fb] dark:hover:bg-white/5">
-                          <Upload className="h-4 w-4" />
-                          Thay file
-                          <input
-                            type="file"
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            className="sr-only"
-                            disabled={isUploadingSigned}
-                            onChange={handleSignedFileChange}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-5 rounded-xl border border-dashed border-[#c7cfdd] dark:border-white/10 bg-[#f7f9fc] dark:bg-white/5 p-5">
-                      <p className="max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-                        Chưa upload bản hợp đồng đặt cọc đã ký. Chỉ upload sau
-                        khi khách đã ký giấy trực tiếp; file này mới là bản
-                        chính thức để khách xem/tải.
-                      </p>
-                      <label
-                        className={`mt-4 inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-extrabold text-white ${safeAgreement.canUploadSignedFile === false ? "cursor-not-allowed bg-slate-400" : "bg-[#102033] hover:bg-[#1c2f4a]"}`}
-                      >
-                        <Upload className="h-4 w-4" />
-                        {isUploadingSigned
-                          ? "Đang upload..."
-                          : "Upload bản đã ký"}
-                        <input
-                          type="file"
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          className="sr-only"
-                          disabled={
-                            isUploadingSigned ||
-                            safeAgreement.canUploadSignedFile === false
-                          }
-                          onChange={handleSignedFileChange}
-                        />
-                      </label>
-                      {safeAgreement.canUploadSignedFile === false && (
-                        <p className="mt-3 text-xs font-bold text-rose-600 dark:text-rose-300">
-                          Chỉ upload bản đã ký khi khoản cọc đã thanh toán/xác
-                          nhận và chưa ở trạng thái hoàn cọc hoặc mất cọc.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </section>
               </section>
 
               <aside className="h-fit rounded-xl border border-[#d7dde8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_10px_24px_rgba(9,20,38,0.06)]">
@@ -767,7 +711,78 @@ function DetailModal({
                 <div className="mt-4">
                   <StatusBadge status={agreement.status} />
                 </div>
+                <div className="mt-5 grid gap-3 rounded-xl bg-[#f7f9fc] p-4 dark:bg-white/5">
+                  <div className="flex items-start gap-3">
+                    <CalendarClock className="mt-0.5 h-5 w-5 text-[#1e40af] dark:text-[#93c5fd]" />
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
+                        Hạn xử lý mất cọc
+                      </p>
+                      <p className="mt-1 text-sm font-extrabold text-slate-900 dark:text-white">
+                        {formatDate(safeAgreement.forfeitureDecisionDate)}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {ACTIVE_DEPOSIT_STATUSES.has(safeAgreement.status) && safeAgreement.overdueDays > 0
+                          ? `Đã quá ngày vào dự kiến ${safeAgreement.overdueDays} ngày`
+                          : ACTIVE_DEPOSIT_STATUSES.has(safeAgreement.status)
+                            ? "Chưa quá ngày vào dự kiến"
+                            : "Khoản cọc đã kết thúc xử lý"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#d7dde8] pt-3 dark:border-white/10">
+                    <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
+                      Liên hệ gần nhất
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-slate-900 dark:text-white">
+                      {contactOutcomeLabel(safeAgreement.latestContactOutcome)}
+                    </p>
+                    {safeAgreement.lastContactedAt && (
+                      <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        {formatDateTime(safeAgreement.lastContactedAt)}
+                      </p>
+                    )}
+                    {safeAgreement.lastContactNote && (
+                      <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                        {safeAgreement.lastContactNote}
+                      </p>
+                    )}
+                  </div>
+                  <p className="border-t border-[#d7dde8] pt-3 text-xs font-bold text-slate-600 dark:border-white/10 dark:text-slate-300">
+                    Gia hạn {safeAgreement.extensionCount || 0}/{safeAgreement.maxExtensions || 1} lần, tối đa 7 ngày.
+                  </p>
+                </div>
                 <div className="mt-6 grid gap-3">
+                  {canRecordContact && (
+                    <button
+                      type="button"
+                      onClick={() => onRecordContact(agreement)}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-slate-900 hover:bg-[#f4f7fb] dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+                    >
+                      <PhoneCall className="h-4 w-4" />
+                      Ghi nhận liên hệ
+                    </button>
+                  )}
+                  {safeAgreement.canExtend && (
+                    <button
+                      type="button"
+                      onClick={() => onExtend(agreement)}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-cyan-700 px-4 text-sm font-extrabold text-white hover:bg-cyan-800"
+                    >
+                      <CalendarClock className="h-4 w-4" />
+                      Gia hạn cọc
+                    </button>
+                  )}
+                  {safeAgreement.canForfeit && (
+                    <button
+                      type="button"
+                      onClick={() => onForfeit(agreement)}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-rose-700 px-4 text-sm font-extrabold text-white hover:bg-rose-800"
+                    >
+                      <CircleAlert className="h-4 w-4" />
+                      Xử lý mất cọc
+                    </button>
+                  )}
                   {canEditManagementInfo &&
                     (isEditing ? (
                       <div className="grid gap-3">
@@ -837,6 +852,110 @@ function DetailModal({
   );
 }
 
+function LifecycleActionModal({ action, agreement, onClose, onSubmit }) {
+  const [outcome, setOutcome] = useState("UNREACHABLE");
+  const [additionalDays, setAdditionalDays] = useState(7);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!action || !agreement) return null;
+
+  const config = {
+    contact: {
+      title: "Ghi nhận liên hệ khách",
+      description: "Lưu kết quả liên hệ để hệ thống theo dõi điều kiện xử lý cọc.",
+      submitLabel: "Lưu kết quả liên hệ",
+    },
+    extend: {
+      title: "Gia hạn khoản cọc",
+      description: "Mỗi khoản cọc chỉ được gia hạn một lần, tối đa 7 ngày.",
+      submitLabel: "Xác nhận gia hạn",
+    },
+    forfeit: {
+      title: "Xử lý mất cọc",
+      description: "Hành động này kết thúc giữ chỗ và chuyển phòng về trạng thái trống.",
+      submitLabel: "Xác nhận mất cọc",
+    },
+  }[action];
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!note.trim()) {
+      setError(action === "extend" ? "Vui lòng nhập lý do gia hạn." : "Vui lòng nhập ghi chú xử lý.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const payload = action === "contact"
+        ? { outcome, note: note.trim() }
+        : action === "extend"
+          ? { additionalDays: Number(additionalDays), reason: note.trim() }
+          : { reason: note.trim() };
+      await onSubmit(action, agreement, payload);
+      onClose();
+    } catch (submitError) {
+      setError(submitError.message || "Không thể thực hiện hành động này.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#0f172a]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">{config.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{config.description}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5" aria-label="Đóng">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl bg-[#eef4ff] p-4 text-sm font-bold text-slate-800 dark:bg-white/5 dark:text-slate-200">
+          Phòng {agreement.roomCode || "chưa rõ"} · {agreement.depositorFullName}
+        </div>
+
+        {action === "contact" && (
+          <label className="mt-5 grid gap-2">
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Kết quả liên hệ</span>
+            <select value={outcome} onChange={(event) => setOutcome(event.target.value)} className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold dark:border-white/10 dark:bg-[#0f172a] dark:text-white">
+              <option value="UNREACHABLE">Không liên lạc được</option>
+              <option value="REACHED">Đã liên hệ được</option>
+            </select>
+          </label>
+        )}
+
+        {action === "extend" && (
+          <label className="mt-5 grid gap-2">
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Số ngày gia hạn</span>
+            <input type="number" min="1" max="7" value={additionalDays} onChange={(event) => setAdditionalDays(event.target.value)} className="h-11 rounded-lg border border-[#c4cad6] px-3 text-sm font-semibold dark:border-white/10 dark:bg-[#0f172a] dark:text-white" />
+          </label>
+        )}
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            {action === "extend" ? "Lý do gia hạn" : "Ghi chú"}
+          </span>
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} maxLength={1000} className="rounded-lg border border-[#c4cad6] px-3 py-3 text-sm font-semibold dark:border-white/10 dark:bg-[#0f172a] dark:text-white" placeholder={action === "forfeit" ? "Mô tả các lần liên hệ và lý do xử lý..." : "Nhập nội dung trao đổi với khách..."} />
+        </label>
+
+        {error && <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-bold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} disabled={submitting} className="h-11 rounded-lg border border-[#c4cad6] px-4 text-sm font-extrabold text-slate-800 dark:border-white/10 dark:text-white">Hủy</button>
+          <button type="submit" disabled={submitting} className={`h-11 rounded-lg px-5 text-sm font-extrabold text-white disabled:opacity-60 ${action === "forfeit" ? "bg-rose-700" : "bg-[#102033]"}`}>
+            {submitting ? "Đang xử lý..." : config.submitLabel}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function DepositsPage() {
   const [agreements, setAgreements] = useState([]);
   const [selectedAgreement, setSelectedAgreement] = useState(null);
@@ -844,22 +963,31 @@ export default function DepositsPage() {
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [customerFilter, setCustomerFilter] = useState("");
+  const [debouncedCustomerFilter, setDebouncedCustomerFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
+  const [floorOptions, setFloorOptions] = useState([]);
+  const [summary, setSummary] = useState({
+    totalHeldAmount: 0,
+    heldCount: 0,
+    convertedCount: 0,
+  });
+  const [lifecycleAction, setLifecycleAction] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [updatingId, setUpdatingId] = useState(null);
-  const [uploadingSignedId, setUploadingSignedId] = useState(null);
 
   const loadAgreements = useCallback(async () => {
     try {
       setLoadError("");
       const response = await fetchDepositAgreements({
-        page: page - 1,
+        page,
         size,
         statuses: getDepositStatusFilterValues(statusFilter),
+        search: debouncedCustomerFilter,
+        floorId: floorFilter === "all" ? null : floorFilter,
       });
       const pagination = getAgreementPagination(response);
       const nextAgreements = getAgreementItems(response)
@@ -873,7 +1001,16 @@ export default function DepositsPage() {
         error.message || "Không tải được danh sách hợp đồng cọc từ backend.",
       );
     }
-  }, [page, size, statusFilter]);
+  }, [debouncedCustomerFilter, floorFilter, page, size, statusFilter]);
+
+  const loadSummary = useCallback(async () => {
+    const response = await fetchDepositDashboardSummary();
+    setSummary({
+      totalHeldAmount: Number(response?.totalHeldAmount ?? response?.total_held_amount ?? 0),
+      heldCount: Number(response?.heldCount ?? response?.held_count ?? 0),
+      convertedCount: Number(response?.convertedCount ?? response?.converted_count ?? 0),
+    });
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -883,43 +1020,27 @@ export default function DepositsPage() {
     return () => window.clearTimeout(timer);
   }, [loadAgreements]);
 
-  const floorOptions = useMemo(() => {
-    const floors = new Set(
-      agreements.map((item) => item.floorLabel).filter(Boolean),
-    );
-    return Array.from(floors).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [agreements]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedCustomerFilter(customerFilter.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [customerFilter]);
 
-  const filteredAgreements = useMemo(() => {
-    const normalizedName = customerFilter.trim().toLowerCase();
-    return agreements
-      .filter((item) => {
-        const matchCustomer =
-          !normalizedName ||
-          item.depositorFullName.toLowerCase().includes(normalizedName) ||
-          item.depositorPhone.includes(normalizedName) ||
-          item.depositCode.toLowerCase().includes(normalizedName);
-        const matchStatus =
-          statusFilter === "all" || item.status === statusFilter;
-        const matchFloor =
-          floorFilter === "all" || item.floorLabel === floorFilter;
-        return matchCustomer && matchStatus && matchFloor;
+  useEffect(() => {
+    Promise.all([fetchDepositFilterOptions(), fetchDepositDashboardSummary()])
+      .then(([filterResponse, summaryResponse]) => {
+        setFloorOptions(filterResponse?.floors || []);
+        setSummary({
+          totalHeldAmount: Number(summaryResponse?.totalHeldAmount ?? summaryResponse?.total_held_amount ?? 0),
+          heldCount: Number(summaryResponse?.heldCount ?? summaryResponse?.held_count ?? 0),
+          convertedCount: Number(summaryResponse?.convertedCount ?? summaryResponse?.converted_count ?? 0),
+        });
       })
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0).getTime();
-        const dateB = new Date(b.createdAt || 0).getTime();
-        return dateB - dateA;
-      });
-  }, [agreements, customerFilter, floorFilter, statusFilter]);
+      .catch((error) => setLoadError(error.message || "Không tải được dữ liệu tổng quan hợp đồng cọc."));
+  }, []);
 
-  const paidAgreements = agreements.filter((item) => item.status === "PAID");
-  const convertedAgreements = agreements.filter(
-    (item) => item.status === "CONVERTED_TO_LEASE",
-  );
-  const totalAmount = paidAgreements.reduce(
-    (sum, item) => sum + item.amount,
-    0,
-  );
+  const filteredAgreements = agreements;
   const visiblePages = useMemo(
     () => getVisiblePages(page, totalPages),
     [page, totalPages],
@@ -973,6 +1094,10 @@ export default function DepositsPage() {
   const handleStatusChange = async (agreement, nextStatus) => {
     if (!agreement?.id || !nextStatus || nextStatus === agreement.status)
       return;
+    if (nextStatus === "FORFEITED") {
+      setLifecycleAction({ action: "forfeit", agreement });
+      return;
+    }
     setUpdatingId(agreement.id);
     setNotice("");
     try {
@@ -988,11 +1113,39 @@ export default function DepositsPage() {
         setSelectedAgreement(merged);
       }
       setNotice("Đã cập nhật trạng thái cọc và trạng thái phòng.");
+      await loadSummary();
     } catch (error) {
       setNotice(error.message || "Không cập nhật được trạng thái cọc.");
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleLifecycleSubmit = async (action, agreement, payload) => {
+    let details;
+    if (action === "contact") {
+      details = await recordDepositContact(agreement.id, payload);
+    } else if (action === "extend") {
+      details = await extendDepositAgreement(agreement.id, payload);
+    } else {
+      details = await forfeitDepositAgreement(agreement.id, payload);
+    }
+
+    const merged = mergeAgreement(agreement, details);
+    setAgreements((current) =>
+      current.map((item) => (item.id === agreement.id ? merged : item)),
+    );
+    if (selectedAgreement?.id === agreement.id) {
+      setSelectedAgreement(merged);
+    }
+    setNotice(
+      action === "contact"
+        ? "Đã ghi nhận kết quả liên hệ khách."
+        : action === "extend"
+          ? "Đã gia hạn khoản cọc và cập nhật ngày vào ở dự kiến."
+          : "Đã xử lý mất cọc và giải phóng phòng.",
+    );
+    await Promise.all([loadAgreements(), loadSummary()]);
   };
 
   const handleSaveManagementInfo = async (agreement, payload) => {
@@ -1040,93 +1193,6 @@ export default function DepositsPage() {
     }
   };
 
-  const handleOpenSignedContract = async (agreement) => {
-    if (!agreement?.id) {
-      setNotice("Chưa có mã hợp đồng đặt cọc để mở bản đã ký.");
-      return;
-    }
-    try {
-      await openSignedDepositContractPdf(agreement.id);
-    } catch (error) {
-      setNotice(error.message || "Không thể mở bản hợp đồng đặt cọc đã ký.");
-    }
-  };
-
-  const handleDownloadSignedContract = async (agreement) => {
-    if (!agreement?.id) {
-      setNotice("Chưa có mã hợp đồng đặt cọc để tải bản đã ký.");
-      return;
-    }
-    try {
-      await downloadSignedDepositContractPdf(
-        agreement.id,
-        agreement.signedFileName ||
-          `hop-dong-dat-coc-da-ky-${agreement.roomCode || agreement.depositCode}.pdf`,
-      );
-    } catch (error) {
-      setNotice(error.message || "Không thể tải bản hợp đồng đặt cọc đã ký.");
-    }
-  };
-
-  const handleUploadSignedFile = async (agreement, file) => {
-    if (!agreement?.id) {
-      throw new Error("Chưa có mã hợp đồng đặt cọc để upload bản đã ký.");
-    }
-    const response = await uploadSignedDepositContractFile(agreement.id, file);
-    const latestDetails = await fetchDepositAgreementDetails(agreement.id);
-    const signedFileId =
-      response?.signedFileId ??
-      response?.signed_file_id ??
-      latestDetails?.signedFileId ??
-      latestDetails?.signed_file_id;
-    const merged = mergeAgreement(agreement, {
-      ...latestDetails,
-      ...response,
-      signedFileId,
-      signedFileName:
-        response?.signedFileName ??
-        response?.signed_file_name ??
-        latestDetails?.signedFileName ??
-        latestDetails?.signed_file_name,
-      signedAt:
-        response?.signedAt ??
-        response?.signed_at ??
-        latestDetails?.signedAt ??
-        latestDetails?.signed_at,
-      signatureStatus: signedFileId ? "SIGNED" : "PENDING_SIGNATURE",
-      signatureStatusLabel: signedFileId ? "Đã ký" : "Chờ ký",
-      canViewSignedFile: Boolean(signedFileId),
-    });
-    setAgreements((current) =>
-      current.map((item) => (item.id === agreement.id ? merged : item)),
-    );
-    if (selectedAgreement?.id === agreement.id) {
-      setSelectedAgreement(merged);
-    }
-    setNotice(
-      response?.message || "Tải lên bản hợp đồng đặt cọc đã ký thành công.",
-    );
-    return merged;
-  };
-
-  const handleTableSignedFileChange = async (agreement, event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    setUploadingSignedId(agreement.id);
-    setNotice("");
-    try {
-      await handleUploadSignedFile(agreement, file);
-    } catch (error) {
-      setNotice(
-        error.message || "Không thể upload bản hợp đồng đặt cọc đã ký.",
-      );
-    } finally {
-      setUploadingSignedId(null);
-    }
-  };
-
   return (
     <>
       <section className="w-full min-w-0 flex flex-col gap-6">
@@ -1154,20 +1220,20 @@ export default function DepositsPage() {
           <DashboardStatCard
             icon={WalletCards}
             label="Tổng số tiền cọc"
-            value={formatMoney(totalAmount)}
-            subtitle="Tổng tiền cọc đã ghi nhận"
+            value={formatMoney(summary.totalHeldAmount)}
+            subtitle="Toàn bộ khoản cọc đang giữ"
           />
           <DashboardStatCard
             icon={LockKeyhole}
             label="Đang giữ cọc"
-            value={paidAgreements.length}
-            subtitle="Khoản thu khả dụng"
+            value={summary.heldCount}
+            subtitle="Toàn bộ khoản cọc đang hiệu lực"
             tone="amber"
           />
           <DashboardStatCard
             icon={ClipboardCheck}
             label="Đã nhận phòng"
-            value={convertedAgreements.length}
+            value={summary.convertedCount}
             subtitle="Đã chính thức nhận phòng"
             tone="emerald"
           />
@@ -1217,8 +1283,8 @@ export default function DepositsPage() {
               >
                 <option value="all">Tất cả tầng</option>
                 {floorOptions.map((floor) => (
-                  <option key={floor} value={floor}>
-                    {floor}
+                  <option key={floor.id} value={floor.id}>
+                    {floor.name}
                   </option>
                 ))}
               </select>
@@ -1236,6 +1302,8 @@ export default function DepositsPage() {
                   <th className="px-5 py-4">Số tiền cọc</th>
                   <th className="px-5 py-4">Ngày tạo</th>
                   <th className="px-5 py-4">Ngày hẹn ký HĐ</th>
+                  <th className="px-5 py-4">Ngày dự kiến vào</th>
+                  <th className="px-5 py-4">Theo dõi</th>
                   <th className="px-5 py-4">Trạng thái</th>
                   <th className="px-5 py-4">Ký HĐ cọc</th>
                   <th className="px-5 py-4 text-center">Hành động</th>
@@ -1245,7 +1313,7 @@ export default function DepositsPage() {
                 {filteredAgreements.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={10}
                       className="px-5 py-10 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                     >
                       Không có hợp đồng đặt cọc phù hợp.
@@ -1298,35 +1366,54 @@ export default function DepositsPage() {
                       >
                         {formatDate(agreement.expectedLeaseSignDate)}
                       </td>
+                      <td
+                        data-label="Ngày dự kiến vào"
+                        className="px-5 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300"
+                      >
+                        {formatDate(agreement.expectedMoveInDate)}
+                      </td>
+                      <td data-label="Theo dõi" className="px-5 py-4">
+                        <div className="grid gap-1">
+                          <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-extrabold ${getDepositTrackingState(agreement).className}`}>
+                            {getDepositTrackingState(agreement).label}
+                          </span>
+                          {agreement.latestContactOutcome && (
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                              {contactOutcomeLabel(agreement.latestContactOutcome)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td data-label="Trạng thái" className="px-5 py-4">
+                        {ACTIVE_DEPOSIT_STATUSES.has(agreement.status) ? (
                         <select
-                          value={
-                            STATUS_OPTIONS.some(
-                              (status) => status.value === agreement.status,
-                            )
-                              ? agreement.status
-                              : ""
-                          }
+                          value={agreement.status}
                           onChange={(event) =>
                             handleStatusChange(agreement, event.target.value)
                           }
                           disabled={updatingId === agreement.id}
                           className="h-9 rounded-full border border-[#c4cad6] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-xs font-extrabold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {!STATUS_OPTIONS.some(
+                          {!STATUS_UPDATE_OPTIONS.some(
                             (status) => status.value === agreement.status,
                           ) && (
-                            <option value="">
+                            <option value={agreement.status}>
                               {STATUS_LABELS[agreement.status]?.label ||
                                 "Chưa cập nhật"}
                             </option>
                           )}
-                          {STATUS_OPTIONS.map((status) => (
+                          {STATUS_UPDATE_OPTIONS.map((status) => (
                             <option key={status.value} value={status.value}>
                               {status.label}
                             </option>
                           ))}
+                          {agreement.canForfeit && agreement.status !== "FORFEITED" && (
+                            <option value="FORFEITED">Mất cọc</option>
+                          )}
                         </select>
+                        ) : (
+                          <StatusBadge status={agreement.status} />
+                        )}
                       </td>
                       <td data-label="Ký HĐ cọc" className="px-5 py-4">
                         <span
@@ -1339,59 +1426,15 @@ export default function DepositsPage() {
                         </span>
                       </td>
                       <td data-label="Hành động" className="px-5 py-4">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => openDetails(agreement)}
-                            className="rounded-full p-2 text-[#1e40af] dark:text-[#93c5fd] hover:bg-[#eef4ff]"
+                            className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-lg bg-[#1e40af] px-4 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#17358f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e40af] focus-visible:ring-offset-2 dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
                             aria-label={`Xem chi tiết ${agreement.depositCode}`}
                           >
-                            <Eye className="h-5 w-5" />
+                            Chi tiết
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenContract(agreement)}
-                            className="rounded-full p-2 text-slate-900 dark:text-white hover:bg-[#eef4ff]"
-                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
-                          >
-                            <FileText className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadContract(agreement)}
-                            className="rounded-full p-2 text-slate-900 dark:text-white hover:bg-[#eef4ff]"
-                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
-                          >
-                            <Download className="h-5 w-5" />
-                          </button>
-                          <label
-                            className={`rounded-full p-2 ${
-                              agreement.canUploadSignedFile === false ||
-                              uploadingSignedId === agreement.id
-                                ? "cursor-not-allowed text-slate-400"
-                                : "cursor-pointer text-slate-900 dark:text-white hover:bg-[#eef4ff]"
-                            }`}
-                            title={
-                              agreement.signatureStatus === "SIGNED"
-                                ? "Thay file đã ký"
-                                : "Upload bản đã ký"
-                            }
-                            aria-label={`${agreement.signatureStatus === "SIGNED" ? "Thay file đã ký" : "Upload bản đã ký"} ${agreement.depositCode}`}
-                          >
-                            <Upload className="h-5 w-5" />
-                            <input
-                              type="file"
-                              accept="application/pdf,image/jpeg,image/png,image/webp"
-                              className="sr-only"
-                              disabled={
-                                agreement.canUploadSignedFile === false ||
-                                uploadingSignedId === agreement.id
-                              }
-                              onChange={(event) =>
-                                handleTableSignedFileChange(agreement, event)
-                              }
-                            />
-                          </label>
                         </div>
                       </td>
                     </tr>
@@ -1443,6 +1486,7 @@ export default function DepositsPage() {
                       <PaginationLink
                         href="#"
                         isActive={page === 1}
+                        className={page === 1 ? ACTIVE_PAGE_CLASS : INACTIVE_PAGE_CLASS}
                         onClick={(event) => {
                           event.preventDefault();
                           goToPage(1);
@@ -1463,6 +1507,11 @@ export default function DepositsPage() {
                     <PaginationLink
                       href="#"
                       isActive={pageNumber === page}
+                      className={
+                        pageNumber === page
+                          ? ACTIVE_PAGE_CLASS
+                          : INACTIVE_PAGE_CLASS
+                      }
                       onClick={(event) => {
                         event.preventDefault();
                         goToPage(pageNumber);
@@ -1483,6 +1532,11 @@ export default function DepositsPage() {
                       <PaginationLink
                         href="#"
                         isActive={page === totalPages}
+                        className={
+                          page === totalPages
+                            ? ACTIVE_PAGE_CLASS
+                            : INACTIVE_PAGE_CLASS
+                        }
                         onClick={(event) => {
                           event.preventDefault();
                           goToPage(totalPages);
@@ -1518,10 +1572,23 @@ export default function DepositsPage() {
         onClose={() => setSelectedAgreement(null)}
         onOpenContract={handleOpenContract}
         onDownloadContract={handleDownloadContract}
-        onOpenSignedContract={handleOpenSignedContract}
-        onDownloadSignedContract={handleDownloadSignedContract}
-        onUploadSignedFile={handleUploadSignedFile}
         onSaveManagementInfo={handleSaveManagementInfo}
+        onRecordContact={(agreement) =>
+          setLifecycleAction({ action: "contact", agreement })
+        }
+        onExtend={(agreement) =>
+          setLifecycleAction({ action: "extend", agreement })
+        }
+        onForfeit={(agreement) =>
+          setLifecycleAction({ action: "forfeit", agreement })
+        }
+      />
+      <LifecycleActionModal
+        key={`${lifecycleAction?.action || "none"}-${lifecycleAction?.agreement?.id || "none"}`}
+        action={lifecycleAction?.action}
+        agreement={lifecycleAction?.agreement}
+        onClose={() => setLifecycleAction(null)}
+        onSubmit={handleLifecycleSubmit}
       />
     </>
   );

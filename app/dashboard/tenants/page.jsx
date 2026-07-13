@@ -1854,7 +1854,7 @@ export default function TenantsPage() {
         </section>
       )}
 
-      {!isLoading && !error && (
+      {!error && (
         <DashboardPagination
           page={page}
           size={size}

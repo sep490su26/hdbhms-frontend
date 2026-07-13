@@ -48,6 +48,9 @@ import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTim
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
+// ponytail: local filters cover the first 1000 contracts; move these filters into the API when the portfolio grows.
+const CONTRACT_MANAGEMENT_FETCH_SIZE = 1000;
+
 const STATUS_FILTERS = [
   { id: "all", label: "Tất cả" },
   { id: "PENDING_SIGNATURE", label: "Chờ ký" },
@@ -652,8 +655,6 @@ export default function ContractTemplatePage() {
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
   const [cleanupStep, setCleanupStep] = useState(1);
   const selectedYear = searchParams.get("year") || "all";
@@ -662,13 +663,14 @@ export default function ContractTemplatePage() {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchLeaseContractManagementList({ page: page - 1, size });
+      const data = await fetchLeaseContractManagementList({
+        page: 0,
+        size: CONTRACT_MANAGEMENT_FETCH_SIZE,
+      });
       const visibleContracts = data.items.filter((item) => !isRoomTransferManagedContract(item));
       setContracts(visibleContracts);
       setSelected((current) => (isRoomTransferManagedContract(current) ? null : current));
       setDetails((current) => (isRoomTransferManagedContract(current) ? null : current));
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
       return visibleContracts;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
@@ -676,7 +678,7 @@ export default function ContractTemplatePage() {
       setLoading(false);
     }
     return [];
-  }, [page, size]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -684,6 +686,18 @@ export default function ContractTemplatePage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadContracts]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    contractTypeFilter,
+    fileFilter,
+    keyword,
+    roomFilter,
+    selectedYear,
+    statusFilter,
+    timeFilter,
+  ]);
 
   useEffect(() => {
     let ignore = false;
@@ -803,6 +817,18 @@ export default function ContractTemplatePage() {
     statusFilter,
     timeFilter,
   ]);
+
+  const filteredTotalElements = filteredContracts.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedContractPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedContracts = useMemo(() => {
+    const start = (displayedContractPage - 1) * size;
+    return filteredContracts.slice(start, start + size);
+  }, [displayedContractPage, filteredContracts, size]);
 
   const mergedSelected = useMemo(() => {
     if (!selected) return null;
@@ -1691,15 +1717,14 @@ export default function ContractTemplatePage() {
         >
           <table
             className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2.5 [&_td]:py-4 xl:[&_td]:px-3 xl:[&_td]:py-4 [&_th]:px-2.5 [&_th]:py-3 xl:[&_th]:px-3 xl:[&_th]:py-3"
-            style={{ minWidth: 1240, width: 1240 }}
+            style={{ minWidth: 1100, width: 1100 }}
           >
             <colgroup>
               <col className="w-[240px]" />
               <col className="w-[85px]" />
               <col className="w-[170px]" />
               <col className="w-[145px]" />
-              <col className="w-[160px]" />
-              <col className="w-[140px]" />
+              <col className="w-[180px]" />
               <col className="w-[170px]" />
               <col className="w-[130px]" />
             </colgroup>
@@ -1710,7 +1735,6 @@ export default function ContractTemplatePage() {
                 <th>Người ký chính</th>
                 <th>Thời hạn</th>
                 <th>Giá thuê</th>
-                <th>File</th>
                 <th>Trạng thái</th>
                 <th className="contract-management-table__action !pl-2 !pr-5 text-center xl:!pl-3 xl:!pr-6">Xem</th>
               </tr>
@@ -1718,7 +1742,7 @@ export default function ContractTemplatePage() {
             <tbody className="divide-y divide-[#edf1f6]">
               {loading && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm font-bold text-[#607089]">
+                  <td colSpan={7} className="py-12 text-center text-sm font-bold text-[#607089]">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Đang tải dữ liệu hợp đồng...
@@ -1728,7 +1752,7 @@ export default function ContractTemplatePage() {
               )}
 
               {!loading &&
-                filteredContracts.map((item, index) => (
+                pagedContracts.map((item, index) => (
                   <tr
                     key={getContractRowKey(item, index)}
                     className="bg-white dark:bg-[#0f172a] transition hover:bg-[#f8fbff] dark:hover:bg-white/5"
@@ -1810,9 +1834,6 @@ export default function ContractTemplatePage() {
                     <td data-label="Giá thuê" className="align-middle">
                       <p className="font-extrabold leading-5 text-[#091426]">{formatMoney(item.monthlyRent)}</p>
                     </td>
-                    <td data-label="File" className="align-middle">
-                      <FileBadge item={item} />
-                    </td>
                     <td data-label="Trạng thái" className="align-middle">
                       <StatusBadge item={item} />
                     </td>
@@ -1840,7 +1861,7 @@ export default function ContractTemplatePage() {
 
               {!loading && filteredContracts.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
+                  <td colSpan={7} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
                     Không có hợp đồng phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -1851,8 +1872,8 @@ export default function ContractTemplatePage() {
         <DashboardPagination
           page={page}
           size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          totalElements={filteredTotalElements}
+          totalPages={filteredTotalPages}
           itemLabel="hợp đồng"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

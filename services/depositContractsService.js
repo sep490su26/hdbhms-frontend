@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/lib/apiConfig";
 import { refreshTokenApi } from "@/services/identityAccessService";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 function getAuthToken() {
   if (typeof window === "undefined") return "";
@@ -55,6 +56,28 @@ async function readEnvelope(response, fallbackMessage) {
     throw error;
   }
   return payload.data ?? null;
+}
+
+async function readPageEnvelope(response, fallbackMessage, { page = 0, size = 10 } = {}) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.code !== 0) {
+    const error = new Error(payload.message || payload.details || fallbackMessage);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  const data = payload.data ?? {};
+  const items = readPageItems(data);
+  const pagination = normalizePageResponse(data, { page: page + 1, size, items });
+  return {
+    ...data,
+    ...pagination,
+    data: items,
+    items,
+    currentPage: pagination.page,
+    pageSize: pagination.size,
+  };
 }
 
 function extractFilenameFromContentDisposition(headerValue) {
@@ -171,6 +194,7 @@ export async function fetchDepositAgreements({ page = 0, size = 10, status, stat
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
+    sort: "createdAt,desc",
   });
   if (status) params.set("status", status);
   if (Array.isArray(statuses)) {
@@ -181,7 +205,7 @@ export async function fetchDepositAgreements({ page = 0, size = 10, status, stat
     method: "GET",
   });
 
-  return readEnvelope(response, "Không thể tải danh sách hợp đồng cọc.");
+  return readPageEnvelope(response, "Không thể tải danh sách hợp đồng cọc.", { page, size });
 }
 
 export async function fetchDepositAgreementDetails(depositAgreementId) {

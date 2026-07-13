@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Rnd } from "react-rnd";
-import { ArrowLeft, Check, DoorOpen, Eye, Layers3, LoaderCircle, Plus, RotateCw, Save, Trash2, WandSparkles, X } from "lucide-react";
+import { ArrowLeft, Check, DoorOpen, Eye, Layers3, LoaderCircle, Move, Plus, Redo2, RotateCw, Save, Trash2, Undo2, WandSparkles, X, ZoomIn, ZoomOut } from "lucide-react";
 import {
   BLUEPRINT_RESIZE_ENABLE,
   BLUEPRINT_RESIZE_HANDLE_STYLES,
@@ -18,6 +18,12 @@ import { fetchFloorPlanDesignerData } from "@/services/floorPlanDesignerService"
 import { fetchAdminFloorPlan, saveAdminFloorPlan } from "@/services/floorPlanService";
 
 const GRID = 20;
+const CANVAS_WIDTH = 2400;
+const CANVAS_HEIGHT = 1600;
+const HISTORY_LIMIT = 50;
+const MIN_ZOOM = 0.45;
+const MAX_ZOOM = 2.25;
+const ZOOM_STEP = 0.15;
 const LEFT_COL_X = 240;
 const LEFT_ROOM_W = 100;
 const LEFT_ROOM_H = 120;
@@ -302,9 +308,38 @@ function normalizeLayoutPosition(rooms, blocks) {
   };
 }
 
+function cloneRoomLayout(room) {
+  return {
+    ...room,
+    doors: Array.isArray(room.doors) ? room.doors.map((door) => ({ ...door })) : [],
+    windows: Array.isArray(room.windows) ? room.windows.map((window) => ({ ...window })) : [],
+  };
+}
+
+function cloneBlockLayout(block) {
+  return { ...block };
+}
+
+function layoutSnapshot(floorId, rooms, blocks) {
+  return {
+    floorId: String(floorId || ""),
+    rooms: (rooms ?? []).map(cloneRoomLayout),
+    blocks: (blocks ?? []).map(cloneBlockLayout),
+  };
+}
+
+function sameSnapshot(left, right) {
+  if (!left || !right) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function clampZoom(value) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value) || 1));
+}
+
 function PreviewPanel({ rooms, blocks, onClose }) {
   return (
-    <div className="absolute inset-6 z-40 overflow-auto rounded-3xl border bg-[#e9e9e9] p-6 shadow-2xl">
+    <div data-editor-ui="true" className="absolute inset-6 z-40 overflow-auto rounded-3xl border bg-[#e9e9e9] p-6 shadow-2xl">
       <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white dark:bg-[#0f172a] p-2 shadow"><X className="h-4 w-4" /></button>
       <h2 className="mb-4 text-lg font-black text-slate-950">Xem trước sơ đồ</h2>
       <div className="relative min-h-[720px] min-w-[1100px] rounded-2xl bg-white/50">
@@ -489,11 +524,17 @@ function OpeningDeleteButtons({ room, onRemove }) {
 
 export function FacilityFloorPlanDesigner({ propertyId }) {
   const router = useRouter();
+  const canvasViewportRef = useRef(null);
+  const panStartRef = useRef(null);
+  const hasPannedRef = useRef(false);
   const IS_HAI_DANG_1 = String(propertyId) === "1";
   const [data, setData] = useState(null);
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [layouts, setLayouts] = useState({});
   const [blocksByFloor, setBlocksByFloor] = useState({});
+  const [canvasView, setCanvasView] = useState({ x: 80, y: 60, zoom: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [history, setHistory] = useState({ past: [], future: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addingFloor, setAddingFloor] = useState(false);
@@ -560,6 +601,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     const defaultRooms = applyLayout(floor.rooms, selectedFloorId, { forceDefault: true });
     const defaultBlocks = defaultBlocksFor(defaultRooms, selectedFloorId);
     const { rooms: nextRooms, blocks: nextBlocks } = normalizeLayoutPosition(defaultRooms, defaultBlocks);
+    recordHistory();
     setLayouts((current) => ({ ...current, [selectedFloorId]: nextRooms }));
     setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: nextBlocks }));
     setSelectedItemId("");
@@ -610,6 +652,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         setLayouts(Object.fromEntries(savedLayouts.map(([floorId, rooms]) => [floorId, rooms])));
         setBlocksByFloor(Object.fromEntries(savedLayouts.map(([floorId, _, blocks]) => [floorId, blocks])));
         setHasUnsavedChanges(false);
+        setHistory({ past: [], future: [] });
       })
       .catch((loadError) => active && setError(loadError?.message || "Không thể tải sơ đồ tầng."))
       .finally(() => active && setLoading(false));
@@ -632,18 +675,168 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     [currentBlocks, selectedItemId],
   );
   const placementActive = placementMode && placementTargetId;
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+
+  const recordHistory = (rooms = currentRooms, blocks = currentBlocks) => {
+    if (!selectedFloorId) return;
+    const snapshot = layoutSnapshot(selectedFloorId, rooms, blocks);
+    setHistory((current) => {
+      const last = current.past[current.past.length - 1];
+      if (sameSnapshot(last, snapshot)) return current;
+      return {
+        past: [...current.past.slice(-(HISTORY_LIMIT - 1)), snapshot],
+        future: [],
+      };
+    });
+  };
+
+  const syncSelectionAfterRestore = (snapshot) => {
+    const item =
+      snapshot.rooms.find((room) => String(room.id) === String(selectedItemId)) ??
+      snapshot.blocks.find((block) => String(block.id) === String(selectedItemId));
+
+    if (!item) {
+      clearSelection();
+      return;
+    }
+
+    if (snapshot.rooms.some((room) => String(room.id) === String(item.id))) {
+      setAreaInputValue(areaFromSize(item.width, item.height));
+      setPriceInputValue(roomPriceValue(item) ? String(roomPriceValue(item)) : "");
+      return;
+    }
+
+    setAreaInputValue("");
+    setPriceInputValue("");
+  };
+
+  const restoreSnapshot = (snapshot) => {
+    setSelectedFloorId(snapshot.floorId);
+    setLayouts((current) => ({ ...current, [snapshot.floorId]: snapshot.rooms.map(cloneRoomLayout) }));
+    setBlocksByFloor((current) => ({ ...current, [snapshot.floorId]: snapshot.blocks.map(cloneBlockLayout) }));
+    syncSelectionAfterRestore(snapshot);
+    setPlacementMode(null);
+    setPlacementTargetId(null);
+    setHasUnsavedChanges(true);
+    setNotice("");
+    setError("");
+  };
+
+  const undoLayout = () => {
+    if (!canUndo) return;
+    const previous = history.past[history.past.length - 1];
+    const current = layoutSnapshot(selectedFloorId, currentRooms, currentBlocks);
+    restoreSnapshot(previous);
+    setHistory({
+      past: history.past.slice(0, -1),
+      future: [current, ...history.future].slice(0, HISTORY_LIMIT),
+    });
+  };
+
+  const redoLayout = () => {
+    if (!canRedo) return;
+    const next = history.future[0];
+    const current = layoutSnapshot(selectedFloorId, currentRooms, currentBlocks);
+    restoreSnapshot(next);
+    setHistory({
+      past: [...history.past, current].slice(-HISTORY_LIMIT),
+      future: history.future.slice(1),
+    });
+  };
+
+  const zoomCanvas = (nextZoom, anchorClientX, anchorClientY) => {
+    const viewport = canvasViewportRef.current;
+    setCanvasView((current) => {
+      const zoom = clampZoom(nextZoom);
+      if (!viewport || zoom === current.zoom) return { ...current, zoom };
+      const rect = viewport.getBoundingClientRect();
+      const anchorX = Number.isFinite(anchorClientX) ? anchorClientX : rect.left + rect.width / 2;
+      const anchorY = Number.isFinite(anchorClientY) ? anchorClientY : rect.top + rect.height / 2;
+      const localX = anchorX - rect.left;
+      const localY = anchorY - rect.top;
+      const worldX = (localX - current.x) / current.zoom;
+      const worldY = (localY - current.y) / current.zoom;
+      return {
+        x: localX - worldX * zoom,
+        y: localY - worldY * zoom,
+        zoom,
+      };
+    });
+  };
+
+  const resetCanvasView = () => {
+    setCanvasView({ x: 80, y: 60, zoom: 1 });
+  };
+
+  const shouldIgnoreCanvasGesture = (target) =>
+    Boolean(target?.closest?.("button,input,textarea,select,[data-floor-item='true'],[data-editor-ui='true']"));
+
+  const handleCanvasPointerDown = (event) => {
+    if (event.button !== 0 && event.button !== 1) return;
+    if (shouldIgnoreCanvasGesture(event.target)) return;
+    event.preventDefault();
+    hasPannedRef.current = false;
+    panStartRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      view: canvasView,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setIsPanning(true);
+  };
+
+  const handleCanvasPointerMove = (event) => {
+    const panStart = panStartRef.current;
+    if (!panStart) return;
+    const deltaX = event.clientX - panStart.clientX;
+    const deltaY = event.clientY - panStart.clientY;
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+      panStart.moved = true;
+      hasPannedRef.current = true;
+    }
+    setCanvasView({
+      ...panStart.view,
+      x: panStart.view.x + deltaX,
+      y: panStart.view.y + deltaY,
+    });
+  };
+
+  const handleCanvasPointerUp = (event) => {
+    if (!panStartRef.current) return;
+    if (event.currentTarget.hasPointerCapture?.(panStartRef.current.pointerId)) {
+      event.currentTarget.releasePointerCapture(panStartRef.current.pointerId);
+    }
+    panStartRef.current = null;
+    setIsPanning(false);
+  };
+
+  const handleCanvasWheel = (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -1 : 1;
+    zoomCanvas(canvasView.zoom + direction * ZOOM_STEP, event.clientX, event.clientY);
+  };
 
   const updatePosition = (roomId, position) => {
-    setLayouts((current) => ({ ...current, [selectedFloorId]: currentRooms.map((room) => room.id === roomId ? { ...room, ...position } : room) }));
+    const nextRooms = currentRooms.map((room) => room.id === roomId ? { ...room, ...position } : room);
+    if (sameSnapshot(layoutSnapshot(selectedFloorId, currentRooms, currentBlocks), layoutSnapshot(selectedFloorId, nextRooms, currentBlocks))) return;
+    recordHistory();
+    setLayouts((current) => ({ ...current, [selectedFloorId]: nextRooms }));
     setHasUnsavedChanges(true);
   };
 
   const updateRoom = (roomId, patch) => {
+    const nextRooms = currentRooms.map((room) =>
+      String(room.id) === String(roomId) ? { ...room, ...patch } : room
+    );
+    if (sameSnapshot(layoutSnapshot(selectedFloorId, currentRooms, currentBlocks), layoutSnapshot(selectedFloorId, nextRooms, currentBlocks))) return;
+    recordHistory();
     setLayouts((current) => ({
       ...current,
-      [selectedFloorId]: (current[selectedFloorId] ?? []).map((room) =>
-        String(room.id) === String(roomId) ? { ...room, ...patch } : room
-      ),
+      [selectedFloorId]: nextRooms,
     }));
     setHasUnsavedChanges(true);
   };
@@ -677,6 +870,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     setAreaInputValue("");
     setPriceInputValue("");
     setFloorDeleteConfirmOpen(false);
+    setHistory({ past: [], future: [] });
+    resetCanvasView();
   };
 
   const addFloor = async () => {
@@ -711,6 +906,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setAreaInputValue("");
       setPriceInputValue("");
       setHasUnsavedChanges(false);
+      setHistory({ past: [], future: [] });
+      resetCanvasView();
       setNotice(`Đã thêm ${nextFloor.name ?? floorName}.`);
     } catch (createError) {
       setError(createError?.message || "Không thể thêm tầng mới.");
@@ -763,6 +960,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setPriceInputValue("");
       setHasUnsavedChanges(false);
       setFloorDeleteConfirmOpen(false);
+      setHistory({ past: [], future: [] });
+      resetCanvasView();
       setNotice(`Đã xóa ${selectedFloor.name}.`);
     } catch (deleteError) {
       setError(deleteError?.message || "Không thể xóa tầng.");
@@ -772,7 +971,20 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   };
 
   const updateBlock = (blockId, patch) => {
-    setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: currentBlocks.map((block) => block.id === blockId ? { ...block, ...patch } : block) }));
+    const nextBlocks = currentBlocks.map((block) => block.id === blockId ? { ...block, ...patch } : block);
+    if (sameSnapshot(layoutSnapshot(selectedFloorId, currentRooms, currentBlocks), layoutSnapshot(selectedFloorId, currentRooms, nextBlocks))) return;
+    recordHistory();
+    setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: nextBlocks }));
+    setHasUnsavedChanges(true);
+  };
+
+  const updateBlockLive = (blockId, patch) => {
+    setBlocksByFloor((current) => ({
+      ...current,
+      [selectedFloorId]: (current[selectedFloorId] ?? []).map((block) =>
+        String(block.id) === String(blockId) ? { ...block, ...patch } : block
+      ),
+    }));
     setHasUnsavedChanges(true);
   };
 
@@ -787,6 +999,26 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [placementMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.target?.closest?.("input,textarea,select,[contenteditable='true']")) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undoLayout();
+        return;
+      }
+      if (key === "y" || (key === "z" && event.shiftKey)) {
+        event.preventDefault();
+        redoLayout();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [history, selectedFloorId, currentRooms, currentBlocks]);
 
   const rotateSelectedItem = () => {
     if (selectedRoom) {
@@ -883,6 +1115,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         setPlacementTargetId(null);
         setAreaInputValue("");
         setPriceInputValue("");
+        setHistory({ past: [], future: [] });
         setNotice(`Đã xóa phòng ${selectedRoom.roomCode ?? selectedRoom.room_code ?? selectedRoom.name}.`);
       } catch (deleteError) {
         setError(deleteError?.message || "Không thể xóa phòng.");
@@ -946,6 +1179,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setSelectedItemId(createdRoom.id);
       setAreaInputValue(areaFromSize(placedRoom.width, placedRoom.height));
       setPriceInputValue("");
+      setHistory({ past: [], future: [] });
       setNotice(`Đã thêm phòng ${placedRoom.roomCode ?? placedRoom.room_code ?? roomCode}.`);
     } catch (createError) {
       setError(createError?.message || "Không thể thêm phòng mới.");
@@ -958,11 +1192,13 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     const meta = BLOCK_TYPES[type];
     const count = Object.values(blocksByFloor).flat().filter((block) => block.type === type).length + 1;
     const id = `${type.toLowerCase()}-${count}`;
+    recordHistory();
     setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: [...currentBlocks, { id, type, x: LEFT_COL_X, y: START_Y, width: meta.width, height: meta.height, orientation: "north" }] }));
     setHasUnsavedChanges(true);
   };
 
   const removeBlock = (blockId) => {
+    recordHistory();
     setBlocksByFloor((current) => ({ ...current, [selectedFloorId]: currentBlocks.filter((block) => block.id !== blockId) }));
     setSelectedItemId((current) => current === blockId ? "" : current);
     setHasUnsavedChanges(true);
@@ -971,6 +1207,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const alignCurrentRooms = () => {
     if (!selectedFloorId || !currentRooms.length) return;
     const alignedRooms = alignRoomItems(currentRooms, { gridSize: GRID, assumeAllRooms: true });
+    if (sameSnapshot(layoutSnapshot(selectedFloorId, currentRooms, currentBlocks), layoutSnapshot(selectedFloorId, alignedRooms, currentBlocks))) return;
+    recordHistory();
     setLayouts((current) => ({ ...current, [selectedFloorId]: alignedRooms }));
     setSelectedItemId("");
     setPlacementMode(null);
@@ -1116,86 +1354,174 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         </aside>
 
         <main
-          className="relative flex-1 overflow-auto bg-[#f1f5f9] dark:bg-white/5 p-8"
-          style={{ backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: `${GRID}px ${GRID}px` }}
+          ref={canvasViewportRef}
+          className={`relative flex-1 overflow-hidden bg-[#f1f5f9] dark:bg-white/5 touch-none ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerUp}
+          onPointerCancel={handleCanvasPointerUp}
+          onWheel={handleCanvasWheel}
           onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
+            if (hasPannedRef.current) {
+              hasPannedRef.current = false;
+              return;
+            }
+            if (shouldIgnoreCanvasGesture(event.target)) return;
             if (placementActive) finishPlacement();
             clearSelection();
           }}
         >
-          <FloorPlanSvgDefs />
+          <div
+            data-editor-ui="true"
+            className="absolute right-4 top-4 z-50 flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-xl shadow-slate-200/70 backdrop-blur dark:border-white/10 dark:bg-[#0f172a]/95 dark:shadow-black/20"
+          >
+            <button
+              type="button"
+              aria-label="Hoàn tác"
+              title="Hoàn tác"
+              onClick={undoLayout}
+              disabled={!canUndo}
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Làm lại"
+              title="Làm lại"
+              onClick={redoLayout}
+              disabled={!canRedo}
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+            <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-white/10" />
+            <button
+              type="button"
+              aria-label="Thu nhỏ"
+              title="Thu nhỏ"
+              onClick={() => zoomCanvas(canvasView.zoom - ZOOM_STEP)}
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <span className="min-w-12 text-center text-xs font-black text-slate-600 dark:text-slate-300">
+              {Math.round(canvasView.zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              aria-label="Phóng to"
+              title="Phóng to"
+              onClick={() => zoomCanvas(canvasView.zoom + ZOOM_STEP)}
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Đặt lại góc nhìn"
+              title="Đặt lại góc nhìn"
+              onClick={resetCanvasView}
+              className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <Move className="h-4 w-4" />
+            </button>
+          </div>
           {placementActive && (
-            <div className="sticky left-1/2 top-2 z-50 mx-auto mb-3 w-fit -translate-x-1/2 rounded-full bg-slate-950/90 px-4 py-2 text-sm font-bold text-white shadow-xl">
+            <div data-editor-ui="true" className="absolute left-1/2 top-4 z-50 w-fit -translate-x-1/2 rounded-full bg-slate-950/90 px-4 py-2 text-sm font-bold text-white shadow-xl">
               Bấm vào tường phòng để đặt {placementMode === "door" ? "cửa" : "cửa sổ"}. Nhấn ESC để hủy.
             </div>
           )}
           {previewOpen && <PreviewPanel rooms={currentRooms} blocks={currentBlocks} onClose={() => setPreviewOpen(false)} />}
-          {currentBlocks.map((block) => (
-            <Rnd
-              key={block.id}
-              bounds="parent"
-              dragGrid={[GRID, GRID]}
-              disableDragging={Boolean(placementActive)}
-              size={{ width: block.width, height: block.height }}
-              position={{ x: block.x, y: block.y }}
-              enableResizing={selectedItemId === block.id ? BLUEPRINT_RESIZE_ENABLE : false}
-              resizeHandleStyles={selectedItemId === block.id ? BLUEPRINT_RESIZE_HANDLE_STYLES : undefined}
-              onClick={() => selectItem(block)}
-              onDragStop={(_, position) => updateBlock(block.id, { x: position.x, y: position.y })}
-              onResizeStop={(_, __, ref, ___, position) => updateBlock(block.id, { width: ref.offsetWidth, height: ref.offsetHeight, ...position })}
-              className="group relative cursor-grab select-none active:cursor-grabbing"
-            >
-              {selectedItemId === block.id && (
-                <FloatingToolbar
-                  item={block}
-                  isRoom={false}
-                  placementMode={null}
-                  onRotate={rotateSelectedItem}
-                  onDelete={removeSelectedItem}
-                />
-              )}
-              <button type="button" onClick={(event) => { event.stopPropagation(); removeBlock(block.id); }} className="absolute right-1 top-1 z-20 grid h-4 w-4 place-items-center rounded-full bg-slate-200 text-[10px] text-slate-700 hover:bg-rose-200"><X className="h-3 w-3" /></button>
-              <FloorPlanItem item={{ ...block, label: BLOCK_TYPES[block.type]?.label }} selected={selectedItemId === block.id} />
-            </Rnd>
-          ))}
-          {currentRooms.map((room) => (
-            <Rnd
-              key={room.id}
-              bounds="parent"
-              dragGrid={[GRID, GRID]}
-              disableDragging={Boolean(placementActive)}
-              enableResizing={false}
-              size={{ width: room.width, height: room.height }}
-              position={{ x: room.x, y: room.y }}
-              onClick={() => selectItem({ ...room, type: "ROOM" })}
-              onDragStop={(_, position) => updatePosition(room.id, { x: position.x, y: position.y })}
-              className="group cursor-grab select-none active:cursor-grabbing"
-            >
-              {selectedItemId === room.id && (
-                <FloatingToolbar
-                  item={{ ...room, type: "ROOM" }}
-                  isRoom
-                  placementMode={placementTargetId === room.id ? placementMode : null}
-                  areaInputValue={areaInputValue}
-                  priceInputValue={priceInputValue}
-                  onAreaInputChange={setAreaInputValue}
-                  onPriceInputChange={setPriceInputValue}
-                  onAreaSubmit={applyArea}
-                  onPriceSubmit={applyRoomPrice}
-                  onRotate={rotateSelectedItem}
-                  onStartPlacement={startPlacement}
-                  onFinishPlacement={finishPlacement}
-                  onCancelPlacement={finishPlacement}
-                  onDelete={removeSelectedItem}
-                />
-              )}
-              <FloorPlanItem item={{ ...room, type: "ROOM" }} selected={selectedItemId === room.id} />
-              {selectedItemId === room.id && <OpeningDeleteButtons room={room} onRemove={removeOpening} />}
-              {placementTargetId === room.id && placementMode && <RoomPlacementZones mode={placementMode} onPlace={placeOpening} />}
-            </Rnd>
-          ))}
-          {!currentRooms.length && !currentBlocks.length && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-500">Tầng này chưa có phòng.</div>}
+          <div
+            className="absolute left-0 top-0"
+            style={{
+              width: CANVAS_WIDTH,
+              height: CANVAS_HEIGHT,
+              transform: `translate(${canvasView.x}px, ${canvasView.y}px) scale(${canvasView.zoom})`,
+              transformOrigin: "0 0",
+              backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
+              backgroundSize: `${GRID}px ${GRID}px`,
+            }}
+          >
+            <FloorPlanSvgDefs />
+            {currentBlocks.map((block) => (
+              <Rnd
+                key={block.id}
+                data-floor-item="true"
+                bounds="parent"
+                scale={canvasView.zoom}
+                dragGrid={[GRID, GRID]}
+                disableDragging={Boolean(placementActive)}
+                size={{ width: block.width, height: block.height }}
+                position={{ x: block.x, y: block.y }}
+                enableResizing={selectedItemId === block.id ? BLUEPRINT_RESIZE_ENABLE : false}
+                lockAspectRatio={block.type === "STAIR"}
+                resizeHandleStyles={selectedItemId === block.id ? BLUEPRINT_RESIZE_HANDLE_STYLES : undefined}
+                onClick={() => selectItem(block)}
+                onDragStop={(_, position) => updateBlock(block.id, { x: position.x, y: position.y })}
+                onResizeStart={() => recordHistory()}
+                onResize={(_, __, ref, ___, position) => updateBlockLive(block.id, { width: ref.offsetWidth, height: ref.offsetHeight, ...position })}
+                onResizeStop={(_, __, ref, ___, position) => updateBlockLive(block.id, { width: ref.offsetWidth, height: ref.offsetHeight, ...position })}
+                className="group relative cursor-grab select-none active:cursor-grabbing"
+              >
+                <div data-floor-item="true" className="relative h-full w-full">
+                  {selectedItemId === block.id && (
+                    <FloatingToolbar
+                      item={block}
+                      isRoom={false}
+                      placementMode={null}
+                      onRotate={rotateSelectedItem}
+                      onDelete={removeSelectedItem}
+                    />
+                  )}
+                  <button type="button" onClick={(event) => { event.stopPropagation(); removeBlock(block.id); }} className="absolute right-1 top-1 z-20 grid h-4 w-4 place-items-center rounded-full bg-slate-200 text-[10px] text-slate-700 hover:bg-rose-200"><X className="h-3 w-3" /></button>
+                  <FloorPlanItem item={{ ...block, label: BLOCK_TYPES[block.type]?.label }} selected={selectedItemId === block.id} />
+                </div>
+              </Rnd>
+            ))}
+            {currentRooms.map((room) => (
+              <Rnd
+                key={room.id}
+                data-floor-item="true"
+                bounds="parent"
+                scale={canvasView.zoom}
+                dragGrid={[GRID, GRID]}
+                disableDragging={Boolean(placementActive)}
+                enableResizing={false}
+                size={{ width: room.width, height: room.height }}
+                position={{ x: room.x, y: room.y }}
+                onClick={() => selectItem({ ...room, type: "ROOM" })}
+                onDragStop={(_, position) => updatePosition(room.id, { x: position.x, y: position.y })}
+                className="group cursor-grab select-none active:cursor-grabbing"
+              >
+                <div data-floor-item="true" className="relative h-full w-full">
+                  {selectedItemId === room.id && (
+                    <FloatingToolbar
+                      item={{ ...room, type: "ROOM" }}
+                      isRoom
+                      placementMode={placementTargetId === room.id ? placementMode : null}
+                      areaInputValue={areaInputValue}
+                      priceInputValue={priceInputValue}
+                      onAreaInputChange={setAreaInputValue}
+                      onPriceInputChange={setPriceInputValue}
+                      onAreaSubmit={applyArea}
+                      onPriceSubmit={applyRoomPrice}
+                      onRotate={rotateSelectedItem}
+                      onStartPlacement={startPlacement}
+                      onFinishPlacement={finishPlacement}
+                      onCancelPlacement={finishPlacement}
+                      onDelete={removeSelectedItem}
+                    />
+                  )}
+                  <FloorPlanItem item={{ ...room, type: "ROOM" }} selected={selectedItemId === room.id} />
+                  {selectedItemId === room.id && <OpeningDeleteButtons room={room} onRemove={removeOpening} />}
+                  {placementTargetId === room.id && placementMode && <RoomPlacementZones mode={placementMode} onPlace={placeOpening} />}
+                </div>
+              </Rnd>
+            ))}
+          </div>
+          {!currentRooms.length && !currentBlocks.length && <div className="pointer-events-none absolute inset-0 grid place-items-center text-sm font-semibold text-slate-500">Tầng này chưa có phòng.</div>}
         </main>
       </div>
 

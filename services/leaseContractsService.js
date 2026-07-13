@@ -247,9 +247,13 @@ export async function fetchLeaseContractManagementList({ page = 0, size = 10 } =
     method: "GET",
   });
   const items = normalizeLeaseContractList(data);
+  const pagination = normalizePageResponse(data, { page: page + 1, size, items });
   return {
-    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    ...pagination,
+    data: items,
     items,
+    currentPage: pagination.page,
+    pageSize: pagination.size,
   };
 }
 

@@ -31,6 +31,9 @@ import { DashboardPagination } from "@/components/dashboard/DashboardPagination"
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
+// ponytail: local filters cover the first 1000 deposit agreements; move search/floor filters into the API when this route is kept.
+const DEPOSIT_AGREEMENT_FETCH_SIZE = 1000;
+
 const money = new Intl.NumberFormat("vi-VN");
 
 const STATUS_OPTIONS = [
@@ -438,27 +441,23 @@ export default function DepositsPage() {
   const [updatingId, setUpdatingId] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const loadAgreements = useCallback(async () => {
     try {
       setLoadError("");
       const response = await fetchDepositAgreements({
-        page: page - 1,
-        size,
+        page: 0,
+        size: DEPOSIT_AGREEMENT_FETCH_SIZE,
         statuses: [...MANAGED_DEPOSIT_STATUSES],
       });
       const nextAgreements = getAgreementItems(response)
         .map(normalizeAgreement)
         .filter((agreement) => MANAGED_DEPOSIT_STATUSES.has(agreement.status));
       setAgreements(nextAgreements);
-      setTotalElements(response?.totalElements ?? nextAgreements.length);
-      setTotalPages(response?.totalPages ?? 1);
     } catch (error) {
       setLoadError(error.message || "Không tải được danh sách hợp đồng cọc từ backend.");
     }
-  }, [page, size]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -467,6 +466,10 @@ export default function DepositsPage() {
 
     return () => window.clearTimeout(timer);
   }, [loadAgreements]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [customerFilter, floorFilter, statusFilter]);
 
   const floorOptions = useMemo(() => {
     const floors = new Set(agreements.map((item) => item.floorLabel).filter(Boolean));
@@ -486,6 +489,18 @@ export default function DepositsPage() {
       return matchCustomer && matchStatus && matchFloor;
     });
   }, [agreements, customerFilter, floorFilter, statusFilter]);
+
+  const filteredTotalElements = filteredAgreements.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedAgreementPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedAgreements = useMemo(() => {
+    const start = (displayedAgreementPage - 1) * size;
+    return filteredAgreements.slice(start, start + size);
+  }, [displayedAgreementPage, filteredAgreements, size]);
 
   const paidAgreements = agreements.filter((item) => item.status === "PAID");
   const convertedAgreements = agreements.filter((item) => item.status === "CONVERTED_TO_LEASE");
@@ -653,7 +668,7 @@ export default function DepositsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAgreements.map((agreement) => (
+                  pagedAgreements.map((agreement) => (
                     <tr key={agreement.id} className="border-b border-[#edf0f5] dark:border-white/10 last:border-0">
                       <td data-label="Phòng" className="px-5 py-4 text-base font-extrabold text-slate-900 dark:text-white">
                         {agreement.roomCode ? `P.${agreement.roomCode}` : "Chưa rõ"}
@@ -724,8 +739,8 @@ export default function DepositsPage() {
           <DashboardPagination
             page={page}
             size={size}
-            totalElements={totalElements}
-            totalPages={totalPages}
+            totalElements={filteredTotalElements}
+            totalPages={filteredTotalPages}
             itemLabel="hợp đồng"
             onPageChange={setPage}
             onSizeChange={(nextSize) => {

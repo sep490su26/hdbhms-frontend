@@ -176,7 +176,7 @@ export async function fetchViewingCustomers({filters, page, size}) {
     return {
         items: (data.data || []).map(mapVisitRequest),
         total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 0,
+        page: Number(page) || 1,
         size: readField(data, "pageSize", "page_size") || size,
         totalPages: readField(data, "totalPages", "total_pages") || 0,
     };
@@ -221,7 +221,7 @@ export async function fetchViewingCustomerTrash({page, size}) {
     return {
         items: (data.data || []).map(mapVisitRequest),
         total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 1,
+        page: Number(page) || 1,
         size: readField(data, "pageSize", "page_size") || size,
         totalPages: readField(data, "totalPages", "total_pages") || 0,
     };

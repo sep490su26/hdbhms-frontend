@@ -43,6 +43,9 @@ import {
 
 const money = new Intl.NumberFormat("vi-VN");
 
+// ponytail: local search covers the first 1000 rooms; move keyword search into /rooms when properties exceed that.
+const ROOM_LIST_FETCH_SIZE = 1000;
+
 const roomStatus = {
   occupied: [
     "Đang thuê",
@@ -1300,8 +1303,6 @@ function FloorPlanPage({
 function RoomsListPage({ query, propertyId }) {
   const [exportPrompt, setExportPrompt] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
   const [size, setSize] = useState(10);
   const [apiRooms, setApiRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1315,18 +1316,14 @@ function RoomsListPage({ query, propertyId }) {
       try {
         setIsLoading(true);
         const params = new URLSearchParams({
-          page: String(page - 1),
-          size: String(size),
+          page: "0",
+          size: String(ROOM_LIST_FETCH_SIZE),
         });
         if (propertyId) params.set("propertyId", String(propertyId));
 
         const data = await authenticatedFetch(`/rooms?${params.toString()}`);
         const rows = readPageRows(data).map((room) => normalizeApiRoom(room));
         setApiRooms(rows);
-        setTotalPages(data?.totalPages ?? data?.total_pages ?? 1);
-        setTotalElements(
-          data?.totalElements ?? data?.total_elements ?? rows.length,
-        );
         setIsSuccess(true);
       } catch (error) {
         setIsError(true);
@@ -1335,7 +1332,12 @@ function RoomsListPage({ query, propertyId }) {
       }
     };
     fetchStaffRooms();
-  }, [page, propertyId, size]);
+  }, [propertyId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [propertyId, query]);
+
   const filteredRooms = apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();
@@ -1351,6 +1353,17 @@ function RoomsListPage({ query, propertyId }) {
       .join(" ");
     return searchableText.includes(q);
   });
+  const filteredTotalElements = filteredRooms.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedRoomPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedRooms = filteredRooms.slice(
+    (displayedRoomPage - 1) * size,
+    displayedRoomPage * size,
+  );
 
   // Export to CSV
   const exportRooms = () => {
@@ -1407,18 +1420,13 @@ function RoomsListPage({ query, propertyId }) {
         </button>
       </FilterBar>
 
-      {isLoading && (
-        <div className="py-10 text-center font-bold text-slate-600 dark:text-slate-300">
-          Đang tải danh sách phòng...
-        </div>
-      )}
       {isError && (
         <div className="mt-4 rounded-lg border border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-4 text-sm font-semibold text-rose-700 dark:text-rose-300">
           Không thể tải dữ liệu phòng. Vui lòng thử lại.
         </div>
       )}
 
-      {!isLoading && !isError && (
+      {!isError && (
         <Card className="overflow-hidden">
           <div className="dashboard-table">
             <table className="w-full border-collapse text-left">
@@ -1434,55 +1442,16 @@ function RoomsListPage({ query, propertyId }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map((room, index) => (
-                  <tr
-                    key={getRoomRowKey(room, index)}
-                    className="border-t border-[#e2e8f0] dark:border-white/10"
-                  >
+                {isLoading ? (
+                  <tr>
                     <td
-                      data-label="Mã phòng"
-                      className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white"
+                      colSpan={7}
+                      className="px-6 py-10 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                     >
-                      {room.roomCode || room.id}
-                    </td>
-                    <td data-label="Đặc điểm" className="px-6 py-4">
-                      <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[#3c475a]">
-                        Dành cho {room.maxPeople ?? room.maxOccupants ?? 0} người ở
-                      </span>
-                    </td>
-                    <td
-                      data-label="Tầng"
-                      className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
-                    >
-                      {room.floor}
-                    </td>
-                    <td
-                      data-label="Diện tích"
-                      className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
-                    >
-                      {room.area} m²
-                    </td>
-                    <td
-                      data-label="Giá niêm yết"
-                      className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white"
-                    >
-                      {formatMoney(room.listedPrice)}
-                    </td>
-                    <td data-label="Trạng thái" className="px-6 py-4">
-                      <StatusBadge
-                        value={room.status}
-                        map={roomStatus}
-                      />
-                    </td>
-                    <td data-label="Thao tác" className="px-6 py-4">
-                      <div className="flex justify-end gap-1">
-                        <IconButton label={`Xem ${room.id}`} icon={Eye} />
-                        <IconButton label={`Sửa ${room.id}`} icon={Edit3} />
-                      </div>
+                      Đang tải danh sách phòng...
                     </td>
                   </tr>
-                ))}
-                {filteredRooms.length === 0 && (
+                ) : filteredRooms.length === 0 ? (
                   <tr>
                     <td
                       colSpan={7}
@@ -1491,6 +1460,55 @@ function RoomsListPage({ query, propertyId }) {
                       Không có phòng nào phù hợp.
                     </td>
                   </tr>
+                ) : (
+                  pagedRooms.map((room, index) => (
+                    <tr
+                      key={getRoomRowKey(room, index)}
+                      className="border-t border-[#e2e8f0] dark:border-white/10"
+                    >
+                      <td
+                        data-label="Mã phòng"
+                        className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-white"
+                      >
+                        {room.roomCode || room.id}
+                      </td>
+                      <td data-label="Đặc điểm" className="px-6 py-4">
+                        <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[#3c475a]">
+                          Dành cho {room.maxPeople ?? room.maxOccupants ?? 0} người ở
+                        </span>
+                      </td>
+                      <td
+                        data-label="Tầng"
+                        className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
+                      >
+                        {room.floor}
+                      </td>
+                      <td
+                        data-label="Diện tích"
+                        className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
+                      >
+                        {room.area} m²
+                      </td>
+                      <td
+                        data-label="Giá niêm yết"
+                        className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white"
+                      >
+                        {formatMoney(room.listedPrice)}
+                      </td>
+                      <td data-label="Trạng thái" className="px-6 py-4">
+                        <StatusBadge
+                          value={room.status}
+                          map={roomStatus}
+                        />
+                      </td>
+                      <td data-label="Thao tác" className="px-6 py-4">
+                        <div className="flex justify-end gap-1">
+                          <IconButton label={`Xem ${room.id}`} icon={Eye} />
+                          <IconButton label={`Sửa ${room.id}`} icon={Edit3} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -1498,8 +1516,8 @@ function RoomsListPage({ query, propertyId }) {
           <DashboardPagination
             page={page}
             size={size}
-            totalElements={totalElements}
-            totalPages={totalPages}
+            totalElements={filteredTotalElements}
+            totalPages={filteredTotalPages}
             itemLabel="phòng"
             onPageChange={setPage}
             onSizeChange={(nextSize) => {

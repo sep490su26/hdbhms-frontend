@@ -38,6 +38,9 @@ import { DashboardPagination } from "@/components/dashboard/DashboardPagination"
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
+// ponytail: local filters cover the first 1000 deposit agreements; move search/floor filters into the API when this grows.
+const DEPOSIT_AGREEMENT_FETCH_SIZE = 1000;
+
 const money = new Intl.NumberFormat("vi-VN");
 
 const STATUS_OPTIONS = [
@@ -167,6 +170,10 @@ function canExtendSigningDate(agreement) {
   return isWaitingForSigning(agreement) && getSigningOverdueDays(agreement) > 0;
 }
 
+function canExtendSigningDeadline(agreement) {
+  return isWaitingForSigning(agreement);
+}
+
 function canForfeitDeposit(agreement) {
   return (
     isWaitingForSigning(agreement) &&
@@ -215,15 +222,6 @@ function formatDateTime(value) {
 
 function getAgreementItems(response) {
   return response?.data || response?.content || response?.items || [];
-}
-
-function getAgreementPagination(response) {
-  return {
-    currentPage: Number(response?.currentPage || 1),
-    totalPages: Number(response?.totalPages || 0),
-    pageSize: Number(response?.pageSize || 10),
-    totalElements: Number(response?.totalElements || 0),
-  };
 }
 
 function getDepositStatusFilterValues(statusFilter) {
@@ -1024,8 +1022,6 @@ export default function DepositsPage() {
   const [floorFilter, setFloorFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [updatingId, setUpdatingId] = useState(null);
   const [uploadingSignedId, setUploadingSignedId] = useState(null);
   const [extensionModal, setExtensionModal] = useState(null);
@@ -1034,23 +1030,20 @@ export default function DepositsPage() {
     try {
       setLoadError("");
       const response = await fetchDepositAgreements({
-        page: page - 1,
-        size,
+        page: 0,
+        size: DEPOSIT_AGREEMENT_FETCH_SIZE,
         statuses: getDepositStatusFilterValues(statusFilter),
       });
-      const pagination = getAgreementPagination(response);
       const nextAgreements = getAgreementItems(response)
         .map(normalizeAgreement)
         .filter((agreement) => MANAGED_DEPOSIT_STATUSES.has(agreement.status));
       setAgreements(nextAgreements);
-      setTotalElements(pagination.totalElements);
-      setTotalPages(pagination.totalPages);
     } catch (error) {
       setLoadError(
         error.message || "Không tải được danh sách hợp đồng cọc từ backend.",
       );
     }
-  }, [page, size, statusFilter]);
+  }, [statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1088,6 +1081,18 @@ export default function DepositsPage() {
         return dateB - dateA;
       });
   }, [agreements, customerFilter, floorFilter, statusFilter]);
+
+  const filteredTotalElements = filteredAgreements.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedAgreementPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedAgreements = useMemo(() => {
+    const start = (displayedAgreementPage - 1) * size;
+    return filteredAgreements.slice(start, start + size);
+  }, [displayedAgreementPage, filteredAgreements, size]);
 
   const overdueAgreements = agreements.filter(canExtendSigningDate);
   const forfeitableAgreements = agreements.filter(canForfeitDeposit);
@@ -1406,7 +1411,7 @@ export default function DepositsPage() {
           <DashboardStatCard
             icon={ClipboardCheck}
             label="Tổng hợp đồng cọc"
-            value={totalElements || agreements.length}
+            value={filteredTotalElements}
             subtitle="Theo bộ lọc hiện tại"
           />
           <DashboardStatCard
@@ -1526,7 +1531,7 @@ export default function DepositsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAgreements.map((agreement) => (
+                  pagedAgreements.map((agreement) => (
                     <tr
                       key={agreement.id}
                       className="border-b border-[#edf0f5] dark:border-white/10 last:border-0"
@@ -1629,17 +1634,20 @@ export default function DepositsPage() {
                           >
                             <FileText className="h-5 w-5" />
                           </button>
-                          {canExtendSigningDate(agreement) && (
-                            <button
-                              type="button"
-                              onClick={() => openExtensionModal(agreement)}
-                              className="rounded-full p-2 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
-                              aria-label={`Gia hạn ngày ký ${agreement.depositCode}`}
-                              title="Gia hạn ngày ký"
-                            >
-                              <CalendarDays className="h-5 w-5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => openExtensionModal(agreement)}
+                            disabled={!canExtendSigningDeadline(agreement)}
+                            className="rounded-full p-2 text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10 dark:disabled:text-slate-600"
+                            aria-label={`Gia hạn ngày ký ${agreement.depositCode}`}
+                            title={
+                              canExtendSigningDeadline(agreement)
+                                ? "Gia hạn ngày ký"
+                                : "Chỉ gia hạn được hợp đồng cọc còn chờ ký"
+                            }
+                          >
+                            <CalendarDays className="h-5 w-5" />
+                          </button>
                           {canForfeitDeposit(agreement) && (
                             <button
                               type="button"
@@ -1703,8 +1711,8 @@ export default function DepositsPage() {
           <DashboardPagination
             page={page}
             size={size}
-            totalElements={totalElements}
-            totalPages={totalPages}
+            totalElements={filteredTotalElements}
+            totalPages={filteredTotalPages}
             itemLabel="hợp đồng"
             onPageChange={setPage}
             onSizeChange={(nextSize) => {

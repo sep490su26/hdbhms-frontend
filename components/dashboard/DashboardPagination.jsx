@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   Pagination,
   PaginationContent,
@@ -35,18 +36,32 @@ export function DashboardPagination({
   const safePage = Math.max(1, Number(page) || 1);
   const safeSize = Math.max(1, Number(size) || PAGE_SIZE_OPTIONS[0]);
   const safeTotalElements = Math.max(0, Number(totalElements) || 0);
+  const explicitTotalPages = Math.max(0, Number(totalPages) || 0);
   const hasData = safeTotalElements > 0;
   const computedTotalPages = Math.ceil(safeTotalElements / safeSize);
   const safeTotalPages = hasData
-    ? Math.max(1, Number(totalPages) || 0, computedTotalPages)
+    ? Math.max(1, explicitTotalPages, computedTotalPages)
+    : explicitTotalPages;
+  const displayPage = safeTotalPages
+    ? Math.min(safePage, safeTotalPages)
+    : safePage;
+  const firstItem = hasData ? (displayPage - 1) * safeSize + 1 : 0;
+  const lastItem = hasData
+    ? Math.min(displayPage * safeSize, safeTotalElements)
     : 0;
-  const firstItem = hasData ? (safePage - 1) * safeSize + 1 : 0;
-  const lastItem = Math.min(safePage * safeSize, safeTotalElements);
-  const pageItems = hasData ? buildPageItems(safePage, safeTotalPages) : [];
-  const shouldShowPageNav = safeTotalElements > safeSize;
+  const pageItems = safeTotalPages > 0
+    ? buildPageItems(displayPage, safeTotalPages)
+    : [];
+  const shouldShowPageNav = safeTotalPages > 1;
 
-  const isPreviousDisabled = !hasData || safePage <= 1;
-  const isNextDisabled = !hasData || safePage >= safeTotalPages;
+  const isPreviousDisabled = safeTotalPages <= 0 || displayPage <= 1;
+  const isNextDisabled = safeTotalPages <= 0 || displayPage >= safeTotalPages;
+
+  useEffect(() => {
+    if (safeTotalPages > 0 && safePage > safeTotalPages) {
+      onPageChange?.(safeTotalPages);
+    }
+  }, [onPageChange, safePage, safeTotalPages]);
 
   const navButtonClass =
     "h-9 rounded-xl px-2.5 text-sm font-semibold transition sm:px-3";
@@ -64,7 +79,7 @@ export function DashboardPagination({
     "h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#1e40af] dark:border-white/10 dark:bg-[#020817] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white";
 
   const goToPage = (nextPage) => {
-    if (!hasData) return;
+    if (safeTotalPages <= 0) return;
     const bounded = Math.min(Math.max(1, nextPage), safeTotalPages);
     if (bounded !== safePage) onPageChange?.(bounded);
   };

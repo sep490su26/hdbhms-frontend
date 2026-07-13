@@ -390,9 +390,9 @@ body {
 }
 
 .dashboard-table.contract-management-table .contract-management-table__action {
-  width: 7.8125rem;
-  min-width: 7.8125rem;
-  max-width: 7.8125rem;
+  width: 12%;
+  min-width: 8rem;
+  max-width: none;
   overflow: visible;
 }
 
@@ -402,8 +402,8 @@ body {
 }
 
 .dashboard-table.contract-management-table > table {
-  min-width: 1240px !important;
-  width: 1240px !important;
+  min-width: 1080px !important;
+  width: 100% !important;
   table-layout: fixed;
 }
 

@@ -35,6 +35,9 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
+// ponytail: local filters cover the first 1000 tenant profiles; move filters into the API when this grows.
+const TENANT_PROFILE_FETCH_SIZE = 1000;
+
 const valueOf = (item, ...keys) => {
   for (const key of keys) {
     if (
@@ -1283,8 +1286,6 @@ export default function TenantsPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const openContractDetails = async (profile) => {
     const contractId = getProfileContractId(profile);
@@ -1400,10 +1401,11 @@ export default function TenantsPage() {
     try {
       setIsLoading(true);
       setError("");
-      const data = await fetchTenantProfiles({ page: page - 1, size });
+      const data = await fetchTenantProfiles({
+        page: 0,
+        size: TENANT_PROFILE_FETCH_SIZE,
+      });
       setProfiles(data.items);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
@@ -1414,12 +1416,13 @@ export default function TenantsPage() {
   useEffect(() => {
     let isActive = true;
 
-    fetchTenantProfiles({ page: page - 1, size })
+    fetchTenantProfiles({
+      page: 0,
+      size: TENANT_PROFILE_FETCH_SIZE,
+    })
       .then((data) => {
         if (!isActive) return;
         setProfiles(data.items);
-        setTotalElements(data.totalElements);
-        setTotalPages(data.totalPages);
         setError("");
       })
       .catch((loadError) => {
@@ -1433,7 +1436,7 @@ export default function TenantsPage() {
     return () => {
       isActive = false;
     };
-  }, [page, size]);
+  }, []);
 
   const roomOptions = useMemo(() => {
     const rooms = [
@@ -1498,15 +1501,31 @@ export default function TenantsPage() {
     roomFilter,
   ]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, profileStatusFilter, propertyFilter, roleFilter, roomFilter]);
+
+  const filteredTotalElements = filteredProfiles.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedProfilePage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedProfiles = useMemo(() => {
+    const start = (displayedProfilePage - 1) * size;
+    return filteredProfiles.slice(start, start + size);
+  }, [displayedProfilePage, filteredProfiles, size]);
+
   const groupedByRoom = useMemo(() => {
     const groups = new Map();
-    filteredProfiles.forEach((profile) => {
+    pagedProfiles.forEach((profile) => {
       const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(profile);
     });
     return [...groups.values()];
-  }, [filteredProfiles]);
+  }, [pagedProfiles]);
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6">
@@ -1858,8 +1877,8 @@ export default function TenantsPage() {
         <DashboardPagination
           page={page}
           size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          totalElements={filteredTotalElements}
+          totalPages={filteredTotalPages}
           itemLabel="hồ sơ"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

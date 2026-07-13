@@ -24,6 +24,8 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const ALL_VALUE = "Tất cả";
+// ponytail: local filters cover the first 1000 tenant account candidates; move filters into the API when this grows.
+const TENANT_ACCOUNT_FETCH_SIZE = 1000;
 
 const MOCK_TENANT_ACCOUNT_CANDIDATES = [
   {
@@ -309,33 +311,33 @@ export default function AccountsPage() {
   const [message, setMessage] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchTenantAccountCandidates({ page: page - 1, size });
+      const data = await fetchTenantAccountCandidates({
+        page: 0,
+        size: TENANT_ACCOUNT_FETCH_SIZE,
+      });
       setItems(Array.isArray(data.items) ? data.items : []);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
     } finally {
       setLoading(false);
     }
-  }, [page, size]);
+  }, []);
 
   useEffect(() => {
     let active = true;
     const loadInitialData = async () => {
       try {
-        const data = await fetchTenantAccountCandidates();
+        const data = await fetchTenantAccountCandidates({
+          page: 0,
+          size: TENANT_ACCOUNT_FETCH_SIZE,
+        });
         if (active) {
           setItems(Array.isArray(data.items) ? data.items : []);
-          setTotalElements(data.totalElements);
-          setTotalPages(data.totalPages);
         }
       } catch (loadError) {
         if (active)
@@ -406,9 +408,25 @@ export default function AccountsPage() {
     });
   }, [items, propertyFilter, query, roleFilter, stateFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [propertyFilter, query, roleFilter, stateFilter]);
+
+  const filteredTotalElements = filteredItems.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedItemPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedItems = useMemo(() => {
+    const start = (displayedItemPage - 1) * size;
+    return filteredItems.slice(start, start + size);
+  }, [displayedItemPage, filteredItems, size]);
+
   const groupedContracts = useMemo(() => {
     const groups = new Map();
-    for (const item of filteredItems) {
+    for (const item of pagedItems) {
       const key =
         item.contractId ||
         item.contractCode ||
@@ -433,7 +451,7 @@ export default function AccountsPage() {
       ...group,
       safeKey: contractGroupKey(group.rows[0] || {}, index),
     }));
-  }, [filteredItems]);
+  }, [pagedItems]);
 
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
@@ -808,8 +826,8 @@ export default function AccountsPage() {
         <DashboardPagination
           page={page}
           size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          totalElements={filteredTotalElements}
+          totalPages={filteredTotalPages}
           itemLabel="khách thuê"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

@@ -523,22 +523,6 @@ function getStatusLabel(item) {
   return WORKFLOW_LABELS[workflow] || STATUS_LABELS[item?.status] || "Chờ xử lý";
 }
 
-function FileBadge({ item }) {
-  const uploaded = Boolean(getLeaseSignedFileId(item));
-  const Icon = uploaded ? FileCheck2 : FileWarning;
-  return (
-    <span
-      className={`inline-flex w-max items-center justify-center gap-1 rounded-full border px-2.5 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${uploaded
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-red-200 bg-red-50 text-red-700"
-        }`}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
-      {uploaded ? "Đã upload" : "Chưa upload"}
-    </span>
-  );
-}
-
 function StatusBadge({ item }) {
   const workflow = getWorkflow(item);
   const label = getStatusLabel(item);
@@ -1716,27 +1700,27 @@ export default function ContractTemplatePage() {
           }}
         >
           <table
-            className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2.5 [&_td]:py-4 xl:[&_td]:px-3 xl:[&_td]:py-4 [&_th]:px-2.5 [&_th]:py-3 xl:[&_th]:px-3 xl:[&_th]:py-3"
-            style={{ minWidth: 1100, width: 1100 }}
+            className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3"
+            style={{ minWidth: 1080, width: "100%" }}
           >
             <colgroup>
-              <col className="w-[240px]" />
-              <col className="w-[85px]" />
-              <col className="w-[170px]" />
-              <col className="w-[145px]" />
-              <col className="w-[180px]" />
-              <col className="w-[170px]" />
-              <col className="w-[130px]" />
+              <col style={{ width: "22%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "12%" }} />
             </colgroup>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
-                <th className="!pl-5">Mã HĐ</th>
+                <th className="!pl-5 xl:!pl-6">Mã HĐ</th>
                 <th>Phòng</th>
                 <th>Người ký chính</th>
                 <th>Thời hạn</th>
                 <th>Giá thuê</th>
                 <th>Trạng thái</th>
-                <th className="contract-management-table__action !pl-2 !pr-5 text-center xl:!pl-3 xl:!pr-6">Xem</th>
+                <th className="contract-management-table__action !px-2 text-center xl:!px-2.5">Xem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
@@ -1837,7 +1821,7 @@ export default function ContractTemplatePage() {
                     <td data-label="Trạng thái" className="align-middle">
                       <StatusBadge item={item} />
                     </td>
-                    <td data-label="Xem" className="contract-management-table__action !pl-2 !pr-5 text-center align-middle xl:!pl-3 xl:!pr-6">
+                    <td data-label="Xem" className="contract-management-table__action !px-2 text-center align-middle xl:!px-2.5">
                       <div className="flex items-center justify-center">
                         <button
                           type="button"
@@ -1845,7 +1829,7 @@ export default function ContractTemplatePage() {
                             event.stopPropagation();
                             selectContract(item);
                           }}
-                          className="inline-flex h-9 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-1.5 text-xs font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10"
+                          className="inline-flex h-9 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-1 text-[11px] font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10 xl:text-xs"
                         >
                           {needsActivationFlow(item) ? (
                             <FileCheck2 className="h-3.5 w-3.5" />

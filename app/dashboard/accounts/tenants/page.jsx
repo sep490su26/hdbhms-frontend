@@ -408,10 +408,6 @@ export default function AccountsPage() {
     });
   }, [items, propertyFilter, query, roleFilter, stateFilter]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [propertyFilter, query, roleFilter, stateFilter]);
-
   const filteredTotalElements = filteredItems.length;
   const filteredTotalPages =
     filteredTotalElements === 0
@@ -574,7 +570,10 @@ export default function AccountsPage() {
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184]" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm theo tên khách, SĐT, email, phòng hoặc mã hợp đồng"
               className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
             />
@@ -583,7 +582,10 @@ export default function AccountsPage() {
             label="Cơ sở"
             value={propertyFilter}
             options={propertyOptions}
-            onChange={setPropertyFilter}
+            onChange={(value) => {
+              setPropertyFilter(value);
+              setPage(1);
+            }}
           />
           <SelectFilter
             label="Trạng thái"
@@ -598,13 +600,19 @@ export default function AccountsPage() {
               "Gửi thất bại",
               "Thiếu email",
             ]}
-            onChange={setStateFilter}
+            onChange={(value) => {
+              setStateFilter(value);
+              setPage(1);
+            }}
           />
           <SelectFilter
             label="Vai trò"
             value={roleFilter}
             options={[ALL_VALUE, "Người ký chính", "Người ở cùng"]}
-            onChange={setRoleFilter}
+            onChange={(value) => {
+              setRoleFilter(value);
+              setPage(1);
+            }}
           />
         </div>
       </section>

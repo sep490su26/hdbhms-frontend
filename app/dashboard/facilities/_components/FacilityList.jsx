@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
@@ -9,6 +9,7 @@ import {
   ChevronRight,
   DoorOpen,
   Eye,
+  Gauge,
   LayoutGrid,
   Layers3,
   MapPin,
@@ -69,6 +70,17 @@ function getFacilityRoomsHref(facility) {
   if (facility.name) params.set("facilityName", facility.name);
 
   return `/dashboard/rooms?${params.toString()}`;
+}
+
+function getFacilityMeterReadingsHref(facility) {
+  const params = new URLSearchParams({
+    from: "facilities",
+    propertyId: String(facility.id),
+  });
+
+  if (facility.name) params.set("facilityName", facility.name);
+
+  return `/dashboard/meter-readings?${params.toString()}`;
 }
 
 function FacilityTree({ facility }) {
@@ -140,6 +152,7 @@ function MobileFacilityCard({
   onToggle,
   onEdit,
   onStatusChange,
+  showMeterReadingsAction,
 }) {
   const counts = getFacilityCounts(facility);
 
@@ -188,7 +201,7 @@ function MobileFacilityCard({
             Xem chi tiết
           </Link>
          
-          <div className="grid grid-cols-3 gap-2">
+          <div className={`grid gap-2 ${showMeterReadingsAction ? "grid-cols-2" : "grid-cols-3"}`}>
             <button
               type="button"
               onClick={() => onEdit(facility)}
@@ -204,6 +217,15 @@ function MobileFacilityCard({
               <LayoutGrid className="h-3.5 w-3.5" />
               Sơ đồ
             </Link>
+            {showMeterReadingsAction && (
+              <Link
+                href={getFacilityMeterReadingsHref(facility)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+              >
+                <Gauge className="h-3.5 w-3.5" />
+                Điện nước
+              </Link>
+            )}
             <button
               type="button"
               onClick={onToggle}
@@ -230,6 +252,7 @@ function MobileFacilityCard({
 
 export function FacilityList({
   facilities,
+  showMeterReadingsAction = false,
   onEdit,
   onStatusChange,
 }) {
@@ -237,20 +260,23 @@ export function FacilityList({
     () => new Set([facilities[0]?.id].filter(Boolean)),
   );
 
-  useEffect(() => {
+  const visibleIds = useMemo(
+    () => new Set(facilities.map((facility) => facility.id)),
+    [facilities],
+  );
+  const activeExpandedIds = useMemo(() => {
     const firstFacilityId = facilities[0]?.id;
-    if (!firstFacilityId) return;
-    const visibleIds = new Set(facilities.map((facility) => facility.id));
-
-    setExpandedIds((current) => {
-      if ([...current].some((id) => visibleIds.has(id))) return current;
-      return new Set([firstFacilityId]);
-    });
-  }, [facilities]);
+    if (!firstFacilityId) return new Set();
+    if ([...expandedIds].some((id) => visibleIds.has(id))) return expandedIds;
+    return new Set([firstFacilityId]);
+  }, [expandedIds, facilities, visibleIds]);
 
   const toggleFacility = (id) => {
     setExpandedIds((current) => {
-      const next = new Set(current);
+      const currentVisible = [...current].some((itemId) => visibleIds.has(itemId))
+        ? current
+        : activeExpandedIds;
+      const next = new Set(currentVisible);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -278,10 +304,11 @@ export function FacilityList({
           <MobileFacilityCard
             key={facility.id}
             facility={facility}
-            expanded={expandedIds.has(facility.id)}
+            expanded={activeExpandedIds.has(facility.id)}
             onToggle={() => toggleFacility(facility.id)}
             onEdit={onEdit}
             onStatusChange={onStatusChange}
+            showMeterReadingsAction={showMeterReadingsAction}
           />
         ))}
       </div>
@@ -303,7 +330,7 @@ export function FacilityList({
             <tbody>
               {facilities.map((facility) => {
                 const counts = getFacilityCounts(facility);
-                const expanded = expandedIds.has(facility.id);
+                const expanded = activeExpandedIds.has(facility.id);
 
                 return (
                   <Fragment key={facility.id}>
@@ -380,6 +407,16 @@ export function FacilityList({
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
+                          {showMeterReadingsAction && (
+                            <Link
+                              href={getFacilityMeterReadingsHref(facility)}
+                              className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                              title="Quản lý điện nước"
+                              aria-label={`Quản lý điện nước ${facility.name}`}
+                            >
+                              <Gauge className="h-4 w-4" />
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

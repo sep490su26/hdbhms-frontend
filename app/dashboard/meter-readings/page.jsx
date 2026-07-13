@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchBatchHistory,
   fetchUtilityDashboard,
@@ -18,6 +19,14 @@ import {
 } from "@/components/ui/table";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { dedupeBatchHistory, getHistoryRowKey } from "@/lib/meterReadingHistory.mjs";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Edit3 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -59,6 +68,46 @@ const formatTime = (startDate, endDate) => {
   const [ey, em, ed] = endDate.split("-");
   return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
 };
+
+function normalizePropertyId(value) {
+  const text = String(value || "").trim();
+  return /^\d+$/.test(text) ? text : "";
+}
+
+function getBatchHref(period, propertyId, context = {}) {
+  const params = new URLSearchParams();
+  if (period) params.set("period", period);
+  const normalizedPropertyId = normalizePropertyId(propertyId);
+  if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+  if (context.from) params.set("from", context.from);
+  if (context.facilityName) params.set("facilityName", context.facilityName);
+  const query = params.toString();
+  return `/dashboard/meter-readings/batch${query ? `?${query}` : ""}`;
+}
+
+function MeterReadingsBreadcrumb({ facilityName }) {
+  return (
+    <Breadcrumb className="-mb-3">
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/dashboard/facilities">Quản lý cơ sở</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {facilityName ? (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {facilityName}
+              </span>
+            </BreadcrumbItem>
+          </>
+        ) : null}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
 
 function NavIcon({ type, className = "w-5 h-5" }) {
   const p = {
@@ -180,17 +229,28 @@ export default function UtilityManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const propertyId =
+    normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId")) ||
+    "1";
+  const fromFacilities = searchParams.get("from") === "facilities";
+  const facilityName = searchParams.get("facilityName") || "";
+  const batchQueryContext = {
+    from: fromFacilities ? "facilities" : "",
+    facilityName,
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const [historyRes, dashboardRes] = await Promise.all([
-          fetchBatchHistory(null),
-          fetchUtilityDashboard(null),
+          fetchBatchHistory(propertyId || null),
+          fetchUtilityDashboard(propertyId || null),
         ]);
         if (historyRes && historyRes.history) {
           const normalizedHistory = historyRes.history.map((h) => ({
             ...h,
+            batchId: h.batchId ?? h.batch_id ?? h.id,
             isCurrent: h.isCurrent ?? h.is_current,
             totalRooms: h.totalRooms ?? h.total_rooms,
             completedRooms: h.completedRooms ?? h.completed_rooms,
@@ -198,7 +258,7 @@ export default function UtilityManagement() {
             startDate: h.startDate ?? h.start_date,
             endDate: h.endDate ?? h.end_date,
           }));
-          setHistory(normalizedHistory);
+          setHistory(dedupeBatchHistory(normalizedHistory));
         }
         if (dashboardRes) {
           const canCreate =
@@ -230,7 +290,7 @@ export default function UtilityManagement() {
       }
     };
     loadData();
-  }, []);
+  }, [propertyId]);
 
   const handleStartBatch = async () => {
     try {
@@ -240,15 +300,16 @@ export default function UtilityManagement() {
           month: "2-digit",
           year: "numeric",
         });
-      await startBatchReading(periodToStart, 1);
-      router.push(`/dashboard/meter-readings/batch?period=${periodToStart}`);
+      await startBatchReading(periodToStart, propertyId || undefined);
+      router.push(getBatchHref(periodToStart, propertyId, batchQueryContext));
     } catch (error) {
       toast.error("Không thể tạo kỳ ghi chỉ số");
       console.error(error);
     }
   };
 
-  const currentPeriod = history.find((h) => h.isCurrent);
+  const displayHistory = dedupeBatchHistory(history);
+  const currentPeriod = displayHistory.find((h) => h.isCurrent);
 
   if (loading) {
     return (
@@ -267,10 +328,11 @@ export default function UtilityManagement() {
   const progress =
     totalRooms === 0 ? 0 : Math.round((completedRooms / totalRooms) * 100);
 
-  const totalPages = Math.ceil(history.length / itemsPerPage);
-  const paginatedHistory = history.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
+  const totalPages = Math.ceil(displayHistory.length / itemsPerPage);
+  const effectiveCurrentPage = Math.min(currentPage, totalPages || 1);
+  const paginatedHistory = displayHistory.slice(
+    (effectiveCurrentPage - 1) * itemsPerPage,
+    effectiveCurrentPage * itemsPerPage,
   );
 
   const handlePageChange = (page) => {
@@ -282,6 +344,9 @@ export default function UtilityManagement() {
   return (
     <div className="w-full min-w-0 overflow-x-hidden bg-gray-50 font-sans text-slate-900 dark:bg-[#020817] dark:text-slate-100">
       <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-5 sm:gap-6">
+        {fromFacilities ? (
+          <MeterReadingsBreadcrumb facilityName={facilityName} />
+        ) : null}
         {/* Page header */}
         <DashboardPageHeader
           title="Nhập điện nước hàng tháng"
@@ -318,7 +383,9 @@ export default function UtilityManagement() {
 
               {currentPeriod && (
                 <button
-                  onClick={() => router.push("/dashboard/meter-readings/batch")}
+                  onClick={() =>
+                    router.push(getBatchHref(currentPeriod?.period, propertyId, batchQueryContext))
+                  }
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
                 >
                   <svg
@@ -524,7 +591,7 @@ export default function UtilityManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedHistory.map((h) => {
+                  {paginatedHistory.map((h, index) => {
                     const st = STATUS_MAP[h.status] || STATUS_MAP.DRAFT;
                     const prog =
                       h.totalRooms === 0
@@ -532,7 +599,7 @@ export default function UtilityManagement() {
                         : Math.round((h.completedRooms / h.totalRooms) * 100);
                     return (
                       <TableRow
-                        key={h.period}
+                        key={getHistoryRowKey(h, index)}
                         className="border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
                       >
                         <TableCell className="px-5 py-4">
@@ -585,7 +652,7 @@ export default function UtilityManagement() {
                             <button
                               onClick={() =>
                                 router.push(
-                                  `/dashboard/meter-readings/batch?period=${h.period}`,
+                                  getBatchHref(h.period, propertyId, batchQueryContext),
                                 )
                               }
                               className="text-sm font-medium text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-500/20 hover:border-blue-400 px-3 py-1.5 rounded-lg transition-colors"
@@ -602,7 +669,7 @@ export default function UtilityManagement() {
             </div>
             {/* Card List cho Mobile */}
             <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 md:hidden">
-              {paginatedHistory.map((h) => {
+              {paginatedHistory.map((h, index) => {
                 const st = STATUS_MAP[h.status] || STATUS_MAP.DRAFT;
                 const prog =
                   h.totalRooms === 0
@@ -610,7 +677,7 @@ export default function UtilityManagement() {
                     : Math.round((h.completedRooms / h.totalRooms) * 100);
                 return (
                   <div
-                    key={h.period}
+                    key={getHistoryRowKey(h, index)}
                     className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 dark:border-white/10 sm:p-4"
                   >
                     <div className="flex justify-between items-start mb-3">
@@ -668,7 +735,7 @@ export default function UtilityManagement() {
                     <button
                       onClick={() =>
                         router.push(
-                          `/dashboard/meter-readings/batch?period=${h.period}`,
+                          getBatchHref(h.period, propertyId, batchQueryContext),
                         )
                       }
                       className="w-full text-sm font-medium text-blue-600 dark:text-blue-300 bg-white dark:bg-[#0f172a] hover:bg-blue-50 dark:hover:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 py-2 rounded-lg transition-colors"
@@ -681,9 +748,9 @@ export default function UtilityManagement() {
             </div>
 
             <DashboardPagination
-              page={currentPage}
+              page={effectiveCurrentPage}
               size={itemsPerPage}
-              totalElements={history.length}
+              totalElements={displayHistory.length}
               totalPages={totalPages}
               itemLabel="kỳ ghi chỉ số"
               onPageChange={handlePageChange}

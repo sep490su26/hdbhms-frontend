@@ -1501,10 +1501,6 @@ export default function TenantsPage() {
     roomFilter,
   ]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [keyword, profileStatusFilter, propertyFilter, roleFilter, roomFilter]);
-
   const filteredTotalElements = filteredProfiles.length;
   const filteredTotalPages =
     filteredTotalElements === 0
@@ -1550,14 +1546,20 @@ export default function TenantsPage() {
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b97aa]" />
             <input
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm theo tên, SĐT, email hoặc số phòng"
               className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-12 pr-4 text-sm outline-none focus:border-[#1e40af]"
             />
           </div>
           <select
             value={roomFilter}
-            onChange={(event) => setRoomFilter(event.target.value)}
+            onChange={(event) => {
+              setRoomFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả phòng</option>
@@ -1569,7 +1571,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={propertyFilter}
-            onChange={(event) => setPropertyFilter(event.target.value)}
+            onChange={(event) => {
+              setPropertyFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả cơ sở</option>
@@ -1581,7 +1586,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={profileStatusFilter}
-            onChange={(event) => setProfileStatusFilter(event.target.value)}
+            onChange={(event) => {
+              setProfileStatusFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -1594,7 +1602,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
+            onChange={(event) => {
+              setRoleFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả vai trò</option>

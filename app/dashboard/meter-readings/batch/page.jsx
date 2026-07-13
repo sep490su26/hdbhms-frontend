@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
@@ -166,6 +166,21 @@ function numberOrZero(value) {
     return numberOrNull(value) ?? 0;
 }
 
+function normalizePropertyId(value) {
+    const text = String(value || "").trim();
+    return /^\d+$/.test(text) ? text : "";
+}
+
+function getMeterReadingsHref(propertyId, context = {}) {
+    const params = new URLSearchParams();
+    const normalizedPropertyId = normalizePropertyId(propertyId);
+    if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+    if (context.from) params.set("from", context.from);
+    if (context.facilityName) params.set("facilityName", context.facilityName);
+    const query = params.toString();
+    return `/dashboard/meter-readings${query ? `?${query}` : ""}`;
+}
+
 function MeterPhoto({ src }) {
     return (
         <div
@@ -195,16 +210,23 @@ export default function MeterReadings() {
 
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
+    const propertyId =
+        normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId")) || "1";
+    const fromFacilities = searchParams.get("from") === "facilities";
+    const facilityName = searchParams.get("facilityName") || "";
+    const meterReadingsHref = getMeterReadingsHref(propertyId, {
+        from: fromFacilities ? "facilities" : "",
+        facilityName,
+    });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetchBatchMeterReadingsStatus(period, 1);
+            const res = await fetchBatchMeterReadingsStatus(period, propertyId);
             if (res) {
                 const fetchedBatchId = res.batchId || res.batch_id;
                 if (fetchedBatchId) setBatchId(fetchedBatchId);
-                console.log("Fetched batchId:", fetchedBatchId);
                 if (res.rooms) {
                     const mappedRooms = res.rooms.map((r, index) => {
                         const roomId = readField(r, "roomId", "room_id");
@@ -232,7 +254,7 @@ export default function MeterReadings() {
         } finally {
             setLoading(false);
         }
-    }, [period]);
+    }, [period, propertyId]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -254,24 +276,6 @@ export default function MeterReadings() {
             document.body.classList.remove("overflow-hidden");
         };
     }, [focusRoomId]);
-
-    const scrollRef = useRef(null);
-    const handleWheel = useCallback((e) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            e.currentTarget.scrollLeft += e.deltaY;
-        }
-    }, []);
-
-    const horizontalScrollRef = useCallback((node) => {
-        if (scrollRef.current) {
-            scrollRef.current.removeEventListener("wheel", handleWheel);
-        }
-        if (node) {
-            node.addEventListener("wheel", handleWheel, { passive: false });
-        }
-        scrollRef.current = node;
-    }, [handleWheel]);
 
     // handleSaveBatch removed
 
@@ -421,8 +425,24 @@ export default function MeterReadings() {
         <div className="w-full min-w-0 overflow-x-hidden font-sans">
             <Breadcrumb>
                 <BreadcrumbList>
+                    {fromFacilities ? (
+                        <>
+                            <BreadcrumbItem>
+                                <BreadcrumbLink href="/dashboard/facilities">Quản lý cơ sở</BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator />
+                            {facilityName ? (
+                                <>
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink href={meterReadingsHref}>{facilityName}</BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                    <BreadcrumbSeparator />
+                                </>
+                            ) : null}
+                        </>
+                    ) : null}
                     <BreadcrumbItem>
-                        <BreadcrumbLink href={"/dashboard/meter-readings"}>Quản lý điện nước</BreadcrumbLink>
+                        <BreadcrumbLink href={meterReadingsHref}>Quản lý điện nước</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -858,9 +878,11 @@ export default function MeterReadings() {
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <button
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 md:w-auto">
-                        <ClipboardCheck className="h-4 w-4" />
-                        Kiểm tra & chốt chỉ số
+                        onClick={handleSaveAll}
+                        disabled={saving || loading || pending > 0 || errors > 0}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
+                        {saving ? "Đang chốt..." : "Kiểm tra & chốt chỉ số"}
                     </button>
                 </div>
             </div>
@@ -880,17 +902,6 @@ export default function MeterReadings() {
                                 <DialogHeader>
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
-                                <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 dark:border-white/10 mb-2" ref={horizontalScrollRef}>
-                                    {filtered.map(r => (
-                                        <button
-                                            key={r.id}
-                                            onClick={() => setFocusRoomId(r.id)}
-                                            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-gray-200'}`}
-                                        >
-                                            {r.id}
-                                        </button>
-                                    ))}
-                                </div>
                                 <div className="space-y-6 py-4">
                                     {/* Electricity */}
                                     <div className="space-y-3">
@@ -962,8 +973,8 @@ export default function MeterReadings() {
 
                                     <div className="pt-2">
                                         {capturedPhotos[room.id] ? (
-                                            <div className="relative h-48 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#020817]">
-                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" fill sizes="(max-width: 768px) 100vw, 320px" className="object-contain bg-black/5" unoptimized />
+                                            <div className="relative h-32 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#020817]">
+                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized />
                                                 <button
                                                     onClick={() => {
                                                         const newPhotos = {...capturedPhotos};
@@ -992,10 +1003,8 @@ export default function MeterReadings() {
                                         Đóng
                                     </Button>
                                     <Button onClick={handleSaveAndNext}
-                                        className="flex w-2/3 items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700">
-                                        <Save className="h-4 w-4" />
+                                        className="w-2/3 bg-blue-600 hover:bg-blue-700">
                                         Lưu & Tiếp theo
-                                        <ArrowRight className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </>

@@ -467,10 +467,6 @@ export default function DepositsPage() {
     return () => window.clearTimeout(timer);
   }, [loadAgreements]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [customerFilter, floorFilter, statusFilter]);
-
   const floorOptions = useMemo(() => {
     const floors = new Set(agreements.map((item) => item.floorLabel).filter(Boolean));
     return Array.from(floors).sort((a, b) => a.localeCompare(b, "vi"));
@@ -611,7 +607,10 @@ export default function DepositsPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
                 <input
                   value={customerFilter}
-                  onChange={(event) => setCustomerFilter(event.target.value)}
+                  onChange={(event) => {
+                    setCustomerFilter(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Nhập tên khách, SĐT, mã cọc..."
                   className="h-11 w-full rounded-lg border border-[#c4cad6] dark:border-white/10 pl-10 pr-3 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-500 dark:text-slate-400 focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10"
                 />
@@ -621,7 +620,10 @@ export default function DepositsPage() {
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">Trạng thái</span>
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value);
+                  setPage(1);
+                }}
                 className="h-11 w-full rounded-lg border border-[#c4cad6] dark:border-white/10 px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10"
               >
                 <option value="all">Tất cả trạng thái</option>
@@ -634,7 +636,10 @@ export default function DepositsPage() {
               <span className="text-xs font-bold uppercase tracking-[0.06em] text-slate-600 dark:text-slate-300">Tầng</span>
               <select
                 value={floorFilter}
-                onChange={(event) => setFloorFilter(event.target.value)}
+                onChange={(event) => {
+                  setFloorFilter(event.target.value);
+                  setPage(1);
+                }}
                 className="h-11 w-full rounded-lg border border-[#c4cad6] dark:border-white/10 px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10"
               >
                 <option value="all">Tất cả tầng</option>

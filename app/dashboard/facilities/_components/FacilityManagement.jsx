@@ -22,6 +22,8 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { facilityStatusOptions } from "@/services/facilityService";
+import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
+import { ROLES } from "@/app/dashboard/_lib/rbac";
 
 const statCards = [
   {
@@ -128,6 +130,7 @@ export function FacilityManagement() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const { user } = useAuth();
   const facility = useFacilityManagement({
     keyword: query,
     status: statusFilter,
@@ -208,6 +211,7 @@ export function FacilityManagement() {
 
       <FacilityList
         facilities={facility.facilities}
+        showMeterReadingsAction={user?.role === ROLES.OWNER}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
       />

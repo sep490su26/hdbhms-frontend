@@ -199,15 +199,21 @@ function getAllowedRoles(item) {
 
 function getVisibleNavigation(role) {
   if (role !== ROLES.OWNER) return navigation;
-  return navigation.filter((item) => item.path !== "/dashboard/rooms");
+  return navigation.filter(
+    (item) =>
+      item.path !== "/dashboard/rooms" &&
+      item.path !== "/dashboard/meter-readings",
+  );
 }
 
-function isOwnerRoomsRoute(role, pathname, propertyId) {
+function isOwnerFacilityScopedRouteWithoutProperty(role, pathname, propertyId) {
   return (
     role === ROLES.OWNER &&
     !propertyId &&
     (pathname === "/dashboard/rooms" ||
-      pathname?.startsWith("/dashboard/rooms/"))
+      pathname?.startsWith("/dashboard/rooms/") ||
+      pathname === "/dashboard/meter-readings" ||
+      pathname?.startsWith("/dashboard/meter-readings/"))
   );
 }
 
@@ -980,7 +986,7 @@ function DashboardLayoutShell({ children }) {
       router.replace(`/login${redirect}`);
       return;
     }
-    if (isOwnerRoomsRoute(effectiveRole, pathname, routePropertyId)) {
+    if (isOwnerFacilityScopedRouteWithoutProperty(effectiveRole, pathname, routePropertyId)) {
       router.replace("/dashboard/facilities");
       return;
     }

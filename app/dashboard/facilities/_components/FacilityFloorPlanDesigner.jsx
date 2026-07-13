@@ -527,6 +527,9 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
   const canvasViewportRef = useRef(null);
   const panStartRef = useRef(null);
   const hasPannedRef = useRef(false);
+  const openingSequenceRef = useRef(0);
+  const undoLayoutRef = useRef(null);
+  const redoLayoutRef = useRef(null);
   const IS_HAI_DANG_1 = String(propertyId) === "1";
   const [data, setData] = useState(null);
   const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -691,6 +694,14 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
     });
   };
 
+  const clearSelection = () => {
+    setSelectedItemId("");
+    setPlacementMode(null);
+    setPlacementTargetId(null);
+    setAreaInputValue("");
+    setPriceInputValue("");
+  };
+
   const syncSelectionAfterRestore = (snapshot) => {
     const item =
       snapshot.rooms.find((room) => String(room.id) === String(selectedItemId)) ??
@@ -744,6 +755,11 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       future: history.future.slice(1),
     });
   };
+
+  useEffect(() => {
+    undoLayoutRef.current = undoLayout;
+    redoLayoutRef.current = redoLayout;
+  });
 
   const zoomCanvas = (nextZoom, anchorClientX, anchorClientY) => {
     const viewport = canvasViewportRef.current;
@@ -852,14 +868,6 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       setAreaInputValue("");
       setPriceInputValue("");
     }
-  };
-
-  const clearSelection = () => {
-    setSelectedItemId("");
-    setPlacementMode(null);
-    setPlacementTargetId(null);
-    setAreaInputValue("");
-    setPriceInputValue("");
   };
 
   const changeFloor = (floorId) => {
@@ -1008,17 +1016,17 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       const key = event.key.toLowerCase();
       if (key === "z" && !event.shiftKey) {
         event.preventDefault();
-        undoLayout();
+        undoLayoutRef.current?.();
         return;
       }
       if (key === "y" || (key === "z" && event.shiftKey)) {
         event.preventDefault();
-        redoLayout();
+        redoLayoutRef.current?.();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [history, selectedFloorId, currentRooms, currentBlocks]);
+  }, []);
 
   const rotateSelectedItem = () => {
     if (selectedRoom) {
@@ -1057,7 +1065,8 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
       : (event.clientY - rect.top) / rect.height;
     const offset = Math.min(0.96, Math.max(0.04, Number(rawOffset.toFixed(3))));
     const key = placementMode === "door" ? "doors" : "windows";
-    const nextFeature = { id: `${placementMode}-${Date.now()}`, wall, offset };
+    openingSequenceRef.current += 1;
+    const nextFeature = { id: `${placementMode}-${selectedRoom.id}-${openingSequenceRef.current}`, wall, offset };
     updateRoom(selectedRoom.id, { [key]: [...(selectedRoom[key] ?? []), nextFeature] });
   };
 

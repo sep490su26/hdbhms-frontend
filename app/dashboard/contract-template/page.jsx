@@ -672,18 +672,6 @@ export default function ContractTemplatePage() {
   }, [loadContracts]);
 
   useEffect(() => {
-    setPage(1);
-  }, [
-    contractTypeFilter,
-    fileFilter,
-    keyword,
-    roomFilter,
-    selectedYear,
-    statusFilter,
-    timeFilter,
-  ]);
-
-  useEffect(() => {
     let ignore = false;
     async function loadDetails() {
       if (!selected?.leaseContractId) {
@@ -1389,6 +1377,7 @@ export default function ContractTemplatePage() {
 
   function selectTimeFilter(value) {
     setTimeFilter(value);
+    setPage(1);
     setTimePanelQuarter(getQuarterForTimeFilter(value));
     setTimePopoverOpen(false);
   }
@@ -1495,7 +1484,10 @@ export default function ContractTemplatePage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm mã HĐ, phòng hoặc người ký..."
               className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
             />
@@ -1504,7 +1496,10 @@ export default function ContractTemplatePage() {
             <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <select
               value={fileFilter}
-              onChange={(event) => setFileFilter(event.target.value)}
+              onChange={(event) => {
+                setFileFilter(event.target.value);
+                setPage(1);
+              }}
               className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
             >
               <option value="all">Tất cả file</option>
@@ -1585,7 +1580,10 @@ export default function ContractTemplatePage() {
             <span className="sr-only">Lọc theo phòng</span>
             <select
               value={roomFilter}
-              onChange={(event) => setRoomFilter(event.target.value)}
+              onChange={(event) => {
+                setRoomFilter(event.target.value);
+                setPage(1);
+              }}
               className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
             >
               <option value="all">Tất cả phòng</option>
@@ -1600,7 +1598,10 @@ export default function ContractTemplatePage() {
             <span className="sr-only">Loại hợp đồng</span>
             <select
               value={contractTypeFilter}
-              onChange={(event) => setContractTypeFilter(event.target.value)}
+              onChange={(event) => {
+                setContractTypeFilter(event.target.value);
+                setPage(1);
+              }}
               className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
             >
               <option value="all">Tất cả loại HĐ</option>
@@ -1624,7 +1625,10 @@ export default function ContractTemplatePage() {
               <button
                 key={filter.id}
                 type="button"
-                onClick={() => setStatusFilter(filter.id)}
+                onClick={() => {
+                  setStatusFilter(filter.id);
+                  setPage(1);
+                }}
                 className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${statusFilter === filter.id
                   ? "border-[#091426] bg-[#091426] text-white"
                   : "border-[#d7deea] bg-white text-[#56647a] hover:border-[#9ba8ba] hover:text-[#091426]"
@@ -1637,7 +1641,10 @@ export default function ContractTemplatePage() {
           <div className="flex justify-end lg:w-[130px] lg:shrink-0">
             <button
               type="button"
-              onClick={() => setStatusFilter(HISTORY_FILTER.id)}
+              onClick={() => {
+                setStatusFilter(HISTORY_FILTER.id);
+                setPage(1);
+              }}
               className="h-11 shrink-0 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white transition hover:bg-[#16253a]"
             >
               {HISTORY_FILTER.label}

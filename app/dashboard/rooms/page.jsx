@@ -1334,10 +1334,6 @@ function RoomsListPage({ query, propertyId }) {
     fetchStaffRooms();
   }, [propertyId]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [propertyId, query]);
-
   const filteredRooms = apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();

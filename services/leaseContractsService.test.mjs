@@ -75,7 +75,10 @@ test("lease contract download fallbacks do not use legacy hop-dong-thue filename
   assert.doesNotMatch(pageSource, /hop-dong-thue\.pdf/);
   assert.doesNotMatch(wizardSource, /hop-dong-thue/);
   assert.match(pageSource, /selectedLeaseContractFilename/);
-  assert.match(pageSource, /downloadLeaseContractSignedFile\(mergedSelected\.leaseContractId, selectedLeaseContractFilename\)/);
+  assert.match(
+    pageSource,
+    /downloadLeaseContractSignedFile\(\s*mergedSelected\.leaseContractId,\s*selectedLeaseContractFilename,\s*\)/,
+  );
   assert.match(wizardSource, /buildLeaseContractDocumentFilename/);
 });
 

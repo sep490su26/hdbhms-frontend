@@ -5,7 +5,7 @@ export { API_BASE_URL };
 
 export class ApiError extends Error {
     constructor(message, { code, details, status, payload } = {}) {
-        super(message || details || "Khong the xu ly yeu cau.");
+        super(message || stringifyDetails(details) || messageForStatus(status));
         this.name = "ApiError";
         this.code = code;
         this.details = details;
@@ -29,24 +29,110 @@ export function clearAuthSession() {
 function getAuthHeaders(extraHeaders = {}) {
     const token = getAuthToken();
     return {
+        Accept: "application/json",
         "X-Client-Type": "web",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...extraHeaders,
     };
 }
 
-export async function parseEnvelope(response) {
-    const payload = await response.json().catch(() => ({}));
+function stringifyDetails(details) {
+    if (!details) return "";
+    if (typeof details === "string") return details;
+    try {
+        return JSON.stringify(details);
+    } catch {
+        return String(details);
+    }
+}
 
-    if (!response.ok || payload.code !== 0) {
-        throw new ApiError(payload.message || payload.details, {
-            code: payload.code,
-            details: payload.details,
+function messageForStatus(status) {
+    if (status === 401) return "Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập.";
+    if (status === 403) return "Bạn không có quyền truy cập chức năng này.";
+    if (status === 404) return "Không tìm thấy tài nguyên hoặc endpoint.";
+    if (status >= 500) return "Lỗi hệ thống. Vui lòng thử lại sau.";
+    return "Không thể xử lý yêu cầu.";
+}
+
+async function readResponsePayload(response) {
+    if (response.status === 204) return { payload: null, rawText: "" };
+
+    const rawText = await response.text().catch(() => "");
+    if (!rawText) return { payload: null, rawText: "" };
+
+    try {
+        return { payload: JSON.parse(rawText), rawText };
+    } catch {
+        return { payload: parseXmlEnvelope(rawText), rawText };
+    }
+}
+
+function parseXmlEnvelope(rawText) {
+    const trimmed = rawText.trim();
+    if (!trimmed.startsWith("<")) return null;
+
+    const tagValue = (tag) => {
+        const match = trimmed.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+        return match?.[1]?.trim();
+    };
+
+    const code = tagValue("code");
+    const message = tagValue("message");
+    const details = tagValue("details");
+
+    if (code === undefined && message === undefined && details === undefined) {
+        return null;
+    }
+
+    return {
+        ...(code !== undefined ? { code: Number.isNaN(Number(code)) ? code : Number(code) } : {}),
+        ...(message !== undefined ? { message } : {}),
+        ...(details !== undefined ? { details } : {}),
+    };
+}
+
+function isSuccessCode(code) {
+    return code === undefined || code === null || code === 0 || code === "0";
+}
+
+function isEnvelopePayload(payload) {
+    return (
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        ("code" in payload || "data" in payload || "message" in payload || "details" in payload)
+    );
+}
+
+async function safeFetch(url, options) {
+    try {
+        return await fetch(url, options);
+    } catch (error) {
+        throw new ApiError("Không thể kết nối máy chủ.", {
+            details: error?.message,
+        });
+    }
+}
+
+export async function parseEnvelope(response) {
+    const { payload, rawText } = await readResponsePayload(response);
+    const isEnvelope = isEnvelopePayload(payload);
+    const code = isEnvelope ? payload.code : undefined;
+    const details = isEnvelope ? payload.details : rawText;
+    const message = isEnvelope ? payload.message : rawText;
+
+    if (!response.ok || (isEnvelope && !isSuccessCode(code))) {
+        throw new ApiError(message || stringifyDetails(details), {
+            code,
+            details,
             status: response.status,
             payload,
         });
     }
 
+    if (response.status === 204) return {};
+    if (payload === null) return rawText || {};
+    if (!isEnvelope) return payload ?? rawText;
     return payload.data ?? {};
 }
 
@@ -58,7 +144,7 @@ export async function authenticatedFetch(url, options = {}) {
         headers: getAuthHeaders(options.headers),
     };
 
-    const res = await fetch(fullUrl, requestOptions);
+    const res = await safeFetch(fullUrl, requestOptions);
 
     if (res.status !== 401) {
         return parseEnvelope(res);
@@ -78,7 +164,7 @@ export async function authenticatedFetch(url, options = {}) {
         });
     }
 
-    const retryRes = await fetch(fullUrl, {
+    const retryRes = await safeFetch(fullUrl, {
         ...options,
         credentials: "include",
         headers: {
@@ -108,6 +194,7 @@ export async function loginWithPhonePassword({ phone, password }) {
         method: "POST",
         credentials: "include",
         headers: {
+            Accept: "application/json",
             "Content-Type": "application/json",
             "X-Client-Type": "web",
         },
@@ -133,6 +220,7 @@ export async function refreshTokenApi() {
         method: "POST",
         credentials: "include",
         headers: {
+            Accept: "application/json",
             "Content-Type": "application/json",
             "X-Client-Type": "web"
         },

@@ -183,6 +183,8 @@ export default function UtilityManagement() {
   const [canStartCurrentPeriod, setCanStartCurrentPeriod] = useState(false);
   const [nextOpenDate, setNextOpenDate] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const router = useRouter();
@@ -190,6 +192,8 @@ export default function UtilityManagement() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setLoading(true);
+        setErrorMessage("");
         const [historyRes, dashboardRes] = await Promise.all([
           fetchBatchHistory(null),
           fetchUtilityDashboard(null),
@@ -231,12 +235,14 @@ export default function UtilityManagement() {
         }
       } catch (error) {
         console.error("Error fetching data", error);
+        setErrorMessage(error?.message || "Không thể tải dữ liệu điện nước.");
+        toast.error(error?.message || "Không thể tải dữ liệu điện nước.");
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [reloadKey]);
 
   const handleStartBatch = async () => {
     try {
@@ -260,6 +266,31 @@ export default function UtilityManagement() {
     return (
       <div className="flex min-h-[320px] w-full items-center justify-center bg-gray-50 dark:bg-[#020817]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="w-full bg-gray-50 text-slate-900 dark:bg-[#020817] dark:text-slate-100">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+          <DashboardPageHeader
+            title="Nhập điện nước hàng tháng"
+            description="Quản lý ghi chỉ số điện nước hàng tháng"
+          />
+          <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm dark:border-red-500/20 dark:bg-[#0f172a]">
+            <p className="text-sm font-semibold text-red-600 dark:text-red-300">
+              {errorMessage}
+            </p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((value) => value + 1)}
+              className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

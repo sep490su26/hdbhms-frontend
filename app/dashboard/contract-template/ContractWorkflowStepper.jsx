@@ -1,78 +1,264 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Download,
-  Upload,
-  CheckCircle2,
-  FileText,
   AlertCircle,
-  Loader2,
+  Check,
+  CheckCircle2,
   ClipboardEdit,
+  Download,
+  FileText,
+  Info,
+  Loader2,
+  Upload,
   Zap,
-  ShieldCheck,
 } from "lucide-react";
-import { buildLeaseContractDocumentFilename, downloadLeaseContractDraftPdf, uploadSignedLeaseContractFile } from "@/services/leaseContractsService";
-import { buildHandoverDocumentFilename, downloadHandoverDraftPdf, uploadHandoverSignedDocument, fetchContractHandover } from "@/services/contractHandoverService";
-import { buildDepositContractDocumentFilename, downloadDepositContractPdf, uploadSignedDepositContractFile } from "@/services/depositContractsService";
 import { toast } from "sonner";
-import { isLeaseSignedUploadDisabled } from "./contractWorkflowState";
+
+import {
+  buildDepositContractDocumentFilename,
+  downloadDepositContractPdf,
+  uploadSignedDepositContractFile,
+} from "@/services/depositContractsService";
+import {
+  buildHandoverDocumentFilename,
+  downloadHandoverDraftPdf,
+  fetchContractHandover,
+  uploadHandoverSignedDocument,
+} from "@/services/contractHandoverService";
+import {
+  buildLeaseContractDocumentFilename,
+  downloadLeaseContractDraftPdf,
+  uploadSignedLeaseContractFile,
+} from "@/services/leaseContractsService";
+
+import {
+  getContractActivationReadiness,
+  isLeaseSignedUploadDisabled,
+} from "./contractWorkflowState";
+
+const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024;
+
+const ACTION = {
+  DOWNLOAD_DEPOSIT: "download-deposit",
+  UPLOAD_DEPOSIT: "upload-deposit",
+  DOWNLOAD_LEASE: "download-lease",
+  UPLOAD_LEASE: "upload-lease",
+  DOWNLOAD_HANDOVER: "download-handover",
+  UPLOAD_HANDOVER: "upload-handover",
+};
 
 function unwrapHandoverResponse(response) {
   return response?.data || response || null;
 }
 
-function hasSignedHandoverDocument(handover) {
-  return Boolean(handover?.signedDocumentId || handover?.signed_document_id);
+function hasHandoverReadings(handover) {
+  return Boolean(handover?.electricity && handover?.water);
 }
 
-export default function ContractWorkflowStepper({ contractDetails, refreshKey = 0, onContractUpdated, onRequestShowHandover, onActivate, leaseVersion = 0, isActivating = false }) {
-  const fileInputRef0 = useRef(null);
-  const fileInputRef1 = useRef(null);
-  const fileInputRef2 = useRef(null);
+function getSignedHandoverDocumentId(handover) {
+  return handover?.signedDocumentId ?? handover?.signed_document_id ?? null;
+}
+
+function getReadingValue(reading) {
+  return reading?.currentValue ?? reading?.current_value ?? null;
+}
+
+function isPdfFile(file) {
+  return Boolean(
+    file &&
+      (file.type === "application/pdf" || /\.pdf$/i.test(file.name || "")),
+  );
+}
+
+function StatusPill({ complete = false, children, warning = false }) {
+  const style = complete
+    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
+    : warning
+      ? "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300"
+      : "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400";
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-extrabold ${style}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PanelHeader({ kicker, title, description, count }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
+      <div>
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-blue-700 dark:text-blue-300">
+          {kicker}
+        </p>
+        <h3 className="mt-1 text-base font-extrabold tracking-[-0.015em] text-slate-950 dark:text-white sm:text-lg">
+          {title}
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+      </div>
+      {count != null && (
+        <span className="grid h-7 min-w-8 shrink-0 place-items-center rounded-lg border border-slate-200 px-2 text-[11px] font-extrabold text-slate-500 dark:border-white/10 dark:text-slate-400">
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DocumentRow({
+  title,
+  meta,
+  complete = true,
+  statusLabel,
+  children,
+}) {
+  return (
+    <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 border-t border-slate-200 px-4 py-3 dark:border-white/10 sm:grid-cols-[38px_minmax(0,1fr)_auto_auto] sm:px-5">
+      <div className="grid h-9.5 w-9.5 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-blue-700 dark:border-white/10 dark:bg-white/5 dark:text-blue-300">
+        <FileText className="h-[18px] w-[18px]" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[13px] font-extrabold text-slate-900 dark:text-white">
+          {title}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+          {meta}
+        </p>
+      </div>
+      <div className="col-start-2 sm:col-start-auto">
+        <StatusPill complete={complete} warning={!complete}>
+          {statusLabel}
+        </StatusPill>
+      </div>
+      <div className="col-start-2 flex flex-wrap gap-2 sm:col-start-auto sm:justify-end">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function UploadRow({
+  title,
+  description,
+  complete,
+  fileName,
+  loading,
+  disabled,
+  onClick,
+}) {
+  return (
+    <div className="grid grid-cols-[38px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 border-t border-slate-200 px-4 py-3 dark:border-white/10 sm:grid-cols-[38px_minmax(0,1fr)_auto] sm:px-5">
+      <div className="grid h-9.5 w-9.5 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-300">
+        <Upload className="h-[18px] w-[18px]" />
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-extrabold text-slate-900 dark:text-white">
+            {title}
+          </p>
+          <StatusPill complete={complete}>
+            {complete ? "Đã có file" : "Chưa có file"}
+          </StatusPill>
+        </div>
+        <p
+          className={`mt-1 truncate text-[11px] leading-4 ${
+            complete
+              ? "font-bold text-emerald-700 dark:text-emerald-300"
+              : "text-slate-500 dark:text-slate-400"
+          }`}
+        >
+          {complete && fileName ? fileName : description}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="col-start-2 inline-flex h-9 w-fit items-center justify-center gap-1.5 rounded-lg bg-blue-700 px-3 text-[11px] font-extrabold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-white/10 dark:disabled:text-slate-500 sm:col-start-auto"
+      >
+        {loading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Upload className="h-3.5 w-3.5" />
+        )}
+        {loading ? "Đang tải..." : complete ? "Thay PDF" : "Chọn PDF"}
+      </button>
+    </div>
+  );
+}
+
+function ChecklistItem({ label, description, complete }) {
+  return (
+    <div
+      className={`grid grid-cols-[20px_minmax(0,1fr)] gap-2.5 border-b border-slate-200 py-3.5 last:border-b-0 dark:border-white/10 sm:px-4 sm:[&:nth-child(odd)]:border-r ${
+        complete ? "text-slate-800 dark:text-slate-100" : "text-slate-400"
+      }`}
+    >
+      <span
+        className={`mt-0.5 grid h-5 w-5 place-items-center rounded-full border ${
+          complete
+            ? "border-emerald-600 bg-emerald-600 text-white"
+            : "border-slate-300 text-transparent dark:border-slate-600"
+        }`}
+      >
+        <Check className="h-3 w-3" />
+      </span>
+      <div>
+        <p className="text-xs font-extrabold leading-4">{label}</p>
+        <p className="mt-1 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function ContractWorkflowStepper({
+  contractDetails,
+  refreshKey = 0,
+  onContractUpdated,
+  onRequestShowHandover,
+  onActivate,
+  onReadinessChange,
+  leaseVersion = 0,
+  isActivating = false,
+}) {
+  const depositInputRef = useRef(null);
+  const leaseInputRef = useRef(null);
+  const handoverInputRef = useRef(null);
   const leaseUploadInFlightRef = useRef(false);
+  const prevLeaseVersionRef = useRef(0);
+  const prevRefreshKeyRef = useRef(0);
+  const isInitialMountRef = useRef(true);
+
   const [loadingStep, setLoadingStep] = useState(null);
   const [handoverData, setHandoverData] = useState(null);
   const [handoverLoading, setHandoverLoading] = useState(true);
-
-  // After a lease re-upload, the backend still holds the old handover
-  // record. We track which leaseVersion the handover was last confirmed
-  // against. Steps 3–5 are only "done" when this matches the current
-  // leaseVersion, forcing the user to re-confirm after a lease change.
   const [confirmedLeaseVersion, setConfirmedLeaseVersion] = useState(0);
-  const prevLeaseVersionRef = useRef(0);
-  // Track refreshKey changes so the load effect can distinguish a
-  // handover-save trigger (refreshKey bumped) from other triggers.
-  const prevRefreshKeyRef = useRef(0);
-  // True only on the very first render, used to auto-confirm handover
-  // when opening a contract that was already completed before.
-  const isInitialMountRef = useRef(true);
 
-  const contractId = contractDetails?.contractId || contractDetails?.leaseContractId;
+  const contractId =
+    contractDetails?.contractId || contractDetails?.leaseContractId;
   const depositAgreementId = contractDetails?.depositAgreementId;
-  const leaseSignedFileId = contractDetails?.signedFileId ?? contractDetails?.signed_file_id ?? null;
-  const depositSignedFileId = contractDetails?.depositSignedFileId ?? contractDetails?.deposit_signed_file_id ?? null;
-  const step0Done = !!depositSignedFileId;
-  const step1Done = !!depositSignedFileId;
-  const step2Done = !!leaseSignedFileId;
-  const step3Done = Boolean(handoverData?.electricity && handoverData?.water) && confirmedLeaseVersion === leaseVersion;
-  const step5Done = hasSignedHandoverDocument(handoverData) && confirmedLeaseVersion === leaseVersion;
+  const hasDeposit = Boolean(depositAgreementId);
+  const leaseSignedFileId =
+    contractDetails?.signedFileId ?? contractDetails?.signed_file_id ?? null;
+  const depositSignedFileId =
+    contractDetails?.depositSignedFileId ??
+    contractDetails?.deposit_signed_file_id ??
+    null;
 
-  // Debug logging
-  console.log("[ContractWorkflowStepper] Contract details:", {
-    contractId,
-    depositAgreementId,
-    hasDeposit: !!depositAgreementId,
-    depositSignedFileId,
-    step0Done,
-    step1Done,
-    step2Done,
-  });
-
-  // Reset confirmed version when the lease version changes (re-upload).
   useEffect(() => {
-    if (leaseVersion > 0 && leaseVersion !== prevLeaseVersionRef.current) {
+    if (
+      leaseVersion > 0 &&
+      leaseVersion !== prevLeaseVersionRef.current
+    ) {
       setConfirmedLeaseVersion(0);
-      setHandoverData(null);
-      toast.info("Hợp đồng đã thay đổi — vui lòng xác nhận lại bàn giao phòng.");
+      toast.info(
+        "Bản hợp đồng thuê đã thay đổi. Vui lòng tải và lưu lại biên bản bàn giao đã ký.",
+      );
     }
     prevLeaseVersionRef.current = leaseVersion;
   }, [leaseVersion]);
@@ -83,466 +269,465 @@ export default function ContractWorkflowStepper({ contractDetails, refreshKey = 
     prevRefreshKeyRef.current = refreshKey;
 
     async function loadHandover() {
-      if (!contractId) return;
+      if (!contractId) {
+        setHandoverLoading(false);
+        return;
+      }
+
       setHandoverLoading(true);
       try {
-        const data = await fetchContractHandover(contractId, "MOVE_IN");
-        if (!ignore) {
-          setHandoverData(unwrapHandoverResponse(data));
-          // When the load was triggered by a handover save (refreshKey
-          // bump), confirm the current leaseVersion so steps 3–5 show done.
-          if (wasSaveTriggered) {
+        const response = await fetchContractHandover(contractId, "MOVE_IN");
+        if (ignore) return;
+
+        const handover = unwrapHandoverResponse(response);
+        setHandoverData(handover);
+        if (wasSaveTriggered || isInitialMountRef.current) {
+          if (hasHandoverReadings(handover)) {
             setConfirmedLeaseVersion(leaseVersion);
           }
-          // On initial mount with existing handover data, auto-confirm
-          // so previously-completed contracts show the correct state.
-          if (isInitialMountRef.current) {
-            isInitialMountRef.current = false;
-            const h = unwrapHandoverResponse(data);
-            if (h?.electricity && h?.water) {
-              setConfirmedLeaseVersion(leaseVersion);
-            }
-          }
         }
-      } catch (err) {
-        if (!ignore) {
-          setHandoverData(null);
-          if (isInitialMountRef.current) isInitialMountRef.current = false;
-        }
+      } catch {
+        if (!ignore) setHandoverData(null);
       } finally {
-        if (!ignore) setHandoverLoading(false);
+        if (!ignore) {
+          isInitialMountRef.current = false;
+          setHandoverLoading(false);
+        }
       }
     }
+
     loadHandover();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [contractId, refreshKey, leaseSignedFileId, leaseVersion]);
 
-  const handlePrintDeposit = async () => {
-    console.log("[ContractWorkflowStepper] handlePrintDeposit called", { depositAgreementId, contractDetails });
-    if (!depositAgreementId) {
-      toast.error("Hợp đồng này không có mã hợp đồng đặt cọc. Vui lòng tạo hợp đồng thuê từ hợp đồng đặt cọc trước.");
-      console.error("[ContractWorkflowStepper] depositAgreementId is missing for Step 0");
-      return;
+  const handoverHasData = hasHandoverReadings(handoverData);
+  const handoverMatchesLease = confirmedLeaseVersion === leaseVersion;
+  const handoverReady = handoverHasData && handoverMatchesLease;
+  const handoverSignedFileId = getSignedHandoverDocumentId(handoverData);
+  const signedHandoverReady =
+    Boolean(handoverSignedFileId) && handoverMatchesLease;
+  const readiness = getContractActivationReadiness({
+    hasDeposit,
+    depositSignedFileId,
+    leaseSignedFileId,
+    hasHandoverData: handoverReady,
+    handoverSignedFileId: signedHandoverReady ? handoverSignedFileId : null,
+  });
+  const isBusy = loadingStep != null;
+  const uploadLeaseDisabled = isLeaseSignedUploadDisabled({
+    contractId,
+    leaseContractId: contractDetails?.leaseContractId,
+    loadingStep,
+  });
+  const uploadTotal = hasDeposit ? 3 : 2;
+  const uploadedCount =
+    Number(Boolean(leaseSignedFileId)) +
+    Number(signedHandoverReady) +
+    (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0);
+  const missingCount = readiness.totalCount - readiness.completedCount;
+  const electricValue = getReadingValue(handoverData?.electricity);
+  const waterValue = getReadingValue(handoverData?.water);
+
+  useEffect(() => {
+    onReadinessChange?.({
+      ready: readiness.ready,
+      completedCount: readiness.completedCount,
+      totalCount: readiness.totalCount,
+    });
+  }, [
+    onReadinessChange,
+    readiness.completedCount,
+    readiness.ready,
+    readiness.totalCount,
+  ]);
+
+  function resetFileInput(ref) {
+    if (ref.current) ref.current.value = "";
+  }
+
+  function validateSelectedPdf(file, ref) {
+    if (!file) return false;
+    if (!isPdfFile(file)) {
+      toast.error("Chỉ chấp nhận file PDF.");
+      resetFileInput(ref);
+      return false;
     }
-    console.log("[ContractWorkflowStepper] Downloading deposit contract PDF from backend:", depositAgreementId);
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      toast.error("File PDF vượt quá giới hạn 15 MB.");
+      resetFileInput(ref);
+      return false;
+    }
+    return true;
+  }
+
+  async function handleDownloadDeposit() {
+    if (!depositAgreementId) return;
     try {
-      setLoadingStep(0);
-      await downloadDepositContractPdf(depositAgreementId, buildDepositContractDocumentFilename(contractDetails));
-      toast.success("Đã tải PDF hợp đồng đặt cọc. Vui lòng in và ký.");
-    } catch (err) {
-      console.error("[ContractWorkflowStepper] Download deposit PDF error:", err);
-      toast.error(err.message || "Lỗi tải PDF hợp đồng đặt cọc");
+      setLoadingStep(ACTION.DOWNLOAD_DEPOSIT);
+      await downloadDepositContractPdf(
+        depositAgreementId,
+        buildDepositContractDocumentFilename(contractDetails),
+      );
+      toast.success("Đã tải hợp đồng đặt cọc để in và ký.");
+    } catch (error) {
+      toast.error(error?.message || "Không tải được hợp đồng đặt cọc.");
     } finally {
       setLoadingStep(null);
     }
-  };
+  }
 
-  const handleUploadDeposit = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!depositAgreementId) {
-      toast.error("Không tìm thấy mã hợp đồng đặt cọc. Vui lòng đảm bảo hợp đồng này được tạo từ hợp đồng đặt cọc.");
-      console.error("[ContractWorkflowStepper] depositAgreementId is missing:", contractDetails);
-      return;
-    }
-    console.log("[ContractWorkflowStepper] Uploading deposit contract:", { depositAgreementId, fileName: file.name });
+  async function handleDownloadLease() {
     try {
-      setLoadingStep(1);
+      setLoadingStep(ACTION.DOWNLOAD_LEASE);
+      await downloadLeaseContractDraftPdf(
+        contractId,
+        buildLeaseContractDocumentFilename(contractDetails),
+      );
+      toast.success("Đã tải hợp đồng thuê để in và ký.");
+    } catch (error) {
+      toast.error(error?.message || "Không tải được hợp đồng thuê.");
+    } finally {
+      setLoadingStep(null);
+    }
+  }
+
+  async function handleDownloadHandover() {
+    try {
+      setLoadingStep(ACTION.DOWNLOAD_HANDOVER);
+      await downloadHandoverDraftPdf(
+        contractId,
+        "MOVE_IN",
+        buildHandoverDocumentFilename(contractDetails),
+      );
+      toast.success("Đã tải biên bản bàn giao để in và ký.");
+    } catch (error) {
+      toast.error(
+        error?.message ||
+          "Không tải được biên bản. Vui lòng kiểm tra thông tin bàn giao.",
+      );
+    } finally {
+      setLoadingStep(null);
+    }
+  }
+
+  async function handleUploadDeposit(event) {
+    const file = event.target.files?.[0];
+    if (!validateSelectedPdf(file, depositInputRef)) return;
+
+    try {
+      setLoadingStep(ACTION.UPLOAD_DEPOSIT);
       await uploadSignedDepositContractFile(depositAgreementId, file);
-      toast.success("Upload hợp đồng đặt cọc đã ký thành công.");
-      onContractUpdated();
-    } catch (err) {
-      console.error("[ContractWorkflowStepper] Upload deposit error:", err);
-      toast.error(err.message || "Lỗi upload file hợp đồng đặt cọc");
+      await onContractUpdated?.();
+      toast.success("Đã lưu hợp đồng đặt cọc có chữ ký.");
+    } catch (error) {
+      toast.error(error?.message || "Không upload được hợp đồng đặt cọc.");
     } finally {
       setLoadingStep(null);
-      if (fileInputRef0.current) fileInputRef0.current.value = "";
+      resetFileInput(depositInputRef);
     }
-  };
+  }
 
-  const handlePrintLease = async () => {
-    try {
-      setLoadingStep(2);
-      await downloadLeaseContractDraftPdf(contractId, buildLeaseContractDocumentFilename(contractDetails));
-      toast.success("Tải xuống PDF hợp đồng thuê thành công. Vui lòng in và ký.");
-    } catch (err) {
-      toast.error(err.message || "Lỗi tải PDF hợp đồng");
-    } finally {
-      setLoadingStep(null);
-    }
-  };
-
-  const handleUploadLease = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function handleUploadLease(event) {
+    const file = event.target.files?.[0];
+    if (!validateSelectedPdf(file, leaseInputRef)) return;
     if (leaseUploadInFlightRef.current) {
-      if (fileInputRef1.current) fileInputRef1.current.value = "";
+      resetFileInput(leaseInputRef);
       return;
     }
-    if (!contractId) {
-      toast.error("Tạo hợp đồng thuê trước khi upload file đã ký.");
-      if (fileInputRef1.current) fileInputRef1.current.value = "";
-      return;
-    }
+
     leaseUploadInFlightRef.current = true;
     try {
-      setLoadingStep(3);
-      await uploadSignedLeaseContractFile(contractDetails, file, { replace: Boolean(leaseSignedFileId) });
-      toast.success("Upload hợp đồng thuê đã ký thành công.");
-      onContractUpdated();
-    } catch (err) {
-      toast.error(err.message || "Lỗi upload file hợp đồng");
+      setLoadingStep(ACTION.UPLOAD_LEASE);
+      await uploadSignedLeaseContractFile(contractDetails, file, {
+        replace: Boolean(leaseSignedFileId),
+      });
+      await onContractUpdated?.();
+      toast.success("Đã lưu hợp đồng thuê có chữ ký.");
+    } catch (error) {
+      toast.error(error?.message || "Không upload được hợp đồng thuê.");
     } finally {
       leaseUploadInFlightRef.current = false;
       setLoadingStep(null);
-      if (fileInputRef1.current) fileInputRef1.current.value = "";
+      resetFileInput(leaseInputRef);
     }
-  };
+  }
 
-  const handlePrintHandover = async () => {
-    try {
-      setLoadingStep(4);
-      await downloadHandoverDraftPdf(contractId, "MOVE_IN", buildHandoverDocumentFilename(contractDetails));
-      toast.success("Tải xuống PDF biên bản bàn giao thành công. Vui lòng in và ký.");
-    } catch (err) {
-      toast.error(err.message || "Lỗi tải PDF bàn giao. Có thể bạn chưa hoàn thành nhập chỉ số điện nước.");
-    } finally {
-      setLoadingStep(null);
-    }
-  };
+  async function handleUploadHandover(event) {
+    const file = event.target.files?.[0];
+    if (!validateSelectedPdf(file, handoverInputRef)) return;
 
-  const handleUploadHandover = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
     try {
-      setLoadingStep(5);
+      setLoadingStep(ACTION.UPLOAD_HANDOVER);
       await uploadHandoverSignedDocument(contractId, file, "MOVE_IN");
-      toast.success("Upload biên bản bàn giao đã ký thành công.");
-      const data = await fetchContractHandover(contractId, "MOVE_IN");
-      setHandoverData(unwrapHandoverResponse(data));
+      const response = await fetchContractHandover(contractId, "MOVE_IN");
+      setHandoverData(unwrapHandoverResponse(response));
       setConfirmedLeaseVersion(leaseVersion);
-      onContractUpdated();
-    } catch (err) {
-      toast.error(err.message || "Lỗi upload biên bản bàn giao");
+      await onContractUpdated?.();
+      toast.success("Đã lưu biên bản bàn giao có chữ ký.");
+    } catch (error) {
+      toast.error(error?.message || "Không upload được biên bản bàn giao.");
     } finally {
       setLoadingStep(null);
-      if (fileInputRef2.current) fileInputRef2.current.value = "";
-    }
-  };
-
-  // Static step metadata — no refs or handlers, safe to define outside render.
-  // Phase 1 (Steps 0-1) only shows if depositAgreementId exists
-  const hasDeposit = !!depositAgreementId;
-  const leaseSignedUploadDisabled = isLeaseSignedUploadDisabled({
-    contractId,
-    leaseContractId: contractDetails?.leaseContractId,
-    depositSignedFileId,
-    hasDeposit,
-    loadingStep,
-  });
-  const STEP_META = hasDeposit ? [
-    { num: 0, phase: "deposit", title: "Cấp HĐ đặt cọc", desc: "Tải file PDF hợp đồng đặt cọc nháp để in và ký", accent: "amber" },
-    { num: 1, phase: "deposit", title: "Ký HĐ đặt cọc", desc: "Upload bản scan hợp đồng đặt cọc có chữ ký", accent: "amber" },
-    { num: 2, phase: "contract", title: "Cấp HĐ thuê", desc: "Tải file PDF hợp đồng thuê nháp để in và ký", accent: "blue" },
-    { num: 3, phase: "contract", title: "Ký HĐ thuê", desc: "Upload bản scan hợp đồng thuê có chữ ký", accent: "blue" },
-    { num: 4, phase: "handover", title: "Nhập bàn giao", desc: "Nhập chỉ số điện, nước & hiện trạng thiết bị", accent: "indigo" },
-    { num: 5, phase: "handover", title: "Cấp BB bàn giao", desc: "Tải file PDF biên bản bàn giao phòng", accent: "indigo" },
-    { num: 6, phase: "handover", title: "Ký BB bàn giao", desc: "Upload biên bản bàn giao có chữ ký", accent: "indigo" },
-  ] : [
-    { num: 2, phase: "contract", title: "Cấp HĐ thuê", desc: "Tải file PDF hợp đồng thuê nháp để in và ký", accent: "blue" },
-    { num: 3, phase: "contract", title: "Ký HĐ thuê", desc: "Upload bản scan hợp đồng thuê có chữ ký", accent: "blue" },
-    { num: 4, phase: "handover", title: "Nhập bàn giao", desc: "Nhập chỉ số điện, nước & hiện trạng thiết bị", accent: "indigo" },
-    { num: 5, phase: "handover", title: "Cấp BB bàn giao", desc: "Tải file PDF biên bản bàn giao phòng", accent: "indigo" },
-    { num: 6, phase: "handover", title: "Ký BB bàn giao", desc: "Upload biên bản bàn giao có chữ ký", accent: "indigo" },
-  ];
-
-  function getStepState(num) {
-    switch (num) {
-      case 0: return { done: step0Done, disabled: loadingStep != null, loading: loadingStep === 0, actionLabel: "Tải HĐ cọc", icon: <Download className="w-4 h-4" /> };
-      case 1: return { done: step1Done, disabled: loadingStep != null, loading: loadingStep === 1, actionLabel: step1Done ? "Upload lại HĐ cọc" : "Upload HĐ cọc ký", icon: <Upload className="w-4 h-4" /> };
-      case 2: return { done: step2Done, disabled: !step1Done, loading: loadingStep === 2, actionLabel: "Tải HĐ thuê", icon: <Download className="w-4 h-4" /> };
-      case 3: return { done: step2Done, disabled: leaseSignedUploadDisabled, loading: loadingStep === 3, actionLabel: step2Done ? "Upload lại HĐ thuê" : "Upload HĐ thuê ký", icon: <Upload className="w-4 h-4" /> };
-      case 4: return { done: step3Done, disabled: !step2Done, loading: false, actionLabel: step3Done ? "Sửa thông tin" : "Nhập thông tin", icon: <ClipboardEdit className="w-4 h-4" /> };
-      case 5: return { done: step5Done, disabled: loadingStep != null || !step3Done, loading: loadingStep === 4, actionLabel: "Tải bàn giao", icon: <Download className="w-4 h-4" /> };
-      case 6: return { done: step5Done, disabled: loadingStep != null || !step3Done, loading: loadingStep === 5, actionLabel: step5Done ? "Upload lại BB" : "Upload BB ký", icon: <Upload className="w-4 h-4" /> };
-      default: return {};
+      resetFileInput(handoverInputRef);
     }
   }
-
-  function handleStepClick(num) {
-    console.log(`[ContractWorkflowStepper] Step ${num} clicked`, { depositAgreementId, contractId });
-    switch (num) {
-      case 0:
-        if (!depositAgreementId) return;
-        return handlePrintDeposit();
-      case 1: {
-        if (!depositAgreementId) return;
-        console.log("[ContractWorkflowStepper] Triggering file input for deposit upload");
-        fileInputRef0.current?.click();
-        break;
-      }
-      case 2: return handlePrintLease();
-      case 3: return fileInputRef1.current?.click();
-      case 4:
-        if (onRequestShowHandover) onRequestShowHandover();
-        setTimeout(() => {
-          const el = document.getElementById("handover-entry-section");
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-        return;
-      case 5: return handlePrintHandover();
-      case 6: return fileInputRef2.current?.click();
-      default: return;
-    }
-  }
-
-  const completedCount = STEP_META.filter((m) => getStepState(m.num).done).length;
-  const progressPercent = Math.round((completedCount / STEP_META.length) * 100);
-  // All required steps done (skip deposit steps if no deposit)
-  const allDone = hasDeposit 
-    ? step0Done && step1Done && step2Done && step5Done
-    : step2Done && step5Done;
-
-  const accentStyles = {
-    amber: {
-      ring: "ring-amber-500/20",
-      circle: "bg-amber-600",
-      circleLight: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
-      btn: "bg-amber-600 hover:bg-amber-700 text-white",
-      btnDone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 border-amber-200 dark:border-yellow-500/20 hover:bg-amber-100 dark:hover:bg-yellow-500/10",
-      tag: "bg-amber-600",
-    },
-    blue: {
-      ring: "ring-blue-500/20",
-      circle: "bg-blue-600",
-      circleLight: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
-      btn: "bg-blue-600 hover:bg-blue-700 text-white",
-      btnDone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-500/10",
-      tag: "bg-blue-600",
-    },
-    indigo: {
-      ring: "ring-indigo-500/20",
-      circle: "bg-indigo-600",
-      circleLight: "bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300",
-      btn: "bg-indigo-600 hover:bg-indigo-700 text-white",
-      btnDone: "bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300 border-indigo-200 dark:border-blue-500/20 hover:bg-indigo-100 dark:hover:bg-blue-500/10",
-      tag: "bg-indigo-600",
-    },
-  };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white shadow-sm mb-6 overflow-hidden">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-5 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-6 py-5 md:flex-row md:items-center md:justify-between md:px-8">
-        <div className="flex items-center gap-3.5">
-          <div className={`grid h-10 w-10 place-items-center rounded-xl shadow-sm transition-colors ${allDone ? "bg-emerald-600" : "bg-slate-900"}`}>
-            {allDone
-              ? <ShieldCheck className="h-5 w-5 text-white" />
-              : <FileText className="h-5 w-5 text-white" />
-            }
-          </div>
+    <div className="space-y-4 bg-[#f7f8fb] p-4 dark:bg-[#081225] sm:p-6">
+      <section className="grid overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0d182c] sm:grid-cols-2">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3.5 dark:border-white/10 sm:border-b-0 sm:border-r">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-700 text-xs font-extrabold text-white">
+            01
+          </span>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 md:text-lg">
-              Quy trình kích hoạt & Bàn giao
-            </h2>
-            <p className="text-sm text-slate-500">
-              Hoàn thành {hasDeposit ? '7' : '5'} bước để kích hoạt hợp đồng và đưa khách vào ở.
+            <p className="text-[13px] font-extrabold text-slate-900 dark:text-white">
+              Chuẩn bị hồ sơ
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              Tải bản in và nhập thông tin bàn giao
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          {/* Progress pill */}
-          <div className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5">
-            <span className="text-xs font-bold text-slate-500">Tiến độ</span>
-            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-emerald-500" : "bg-blue-600"}`}
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <span className={`text-xs font-extrabold ${allDone ? "text-emerald-600 dark:text-emerald-300" : "text-slate-700"}`}>
-              {completedCount}/{STEP_META.length}
-            </span>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-50 text-xs font-extrabold text-blue-700 dark:bg-blue-400/10 dark:text-blue-300">
+            02
+          </span>
+          <div>
+            <p className="text-[13px] font-extrabold text-slate-900 dark:text-white">
+              Lưu bản đã ký
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              Upload PDF và kích hoạt hợp đồng
+            </p>
           </div>
+        </div>
+      </section>
 
-          {/* Activate button — only shown when stepper is visible */}
-          {(() => {
-            // All steps done → activate
-            if (allDone) {
-              return (
-                <button
-                  onClick={onActivate}
-                  disabled={isActivating || handoverLoading}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-xl hover:shadow-emerald-500/30 disabled:opacity-60 disabled:shadow-none"
-                >
-                  {isActivating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4" />
-                  )}
-                  {isActivating ? "Đang kích hoạt..." : "Kích hoạt & Cấp tài khoản"}
-                </button>
-              );
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
+        <PanelHeader
+          kicker="Chuẩn bị hồ sơ"
+          title="Tải tài liệu và nhập bàn giao"
+          description="Tải từng tài liệu để in, ký trực tiếp tại cơ sở và chốt dữ liệu bàn giao."
+          count={hasDeposit ? 3 : 2}
+        />
+
+        {hasDeposit && (
+          <DocumentRow
+            title="Hợp đồng đặt cọc"
+            meta={`PDF · ${contractDetails?.depositCode || `Mã cọc #${depositAgreementId}`} · 2 bản`}
+            statusLabel="Sẵn sàng tải"
+          >
+            <button
+              type="button"
+              onClick={handleDownloadDeposit}
+              disabled={isBusy}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07112f] px-3 text-[11px] font-extrabold text-white hover:bg-[#10204a] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loadingStep === ACTION.DOWNLOAD_DEPOSIT ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              Tải PDF
+            </button>
+          </DocumentRow>
+        )}
+
+        <DocumentRow
+          title="Hợp đồng thuê"
+          meta={`PDF · ${contractDetails?.contractCode || contractDetails?.displayCode || `#${contractId}`} · 2 bản`}
+          statusLabel="Sẵn sàng tải"
+        >
+          <button
+            type="button"
+            onClick={handleDownloadLease}
+            disabled={isBusy || !contractId}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07112f] px-3 text-[11px] font-extrabold text-white hover:bg-[#10204a] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingStep === ACTION.DOWNLOAD_LEASE ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            Tải PDF
+          </button>
+        </DocumentRow>
+
+        <DocumentRow
+          title="Biên bản bàn giao"
+          meta={
+            handoverHasData
+              ? `Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³ · Thiết bị đã kiểm tra`
+              : "Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
+          }
+          complete={handoverReady}
+          statusLabel={handoverReady ? "Đã đủ dữ liệu" : "Cần nhập dữ liệu"}
+        >
+          <button
+            type="button"
+            onClick={onRequestShowHandover}
+            disabled={isBusy || handoverLoading}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-white"
+          >
+            {handoverLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ClipboardEdit className="h-3.5 w-3.5" />
+            )}
+            {handoverHasData ? "Xem bàn giao" : "Nhập bàn giao"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadHandover}
+            disabled={isBusy || !handoverHasData}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07112f] px-3 text-[11px] font-extrabold text-white hover:bg-[#10204a] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-white/10"
+          >
+            {loadingStep === ACTION.DOWNLOAD_HANDOVER ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            Tải PDF
+          </button>
+        </DocumentRow>
+
+        <div className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] leading-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:mx-5">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Nút “Nhập bàn giao” chuyển sang màn con ngay trong popup hiện tại,
+          không mở thêm popup lồng nhau.
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
+        <PanelHeader
+          kicker="Lưu bản đã ký"
+          title="Upload các bản PDF đã ký"
+          description="Chọn đúng loại tài liệu; có thể thay từng file nếu bản scan cần chỉnh lại."
+          count={`${uploadedCount}/${uploadTotal}`}
+        />
+
+        {hasDeposit && (
+          <UploadRow
+            title="Hợp đồng đặt cọc đã ký"
+            description="PDF tối đa 15 MB · cần đủ chữ ký các bên"
+            complete={Boolean(depositSignedFileId)}
+            fileName={
+              contractDetails?.depositSignedFileName ||
+              "Hợp đồng đặt cọc đã được lưu"
             }
-
-            // Steps incomplete → disabled with progress
-            return (
-              <button
-                disabled
-                className="flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-extrabold text-slate-400 cursor-not-allowed"
-              >
-                <Zap className="h-4 w-4 opacity-40" />
-                Kích hoạt hợp đồng ({completedCount}/{STEP_META.length})
-              </button>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* ── Phase labels ── */}
-      {hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1.5fr_1.5fr] gap-0 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-8">
-          <div className="flex items-center gap-2 py-3 pr-4">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-700 dark:text-yellow-300">
-              Hợp đồng đặt cọc
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-300">
-              Hợp đồng thuê
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–4</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-blue-300">
-              Bàn giao phòng
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 5–7</span>
-          </div>
-        </div>
-      )}
-      {!hasDeposit && (
-        <div className="hidden md:grid md:grid-cols-[1fr_1fr] gap-0 border-b border-slate-100 bg-white dark:bg-[#0f172a] px-8">
-          <div className="flex items-center gap-2 py-3 pr-4">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-300">
-              Hợp đồng thuê
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 1–2</span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-200 py-3 pl-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700 dark:text-blue-300">
-              Bàn giao phòng
-            </span>
-            <span className="ml-auto text-[11px] font-bold text-slate-400">Bước 3–5</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Steps ── */}
-      <div className="relative px-4 py-6 md:px-8 md:py-8">
-        {/* Connector track (desktop) */}
-        <div className="absolute left-8 right-8 top-1/2 hidden h-0.5 -translate-y-1/2 md:block">
-          <div className="h-full rounded-full bg-slate-200" />
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
+            loading={loadingStep === ACTION.UPLOAD_DEPOSIT}
+            disabled={isBusy}
+            onClick={() => depositInputRef.current?.click()}
           />
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-7 md:gap-3 relative z-10">
-          {STEP_META.map((meta, idx) => {
-            const accent = accentStyles[meta.accent];
-            const state = getStepState(meta.num);
-            const isLastInPhase = idx === 1 || idx === 3;
+        <UploadRow
+          title="Hợp đồng thuê đã ký"
+          description="PDF tối đa 15 MB · cần đủ chữ ký các bên"
+          complete={Boolean(leaseSignedFileId)}
+          fileName={contractDetails?.signedFileName}
+          loading={loadingStep === ACTION.UPLOAD_LEASE}
+          disabled={uploadLeaseDisabled}
+          onClick={() => leaseInputRef.current?.click()}
+        />
+
+        <UploadRow
+          title="Biên bản bàn giao đã ký"
+          description={
+            handoverHasData
+              ? "PDF tối đa 15 MB · cần đủ chữ ký các bên"
+              : "Chỉ mở sau khi hoàn tất thông tin bàn giao"
+          }
+          complete={signedHandoverReady}
+          fileName="Biên bản bàn giao đã được lưu"
+          loading={loadingStep === ACTION.UPLOAD_HANDOVER}
+          disabled={isBusy || handoverLoading || !handoverHasData}
+          onClick={() => handoverInputRef.current?.click()}
+        />
+
+        {!handoverHasData && (
+          <div className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-4 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300 sm:mx-5">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Cần nhập thông tin bàn giao trước khi upload biên bản đã ký.
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
+        <PanelHeader
+          kicker="Kiểm tra trước khi kích hoạt"
+          title="Đảm bảo đủ điều kiện kích hoạt"
+          description={`Hoàn tất đủ ${readiness.totalCount} điều kiện trước khi kích hoạt hợp đồng và cấp tài khoản.`}
+        />
+        <div className="grid border-t border-slate-200 px-4 dark:border-white/10 sm:grid-cols-2 sm:px-1">
+          {readiness.requirements.map((item) => {
+            const descriptions = {
+              deposit: "Upload đúng file PDF có đầy đủ chữ ký.",
+              lease: "Upload đúng file PDF có đầy đủ chữ ký.",
+              "handover-data": "Chỉ số điện, nước và thiết bị đã được chốt.",
+              "handover-document": "Upload bản scan hoàn chỉnh sau buổi ký.",
+            };
             return (
-              <div
-                key={meta.num}
-                className={`relative rounded-xl border bg-white dark:bg-[#0f172a] p-4 flex flex-col transition-all duration-200 ${
-                  state.done
-                    ? "border-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
-                    : state.disabled
-                      ? "border-slate-100 opacity-60"
-                      : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"
-                } ${isLastInPhase ? "md:mr-2" : ""}`}
-              >
-                {/* Step circle + title */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-extrabold transition-colors ${
-                      state.done
-                        ? `${accent.circle} text-white ring-4 ring-emerald-100`
-                        : state.disabled
-                          ? "bg-slate-100 text-slate-400"
-                          : `${accent.circleLight} ring-4 ${accent.ring}`
-                    }`}
-                  >
-                    {state.done ? <CheckCircle2 className="h-5 w-5" /> : meta.num}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className={`text-sm font-extrabold leading-tight ${state.done ? "text-emerald-800 dark:text-emerald-300" : "text-slate-800"}`}>
-                      {meta.title}
-                    </h3>
-                    <p className="text-[11px] leading-snug text-slate-500 mt-0.5 line-clamp-2">
-                      {meta.desc}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Action button */}
-                <button
-                  onClick={() => handleStepClick(meta.num)}
-                  disabled={state.disabled}
-                  className={`mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-extrabold transition-all ${
-                    state.done
-                      ? `border ${accent.btnDone}`
-                      : state.disabled
-                        ? "cursor-not-allowed bg-slate-50 text-slate-300"
-                        : `${accent.btn} shadow-sm`
-                  }`}
-                >
-                  {state.loading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : state.done ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    state.icon
-                  )}
-                  <span className="truncate">{state.actionLabel}</span>
-                </button>
-              </div>
+              <ChecklistItem
+                key={item.key}
+                label={item.label}
+                description={descriptions[item.key]}
+                complete={item.complete}
+              />
             );
           })}
         </div>
-
-        {/* Hidden file inputs (rendered in JSX, not referenced during render) */}
-        <input type="file" className="hidden" ref={fileInputRef0} accept="application/pdf,image/*" onChange={handleUploadDeposit} />
-        <input type="file" className="hidden" ref={fileInputRef1} accept="application/pdf,image/*" onChange={handleUploadLease} />
-        <input type="file" className="hidden" ref={fileInputRef2} accept="application/pdf,image/*" onChange={handleUploadHandover} />
-      </div>
-
-      {/* ── Footer note ── */}
-      {!allDone && (
-        <div className="mx-4 mb-4 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-yellow-500/20 bg-amber-50/70 px-4 py-3 md:mx-8 md:mb-6">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-yellow-300" />
-          <div className="text-xs leading-relaxed text-amber-800 dark:text-yellow-300">
-            <p className="font-bold mb-1">Lưu ý</p>
-            <ul className="list-disc space-y-0.5 pl-4 text-amber-700/90">
-              {hasDeposit && (
-                <li>In và ký hợp đồng đặt cọc trước, sau đó upload file đã ký.</li>
-              )}
-              <li>Chỉnh sửa nội dung hợp đồng thuê ở phần thông tin chi tiết trước khi tải PDF.</li>
-              <li>Nhập chỉ số điện/nước ở phần Bàn Giao Phòng bên dưới trước khi tải và ký PDF biên bản bàn giao.</li>
-            </ul>
-          </div>
+        <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03] sm:px-5">
+          <button
+            type="button"
+            onClick={onActivate}
+            disabled={
+              !readiness.ready || isActivating || handoverLoading || isBusy
+            }
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-xs font-extrabold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-white/10 dark:disabled:text-slate-500"
+          >
+            {isActivating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : readiness.ready ? (
+              <Zap className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            {isActivating
+              ? "Đang kích hoạt..."
+              : "Kích hoạt hợp đồng và cấp tài khoản"}
+          </button>
+          <p className="mt-2 text-center text-[10.5px] leading-4 text-slate-500 dark:text-slate-400">
+            {readiness.ready
+              ? "Hồ sơ đã đủ điều kiện. Có thể kích hoạt hợp đồng và cấp tài khoản."
+              : `Còn thiếu ${missingCount} điều kiện. Nút kích hoạt chỉ mở khi hồ sơ hoàn tất.`}
+          </p>
         </div>
-      )}
+      </section>
+
+      <input
+        ref={depositInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleUploadDeposit}
+      />
+      <input
+        ref={leaseInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleUploadLease}
+      />
+      <input
+        ref={handoverInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleUploadHandover}
+      />
     </div>
   );
 }

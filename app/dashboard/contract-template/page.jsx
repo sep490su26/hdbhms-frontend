@@ -650,6 +650,7 @@ export default function ContractTemplatePage() {
   const [intentionError, setIntentionError] = useState("");
   const [printWizard, setPrintWizard] = useState(null);
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
+  const [activationReadiness, setActivationReadiness] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
@@ -879,6 +880,7 @@ export default function ContractTemplatePage() {
 
   function selectContract(item) {
     setSelected(item);
+    setActivationReadiness(null);
     setActionMessage("");
     setTermsForm(buildTermsForm(item));
     setIsEditingTerms(false);
@@ -1038,7 +1040,9 @@ export default function ContractTemplatePage() {
     if (!item?.leaseContractId) return;
 
     if (!getLeaseSignedFileId(item)) {
-      window.alert("Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.");
+      const message = "Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -1056,9 +1060,10 @@ export default function ContractTemplatePage() {
           throw new Error("Missing handover data");
         }
       } catch (err) {
-        window.alert(
-          "Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.",
-        );
+        const message =
+          "Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.";
+        setError(message);
+        toast.error(message);
         setActionLoading("");
         return;
       }
@@ -1134,7 +1139,9 @@ export default function ContractTemplatePage() {
         );
       }
     } catch (err) {
-      setError(err?.message || "Không kích hoạt được hợp đồng.");
+      const message = err?.message || "Không kích hoạt được hợp đồng.";
+      setError(message);
+      toast.error(message);
     } finally {
       setActionLoading("");
     }
@@ -2068,10 +2075,12 @@ export default function ContractTemplatePage() {
           }}
         >
           <section
-            className="max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl"
+            id="contract-detail-dialog"
+            className="max-h-[94vh] w-full max-w-[1120px] overflow-y-auto rounded-2xl bg-white dark:bg-[#0f172a] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <header className="relative bg-[#05091d] px-5 py-7 text-white xl:px-7 xl:py-8">
+            <header className="relative overflow-hidden bg-[#07112f] px-5 py-6 text-white sm:px-7 sm:py-7">
+              <div className="pointer-events-none absolute -right-20 -top-32 h-64 w-64 rounded-full border-[28px] border-blue-400/10" />
               <button
                 type="button"
                 onClick={() => {
@@ -2081,32 +2090,73 @@ export default function ContractTemplatePage() {
                   setTermsError("");
                 }}
                 aria-label="Đóng chi tiết hợp đồng"
-                className="absolute right-4 top-4 rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                className="absolute right-4 top-4 z-10 rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
-              <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">
+              <p className="relative text-[11px] font-bold uppercase tracking-[0.2em] text-[#9fb4e1]">
                 Chi tiết hợp đồng
               </p>
-              <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
+              <h2 className="relative mt-3 pr-12 text-2xl font-extrabold tracking-[-0.03em] sm:text-[28px]">
                 {getContractDisplayName(mergedSelected)}
               </h2>
-              <div className="mt-4">
-                <StatusBadge item={mergedSelected} />
-              </div>
+              {needsActivationFlow(mergedSelected) ? (
+                <div className="relative mt-4 flex flex-wrap gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-bold ${
+                      activationReadiness?.ready
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                        : "border-red-200 bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {activationReadiness?.ready ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    )}
+                    {activationReadiness == null
+                      ? "Đang kiểm tra hồ sơ"
+                      : activationReadiness.ready
+                        ? "Sẵn sàng kích hoạt"
+                        : `Còn thiếu ${activationReadiness.totalCount - activationReadiness.completedCount} điều kiện`}
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-bold text-slate-100">
+                    Phòng {mergedSelected.roomCode || mergedSelected.room?.roomCode || "—"}
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-bold text-slate-100">
+                    {mergedSelected.primaryTenant?.fullName ||
+                      mergedSelected.primaryTenantName ||
+                      mergedSelected.tenantName ||
+                      "Chưa cập nhật người thuê"}
+                  </span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-bold text-slate-100">
+                    Nhận phòng {formatDate(mergedSelected.startDate)}
+                  </span>
+                </div>
+              ) : (
+                <div className="relative mt-4">
+                  <StatusBadge item={mergedSelected} />
+                </div>
+              )}
             </header>
 
-            <div className="grid gap-4 px-5 xl:gap-5 xl:px-7 lg:grid-cols-2">
+            <div
+              className={
+                needsActivationFlow(mergedSelected)
+                  ? ""
+                  : "grid gap-4 px-5 xl:gap-5 xl:px-7 lg:grid-cols-2"
+              }
+            >
               {needsActivationFlow(mergedSelected) ? (
                 <ContractActivationFlow
                   contract={mergedSelected}
-                  details={details}
                   actionLoading={actionLoading}
                   handoverRefreshKey={handoverRefreshKey}
                   onCreateDraft={handleCreateDraft}
                   onContractUpdated={handleContractUpdated}
                   onHandoverSaved={handleHandoverSaved}
                   onActivate={() => handleActivate(mergedSelected)}
+                  onReadinessChange={setActivationReadiness}
                 />
               ) : (
                 <>

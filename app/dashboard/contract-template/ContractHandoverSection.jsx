@@ -13,31 +13,14 @@ import {
   fetchLatestReadings,
   uploadFile,
 } from "@/services/contractHandoverService";
+import {
+  createDefaultHandoverAssets,
+  mergeHandoverAssets,
+} from "./contractHandoverAssets";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
-
-const HANDOVER_ASSET_TEMPLATE = [
-  ["Điều hòa + Remote", "Thiết bị điện tử", "GOOD", ""],
-  ["Thiết bị vệ sinh + phòng tắm", "Thiết bị vệ sinh", "GOOD", "Xí, vòi xịt, vòi sen, lavabo, gương, phụ kiện"],
-  ["Bình nóng lạnh", "Thiết bị điện tử", "GOOD", ""],
-  ["Tủ quần áo 3 buồng", "Nội thất", "GOOD", ""],
-  ["Bàn học", "Nội thất", "GOOD", ""],
-  ["Giường đôi/tầng + Dát giường", "Nội thất", "GOOD", ""],
-  ["Cửa đi + cửa sổ", "Cơ sở hạ tầng", "GOOD", ""],
-  ["Modem Internet", "Thiết bị điện tử", "GOOD", ""],
-  ["Hệ thống điện: công tắc, ổ cắm, bóng điện", "Cơ sở hạ tầng", "GOOD", ""],
-].map(([assetName, assetCategory, currentCondition, description]) => ({
-  id: null,
-  assetName,
-  assetCategory,
-  quantity: 1,
-  currentCondition,
-  description,
-  imageFile: null,
-  imageUrl: "",
-}));
 
 const CONDITION_OPTIONS = [
   { value: "GOOD", label: "Hoạt động bình thường" },
@@ -59,8 +42,10 @@ function apiAssetToRow(raw) {
     quantity: a.quantity,
     currentCondition: a.currentCondition,   // keep as enum value
     description: a.description,
+    fileImageId: a.fileImageId,
     imageFile: null,
-    imageUrl: "",
+    imageUrl:
+      raw.fileImageUrl ?? raw.file_image_url ?? raw.imageUrl ?? raw.image_url ?? "",
   };
 }
 
@@ -120,7 +105,7 @@ export default function ContractHandoverSection({
   const [waterImageUrl, setWaterImageUrl] = useState("");
 
   /* assets ---------------------------------------------------------- */
-  const [assets, setAssets] = useState(HANDOVER_ASSET_TEMPLATE);
+  const [assets, setAssets] = useState(createDefaultHandoverAssets);
   const [fromApi, setFromApi] = useState(false);   // true once loaded from backend
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [loadError, setLoadError] = useState(null);
@@ -152,11 +137,10 @@ export default function ContractHandoverSection({
         if (signal?.aborted) return;
         console.log("[ContractHandoverSection] API response:", data);
         if (Array.isArray(data) && data.length > 0) {
-          setAssets(data.map(apiAssetToRow));
+          setAssets(mergeHandoverAssets(data.map(apiAssetToRow)));
           setFromApi(true);
         } else {
-          // Room exists but no assets saved yet — keep template
-          setAssets(HANDOVER_ASSET_TEMPLATE);
+          setAssets(createDefaultHandoverAssets());
           setFromApi(false);
         }
       })
@@ -200,7 +184,10 @@ export default function ContractHandoverSection({
       })
       .catch((err) => {
         if (signal?.aborted) return;
-        console.error("Failed to fetch latest readings:", err);
+        console.warn(
+          "Không tải được chỉ số điện nước gần nhất; vẫn có thể nhập bàn giao thủ công.",
+          err?.message ?? "Unknown error",
+        );
       });
   }, [roomId]);
 
@@ -337,27 +324,53 @@ export default function ContractHandoverSection({
       }
 
       // 2. Upload new asset images
-      const assetPayloads = await Promise.all(
+      const assetPayloadGroups = await Promise.all(
         assets.map(async (asset) => {
           let assetImageId = null;
           if (asset.imageFile) {
             const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
             assetImageId = res?.fileId || res?.id;
-          } else if (asset.imageUrl && asset.fileImageId) {
+          } else if (asset.fileImageId) {
             assetImageId = asset.fileImageId;
           }
-          return {
+
+          const currentCondition =
+            ASSET_CONDITION_VALUES[asset.currentCondition] ??
+            asset.currentCondition ??
+            "GOOD";
+          const primaryPayload = {
             id: asset.id ?? undefined,
             assetName: asset.assetName.trim(),
             assetCategory: asset.assetCategory.trim(),
             quantity: Number(asset.quantity),
-            currentCondition:
-              ASSET_CONDITION_VALUES[asset.currentCondition] ?? asset.currentCondition ?? "GOOD",
+            currentCondition,
             description: asset.description?.trim() ?? "",
             fileImageId: assetImageId,
           };
+
+          // A canonical UI row can represent legacy split records such as
+          // "Điều hòa" and "Remote điều hòa". Keep those hidden records in
+          // sync so a reload does not restore an obsolete condition.
+          const secondaryPayloads = (asset.sourceAssets ?? [])
+            .filter(
+              (source) =>
+                source.id != null && String(source.id) !== String(asset.id),
+            )
+            .map((source) => ({
+              id: source.id,
+              assetName: source.assetName.trim(),
+              assetCategory:
+                source.assetCategory?.trim() || asset.assetCategory.trim(),
+              quantity: Number(source.quantity) > 0 ? Number(source.quantity) : 1,
+              currentCondition,
+              description: source.description?.trim() ?? "",
+              fileImageId: source.fileImageId ?? undefined,
+            }));
+
+          return [primaryPayload, ...secondaryPayloads];
         }),
       );
+      const assetPayloads = assetPayloadGroups.flat();
 
       // 3. Single atomic submit: readings + assets + confirm
       await submitHandover(contractId, {

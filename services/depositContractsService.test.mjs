@@ -151,9 +151,12 @@ test("contract workflow deposit action downloads instead of opening blob preview
     "utf8",
   );
 
-  assert.match(source, /await downloadDepositContractPdf\(depositAgreementId, buildDepositContractDocumentFilename\(contractDetails\)\);/);
+  assert.match(
+    source,
+    /await downloadDepositContractPdf\(\s*depositAgreementId,\s*buildDepositContractDocumentFilename\(contractDetails\),?\s*\);/,
+  );
   assert.doesNotMatch(source, /await openDepositContractPdf\(depositAgreementId\);/);
-  assert.match(source, /Đã tải PDF hợp đồng đặt cọc\. Vui lòng in và ký\./);
+  assert.match(source, /Đã tải hợp đồng đặt cọc để in và ký\./);
 });
 
 test("fetchDepositAgreements sends one-based page and filters to backend pagination", async () => {

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import {
   Pagination,
   PaginationContent,
@@ -9,6 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { getPaginationState } from "@/lib/pageResponse";
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
@@ -32,14 +35,20 @@ export function DashboardPagination({
   onSizeChange,
   className = "",
 }) {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeSize = Math.max(1, Number(size) || PAGE_SIZE_OPTIONS[0]);
-  const safeTotalElements = Math.max(0, Number(totalElements) || 0);
+  const {
+    page: safePage,
+    size: safeSize,
+    totalElements: safeTotalElements,
+    totalPages: safeTotalPages,
+    firstItem,
+    lastItem,
+  } = getPaginationState({ page, size, totalElements, totalPages });
   const hasData = safeTotalElements > 0;
-  const safeTotalPages = hasData ? Math.max(1, Number(totalPages) || 1) : 0;
-  const firstItem = hasData ? (safePage - 1) * safeSize + 1 : 0;
-  const lastItem = Math.min(safePage * safeSize, safeTotalElements);
   const pageItems = hasData ? buildPageItems(safePage, safeTotalPages) : [];
+
+  useEffect(() => {
+    if (Number(page) !== safePage) onPageChange?.(safePage);
+  }, [onPageChange, page, safePage]);
 
   const isPreviousDisabled = !hasData || safePage <= 1;
   const isNextDisabled = !hasData || safePage >= safeTotalPages;

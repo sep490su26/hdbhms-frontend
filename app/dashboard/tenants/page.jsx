@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Bike,
@@ -30,6 +30,7 @@ import {
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const valueOf = (item, ...keys) => {
   for (const key of keys) {
@@ -1106,8 +1107,6 @@ export default function TenantsPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const openContractDetails = async (profile) => {
     const contractId = getProfileContractId(profile);
@@ -1174,44 +1173,23 @@ export default function TenantsPage() {
     }
   };
 
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
-      const data = await fetchTenantProfiles({ page: page - 1, size });
-      setProfiles(data.items);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      const data = await fetchAllPageItems(fetchTenantProfiles);
+      setProfiles(data);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    fetchTenantProfiles({ page: page - 1, size })
-      .then((data) => {
-        if (!isActive) return;
-        setProfiles(data.items);
-        setTotalElements(data.totalElements);
-        setTotalPages(data.totalPages);
-        setError("");
-      })
-      .catch((loadError) => {
-        if (!isActive) return;
-        setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
-      })
-      .finally(() => {
-        if (isActive) setIsLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [page, size]);
+    const timer = window.setTimeout(() => void loadProfiles(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadProfiles]);
 
   const roomOptions = useMemo(() => {
     const rooms = [
@@ -1275,16 +1253,17 @@ export default function TenantsPage() {
     roleFilter,
     roomFilter,
   ]);
+  const profilePage = paginateItems(filteredProfiles, { page, size });
 
   const groupedByRoom = useMemo(() => {
     const groups = new Map();
-    filteredProfiles.forEach((profile) => {
+    profilePage.items.forEach((profile) => {
       const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(profile);
     });
     return [...groups.values()];
-  }, [filteredProfiles]);
+  }, [profilePage.items]);
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6">
@@ -1314,14 +1293,20 @@ export default function TenantsPage() {
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b97aa]" />
             <input
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm theo tên, SĐT, email hoặc số phòng"
               className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-12 pr-4 text-sm outline-none focus:border-[#1e40af]"
             />
           </div>
           <select
             value={roomFilter}
-            onChange={(event) => setRoomFilter(event.target.value)}
+            onChange={(event) => {
+              setRoomFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả phòng</option>
@@ -1333,7 +1318,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={propertyFilter}
-            onChange={(event) => setPropertyFilter(event.target.value)}
+            onChange={(event) => {
+              setPropertyFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả cơ sở</option>
@@ -1345,7 +1333,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={profileStatusFilter}
-            onChange={(event) => setProfileStatusFilter(event.target.value)}
+            onChange={(event) => {
+              setProfileStatusFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -1358,7 +1349,10 @@ export default function TenantsPage() {
           </select>
           <select
             value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
+            onChange={(event) => {
+              setRoleFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
           >
             <option value="all">Tất cả vai trò</option>
@@ -1590,10 +1584,10 @@ export default function TenantsPage() {
 
       {!isLoading && !error && (
         <DashboardPagination
-          page={page}
-          size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          page={profilePage.page}
+          size={profilePage.size}
+          totalElements={profilePage.totalElements}
+          totalPages={profilePage.totalPages}
           itemLabel="hồ sơ"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

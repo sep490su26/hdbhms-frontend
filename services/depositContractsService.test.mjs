@@ -202,6 +202,17 @@ test("deposits page forwards its one-based page without subtracting one", () => 
   assert.doesNotMatch(source, /page:\s*page\s*-\s*1/);
 });
 
+test("deposits page reuses the shared dashboard pagination", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/deposits/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /import \{ DashboardPagination \}/);
+  assert.match(source, /<DashboardPagination[\s\S]*itemLabel="hợp đồng"/);
+  assert.doesNotMatch(source, /components\/ui\/pagination/);
+});
+
 test("forfeitDepositAgreement uses the guarded lifecycle endpoint with a reason", async () => {
   const { forfeitDepositAgreement } = loadDepositContractsService();
   const originalFetch = globalThis.fetch;

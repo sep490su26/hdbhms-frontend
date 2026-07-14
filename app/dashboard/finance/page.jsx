@@ -6,6 +6,7 @@ import { Building2, CircleDollarSign, Loader2, Wrench } from "lucide-react";
 import { fetchInternalMaintenanceCosts } from "@/services/maintenanceService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -27,19 +28,15 @@ export default function FinancePage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     let mounted = true;
     const timer = window.setTimeout(() => {
       setLoading(true);
-      fetchInternalMaintenanceCosts({ page: page - 1, size })
-        .then((result) => {
+      fetchAllPageItems(fetchInternalMaintenanceCosts)
+        .then((items) => {
           if (!mounted) return;
-          setCosts(result.items);
-          setTotalElements(result.totalElements);
-          setTotalPages(result.totalPages);
+          setCosts(items);
         })
         .catch(
           (loadError) =>
@@ -54,7 +51,7 @@ export default function FinancePage() {
       mounted = false;
       window.clearTimeout(timer);
     };
-  }, [page, size]);
+  }, []);
 
   const properties = useMemo(
     () =>
@@ -85,6 +82,7 @@ export default function FinancePage() {
     (sum, item) => sum + Number(item.amount || 0),
     0,
   );
+  const costPage = paginateItems(filteredCosts, { page, size });
 
   return (
     <div className="w-full min-w-0 flex flex-col gap-6 text-slate-900 dark:text-white">
@@ -121,7 +119,10 @@ export default function FinancePage() {
             Cơ sở
             <select
               value={propertyId}
-              onChange={(event) => setPropertyId(event.target.value)}
+              onChange={(event) => {
+                setPropertyId(event.target.value);
+                setPage(1);
+              }}
               className="h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả cơ sở</option>
@@ -137,7 +138,10 @@ export default function FinancePage() {
             <input
               type="month"
               value={month}
-              onChange={(event) => setMonth(event.target.value)}
+              onChange={(event) => {
+                setMonth(event.target.value);
+                setPage(1);
+              }}
               className="h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
@@ -186,7 +190,7 @@ export default function FinancePage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCosts.map((item) => (
+                {costPage.items.map((item) => (
                   <tr
                     key={`${item.ticketId}-${item.recordedAt}`}
                     className="border-t border-[#e2e8f0] dark:border-white/10"
@@ -228,10 +232,10 @@ export default function FinancePage() {
           </div>
         )}
         <DashboardPagination
-          page={page}
-          size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          page={costPage.page}
+          size={costPage.size}
+          totalElements={costPage.totalElements}
+          totalPages={costPage.totalPages}
           itemLabel="chi phí"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

@@ -30,6 +30,7 @@ import { authenticatedFetch } from "@/services/identityAccessService";
 import { fetchManagementRoomRentalHistory } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -1250,8 +1251,6 @@ function FloorPlanPage({ tenantList = [], activeRole = "owner" }) {
 function RoomsListPage({ query }) {
   const [exportPrompt, setExportPrompt] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalElements, setTotalElements] = useState(0);
   const [size, setSize] = useState(10);
   const [apiRooms, setApiRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1264,12 +1263,11 @@ function RoomsListPage({ query }) {
     const fetchStaffRooms = async () => {
       try {
         setIsLoading(true);
-        const data = await authenticatedFetch(
-          `/rooms?page=${page - 1}&size=${size}`,
+        const data = await fetchAllPageItems(
+          ({ page: nextPage, size: nextSize }) =>
+            authenticatedFetch(`/rooms?page=${nextPage}&size=${nextSize}`),
         );
-        setApiRooms(data?.data ?? []);
-        setTotalPages(data?.totalPages ?? data?.total_pages ?? 1);
-        setTotalElements(data?.totalElements ?? data?.total_elements ?? 0);
+        setApiRooms(data);
         setIsSuccess(true);
       } catch (error) {
         setIsError(true);
@@ -1278,14 +1276,26 @@ function RoomsListPage({ query }) {
       }
     };
     fetchStaffRooms();
-  }, [page, size]);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const filteredRooms = apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();
     return (
-      room.id.toLowerCase().includes(q) || room.floor.toLowerCase().includes(q)
+      String(room.room_code || room.id || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(room.floor_name || room.floor || "")
+        .toLowerCase()
+        .includes(q)
     );
   });
+  const roomPage = paginateItems(filteredRooms, { page, size });
 
   // Export to CSV
   const exportRooms = () => {
@@ -1293,11 +1303,11 @@ function RoomsListPage({ query }) {
     filteredRooms.forEach((room) => {
       rows.push(
         [
-          room.id,
-          room.floor,
-          `${room.area} m2`,
-          room.listedPrice,
-          statusCopy(room.status),
+          room.room_code || room.id,
+          room.floor_name || room.floor,
+          `${room.area_m2 || room.area || 0} m2`,
+          room.listed_price || room.listedPrice || 0,
+          statusCopy(room.current_status || room.status),
         ].join(","),
       );
     });
@@ -1369,7 +1379,7 @@ function RoomsListPage({ query }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map((room) => (
+                {roomPage.items.map((room) => (
                   <tr
                     key={room.room_code}
                     className="border-t border-[#e2e8f0] dark:border-white/10"
@@ -1431,10 +1441,10 @@ function RoomsListPage({ query }) {
             </table>
           </div>
           <DashboardPagination
-            page={page}
-            size={size}
-            totalElements={totalElements}
-            totalPages={totalPages}
+            page={roomPage.page}
+            size={roomPage.size}
+            totalElements={roomPage.totalElements}
+            totalPages={roomPage.totalPages}
             itemLabel="phòng"
             onPageChange={setPage}
             onSizeChange={(nextSize) => {

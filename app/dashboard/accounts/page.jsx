@@ -22,103 +22,9 @@ import {
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const ALL_VALUE = "Tất cả";
-
-const MOCK_TENANT_ACCOUNT_CANDIDATES = [
-  {
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-01-03T09:30:00",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    profileId: 1001,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    userId: 9001,
-    fullName: "Nguyen Minh Anh",
-    phone: "0901234567",
-    email: "minh.anh@example.com",
-    recipientEmail: "minh.anh@example.com",
-    accountStatus: "ACTIVE",
-    mustChangePassword: false,
-    accountProvisioned: true,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-01-03T09:30:00",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    profileId: 1002,
-    roomRole: "CO_OCCUPANT",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    userId: 9002,
-    fullName: "Tran Thu Ha",
-    phone: "0987654321",
-    email: "thu.ha@example.com",
-    recipientEmail: "minh.anh@example.com",
-    accountStatus: "PENDING",
-    mustChangePassword: true,
-    accountProvisioned: true,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5002,
-    contractCode: "HD-2026-014",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-05-20T14:00:00",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 205,
-    roomCode: "B205",
-    profileId: 1003,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 1,
-    roomMaxOccupants: 2,
-    userId: null,
-    fullName: "Le Quang Huy",
-    phone: "0978123456",
-    email: "quang.huy@example.com",
-    recipientEmail: "quang.huy@example.com",
-    accountStatus: null,
-    mustChangePassword: null,
-    accountProvisioned: false,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5003,
-    contractCode: "HD-2026-020",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-06-01T10:15:00",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 301,
-    roomCode: "C301",
-    profileId: 1004,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 1,
-    roomMaxOccupants: 3,
-    userId: null,
-    fullName: "Pham Gia Bao",
-    phone: "0966123456",
-    email: "",
-    recipientEmail: "",
-    accountStatus: null,
-    mustChangePassword: null,
-    accountProvisioned: false,
-    emailAvailable: false,
-  },
-];
 
 function normalize(value) {
   return String(value || "")
@@ -287,50 +193,24 @@ export default function AccountsPage() {
   const [message, setMessage] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchTenantAccountCandidates({ page: page - 1, size });
-      setItems(data.items);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
+      const data = await fetchAllPageItems(fetchTenantAccountCandidates);
+      setItems(data);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
     } finally {
       setLoading(false);
     }
-  }, [page, size]);
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    const loadInitialData = async () => {
-      try {
-        const data = await fetchTenantAccountCandidates();
-        if (active) {
-          setItems(data.items ?? []);
-          setTotalElements(data.totalElements ?? 0);
-          setTotalPages(data.totalPages ?? 1);
-        }
-      } catch (loadError) {
-        if (active)
-          setError(
-            loadError?.message || "Không tải được danh sách cấp tài khoản.",
-          );
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    void loadInitialData();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadData]);
 
   const propertyOptions = useMemo(
     () => [
@@ -412,6 +292,7 @@ export default function AccountsPage() {
       safeKey: contractGroupKey(group.rows[0] || {}, index),
     }));
   }, [filteredItems]);
+  const contractPage = paginateItems(groupedContracts, { page, size });
 
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
@@ -540,7 +421,10 @@ export default function AccountsPage() {
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
               placeholder="Tìm theo tên khách, SĐT, email, phòng hoặc mã hợp đồng"
               className="h-11 w-full rounded-lg border border-[#c8ceda] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-10 pr-3 text-sm text-slate-900 dark:text-white outline-none placeholder:text-slate-500 dark:text-slate-400 focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
             />
@@ -549,7 +433,10 @@ export default function AccountsPage() {
             label="Cơ sở"
             value={propertyFilter}
             options={propertyOptions}
-            onChange={setPropertyFilter}
+            onChange={(value) => {
+              setPropertyFilter(value);
+              setPage(1);
+            }}
           />
           <SelectFilter
             label="Trạng thái"
@@ -564,13 +451,19 @@ export default function AccountsPage() {
               "Gửi thất bại",
               "Thiếu email",
             ]}
-            onChange={setStateFilter}
+            onChange={(value) => {
+              setStateFilter(value);
+              setPage(1);
+            }}
           />
           <SelectFilter
             label="Vai trò"
             value={roleFilter}
             options={[ALL_VALUE, "Người ký chính", "Người ở cùng"]}
-            onChange={setRoleFilter}
+            onChange={(value) => {
+              setRoleFilter(value);
+              setPage(1);
+            }}
           />
         </div>
       </section>
@@ -613,7 +506,7 @@ export default function AccountsPage() {
           </div>
         ) : (
           <div className="divide-y divide-[#d4dbe8]">
-            {groupedContracts.map((group) => {
+            {contractPage.items.map((group) => {
               const groupStates = group.rows.map(
                 (row) => resolveAccountState(row).key,
               );
@@ -793,11 +686,11 @@ export default function AccountsPage() {
           </div>
         )}
         <DashboardPagination
-          page={page}
-          size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
-          itemLabel="khách thuê"
+          page={contractPage.page}
+          size={contractPage.size}
+          totalElements={contractPage.totalElements}
+          totalPages={contractPage.totalPages}
+          itemLabel="hợp đồng"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {
             setSize(nextSize);

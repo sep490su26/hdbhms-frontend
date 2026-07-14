@@ -106,7 +106,20 @@ test("billing page renders API invoices without legacy mock room codes", () => {
     "utf8",
   );
 
-  assert.match(source, /invoices\.map\(\(invoice\) =>/);
+  assert.match(source, /paginatedInvoices\.map\(\(invoice\) =>/);
   assert.match(source, /displayRoomCode\(invoice\.roomCode\)/);
   assert.doesNotMatch(source, /mockInvoices|A101|A203|B105|B302|C204|C310/);
+});
+
+test("billing page uses the shared dashboard pagination without changing totals", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/billing/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /import \{ DashboardPagination \}/);
+  assert.match(source, /const paginatedInvoices = useMemo/);
+  assert.match(source, /return invoices\.slice\(firstIndex, firstIndex \+ size\)/);
+  assert.match(source, /const totals = invoices\.reduce/);
+  assert.match(source, /<DashboardPagination[\s\S]*itemLabel="hóa đơn"/);
 });

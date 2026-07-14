@@ -19,6 +19,11 @@ function buildParams(filters = {}) {
   if (filters.tenantName?.trim()) params.set("tenantName", filters.tenantName.trim());
   if (filters.fromDate) params.set("fromDate", filters.fromDate);
   if (filters.toDate) params.set("toDate", filters.toDate);
+  if (filters.periodType) params.set("periodType", filters.periodType);
+  if (filters.billingPeriod) params.set("billingPeriod", filters.billingPeriod);
+  if (filters.year) params.set("year", filters.year);
+  if (filters.issueFromDate) params.set("issueFromDate", filters.issueFromDate);
+  if (filters.issueToDate) params.set("issueToDate", filters.issueToDate);
   return params;
 }
 
@@ -67,15 +72,24 @@ function extractFilenameFromContentDisposition(headerValue) {
   return filenameMatch?.[1]?.trim().replace(/^"|"$/g, "") || "";
 }
 
-function buildExportFallbackFilename(format) {
+function buildExportFallbackFilename(format, filters = {}) {
   if (format === "excel" || format === "xlsx") {
-    const date = new Date();
-    const formattedDate = [
-      String(date.getDate()).padStart(2, "0"),
-      String(date.getMonth() + 1).padStart(2, "0"),
-      date.getFullYear(),
-    ].join("-");
-    return `Danh sách hóa đơn ${formattedDate}.xlsx`;
+    const periodType = String(filters.periodType || "ALL").toUpperCase();
+    if (periodType === "MONTH") {
+      const match = /^(\d{4})-(\d{2})$/.exec(String(filters.billingPeriod || ""));
+      if (match) return `Hóa đơn tháng ${match[2]}-${match[1]}.xlsx`;
+    }
+    if (periodType === "YEAR" && /^\d{4}$/.test(String(filters.year || ""))) {
+      return `Hóa đơn năm ${filters.year}.xlsx`;
+    }
+    if (periodType === "DATE_RANGE") {
+      const fromMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(filters.issueFromDate || ""));
+      const toMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(filters.issueToDate || ""));
+      if (fromMatch && toMatch) {
+        return `Hóa đơn từ ${fromMatch[3]}-${fromMatch[2]}-${fromMatch[1]} đến ${toMatch[3]}-${toMatch[2]}-${toMatch[1]}.xlsx`;
+      }
+    }
+    return "Danh sách tất cả hóa đơn.xlsx";
   }
   return "lich-su-thanh-toan.pdf";
 }
@@ -142,7 +156,7 @@ export async function downloadTransactionHistoryExport(filters = {}, format = "e
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename || buildExportFallbackFilename(format);
+  link.download = filename || buildExportFallbackFilename(format, filters);
   document.body.appendChild(link);
   link.click();
   link.remove();

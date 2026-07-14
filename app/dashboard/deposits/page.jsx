@@ -33,15 +33,7 @@ import {
   formatDate as formatDisplayDate,
   formatDateTime as formatDisplayDateTime,
 } from "@/lib/dateFormat";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 
 const money = new Intl.NumberFormat("vi-VN");
@@ -96,12 +88,7 @@ const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set([
   "CONFIRMED",
   "EXTENDED",
 ]);
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 const ACTIVE_DEPOSIT_STATUSES = new Set(["PAID", "CONFIRMED", "EXTENDED"]);
-const ACTIVE_PAGE_CLASS =
-  "border-slate-400 bg-slate-200 text-slate-900 shadow-none hover:bg-slate-300 hover:text-slate-950 dark:border-slate-500 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600";
-const INACTIVE_PAGE_CLASS =
-  "border-transparent bg-transparent text-slate-600 shadow-none hover:bg-slate-200 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white";
 const STATUS_UPDATE_OPTIONS = STATUS_OPTIONS.filter((status) =>
   ["CONVERTED_TO_LEASE", "REFUNDED"].includes(status.value),
 );
@@ -181,13 +168,6 @@ function getAgreementPagination(response) {
     pageSize: Number(response?.pageSize || 10),
     totalElements: Number(response?.totalElements || 0),
   };
-}
-
-function getVisiblePages(currentPage, totalPages) {
-  if (totalPages <= 0) return [];
-  const start = Math.max(1, currentPage - 2);
-  const end = Math.min(totalPages, currentPage + 2);
-  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
 function getDepositStatusFilterValues(statusFilter) {
@@ -1041,22 +1021,6 @@ export default function DepositsPage() {
   }, []);
 
   const filteredAgreements = agreements;
-  const visiblePages = useMemo(
-    () => getVisiblePages(page, totalPages),
-    [page, totalPages],
-  );
-  const showingFrom = totalElements === 0 ? 0 : (page - 1) * size + 1;
-  const showingTo = Math.min(page * size, totalElements);
-
-  const goToPage = (nextPage) => {
-    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
-    setPage(nextPage);
-  };
-
-  const handlePageSizeChange = (event) => {
-    setSize(Number(event.target.value));
-    setPage(1);
-  };
 
   const handleStatusFilterChange = (event) => {
     setStatusFilter(event.target.value);
@@ -1443,126 +1407,18 @@ export default function DepositsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex flex-col gap-4 border-t border-[#d7dde8] bg-[#eef4ff] px-5 py-4 text-sm font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <span>
-                Hiển thị {filteredAgreements.length} dòng trên trang này, bản
-                ghi {showingFrom}-{showingTo} trong tổng số {totalElements} hợp
-                đồng
-              </span>
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                <span>Số dòng/trang</span>
-                <select
-                  value={size}
-                  onChange={handlePageSizeChange}
-                  className="h-10 rounded-lg border border-[#c4cad6] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-4 focus:ring-[#1e40af]/10"
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <Pagination className="mx-0 w-auto justify-start lg:justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    text="Trước"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      goToPage(page - 1);
-                    }}
-                    className={
-                      page <= 1 ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-                {visiblePages[0] > 1 && (
-                  <>
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={page === 1}
-                        className={page === 1 ? ACTIVE_PAGE_CLASS : INACTIVE_PAGE_CLASS}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          goToPage(1);
-                        }}
-                      >
-                        1
-                      </PaginationLink>
-                    </PaginationItem>
-                    {visiblePages[0] > 2 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-                  </>
-                )}
-                {visiblePages.map((pageNumber) => (
-                  <PaginationItem key={pageNumber}>
-                    <PaginationLink
-                      href="#"
-                      isActive={pageNumber === page}
-                      className={
-                        pageNumber === page
-                          ? ACTIVE_PAGE_CLASS
-                          : INACTIVE_PAGE_CLASS
-                      }
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToPage(pageNumber);
-                      }}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                {visiblePages[visiblePages.length - 1] < totalPages && (
-                  <>
-                    {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-                      <PaginationItem>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    )}
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={page === totalPages}
-                        className={
-                          page === totalPages
-                            ? ACTIVE_PAGE_CLASS
-                            : INACTIVE_PAGE_CLASS
-                        }
-                        onClick={(event) => {
-                          event.preventDefault();
-                          goToPage(totalPages);
-                        }}
-                      >
-                        {totalPages}
-                      </PaginationLink>
-                    </PaginationItem>
-                  </>
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    text="Sau"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      goToPage(page + 1);
-                    }}
-                    className={
-                      page >= totalPages ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </footer>
+          <DashboardPagination
+            page={page}
+            size={size}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            itemLabel="hợp đồng"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+          />
         </section>
       </section>
 

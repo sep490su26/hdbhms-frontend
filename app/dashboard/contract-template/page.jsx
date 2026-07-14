@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   FileText,
@@ -50,6 +50,7 @@ import {
 } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const STATUS_FILTERS = [
   { id: "all", label: "Tất cả" },
@@ -651,38 +652,36 @@ export default function ContractTemplatePage() {
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
   const [cleanupStep, setCleanupStep] = useState(1);
   const selectedYear = searchParams.get("year") || "all";
 
-  async function loadContracts() {
+  const loadContracts = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchLeaseContractManagementList({
-        page: page - 1,
-        size,
-      });
-      setContracts(data.items);
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
-      return data.items;
+      const data = await fetchAllPageItems(fetchLeaseContractManagementList);
+      setContracts(data);
+      return data;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
     } finally {
       setLoading(false);
     }
     return [];
-  }
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       loadContracts();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [page, size]);
+  }, [loadContracts]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
+  }, [selectedYear]);
 
   useEffect(() => {
     let ignore = false;
@@ -788,6 +787,7 @@ export default function ContractTemplatePage() {
     statusFilter,
     timeFilter,
   ]);
+  const contractPage = paginateItems(filteredContracts, { page, size });
 
   const mergedSelected = useMemo(() => {
     if (!selected) return null;
@@ -1466,6 +1466,7 @@ export default function ContractTemplatePage() {
 
   function selectTimeFilter(value) {
     setTimeFilter(value);
+    setPage(1);
     setTimePanelQuarter(getQuarterForTimeFilter(value));
     setTimePopoverOpen(false);
   }
@@ -1639,7 +1640,10 @@ export default function ContractTemplatePage() {
                   <button
                     key={filter.id}
                     type="button"
-                    onClick={() => setStatusFilter(filter.id)}
+                    onClick={() => {
+                      setStatusFilter(filter.id);
+                      setPage(1);
+                    }}
                     className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
                       statusFilter === filter.id
                         ? "border-[#1e40af] bg-[#1e40af] text-white dark:bg-[#2563eb]"
@@ -1752,7 +1756,10 @@ export default function ContractTemplatePage() {
                 <span className="sr-only">Lọc theo phòng</span>
                 <select
                   value={roomFilter}
-                  onChange={(event) => setRoomFilter(event.target.value)}
+                  onChange={(event) => {
+                    setRoomFilter(event.target.value);
+                    setPage(1);
+                  }}
                   className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-slate-900 outline-none focus:border-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
                 >
                   <option value="all">Lọc theo phòng</option>
@@ -1767,9 +1774,10 @@ export default function ContractTemplatePage() {
                 <span className="sr-only">Loại hợp đồng</span>
                 <select
                   value={contractTypeFilter}
-                  onChange={(event) =>
-                    setContractTypeFilter(event.target.value)
-                  }
+                  onChange={(event) => {
+                    setContractTypeFilter(event.target.value);
+                    setPage(1);
+                  }}
                   className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-slate-900 outline-none focus:border-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
                 >
                   <option value="all">Tất cả loại HĐ</option>
@@ -1813,7 +1821,7 @@ export default function ContractTemplatePage() {
               )}
 
               {!loading &&
-                filteredContracts.map((item, index) => (
+                contractPage.items.map((item, index) => (
                   <tr
                     key={getContractRowKey(item, index)}
                     className="bg-white dark:bg-[#0f172a] transition hover:bg-[#f8fbff] dark:hover:bg-white/5"
@@ -1979,10 +1987,10 @@ export default function ContractTemplatePage() {
           </table>
         </div>
         <DashboardPagination
-          page={page}
-          size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          page={contractPage.page}
+          size={contractPage.size}
+          totalElements={contractPage.totalElements}
+          totalPages={contractPage.totalPages}
           itemLabel="hợp đồng"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

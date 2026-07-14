@@ -16,6 +16,7 @@ import {
   fetchBillingInvoices,
 } from "@/services/billingService";
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -104,6 +105,8 @@ export default function BillingPage() {
   });
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [overrideForm, setOverrideForm] = useState({
     propertyId: "",
@@ -178,6 +181,14 @@ export default function BillingPage() {
       }),
     [invoices, paymentForm.propertyId, paymentForm.roomId],
   );
+
+  const totalElements = invoices.length;
+  const totalPages = Math.ceil(totalElements / size);
+  const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+  const paginatedInvoices = useMemo(() => {
+    const firstIndex = (safePage - 1) * size;
+    return invoices.slice(firstIndex, firstIndex + size);
+  }, [invoices, safePage, size]);
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -281,6 +292,11 @@ export default function BillingPage() {
     }));
   }
 
+  function updateFilters(nextFilters) {
+    setFilters((current) => ({ ...current, ...nextFilters }));
+    setPage(1);
+  }
+
   async function submitPayment(event) {
     event.preventDefault();
     setSaving("payment");
@@ -376,10 +392,7 @@ export default function BillingPage() {
               type="month"
               value={filters.billingPeriod}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  billingPeriod: event.target.value,
-                }))
+                updateFilters({ billingPeriod: event.target.value })
               }
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
@@ -388,12 +401,7 @@ export default function BillingPage() {
             Trạng thái
             <select
               value={filters.status}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value,
-                }))
-              }
+              onChange={(event) => updateFilters({ status: event.target.value })}
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="ALL">Tất cả</option>
@@ -409,10 +417,7 @@ export default function BillingPage() {
             <select
               value={filters.invoiceType}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  invoiceType: event.target.value,
-                }))
+                updateFilters({ invoiceType: event.target.value })
               }
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
@@ -429,11 +434,7 @@ export default function BillingPage() {
             <select
               value={filters.propertyId}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  propertyId: event.target.value,
-                  roomId: "",
-                }))
+                updateFilters({ propertyId: event.target.value, roomId: "" })
               }
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
@@ -449,12 +450,7 @@ export default function BillingPage() {
             Phòng
             <select
               value={filters.roomId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  roomId: event.target.value,
-                }))
-              }
+              onChange={(event) => updateFilters({ roomId: event.target.value })}
               className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả phòng</option>
@@ -521,7 +517,7 @@ export default function BillingPage() {
                       Không có hóa đơn phù hợp với bộ lọc.
                     </td>
                   </tr>
-                ) : invoices.map((invoice) => (
+                ) : paginatedInvoices.map((invoice) => (
                   <tr
                     key={invoice.id}
                     className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
@@ -549,6 +545,18 @@ export default function BillingPage() {
               </tbody>
             </table>
           </div>
+          <DashboardPagination
+            page={safePage}
+            size={size}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            itemLabel="hóa đơn"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+          />
         </div>
       </section>
 

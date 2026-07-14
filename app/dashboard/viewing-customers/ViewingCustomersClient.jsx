@@ -33,6 +33,7 @@ import {
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const emptyForm = {
   fullName: "",
@@ -44,79 +45,6 @@ const emptyForm = {
   note: "",
   status: "NOT_VIEWED",
 };
-
-const MOCK_VIEWING_PROPERTIES = [
-  { id: 1, name: "HDB Home Nguyen Trai" },
-  { id: 2, name: "HDB Residence Cau Giay" },
-  { id: 3, name: "HDB Living Thu Duc" },
-];
-
-const MOCK_VIEWING_CUSTOMERS = [
-  {
-    id: 2001,
-    fullName: "Nguyen Hoang Lan",
-    phone: "0908111222",
-    email: "hoang.lan@example.com",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    interestedRoomId: 101,
-    interestedRoomName: "Phong A101",
-    appointmentAt: "2026-06-06T09:30:00",
-    appointmentLabel: "09:30 06/06/2026",
-    status: "NOT_VIEWED",
-    note: "Khach muon xem phong co ban cong va cho de xe may.",
-    createdAt: "2026-06-03T08:15:00",
-    createdLabel: "08:15 03/06/2026",
-  },
-  {
-    id: 2002,
-    fullName: "Tran Duc Khang",
-    phone: "0919222333",
-    email: "duc.khang@example.com",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    interestedRoomId: 205,
-    interestedRoomName: "Phong B205",
-    appointmentAt: "2026-06-06T14:00:00",
-    appointmentLabel: "14:00 06/06/2026",
-    status: "VIEWED",
-    note: "Da xem phong, dang can nhac hop dong 12 thang.",
-    createdAt: "2026-06-02T10:30:00",
-    createdLabel: "10:30 02/06/2026",
-  },
-  {
-    id: 2003,
-    fullName: "Le Ngoc Mai",
-    phone: "0930333444",
-    email: "ngoc.mai@example.com",
-    propertyId: 3,
-    propertyName: "HDB Living Thu Duc",
-    interestedRoomId: 402,
-    interestedRoomName: "Phong D402",
-    appointmentAt: "2026-06-08T18:30:00",
-    appointmentLabel: "18:30 08/06/2026",
-    status: "NOT_VIEWED",
-    note: "Uu tien phong yen tinh, co the chuyen vao dau thang sau.",
-    createdAt: "2026-06-05T16:20:00",
-    createdLabel: "16:20 05/06/2026",
-  },
-  {
-    id: 2004,
-    fullName: "Pham Tuan Kiet",
-    phone: "0941444555",
-    email: "",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    interestedRoomId: null,
-    interestedRoomName: "",
-    appointmentAt: "2026-06-10T10:00:00",
-    appointmentLabel: "10:00 10/06/2026",
-    status: "DISMISSED",
-    note: "",
-    createdAt: "2026-06-04T11:45:00",
-    createdLabel: "11:45 04/06/2026",
-  },
-];
 
 function StatusSelect({ status, onChange }) {
   const styles = {
@@ -331,22 +259,13 @@ function Field({ label, error, children }) {
 function TrashModal({
   rows,
   pagination,
+  pageSize,
   onClose,
   onRestore,
   onForceDelete,
   onPageChange,
+  onSizeChange,
 }) {
-  const from =
-    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.size + 1;
-  const to =
-    pagination.total === 0
-      ? 0
-      : Math.min(from + rows.length - 1, pagination.total);
-  const pages = Array.from(
-    { length: pagination.totalPages },
-    (_, index) => index + 1,
-  ).slice(0, 5);
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
@@ -459,29 +378,15 @@ function TrashModal({
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-[#d9dde5] dark:border-white/10 px-4 py-4 text-xs text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            {pagination.total === 0
-              ? "Không có khách xem phòng nào trong thùng rác"
-              : `Đang hiển thị ${from} đến ${to} của ${pagination.total} khách`}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            {pages.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => onPageChange(page)}
-                className={`flex h-8 w-8 items-center justify-center rounded border text-xs font-bold ${
-                  page === pagination.page
-                    ? "border-[#1e40af] bg-[#1e40af] dark:bg-[#2563eb] text-white"
-                    : "border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-          </div>
-        </div>
+        <DashboardPagination
+          page={pagination.page}
+          size={pageSize}
+          totalElements={pagination.total}
+          totalPages={pagination.totalPages}
+          itemLabel="khách trong thùng rác"
+          onPageChange={onPageChange}
+          onSizeChange={onSizeChange}
+        />
       </div>
     </div>
   );
@@ -538,7 +443,8 @@ function NoteModal({ customer, onClose }) {
 }
 
 export default function ViewingCustomersClient() {
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
+  const [trashPageSize, setTrashPageSize] = useState(10);
   const [customers, setCustomers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [filterRooms, setFilterRooms] = useState([]);
@@ -648,7 +554,7 @@ export default function ViewingCustomersClient() {
         const data = await fetchViewingCustomerTrash({
           filters,
           page: nextPage,
-          size: pageSize,
+          size: trashPageSize,
         });
         setTrashRows(data.items);
         setTrashPagination(data);
@@ -657,7 +563,7 @@ export default function ViewingCustomersClient() {
         setErrorMessage(getViewingCustomerErrorMessage(error));
       }
     },
-    [filters, pageSize],
+    [filters, trashPageSize],
   );
 
   useEffect(() => {
@@ -667,6 +573,12 @@ export default function ViewingCustomersClient() {
 
     return () => window.clearTimeout(timer);
   }, [loadCustomers]);
+
+  useEffect(() => {
+    if (!trashOpen) return undefined;
+    const timer = window.setTimeout(() => loadTrash(1), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTrash, trashOpen]);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({
@@ -791,9 +703,8 @@ export default function ViewingCustomersClient() {
     }
   };
 
-  const openTrash = async () => {
+  const openTrash = () => {
     setTrashOpen(true);
-    await loadTrash(1);
   };
 
   const restoreCustomer = async (customer) => {
@@ -820,17 +731,6 @@ export default function ViewingCustomersClient() {
       setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
-
-  const pageFrom =
-    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.size + 1;
-  const pageTo =
-    pagination.total === 0
-      ? 0
-      : Math.min(pageFrom + customers.length - 1, pagination.total);
-  const pageNumbers = Array.from(
-    { length: pagination.totalPages },
-    (_, index) => index + 1,
-  ).slice(0, 5);
 
   return (
     <>
@@ -1082,51 +982,15 @@ export default function ViewingCustomersClient() {
               </table>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-[#d9dde5] dark:border-white/10 px-4 py-4 text-xs text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                {pagination.total === 0
-                  ? "Không có khách xem phòng nào"
-                  : `Đang hiển thị ${pageFrom} đến ${pageTo} của ${pagination.total} khách`}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    loadCustomers(Math.max(1, pagination.page - 1))
-                  }
-                  disabled={pagination.page <= 1}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5 disabled:opacity-40"
-                >
-                  {"<"}
-                </button>
-                {pageNumbers.map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => loadCustomers(page)}
-                    className={`flex h-8 w-8 items-center justify-center rounded border text-xs font-bold ${
-                      page === pagination.page
-                        ? "border-[#1e40af] bg-[#1e40af] dark:bg-[#2563eb] text-white"
-                        : "border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    loadCustomers(
-                      Math.min(pagination.totalPages, pagination.page + 1),
-                    )
-                  }
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="flex h-8 w-8 items-center justify-center rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5 disabled:opacity-40"
-                >
-                  {">"}
-                </button>
-              </div>
-            </div>
+            <DashboardPagination
+              page={pagination.page}
+              size={pageSize}
+              totalElements={pagination.total}
+              totalPages={pagination.totalPages}
+              itemLabel="khách xem phòng"
+              onPageChange={loadCustomers}
+              onSizeChange={setPageSize}
+            />
           </section>
         </div>
       </div>
@@ -1158,6 +1022,8 @@ export default function ViewingCustomersClient() {
           onRestore={restoreCustomer}
           onForceDelete={forceDeleteCustomer}
           onPageChange={loadTrash}
+          onSizeChange={setTrashPageSize}
+          pageSize={trashPageSize}
         />
       )}
 

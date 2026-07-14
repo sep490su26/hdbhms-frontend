@@ -16,15 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { paginateItems } from "@/lib/pageResponse";
 
 const NAV_ITEMS = [
   { icon: "grid", label: "Tổng quan" },
@@ -189,7 +182,7 @@ export default function UtilityManagement() {
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const router = useRouter();
 
   useEffect(() => {
@@ -307,17 +300,11 @@ export default function UtilityManagement() {
   const progress =
     totalRooms === 0 ? 0 : Math.round((completedRooms / totalRooms) * 100);
 
-  const totalPages = Math.ceil(history.length / itemsPerPage);
-  const paginatedHistory = history.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
-
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
+  const historyPage = paginateItems(history, {
+    page: currentPage,
+    size: itemsPerPage,
+  });
+  const paginatedHistory = historyPage.items;
 
   return (
     <div className="w-full min-w-0 overflow-x-hidden bg-gray-50 font-sans text-slate-900 dark:bg-[#020817] dark:text-slate-100">
@@ -724,59 +711,18 @@ export default function UtilityManagement() {
               })}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="py-4 border-t border-gray-100 dark:border-white/10">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage - 1);
-                        }}
-                        className={
-                          currentPage === 1
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                      />
-                    </PaginationItem>
-
-                    {[...Array(totalPages)].map((_, i) => (
-                      <PaginationItem key={i + 1}>
-                        <PaginationLink
-                          href="#"
-                          isActive={currentPage === i + 1}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(i + 1);
-                          }}
-                        >
-                          {i + 1}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ))}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(currentPage + 1);
-                        }}
-                        className={
-                          currentPage === totalPages
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
+            <DashboardPagination
+              page={historyPage.page}
+              size={historyPage.size}
+              totalElements={historyPage.totalElements}
+              totalPages={historyPage.totalPages}
+              itemLabel="kỳ ghi"
+              onPageChange={setCurrentPage}
+              onSizeChange={(nextSize) => {
+                setItemsPerPage(nextSize);
+                setCurrentPage(1);
+              }}
+            />
           </div>
         </div>
         {/* Bottom: Hướng dẫn + Ghi chú */}

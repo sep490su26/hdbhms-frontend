@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   fetchChangeRequests,
   fetchChangeRequestStats,
@@ -14,9 +14,7 @@ import {
   MessageSquareWarning,
   Key,
   Search,
-  ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   FileCheck2,
   CalendarCheck,
   XCircle,
@@ -34,16 +32,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const translateType = (type) => {
   const map = {
@@ -103,6 +93,7 @@ export default function ApprovalCenter() {
   const [statusFilter, setStatusFilter] = useState("Pending");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
 
   const [data, setData] = useState([]);
   const [stats, setStats] = useState({
@@ -115,13 +106,13 @@ export default function ApprovalCenter() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [dataRes, statsRes] = await Promise.all([
         fetchChangeRequests({
           page: page - 1,
-          size: 8,
+          size,
           type: typeFilter === "All Types" ? "all" : typeFilter,
           status: statusFilter === "All" ? "all" : statusFilter,
           search,
@@ -158,12 +149,14 @@ export default function ApprovalCenter() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, size, statusFilter, typeFilter]);
 
   useEffect(() => {
     const t = setTimeout(loadData, 300);
     return () => clearTimeout(t);
-  }, [search, typeFilter, statusFilter, page]);
+  }, [loadData]);
+
+  const totalPages = Math.ceil(total / size);
 
   return (
     <div className="w-full min-w-0 flex flex-col gap-6 font-sans">
@@ -243,7 +236,10 @@ export default function ApprovalCenter() {
                 className="w-full pl-11 rounded-xl bg-white dark:bg-[#0f172a]"
                 placeholder="Search tenant, room, request code, contract code..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
             <select
@@ -264,7 +260,10 @@ export default function ApprovalCenter() {
             <select
               className="h-10 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option>Pending</option>
               <option>Approved</option>
@@ -278,6 +277,7 @@ export default function ApprovalCenter() {
                 setTypeFilter("All Types");
                 setStatusFilter("Pending");
                 setSearch("");
+                setPage(1);
               }}
             >
               Reset
@@ -400,54 +400,19 @@ export default function ApprovalCenter() {
             </Table>
           </div>
 
-          <div className="flex items-center justify-between mt-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Showing {Math.min(1 + (page - 1) * 8, total)} to{" "}
-              {Math.min(page * 8, total)} of {total} requests
-            </p>
-            <Pagination className="mx-0 w-auto">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage(Math.max(1, page - 1));
-                    }}
-                    className={
-                      page === 1 ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-                {[1, 2, 3, 4, 5].map((p) => (
-                  <PaginationItem key={p}>
-                    <PaginationLink
-                      href="#"
-                      isActive={p === page}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setPage(p);
-                      }}
-                    >
-                      {p}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage(page + 1);
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+          <DashboardPagination
+            page={page}
+            size={size}
+            totalElements={total}
+            totalPages={totalPages}
+            itemLabel="yêu cầu"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+            className="mt-4 rounded-2xl border border-gray-200 dark:border-white/10"
+          />
         </div>
 
         {/* RIGHT: Breakdown sidebar */}

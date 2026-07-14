@@ -18,6 +18,20 @@ import {
 
 const money = new Intl.NumberFormat("vi-VN");
 
+function currentExportPeriod() {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const lastDay = String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, "0");
+  return {
+    periodType: "MONTH",
+    billingPeriod: `${year}-${month}`,
+    year,
+    issueFromDate: `${year}-${month}-01`,
+    issueToDate: `${year}-${month}-${lastDay}`,
+  };
+}
+
 const TYPE_LABELS = {
   DEPOSIT: "Cọc",
   RENT: "Tiền phòng",
@@ -83,6 +97,7 @@ export default function TransactionHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState("");
+  const [exportPeriod, setExportPeriod] = useState(currentExportPeriod);
   const [error, setError] = useState("");
 
   const activeFilters = useMemo(() => hasFilters(query), [query]);
@@ -128,16 +143,36 @@ export default function TransactionHistoryPage() {
   }
 
   async function exportFile(format) {
-    if (totalElements === 0) {
-      setError("Chưa có dữ liệu để xuất");
+    if (
+      exportPeriod.periodType === "MONTH" &&
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(exportPeriod.billingPeriod)
+    ) {
+      setError("Vui lòng chọn tháng hóa đơn hợp lệ");
+      return;
+    }
+    const exportYear = Number(exportPeriod.year);
+    if (
+      exportPeriod.periodType === "YEAR" &&
+      (!Number.isInteger(exportYear) || exportYear < 1900 || exportYear > 2100)
+    ) {
+      setError("Vui lòng nhập năm hóa đơn hợp lệ");
+      return;
+    }
+    const validIssueFromDate = /^\d{4}-(0[1-9]|1[0-2])-([012]\d|3[01])$/.test(exportPeriod.issueFromDate);
+    const validIssueToDate = /^\d{4}-(0[1-9]|1[0-2])-([012]\d|3[01])$/.test(exportPeriod.issueToDate);
+    if (
+      exportPeriod.periodType === "DATE_RANGE" &&
+      (!validIssueFromDate || !validIssueToDate || exportPeriod.issueFromDate > exportPeriod.issueToDate)
+    ) {
+      setError("Khoảng ngày phát hành hóa đơn không hợp lệ");
       return;
     }
     setExporting(format);
     setError("");
     try {
-      await downloadTransactionHistoryExport(query, format);
-    } catch {
-      setError("Xuất file thất bại, vui lòng thử lại");
+      await downloadTransactionHistoryExport({ ...query, ...exportPeriod }, format);
+    } catch (exportError) {
+      setError(exportError?.message || "Xuất file thất bại, vui lòng thử lại");
     } finally {
       setExporting("");
     }
@@ -156,7 +191,82 @@ export default function TransactionHistoryPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Lịch sử thanh toán</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+            Phạm vi xuất
+            <select
+              value={exportPeriod.periodType}
+              onChange={(event) => setExportPeriod((current) => ({
+                ...current,
+                periodType: event.target.value,
+              }))}
+              className="h-10 min-w-36 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-slate-800 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
+            >
+              <option value="MONTH">Theo tháng</option>
+              <option value="YEAR">Theo năm</option>
+              <option value="DATE_RANGE">Theo khoảng ngày</option>
+              <option value="ALL">Tất cả</option>
+            </select>
+          </label>
+          {exportPeriod.periodType === "MONTH" && (
+            <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+              Tháng hóa đơn
+              <input
+                type="month"
+                value={exportPeriod.billingPeriod}
+                onChange={(event) => setExportPeriod((current) => ({
+                  ...current,
+                  billingPeriod: event.target.value,
+                }))}
+                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-slate-800 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
+              />
+            </label>
+          )}
+          {exportPeriod.periodType === "YEAR" && (
+            <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+              Năm hóa đơn
+              <input
+                type="number"
+                min="1900"
+                max="2100"
+                value={exportPeriod.year}
+                onChange={(event) => setExportPeriod((current) => ({
+                  ...current,
+                  year: event.target.value,
+                }))}
+                className="h-10 w-28 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-slate-800 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
+              />
+            </label>
+          )}
+          {exportPeriod.periodType === "DATE_RANGE" && (
+            <>
+              <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                Phát hành từ ngày
+                <input
+                  type="date"
+                  value={exportPeriod.issueFromDate}
+                  onChange={(event) => setExportPeriod((current) => ({
+                    ...current,
+                    issueFromDate: event.target.value,
+                  }))}
+                  className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-slate-800 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+                Đến ngày phát hành
+                <input
+                  type="date"
+                  value={exportPeriod.issueToDate}
+                  min={exportPeriod.issueFromDate}
+                  onChange={(event) => setExportPeriod((current) => ({
+                    ...current,
+                    issueToDate: event.target.value,
+                  }))}
+                  className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-slate-800 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
+                />
+              </label>
+            </>
+          )}
           <button
             type="button"
             onClick={() => exportFile("excel")}
@@ -201,7 +311,7 @@ export default function TransactionHistoryPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
-            Từ ngày
+            Giao dịch từ ngày
             <input
               type="date"
               value={filters.fromDate}
@@ -210,7 +320,7 @@ export default function TransactionHistoryPage() {
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
-            Đến ngày
+            Giao dịch đến ngày
             <input
               type="date"
               value={filters.toDate}

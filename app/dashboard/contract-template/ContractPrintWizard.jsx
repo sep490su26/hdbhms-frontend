@@ -5,7 +5,6 @@ import {CalendarDays, Download, FileText, Gauge, Home, Printer, Users, X, Loader
 import {createHandoverReadings} from "@/services/contractHandoverService";
 import {buildLeaseContractDocumentFilename} from "@/services/leaseContractsService";
 import {fetchRoomAssets, createRoomAsset, updateRoomAsset} from "@/services/roomAssetsService";
-import DateInput from "@/components/DateInput";
 import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
 const OWNER_INFO = {
@@ -177,15 +176,13 @@ function buildInitialForm(contract, details, occupants) {
 }
 
 function Field({label, value, onChange, type = "text", placeholder = ""}) {
-    const InputComponent = type === "date" ? DateInput : "input";
-
     return (
         <label className="grid min-w-0 gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">{label}</span>
-            <InputComponent
-                type={type === "date" ? undefined : type}
+            <input
+                type={type}
                 value={value ?? ""}
-                placeholder={type === "date" ? placeholder || "dd/mm/yyyy" : placeholder}
+                placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
                 className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
             />
@@ -295,10 +292,10 @@ function buildPrintableHtml({form, handover, assets}) {
 
     <p class="section-title">3. Thông tin thuê phòng</p>
     <p class="indent">Bên A đồng ý cho bên B thuê phòng <b>${e(form.roomCode || "..........")}</b> tại <b>${e(form.propertyAddress || form.propertyName || "..........")}</b>.</p>
-    <p class="indent">Giá thuê: <span class="line">${e(formatMoney(form.monthlyRent))}</span> VNĐ/tháng.</p>
-    <p class="indent">Tiền cọc: <span class="line">${e(formatMoney(form.depositAmount))}</span> VNĐ.</p>
+    <p class="indent">Giá thuê: <span class="line">${e(formatMoney(form.monthlyRent))}</span> đ/tháng.</p>
+    <p class="indent">Tiền cọc: <span class="line">${e(formatMoney(form.depositAmount))}</span> đ.</p>
     <p class="indent">Hợp đồng có giá trị từ ngày <span class="line">${e(formatDate(form.startDate))}</span> đến ngày <span class="line">${e(formatDate(form.endDate))}</span>.</p>
-    <p class="indent">Bên B thanh toán cho bên A ${e(form.paymentCycleMonths || "..........")} tháng/lần, tương đương <span class="line">${e(formatMoney(Number(form.monthlyRent || 0) * Number(form.paymentCycleMonths || 0)))}</span> VNĐ.</p>
+    <p class="indent">Bên B thanh toán cho bên A ${e(form.paymentCycleMonths || "..........")} tháng/lần, tương đương <span class="line">${e(formatMoney(Number(form.monthlyRent || 0) * Number(form.paymentCycleMonths || 0)))}</span> đ.</p>
 
     <p class="section-title">4. Bàn giao phòng</p>
     <p class="indent">Ngày bàn giao: <span class="line">${e(formatDate(handover.handoverDate))}</span></p>
@@ -416,7 +413,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                 return {
                                     name: a.asset_name || a.assetName || "",
                                     unit: "Cái",
-                                    quantity: a.quantity || 1,
+                                    quantity: a.quantity ?? 1,
                                     condition: condition === "GOOD" ? "Hoạt động bình thường" :
                                         condition === "ATTENTION" ? "Có trầy xước nhẹ" :
                                             condition === "BROKEN" ? "Hỏng cần sửa" : "Thiếu thiết bị",
@@ -654,9 +651,12 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                     <td key={field} className="px-3 py-2">
                                                         <input
                                                             type={field === "quantity" ? "number" : "text"}
-                                                            value={asset[field] ?? ""}
+                                                            min={field === "quantity" ? "0" : undefined}
+                                                            step={field === "quantity" ? "1" : undefined}
+                                                            inputMode={field === "quantity" ? "numeric" : undefined}
+                                                            value={asset[field]}
                                                             onChange={(event) => updateAsset(index, field, event.target.value)}
-                                                            className="h-9 w-full rounded-lg border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] px-2 font-semibold outline-none focus:border-[#1e40af]"
+                                                            className={`h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] ${field === "quantity" ? "appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" : ""}`}
                                                         />
                                                     </td>
                                                 ))}
@@ -670,10 +670,11 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         Ngày bàn giao
                                         <span className="ml-1 text-rose-600 dark:text-rose-300">*</span>
                                     </span>
-                                    <DateInput
+                                    <input
+                                        type="date"
                                         value={handover.handoverDate}
                                         disabled={true}
-                                        onChange={(event) => updateHandover("handoverDate", event.target.value)}
+                                        onChange={(e) => updateHandover("handoverDate", e.target.value)}
                                         className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
                                     />
                                 </div>
@@ -707,7 +708,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         <PrintLine label="Bên A" value={OWNER_INFO.fullName}/>
                                         <PrintLine label="Bên B" value={form.tenantName}/>
                                         <PrintLine label="Phòng" value={form.roomCode}/>
-                                        <PrintLine label="Giá thuê" value={`${formatMoney(form.monthlyRent)} VNĐ/tháng`}/>
+                                        <PrintLine label="Giá thuê" value={`${formatMoney(form.monthlyRent)} đ/tháng`}/>
                                         <PrintLine label="Từ ngày" value={formatDate(form.startDate)}/>
                                         <PrintLine label="Đến ngày" value={formatDate(form.endDate)}/>
                                         <PrintLine label="Ngày bàn giao" value={formatDate(handover.handoverDate)}/>

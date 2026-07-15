@@ -3,31 +3,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
   Banknote,
-  CheckCircle2,
   History,
   Loader2,
-  ReceiptText,
   RefreshCw,
   Save,
-  SlidersHorizontal,
-  WalletCards,
   X,
 } from "lucide-react";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
-import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import {
   applyRentOverride,
   confirmManualPayment,
   fetchBillingInvoices,
-  sendOverdueInvoiceWarning,
 } from "@/services/billingService";
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
 const money = new Intl.NumberFormat("vi-VN");
-const FORM_CONTROL_CLASS =
-  "h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white";
 
 const STATUS_LABELS = {
   DRAFT: "Nháp",
@@ -51,45 +42,8 @@ function currentMonth() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function billingPeriodToVietnameseDate(value) {
-  const match = String(value || "").match(/^(\d{4})-(\d{1,2})/);
-  if (!match) return "";
-  return `01/${match[2].padStart(2, "0")}/${match[1]}`;
-}
-
-function formatVietnameseDateInput(value) {
-  const text = String(value || "").replace(/[^\d/]/g, "").slice(0, 10);
-  if (text.includes("/")) return text;
-  const digits = text.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-}
-
-function vietnameseDateToBillingPeriod(value) {
-  const match = String(value || "")
-    .trim()
-    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
-
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
-
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} VNĐ`;
+  return `${money.format(Number(value || 0))} đ`;
 }
 
 function statusLabel(value) {
@@ -107,25 +61,25 @@ function invoiceStatusClasses(status) {
   if (status === "OVERDUE") {
     return "bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20";
   }
-  if (status === "PARTIALLY_PAID") {
-    return "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20";
-  }
   if (status === "VOIDED") {
-    return "bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-400 dark:ring-white/10";
+    return "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-500/10 dark:text-slate-300 dark:ring-slate-500/20";
+  }
+  if (status === "PARTIALLY_PAID") {
+    return "bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20";
   }
   return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
 }
 
-function isPendingInvoice(invoice) {
-  return invoice?.status === "ISSUED";
+function formatBillingPeriod(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || ""));
+  return match ? `${match[2]}/${match[1]}` : value || "-";
 }
 
-function isExpiredInvoice(invoice) {
-  if (!invoice || Number(invoice.remainingAmount || 0) <= 0) return false;
-  if (invoice.status === "OVERDUE") return true;
-  if (!invoice.dueDate) return false;
-  const dueDate = new Date(invoice.dueDate);
-  return !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < Date.now();
+function displayRoomCode(value) {
+  const code = String(value || "").trim();
+  if (!code) return "Chưa gán";
+  if (/^p\d+$/i.test(code)) return `P${code.slice(1)}`;
+  return /^\d+$/.test(code) ? `P${code}` : code;
 }
 
 function roomKey(room) {
@@ -133,7 +87,7 @@ function roomKey(room) {
 }
 
 function roomLabel(room) {
-  return `${room.propertyName ? `${room.propertyName} - ` : ""}${room.roomCode || room.name}`;
+  return `${room.propertyName ? `${room.propertyName} - ` : ""}${displayRoomCode(room.roomCode || room.name)}`;
 }
 
 function roomsForProperty(rooms, propertyId) {
@@ -149,14 +103,10 @@ export default function BillingPage() {
     propertyId: "",
     roomId: "",
   });
-  const [billingPeriodText, setBillingPeriodText] = useState(() =>
-    billingPeriodToVietnameseDate(currentMonth()),
-  );
-  const [overrideBillingPeriodText, setOverrideBillingPeriodText] = useState(
-    () => billingPeriodToVietnameseDate(currentMonth()),
-  );
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [overrideForm, setOverrideForm] = useState({
     propertyId: "",
@@ -217,7 +167,6 @@ export default function BillingPage() {
   const paymentInvoices = useMemo(
     () =>
       invoices.filter((invoice) => {
-        if (!isPendingInvoice(invoice)) return false;
         if (
           paymentForm.propertyId &&
           String(invoice.propertyId) !== String(paymentForm.propertyId)
@@ -232,6 +181,14 @@ export default function BillingPage() {
       }),
     [invoices, paymentForm.propertyId, paymentForm.roomId],
   );
+
+  const totalElements = invoices.length;
+  const totalPages = Math.ceil(totalElements / size);
+  const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+  const paginatedInvoices = useMemo(() => {
+    const firstIndex = (safePage - 1) * size;
+    return invoices.slice(firstIndex, firstIndex + size);
+  }, [invoices, safePage, size]);
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -293,11 +250,6 @@ export default function BillingPage() {
           ? String(rentLine.unitPrice)
           : current.overrideMonthlyRent,
       }));
-      if (selectedInvoice.billingPeriod) {
-        setOverrideBillingPeriodText(
-          billingPeriodToVietnameseDate(selectedInvoice.billingPeriod),
-        );
-      }
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [selectedInvoice]);
@@ -340,36 +292,9 @@ export default function BillingPage() {
     }));
   }
 
-  function openManualPayment(invoice) {
-    if (!invoice) return;
-    setSelectedInvoiceId(invoice.id || "");
-    setPaymentForm({
-      propertyId: invoice.propertyId ? String(invoice.propertyId) : "",
-      roomId: invoice.roomId ? String(invoice.roomId) : "",
-      invoiceId: invoice.id || "",
-      amount: invoice.remainingAmount ? String(invoice.remainingAmount) : "",
-      note: "",
-    });
-    setIsPaymentModalOpen(true);
-  }
-
-  async function sendOverdueWarning(invoice) {
-    if (!invoice?.id) return;
-    setSaving(`warning-${invoice.id}`);
-    setError("");
-    setMessage("");
-    try {
-      const result = await sendOverdueInvoiceWarning(invoice.id);
-      setMessage(
-        result?.recipientCount
-          ? `Đã gửi cảnh báo thanh toán quá hạn cho ${result.recipientCount} khách thuê.`
-          : "Không tìm thấy khách thuê đang nhận thông báo cho phòng này.",
-      );
-    } catch (warningError) {
-      setError(warningError?.message || "Không gửi được cảnh báo thanh toán quá hạn.");
-    } finally {
-      setSaving("");
-    }
+  function updateFilters(nextFilters) {
+    setFilters((current) => ({ ...current, ...nextFilters }));
+    setPage(1);
   }
 
   async function submitPayment(event) {
@@ -390,7 +315,6 @@ export default function BillingPage() {
         amount: "",
         note: "",
       });
-      setIsPaymentModalOpen(false);
       await loadInvoices();
     } catch (saveError) {
       setError(saveError?.message || "Không xác nhận được thanh toán.");
@@ -399,82 +323,29 @@ export default function BillingPage() {
     }
   }
 
-  function updateBillingPeriodText(value) {
-    const nextText = formatVietnameseDateInput(value);
-    setBillingPeriodText(nextText);
-
-    if (!nextText.trim()) {
-      setFilters((current) => ({ ...current, billingPeriod: "" }));
-      return;
-    }
-
-    const nextPeriod = vietnameseDateToBillingPeriod(nextText);
-    if (nextPeriod) {
-      setFilters((current) => ({ ...current, billingPeriod: nextPeriod }));
-    }
-  }
-
-  function normalizeBillingPeriodText() {
-    if (!billingPeriodText.trim()) return;
-
-    const nextPeriod = vietnameseDateToBillingPeriod(billingPeriodText);
-    setBillingPeriodText(
-      billingPeriodToVietnameseDate(nextPeriod || filters.billingPeriod),
-    );
-  }
-
-  function updateOverrideBillingPeriodText(value) {
-    const nextText = formatVietnameseDateInput(value);
-    setOverrideBillingPeriodText(nextText);
-
-    if (!nextText.trim()) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: "" }));
-      return;
-    }
-
-    const nextPeriod = vietnameseDateToBillingPeriod(nextText);
-    if (nextPeriod) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
-    }
-  }
-
-  function normalizeOverrideBillingPeriodText() {
-    if (!overrideBillingPeriodText.trim()) return;
-
-    const nextPeriod = vietnameseDateToBillingPeriod(overrideBillingPeriodText);
-    const normalizedPeriod = nextPeriod || overrideForm.billingPeriod;
-    setOverrideBillingPeriodText(
-      billingPeriodToVietnameseDate(normalizedPeriod),
-    );
-    if (nextPeriod) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
-    }
-  }
-
   const totals = invoices.reduce(
     (acc, invoice) => ({
-      total: acc.total + Number(invoice.totalAmount || 0),
-      paid: acc.paid + Number(invoice.paidAmount || 0),
-      remaining: acc.remaining + Number(invoice.remainingAmount || 0),
+      total: acc.total + invoice.totalAmount,
+      paid: acc.paid + invoice.paidAmount,
+      remaining: acc.remaining + invoice.remainingAmount,
     }),
     { total: 0, paid: 0, remaining: 0 },
   );
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
-      <DashboardPageHeader
-        title="Hóa đơn & Thu tiền"
-        description="Theo dõi hóa đơn phòng, ghi nhận thanh toán thủ công và quản lý các khoản còn phải thu."
-        actions={
-          <Link
-            href="/dashboard/billing/history"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
-          >
-            <History className="h-4 w-4 dark:text-slate-300" />
-            Lịch sử thanh toán
-          </Link>
-        }
-      />
+      <section className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+          Hóa đơn & Thu tiền
+        </h1>
+        <Link
+          href="/dashboard/billing/history"
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
+        >
+          <History className="h-4 w-4 dark:text-slate-300" />
+          Lịch sử thanh toán
+        </Link>
+      </section>
 
       {(error || message) && (
         <section
@@ -489,63 +360,49 @@ export default function BillingPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <DashboardStatCard
-          icon={ReceiptText}
-          label="Tổng hóa đơn"
-          value={formatMoney(totals.total)}
-          tone="blue"
-          subtitle="Tổng giá trị trong kỳ"
-        />
-        <DashboardStatCard
-          icon={CheckCircle2}
-          label="Đã thu"
-          value={formatMoney(totals.paid)}
-          tone="emerald"
-          subtitle="Khoản đã ghi nhận"
-        />
-        <DashboardStatCard
-          icon={WalletCards}
-          label="Còn lại"
-          value={formatMoney(totals.remaining)}
-          tone="rose"
-          subtitle="Khoản cần tiếp tục thu"
-        />
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Tổng hóa đơn
+          </p>
+          <p className="mt-2 text-xl font-black">{formatMoney(totals.total)}</p>
+        </div>
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Đã thu
+          </p>
+          <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
+            {formatMoney(totals.paid)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+            Còn lại
+          </p>
+          <p className="mt-2 text-xl font-black text-rose-700 dark:text-rose-300">
+            {formatMoney(totals.remaining)}
+          </p>
+        </div>
       </section>
 
-      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-            <SlidersHorizontal className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">Bộ lọc hóa đơn</h2>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Lọc theo kỳ, trạng thái, cơ sở và phòng.</p>
-          </div>
-        </div>
+      <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
         <div className="grid gap-3 md:grid-cols-5">
           <label className="grid gap-1 text-sm font-bold">
             Tháng
             <input
-              type="text"
-              inputMode="numeric"
-              placeholder="vd: 01/07/2026"
-              value={billingPeriodText}
-              onBlur={normalizeBillingPeriodText}
-              onChange={(event) => updateBillingPeriodText(event.target.value)}
-              className={FORM_CONTROL_CLASS}
+              type="month"
+              value={filters.billingPeriod}
+              onChange={(event) =>
+                updateFilters({ billingPeriod: event.target.value })
+              }
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             />
           </label>
           <label className="grid gap-1 text-sm font-bold">
             Trạng thái
             <select
               value={filters.status}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value,
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
+              onChange={(event) => updateFilters({ status: event.target.value })}
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -560,12 +417,9 @@ export default function BillingPage() {
             <select
               value={filters.invoiceType}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  invoiceType: event.target.value,
-                }))
+                updateFilters({ invoiceType: event.target.value })
               }
-              className={FORM_CONTROL_CLASS}
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="ALL">Tất cả</option>
               {Object.entries(TYPE_LABELS).map(([value, label]) => (
@@ -580,13 +434,9 @@ export default function BillingPage() {
             <select
               value={filters.propertyId}
               onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  propertyId: event.target.value,
-                  roomId: "",
-                }))
+                updateFilters({ propertyId: event.target.value, roomId: "" })
               }
-              className={FORM_CONTROL_CLASS}
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả cơ sở</option>
               {properties.map((property) => (
@@ -600,13 +450,8 @@ export default function BillingPage() {
             Phòng
             <select
               value={filters.roomId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  roomId: event.target.value,
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
+              onChange={(event) => updateFilters({ roomId: event.target.value })}
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
             >
               <option value="">Tất cả phòng</option>
               {filterRooms.map((room) => (
@@ -623,7 +468,6 @@ export default function BillingPage() {
             onClick={loadInvoices}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
           >
-            <RefreshCw className="h-4 w-4" />
             Tải hóa đơn
           </button>
           <button
@@ -631,84 +475,61 @@ export default function BillingPage() {
             onClick={() => setIsOverrideModalOpen(true)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
           >
-            <SlidersHorizontal className="h-4 w-4" />
-            Điều chỉnh giá
+            ⚙️ Điều chỉnh giá
           </button>
           <button
             type="button"
             onClick={() => setIsPaymentModalOpen(true)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
           >
-            <Banknote className="h-4 w-4" />
-            Thanh toán thủ công
+            💵 Thanh toán thủ công
           </button>
         </div>
       </section>
 
-      <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-              <ReceiptText className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                Danh sách hóa đơn
-              </h2>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Theo dõi trạng thái thu tiền theo từng phòng.
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 dark:bg-white/5 dark:text-slate-300">
-            {invoices.length} hóa đơn
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-left text-sm">
-            <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Hóa đơn</th>
-                <th className="px-4 py-3">Phòng</th>
-                <th className="px-4 py-3">Khách thuê</th>
-                <th className="px-4 py-3">Tháng</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Tổng tiền</th>
-                <th className="px-4 py-3 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+      <section className="w-full">
+        <div className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
-                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                    Đang tải hóa đơn...
-                  </td>
+                  <th className="px-4 py-3">Hóa đơn</th>
+                  <th className="px-4 py-3">Phòng</th>
+                  <th className="px-4 py-3">Khách thuê</th>
+                  <th className="px-4 py-3">Tháng</th>
+                  <th className="px-4 py-3">Trạng thái</th>
+                  <th className="px-4 py-3 text-right">Tổng tiền</th>
                 </tr>
-              ) : invoices.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
-                    Chưa có hóa đơn phù hợp với bộ lọc.
-                  </td>
-                </tr>
-              ) : (
-                invoices.map((invoice) => (
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-500 dark:text-slate-400">
+                      <span className="inline-flex items-center gap-2 font-bold">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải hóa đơn...
+                      </span>
+                    </td>
+                  </tr>
+                ) : invoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-slate-500 dark:text-slate-400">
+                      Không có hóa đơn phù hợp với bộ lọc.
+                    </td>
+                  </tr>
+                ) : paginatedInvoices.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    onClick={() => setSelectedInvoiceId(invoice.id || "")}
-                    className={`cursor-pointer border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5 ${
-                      String(selectedInvoiceId) === String(invoice.id) ? "bg-blue-50/60 dark:bg-blue-500/10" : ""
-                    }`}
+                    className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
                   >
                     <td className="px-4 py-3">
                       <p className="font-black">{invoice.invoiceCode}</p>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {typeLabel(invoice.invoiceType)}
-                      </p>
                     </td>
-                    <td className="px-4 py-3 font-semibold">{invoice.roomCode || "Chưa gán"}</td>
-                    <td className="px-4 py-3">{invoice.tenantName || "Chưa có"}</td>
-                    <td className="px-4 py-3">{billingPeriodToVietnameseDate(invoice.billingPeriod) || invoice.billingPeriod}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {displayRoomCode(invoice.roomCode)}
+                    </td>
+                    <td className="px-4 py-3">{invoice.tenantName || "Chưa cập nhật"}</td>
+                    <td className="px-4 py-3">{formatBillingPeriod(invoice.billingPeriod)}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${invoiceStatusClasses(invoice.status)}`}
@@ -719,49 +540,23 @@ export default function BillingPage() {
                     <td className="px-4 py-3 text-right font-black">
                       {formatMoney(invoice.totalAmount)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        {isPendingInvoice(invoice) && (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openManualPayment(invoice);
-                            }}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-700"
-                          >
-                            <Banknote className="h-3.5 w-3.5" />
-                            Xác nhận
-                          </button>
-                        )}
-                        {isExpiredInvoice(invoice) && (
-                          <button
-                            type="button"
-                            disabled={saving === `warning-${invoice.id}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              sendOverdueWarning(invoice);
-                            }}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
-                          >
-                            {saving === `warning-${invoice.id}` ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                            )}
-                            Cảnh báo
-                          </button>
-                        )}
-                        {!isPendingInvoice(invoice) && !isExpiredInvoice(invoice) && (
-                          <span className="text-xs font-semibold text-slate-400">-</span>
-                        )}
-                      </div>
-                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DashboardPagination
+            page={safePage}
+            size={size}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            itemLabel="hóa đơn"
+            onPageChange={setPage}
+            onSizeChange={(nextSize) => {
+              setSize(nextSize);
+              setPage(1);
+            }}
+          />
         </div>
       </section>
 
@@ -799,7 +594,7 @@ export default function BillingPage() {
                         roomId: "",
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   >
                     <option value="">Chọn cơ sở</option>
                     {properties.map((property) => (
@@ -821,7 +616,7 @@ export default function BillingPage() {
                       }))
                     }
                     disabled={!overrideForm.propertyId}
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   >
                     <option value="">
                       {overrideForm.propertyId
@@ -830,7 +625,7 @@ export default function BillingPage() {
                     </option>
                     {overrideRooms.map((room) => (
                       <option key={roomKey(room)} value={roomKey(room)}>
-                        {room.roomCode || room.name}
+                        {displayRoomCode(room.roomCode || room.name)}
                       </option>
                     ))}
                   </select>
@@ -839,15 +634,15 @@ export default function BillingPage() {
                   Tháng
                   <input
                     required
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="vd: 01/07/2026"
-                    value={overrideBillingPeriodText}
-                    onBlur={normalizeOverrideBillingPeriodText}
+                    type="month"
+                    value={overrideForm.billingPeriod}
                     onChange={(event) =>
-                      updateOverrideBillingPeriodText(event.target.value)
+                      setOverrideForm((current) => ({
+                        ...current,
+                        billingPeriod: event.target.value,
+                      }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -863,7 +658,7 @@ export default function BillingPage() {
                         overrideMonthlyRent: event.target.value,
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -876,7 +671,7 @@ export default function BillingPage() {
                         reason: event.target.value,
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   />
                 </label>
               </div>
@@ -933,7 +728,7 @@ export default function BillingPage() {
                         amount: "",
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   >
                     <option value="">Chọn cơ sở</option>
                     {properties.map((property) => (
@@ -957,7 +752,7 @@ export default function BillingPage() {
                       }))
                     }
                     disabled={!paymentForm.propertyId}
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   >
                     <option value="">
                       {paymentForm.propertyId
@@ -966,7 +761,7 @@ export default function BillingPage() {
                     </option>
                     {paymentRooms.map((room) => (
                       <option key={roomKey(room)} value={roomKey(room)}>
-                        {room.roomCode || room.name}
+                        {displayRoomCode(room.roomCode || room.name)}
                       </option>
                     ))}
                   </select>
@@ -980,14 +775,14 @@ export default function BillingPage() {
                       selectPaymentInvoice(event.target.value)
                     }
                     disabled={!paymentForm.roomId}
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   >
                     <option value="">
                       {paymentForm.roomId ? "Chọn hóa đơn" : "Chọn phòng trước"}
                     </option>
                     {paymentInvoices.map((invoice) => (
                       <option key={invoice.id} value={invoice.id}>
-                        {invoice.invoiceCode} - {invoice.roomCode || "Chưa gán"}
+                        {invoice.invoiceCode} - {displayRoomCode(invoice.roomCode)}
                       </option>
                     ))}
                   </select>
@@ -1005,7 +800,7 @@ export default function BillingPage() {
                         amount: event.target.value,
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   />
                 </label>
                 <label className="grid gap-1 text-sm font-bold">
@@ -1018,7 +813,7 @@ export default function BillingPage() {
                         note: event.target.value,
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-3"
                   />
                 </label>
               </div>

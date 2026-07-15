@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Bike,
@@ -12,7 +12,7 @@ import {
   FolderOpen,
   IdCard,
   ImageOff,
-  KeyRound,
+  LockKeyhole,
   Mail,
   MapPin,
   Phone,
@@ -23,20 +23,14 @@ import {
   X,
 } from "lucide-react";
 import {
-  fetchTenantProfilePermissionGrants,
   fetchPrivateFileObjectUrl,
   fetchTenantProfiles,
   requestTenantProfileAccess,
-  revokeTenantProfilePermissionGrant,
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
-import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
-import { usePermission } from "@/app/dashboard/_hooks/usePermission";
-
-// ponytail: local filters cover the first 1000 tenant profiles; move filters into the API when this grows.
-const TENANT_PROFILE_FETCH_SIZE = 1000;
+import { fetchAllPageItems, paginateItems } from "@/lib/pageResponse";
 
 const valueOf = (item, ...keys) => {
   for (const key of keys) {
@@ -64,10 +58,6 @@ const formatDate = (value) => {
   return formatDisplayDate(value);
 };
 
-const formatDateTime = (value) => {
-  return formatDisplayDateTime(value);
-};
-
 const formatYear = (value) => {
   if (!value) return "Chưa cập nhật";
   const date = new Date(value);
@@ -79,7 +69,7 @@ const formatYear = (value) => {
 const formatMoney = (value) => {
   const amount = Number(value);
   return Number.isFinite(amount) && amount > 0
-    ? `${moneyFormatter.format(amount)} VNĐ`
+    ? `${moneyFormatter.format(amount)} đ`
     : "Chưa cập nhật";
 };
 
@@ -125,57 +115,8 @@ const profileStatusClass = (status) => {
   ) {
     return "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
   }
-  if (value === "ACCESS_REJECTED")
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  if (value.startsWith("ACCESS_"))
-    return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-slate-200 bg-slate-50 text-slate-700";
 };
-
-const profileAccessStatus = (profile) =>
-  String(
-    valueOf(profile, "profileAccessStatus", "profile_access_status") || "",
-  ).toUpperCase();
-
-const canViewProfile = (profile) => {
-  const explicit = valueOf(
-    profile,
-    "canViewSensitiveProfile",
-    "can_view_sensitive_profile",
-  );
-  if (explicit === true || explicit === "true") return true;
-  if (explicit === false || explicit === "false") return false;
-  const status = profileAccessStatus(profile);
-  return !status || status === "APPROVED";
-};
-
-const permissionGrantStatusLabel = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "APPROVED" || value === "ACTIVE") return "Đang hiệu lực";
-  if (value === "EXPIRED") return "Đã hết hạn";
-  if (value === "REVOKED") return "Đã thu hồi";
-  return "Chưa rõ";
-};
-
-const permissionGrantStatusClass = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "APPROVED" || value === "ACTIVE")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (value === "REVOKED") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (value === "EXPIRED") return "border-slate-200 bg-slate-50 text-slate-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
-};
-
-const permissionGrantDurationLabel = (durationCode) => {
-  const value = String(durationCode || "").toUpperCase();
-  if (value === "HOURS_48") return "48 giờ";
-  if (value === "DAYS_7") return "7 ngày";
-  if (value === "DAYS_30") return "30 ngày";
-  return "Theo cấu hình";
-};
-
-const isActivePermissionGrant = (grant) =>
-  ["ACTIVE", "APPROVED"].includes(String(valueOf(grant, "status")).toUpperCase());
 
 const accountStatusLabel = (status) => {
   const value = String(status || "").toUpperCase();
@@ -705,6 +646,9 @@ function TenantProfileModal({
   onOpenContractDetails,
   contractDetailsLoadingId,
   contractDetailsError,
+  onRequestAccess,
+  accessRequestLoadingId,
+  accessRequestError,
 }) {
   const identity =
     valueOf(profile, "identityDocument", "identity_document") || {};
@@ -720,6 +664,19 @@ function TenantProfileModal({
   const contractId = getProfileContractId(profile);
   const isLoadingContractDetails =
     contractId && String(contractDetailsLoadingId) === String(contractId);
+  const profileId = valueOf(profile, "id");
+  const accessStatus = String(
+    valueOf(profile, "profileAccessStatus", "profile_access_status") || "",
+  ).toUpperCase();
+  const canViewSensitiveProfile = valueOf(
+    profile,
+    "canViewSensitiveProfile",
+    "can_view_sensitive_profile",
+  );
+  const accessRestricted = canViewSensitiveProfile === false;
+  const accessPending = accessStatus === "PENDING";
+  const isRequestingAccess =
+    profileId && String(accessRequestLoadingId) === String(profileId);
 
   const openRoommateProfile = (roommateId) => {
     const nextProfile = profiles.find(
@@ -753,6 +710,36 @@ function TenantProfileModal({
             <X className="h-6 w-6" />
           </button>
         </header>
+
+        {accessRestricted && (
+          <div className="flex flex-col gap-4 border-b border-amber-200 bg-amber-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+              <div>
+                <p className="font-black text-amber-950">
+                  {accessPending ? "Đang chờ chủ trọ duyệt quyền xem" : "Thông tin nhạy cảm đang được bảo vệ"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-amber-800">
+                  Số CCCD, địa chỉ, ảnh hồ sơ và liên hệ chi tiết chỉ hiển thị sau khi yêu cầu được duyệt.
+                </p>
+                {accessRequestError && (
+                  <p className="mt-2 text-sm font-bold text-red-700">{accessRequestError}</p>
+                )}
+              </div>
+            </div>
+            {!accessPending && (
+              <button
+                type="button"
+                onClick={() => onRequestAccess(profile)}
+                disabled={isRequestingAccess}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-black text-white hover:bg-[#15243a] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRequestingAccess ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
+                {isRequestingAccess ? "Đang gửi..." : "Yêu cầu quyền xem"}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="grid flex-1 gap-5 overflow-y-auto bg-[#fbfcfe] dark:bg-white/5 p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid content-start gap-5">
@@ -1103,169 +1090,7 @@ function TenantProfileModal({
   );
 }
 
-function PermissionGrantModal({
-  profile,
-  grants,
-  loading,
-  error,
-  actionId,
-  onClose,
-  onRefresh,
-  onRevoke,
-}) {
-  if (!profile) return null;
-
-  const profileName = valueOf(profile, "fullName", "full_name") || "Khách thuê";
-  const roomCode = valueOf(profile, "roomCode", "room_code");
-  const activeCount = grants.filter(isActivePermissionGrant).length;
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <section className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-[#d8dee8] px-6 py-5">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#64748b]">
-              Quyền xem hồ sơ đầy đủ
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-[#091426]">
-              {profileName}
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-[#64748b]">
-              {roomCode ? `Phòng ${roomCode} · ` : ""}{activeCount} quyền đang hiệu lực
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-3 text-sm font-bold text-[#091426] hover:bg-[#f2f4f6] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Làm mới
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-2 text-[#45474c] hover:bg-[#f2f4f6]"
-              aria-label="Đóng quản lý quyền"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto bg-[#fbfcfe] p-5">
-          {loading && (
-            <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-12 text-center text-sm font-bold text-[#64748b]">
-              Đang tải danh sách quyền...
-            </div>
-          )}
-
-          {!loading && error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && grants.length === 0 && (
-            <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-12 text-center">
-              <KeyRound className="mx-auto h-9 w-9 text-[#94a3b8]" />
-              <p className="mt-3 text-sm font-bold text-[#64748b]">
-                Chưa có manager nào được cấp quyền xem hồ sơ này.
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && grants.length > 0 && (
-            <div className="dashboard-table rounded-xl border border-[#e2e8f0] bg-white">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
-                  <tr>
-                    <th className="px-4 py-3">Manager</th>
-                    <th className="px-4 py-3">Trạng thái</th>
-                    <th className="px-4 py-3">Thời hạn</th>
-                    <th className="px-4 py-3">Lý do</th>
-                    <th className="px-4 py-3 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e2e8f0]">
-                  {grants.map((grant) => {
-                    const grantId = valueOf(grant, "id");
-                    const active = isActivePermissionGrant(grant);
-                    const managerName =
-                      valueOf(grant, "granteeFullName", "grantee_full_name") ||
-                      `Manager #${valueOf(grant, "granteeUserId", "grantee_user_id") || ""}`.trim();
-                    const managerContact =
-                      valueOf(grant, "granteePhone", "grantee_phone") ||
-                      valueOf(grant, "granteeEmail", "grantee_email");
-
-                    return (
-                      <tr key={grantId || `${managerName}-${valueOf(grant, "grantedAt", "granted_at")}`}>
-                        <td className="px-4 py-4">
-                          <p className="font-black text-[#091426]">{managerName}</p>
-                          <p className="mt-1 text-xs font-semibold text-[#64748b]">
-                            {managerContact || "Chưa có liên hệ"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge className={permissionGrantStatusClass(valueOf(grant, "status"))}>
-                            {permissionGrantStatusLabel(valueOf(grant, "status"))}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p>{permissionGrantDurationLabel(valueOf(grant, "durationCode", "duration_code"))}</p>
-                          <p className="mt-1 text-xs text-[#64748b]">
-                            Đến {formatDateTime(valueOf(grant, "expiresAt", "expires_at"))}
-                          </p>
-                          {valueOf(grant, "revokedAt", "revoked_at") && (
-                            <p className="mt-1 text-xs text-rose-600">
-                              Thu hồi {formatDateTime(valueOf(grant, "revokedAt", "revoked_at"))}
-                            </p>
-                          )}
-                        </td>
-                        <td className="max-w-[220px] px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p className="line-clamp-2">{valueOf(grant, "reason") || "Không ghi lý do"}</p>
-                          {valueOf(grant, "revokeReason", "revoke_reason") && (
-                            <p className="mt-2 line-clamp-2 text-xs text-rose-600">
-                              {valueOf(grant, "revokeReason", "revoke_reason")}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          {active ? (
-                            <button
-                              type="button"
-                              disabled={String(actionId) === String(grantId)}
-                              onClick={() => onRevoke(grant)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <KeyRound className="h-4 w-4" />
-                              {String(actionId) === String(grantId) ? "Đang thu hồi..." : "Thu hồi"}
-                            </button>
-                          ) : (
-                            <span className="text-xs font-bold text-[#94a3b8]">Không khả dụng</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 export default function TenantsPage() {
-  const { role: activeRole } = usePermission();
   const [profiles, setProfiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1273,12 +1098,8 @@ export default function TenantsPage() {
   const [selectedContract, setSelectedContract] = useState(null);
   const [contractDetailsLoadingId, setContractDetailsLoadingId] = useState("");
   const [contractDetailsError, setContractDetailsError] = useState("");
-  const [accessRequestingId, setAccessRequestingId] = useState("");
-  const [grantActionId, setGrantActionId] = useState("");
-  const [selectedGrantProfile, setSelectedGrantProfile] = useState(null);
-  const [permissionGrants, setPermissionGrants] = useState([]);
-  const [grantsLoading, setGrantsLoading] = useState(false);
-  const [grantsError, setGrantsError] = useState("");
+  const [accessRequestLoadingId, setAccessRequestLoadingId] = useState("");
+  const [accessRequestError, setAccessRequestError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
@@ -1323,120 +1144,52 @@ export default function TenantsPage() {
     }
   };
 
-  const handleRequestProfileAccess = async (profile) => {
-    const profileId = valueOf(profile, "id", "profileId", "profile_id");
+  const requestProfileAccess = async (profile) => {
+    const profileId = valueOf(profile, "id");
     if (!profileId) return;
 
-    const defaultReason = `Cần xem hồ sơ khách thuê phòng ${valueOf(profile, "roomCode", "room_code") || ""}`.trim();
-    const reason = window.prompt("Lý do cần xem hồ sơ khách thuê?", defaultReason);
-    if (reason === null) return;
-
     try {
-      setError("");
-      setAccessRequestingId(String(profileId));
-      await requestTenantProfileAccess(profileId, reason);
-      await loadProfiles();
+      setAccessRequestError("");
+      setAccessRequestLoadingId(profileId);
+      const result = await requestTenantProfileAccess(profileId);
+      const updatedProfile = {
+        ...profile,
+        profileAccessStatus: result?.status || "PENDING",
+        profileAccessRequestId: result?.requestId || null,
+        canViewSensitiveProfile: Boolean(result?.canViewSensitiveProfile),
+      };
+      setProfiles((current) =>
+        current.map((item) =>
+          String(valueOf(item, "id")) === String(profileId) ? updatedProfile : item,
+        ),
+      );
+      setSelectedProfile(updatedProfile);
     } catch (requestError) {
-      setError(requestError?.message || "Không gửi được yêu cầu xem hồ sơ.");
+      setAccessRequestError(
+        requestError?.message || "Không thể gửi yêu cầu quyền xem hồ sơ.",
+      );
     } finally {
-      setAccessRequestingId("");
+      setAccessRequestLoadingId("");
     }
   };
 
-  const loadProfileGrants = async (profile) => {
-    const profileId = valueOf(profile, "id", "profileId", "profile_id");
-    if (!profileId) {
-      setPermissionGrants([]);
-      return;
-    }
-
-    setGrantsLoading(true);
-    setGrantsError("");
-    try {
-      const grants = await fetchTenantProfilePermissionGrants(profileId);
-      setPermissionGrants(Array.isArray(grants) ? grants : []);
-    } catch (loadError) {
-      setGrantsError(loadError?.message || "Không tải được danh sách quyền xem hồ sơ.");
-      setPermissionGrants([]);
-    } finally {
-      setGrantsLoading(false);
-    }
-  };
-
-  const openManageProfileAccess = async (profile) => {
-    setSelectedGrantProfile(profile);
-    setPermissionGrants([]);
-    await loadProfileGrants(profile);
-  };
-
-  const handleRevokePermissionGrant = async (grant) => {
-    const grantId = valueOf(grant, "id");
-    if (!grantId) return;
-
-    const managerName =
-      valueOf(grant, "granteeFullName", "grantee_full_name") ||
-      `manager #${valueOf(grant, "granteeUserId", "grantee_user_id") || ""}`.trim();
-    const reason = window.prompt(
-      `Lý do thu hồi quyền xem hồ sơ của ${managerName}?`,
-      "Không còn cần quyền xem hồ sơ này",
-    );
-    if (reason === null) return;
-
-    try {
-      setError("");
-      setGrantActionId(String(grantId));
-      await revokeTenantProfilePermissionGrant(grantId, reason);
-      if (selectedGrantProfile) {
-        await loadProfileGrants(selectedGrantProfile);
-      }
-      await loadProfiles();
-    } catch (revokeError) {
-      setGrantsError(revokeError?.message || "Không thu hồi được quyền xem hồ sơ.");
-    } finally {
-      setGrantActionId("");
-    }
-  };
-
-  const loadProfiles = async () => {
+  const loadProfiles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError("");
-      const data = await fetchTenantProfiles({
-        page: 0,
-        size: TENANT_PROFILE_FETCH_SIZE,
-      });
-      setProfiles(data.items);
+      const data = await fetchAllPageItems(fetchTenantProfiles);
+      setProfiles(data);
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let isActive = true;
-
-    fetchTenantProfiles({
-      page: 0,
-      size: TENANT_PROFILE_FETCH_SIZE,
-    })
-      .then((data) => {
-        if (!isActive) return;
-        setProfiles(data.items);
-        setError("");
-      })
-      .catch((loadError) => {
-        if (!isActive) return;
-        setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
-      })
-      .finally(() => {
-        if (isActive) setIsLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+    const timer = window.setTimeout(() => void loadProfiles(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadProfiles]);
 
   const roomOptions = useMemo(() => {
     const rooms = [
@@ -1500,45 +1253,31 @@ export default function TenantsPage() {
     roleFilter,
     roomFilter,
   ]);
-
-  const filteredTotalElements = filteredProfiles.length;
-  const filteredTotalPages =
-    filteredTotalElements === 0
-      ? 0
-      : Math.ceil(filteredTotalElements / Math.max(1, size));
-  const displayedProfilePage =
-    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
-  const pagedProfiles = useMemo(() => {
-    const start = (displayedProfilePage - 1) * size;
-    return filteredProfiles.slice(start, start + size);
-  }, [displayedProfilePage, filteredProfiles, size]);
+  const profilePage = paginateItems(filteredProfiles, { page, size });
 
   const groupedByRoom = useMemo(() => {
     const groups = new Map();
-    pagedProfiles.forEach((profile) => {
+    profilePage.items.forEach((profile) => {
       const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(profile);
     });
     return [...groups.values()];
-  }, [pagedProfiles]);
+  }, [profilePage.items]);
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6">
-      <DashboardPageHeader
-        title="Hồ sơ khách thuê"
-        description="Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và người ở cùng."
-        actions={
-          <button
-            type="button"
-            onClick={loadProfiles}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Làm mới
-          </button>
-        }
-      />
+      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+            Hồ sơ khách thuê
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và
+            người ở cùng.
+          </p>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -1815,63 +1554,14 @@ export default function TenantsPage() {
                             data-label="Thao tác"
                             className="px-6 py-5 text-right"
                           >
-                            {(() => {
-                              const profileId = valueOf(
-                                profile,
-                                "id",
-                                "profileId",
-                                "profile_id",
-                              );
-                              const accessStatus = profileAccessStatus(profile);
-                              const isRequesting =
-                                String(accessRequestingId) === String(profileId);
-                              if (canViewProfile(profile)) {
-                                return (
-                                  <div className="flex flex-col items-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedProfile(profile)}
-                                      className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                      Xem hồ sơ
-                                    </button>
-                                    {String(activeRole).toLowerCase() === "owner" && (
-                                      <button
-                                        type="button"
-                                        onClick={() => openManageProfileAccess(profile)}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
-                                      >
-                                        <KeyRound className="h-4 w-4" />
-                                        Quản lý quyền
-                                      </button>
-                                    )}
-                                    {valueOf(profile, "profileAccessExpiresAt", "profile_access_expires_at") && (
-                                      <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
-                                        Hiệu lực đến {formatDate(valueOf(profile, "profileAccessExpiresAt", "profile_access_expires_at"))}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return (
-                                <button
-                                  type="button"
-                                  disabled={accessStatus === "PENDING" || isRequesting}
-                                  onClick={() => handleRequestProfileAccess(profile)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:border-[#e2e8f0] disabled:bg-[#f8fafc] disabled:text-[#94a3b8] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
-                                >
-                                  <KeyRound className="h-4 w-4" />
-                                  {isRequesting
-                                    ? "Đang gửi..."
-                                    : accessStatus === "PENDING"
-                                      ? "Chờ duyệt"
-                                      : accessStatus === "REJECTED"
-                                        ? "Gửi lại yêu cầu"
-                                        : "Yêu cầu xem"}
-                                </button>
-                              );
-                            })()}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProfile(profile)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
+                            >
+                              <Eye className="h-4 w-4" />
+                              Xem hồ sơ
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1884,12 +1574,12 @@ export default function TenantsPage() {
         </section>
       )}
 
-      {!error && (
+      {!isLoading && !error && (
         <DashboardPagination
-          page={page}
-          size={size}
-          totalElements={filteredTotalElements}
-          totalPages={filteredTotalPages}
+          page={profilePage.page}
+          size={profilePage.size}
+          totalElements={profilePage.totalElements}
+          totalPages={profilePage.totalPages}
           itemLabel="hồ sơ"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {
@@ -1908,23 +1598,9 @@ export default function TenantsPage() {
           onOpenContractDetails={openContractDetails}
           contractDetailsLoadingId={contractDetailsLoadingId}
           contractDetailsError={contractDetailsError}
-        />
-      )}
-
-      {selectedGrantProfile && (
-        <PermissionGrantModal
-          profile={selectedGrantProfile}
-          grants={permissionGrants}
-          loading={grantsLoading}
-          error={grantsError}
-          actionId={grantActionId}
-          onClose={() => {
-            setSelectedGrantProfile(null);
-            setPermissionGrants([]);
-            setGrantsError("");
-          }}
-          onRefresh={() => loadProfileGrants(selectedGrantProfile)}
-          onRevoke={handleRevokePermissionGrant}
+          onRequestAccess={requestProfileAccess}
+          accessRequestLoadingId={accessRequestLoadingId}
+          accessRequestError={accessRequestError}
         />
       )}
 

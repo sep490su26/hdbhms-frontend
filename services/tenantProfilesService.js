@@ -73,6 +73,14 @@ export async function fetchMyTenantProfile() {
   return data;
 }
 
+export async function requestTenantProfileAccess(profileId) {
+  return authenticatedFetch(`${API_BASE_URL}/tenant-profiles/${encodeURIComponent(profileId)}/access-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchPrivateFileObjectUrl(fileUrlOrId) {
   if (!fileUrlOrId) return "";
 

@@ -29,7 +29,7 @@ export const SECTION_PERMISSIONS = {
   maintenance: [ROLES.OWNER, ROLES.MANAGER],
   billing: [ROLES.OWNER, ROLES.MANAGER],
   debt: [ROLES.OWNER, ROLES.MANAGER],
-  deposits: [ROLES.OWNER],
+  deposits: [ROLES.OWNER, ROLES.MANAGER],
   contract: [ROLES.OWNER],
   finance: [ROLES.PUBLIC, ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT],
   settings: [ROLES.OWNER],

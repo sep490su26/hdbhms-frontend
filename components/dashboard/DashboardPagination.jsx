@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+
 import {
   Pagination,
   PaginationContent,
@@ -10,6 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { getPaginationState } from "@/lib/pageResponse";
 
 export const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
@@ -33,35 +35,23 @@ export function DashboardPagination({
   onSizeChange,
   className = "",
 }) {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeSize = Math.max(1, Number(size) || PAGE_SIZE_OPTIONS[0]);
-  const safeTotalElements = Math.max(0, Number(totalElements) || 0);
-  const explicitTotalPages = Math.max(0, Number(totalPages) || 0);
+  const {
+    page: safePage,
+    size: safeSize,
+    totalElements: safeTotalElements,
+    totalPages: safeTotalPages,
+    firstItem,
+    lastItem,
+  } = getPaginationState({ page, size, totalElements, totalPages });
   const hasData = safeTotalElements > 0;
-  const computedTotalPages = Math.ceil(safeTotalElements / safeSize);
-  const safeTotalPages = hasData
-    ? Math.max(1, explicitTotalPages, computedTotalPages)
-    : explicitTotalPages;
-  const displayPage = safeTotalPages
-    ? Math.min(safePage, safeTotalPages)
-    : safePage;
-  const firstItem = hasData ? (displayPage - 1) * safeSize + 1 : 0;
-  const lastItem = hasData
-    ? Math.min(displayPage * safeSize, safeTotalElements)
-    : 0;
-  const pageItems = safeTotalPages > 0
-    ? buildPageItems(displayPage, safeTotalPages)
-    : [];
-  const shouldShowPageNav = safeTotalPages > 1;
-
-  const isPreviousDisabled = safeTotalPages <= 0 || displayPage <= 1;
-  const isNextDisabled = safeTotalPages <= 0 || displayPage >= safeTotalPages;
+  const pageItems = hasData ? buildPageItems(safePage, safeTotalPages) : [];
 
   useEffect(() => {
-    if (safeTotalPages > 0 && safePage > safeTotalPages) {
-      onPageChange?.(safeTotalPages);
-    }
-  }, [onPageChange, safePage, safeTotalPages]);
+    if (Number(page) !== safePage) onPageChange?.(safePage);
+  }, [onPageChange, page, safePage]);
+
+  const isPreviousDisabled = !hasData || safePage <= 1;
+  const isNextDisabled = !hasData || safePage >= safeTotalPages;
 
   const navButtonClass =
     "h-9 rounded-xl px-2.5 text-sm font-semibold transition sm:px-3";
@@ -79,7 +69,7 @@ export function DashboardPagination({
     "h-9 min-w-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#1e40af] dark:border-white/10 dark:bg-[#020817] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white";
 
   const goToPage = (nextPage) => {
-    if (safeTotalPages <= 0) return;
+    if (!hasData) return;
     const bounded = Math.min(Math.max(1, nextPage), safeTotalPages);
     if (bounded !== safePage) onPageChange?.(bounded);
   };
@@ -119,72 +109,70 @@ export function DashboardPagination({
         </label>
       </div>
 
-      {shouldShowPageNav ? (
-        <Pagination className="mx-0 w-full justify-start lg:w-auto lg:justify-end">
-          <PaginationContent className="flex-wrap gap-1.5">
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                text="Trước"
-                aria-disabled={isPreviousDisabled}
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (isPreviousDisabled) return;
-                  goToPage(safePage - 1);
-                }}
-                className={`${navButtonClass} ${
-                  isPreviousDisabled ? disabledNavClass : enabledNavClass
-                }`}
-              />
-            </PaginationItem>
+      <Pagination className="mx-0 w-full justify-start lg:w-auto lg:justify-end">
+        <PaginationContent className="flex-wrap gap-1.5">
+          <PaginationItem>
+            <PaginationPrevious
+              href="#"
+              text="Trước"
+              aria-disabled={isPreviousDisabled}
+              onClick={(event) => {
+                event.preventDefault();
+                if (isPreviousDisabled) return;
+                goToPage(safePage - 1);
+              }}
+              className={`${navButtonClass} ${
+                isPreviousDisabled ? disabledNavClass : enabledNavClass
+              }`}
+            />
+          </PaginationItem>
 
-            {pageItems.map((pageNumber, index) => {
-              const previous = pageItems[index - 1];
+          {pageItems.map((pageNumber, index) => {
+            const previous = pageItems[index - 1];
 
-              return (
-                <FragmentWithGap
-                  key={pageNumber}
-                  showGap={previous && pageNumber - previous > 1}
-                >
-                  <PaginationItem>
-                    <PaginationLink
-                      href="#"
-                      isActive={pageNumber === safePage}
-                      className={
-                        pageNumber === safePage
-                          ? activePageClass
-                          : normalPageClass
-                      }
-                      onClick={(event) => {
-                        event.preventDefault();
-                        goToPage(pageNumber);
-                      }}
-                    >
-                      {pageNumber}
-                    </PaginationLink>
-                  </PaginationItem>
-                </FragmentWithGap>
-              );
-            })}
+            return (
+              <FragmentWithGap
+                key={pageNumber}
+                showGap={previous && pageNumber - previous > 1}
+              >
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    isActive={pageNumber === safePage}
+                    className={
+                      pageNumber === safePage
+                        ? activePageClass
+                        : normalPageClass
+                    }
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goToPage(pageNumber);
+                    }}
+                  >
+                    {pageNumber}
+                  </PaginationLink>
+                </PaginationItem>
+              </FragmentWithGap>
+            );
+          })}
 
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                text="Sau"
-                aria-disabled={isNextDisabled}
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (isNextDisabled) return;
-                  goToPage(safePage + 1);
-                }}
-                className={`${navButtonClass} ${
-                  isNextDisabled ? disabledNavClass : enabledNavClass
-                }`}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
+          <PaginationItem>
+            <PaginationNext
+              href="#"
+              text="Sau"
+              aria-disabled={isNextDisabled}
+              onClick={(event) => {
+                event.preventDefault();
+                if (isNextDisabled) return;
+                goToPage(safePage + 1);
+              }}
+              className={`${navButtonClass} ${
+                isNextDisabled ? disabledNavClass : enabledNavClass
+              }`}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 }

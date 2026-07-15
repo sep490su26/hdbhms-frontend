@@ -102,7 +102,7 @@ test("handover download fallbacks do not use legacy bien-ban filenames", () => {
   assert.match(stepperSource, /buildHandoverDocumentFilename/);
   assert.match(
     stepperSource,
-    /downloadHandoverDraftPdf\(contractId, "MOVE_IN", buildHandoverDocumentFilename\(contractDetails\)\)/,
+    /downloadHandoverDraftPdf\(\s*contractId,\s*"MOVE_IN",\s*buildHandoverDocumentFilename\(contractDetails\),?\s*\)/,
   );
   assert.doesNotMatch(stepperSource, /downloadHandoverDraftPdf\(contractId, "MOVE_IN"\);/);
 });

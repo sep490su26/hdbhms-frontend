@@ -60,6 +60,16 @@ test("buildLeaseContractDocumentFilename formats HDT filename from room and star
   assert.equal(buildLeaseContractDocumentFilename({}), "HDT_Phong-X_Chua-Ro-Ngay.pdf");
 });
 
+test("normalizeLeaseContractItem exposes the signed handover file for list badges", () => {
+  const { normalizeLeaseContractItem } = loadLeaseContractsService();
+
+  assert.equal(
+    normalizeLeaseContractItem({ handover_signed_file_id: 73 })
+      .handoverSignedFileId,
+    73,
+  );
+});
+
 test("lease contract download fallbacks do not use legacy hop-dong-thue filenames", () => {
   const serviceSource = readFileSync(new URL("./leaseContractsService.js", import.meta.url), "utf8");
   const pageSource = readFileSync(
@@ -75,7 +85,10 @@ test("lease contract download fallbacks do not use legacy hop-dong-thue filename
   assert.doesNotMatch(pageSource, /hop-dong-thue\.pdf/);
   assert.doesNotMatch(wizardSource, /hop-dong-thue/);
   assert.match(pageSource, /selectedLeaseContractFilename/);
-  assert.match(pageSource, /downloadLeaseContractSignedFile\(mergedSelected\.leaseContractId, selectedLeaseContractFilename\)/);
+  assert.match(
+    pageSource,
+    /downloadLeaseContractSignedFile\(\s*mergedSelected\.leaseContractId,\s*selectedLeaseContractFilename,\s*\)/,
+  );
   assert.match(wizardSource, /buildLeaseContractDocumentFilename/);
 });
 
@@ -185,7 +198,10 @@ test("contract workflow lease action passes generated HDT filename fallback", ()
     "utf8",
   );
 
-  assert.match(source, /await downloadLeaseContractDraftPdf\(contractId, buildLeaseContractDocumentFilename\(contractDetails\)\);/);
+  assert.match(
+    source,
+    /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),?\s*\);/,
+  );
   assert.doesNotMatch(source, /await downloadLeaseContractDraftPdf\(contractId\);/);
 });
 
@@ -199,12 +215,18 @@ test("contract workflow lease signed state uses signedFileId and replace=true fo
     "utf8",
   );
 
-  assert.match(source, /const leaseSignedFileId = contractDetails\?\.signedFileId/);
+  assert.match(
+    source,
+    /const leaseSignedFileId =\s*contractDetails\?\.signedFileId/,
+  );
   assert.match(source, /const leaseUploadInFlightRef = useRef\(false\);/);
-  assert.match(source, /const step2Done = !!leaseSignedFileId;/);
-  assert.match(source, /uploadSignedLeaseContractFile\(contractDetails, file, \{ replace: Boolean\(leaseSignedFileId\) \}\)/);
+  assert.match(source, /complete=\{Boolean\(leaseSignedFileId\)\}/);
+  assert.match(
+    source,
+    /uploadSignedLeaseContractFile\(contractDetails, file, \{\s*replace: Boolean\(leaseSignedFileId\),?\s*\}\)/,
+  );
   assert.match(source, /if \(leaseUploadInFlightRef\.current\)/);
-  assert.doesNotMatch(source, /const step2Done = !!currentFileId;/);
+  assert.doesNotMatch(source, /currentFileId/);
   assert.match(activationFlowSource, /const leaseSignedFileId = contract\?\.signedFileId/);
   assert.doesNotMatch(activationFlowSource, /currentFileId/);
 });

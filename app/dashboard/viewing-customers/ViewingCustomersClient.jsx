@@ -32,8 +32,6 @@ import {
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
-import DateInput from "@/components/DateInput";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
@@ -47,79 +45,6 @@ const emptyForm = {
   note: "",
   status: "NOT_VIEWED",
 };
-
-const MOCK_VIEWING_PROPERTIES = [
-  { id: 1, name: "HDB Home Nguyen Trai" },
-  { id: 2, name: "HDB Residence Cau Giay" },
-  { id: 3, name: "HDB Living Thu Duc" },
-];
-
-const MOCK_VIEWING_CUSTOMERS = [
-  {
-    id: 2001,
-    fullName: "Nguyen Hoang Lan",
-    phone: "0908111222",
-    email: "hoang.lan@example.com",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    interestedRoomId: 101,
-    interestedRoomName: "Phong A101",
-    appointmentAt: "2026-06-06T09:30:00",
-    appointmentLabel: "09:30 06/06/2026",
-    status: "NOT_VIEWED",
-    note: "Khach muon xem phong co ban cong va cho de xe may.",
-    createdAt: "2026-06-03T08:15:00",
-    createdLabel: "08:15 03/06/2026",
-  },
-  {
-    id: 2002,
-    fullName: "Tran Duc Khang",
-    phone: "0919222333",
-    email: "duc.khang@example.com",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    interestedRoomId: 205,
-    interestedRoomName: "Phong B205",
-    appointmentAt: "2026-06-06T14:00:00",
-    appointmentLabel: "14:00 06/06/2026",
-    status: "VIEWED",
-    note: "Da xem phong, dang can nhac hop dong 12 thang.",
-    createdAt: "2026-06-02T10:30:00",
-    createdLabel: "10:30 02/06/2026",
-  },
-  {
-    id: 2003,
-    fullName: "Le Ngoc Mai",
-    phone: "0930333444",
-    email: "ngoc.mai@example.com",
-    propertyId: 3,
-    propertyName: "HDB Living Thu Duc",
-    interestedRoomId: 402,
-    interestedRoomName: "Phong D402",
-    appointmentAt: "2026-06-08T18:30:00",
-    appointmentLabel: "18:30 08/06/2026",
-    status: "NOT_VIEWED",
-    note: "Uu tien phong yen tinh, co the chuyen vao dau thang sau.",
-    createdAt: "2026-06-05T16:20:00",
-    createdLabel: "16:20 05/06/2026",
-  },
-  {
-    id: 2004,
-    fullName: "Pham Tuan Kiet",
-    phone: "0941444555",
-    email: "",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    interestedRoomId: null,
-    interestedRoomName: "",
-    appointmentAt: "2026-06-10T10:00:00",
-    appointmentLabel: "10:00 10/06/2026",
-    status: "DISMISSED",
-    note: "",
-    createdAt: "2026-06-04T11:45:00",
-    createdLabel: "11:45 04/06/2026",
-  },
-];
 
 function StatusSelect({ status, onChange }) {
   const styles = {
@@ -266,7 +191,8 @@ function ViewingModal({
               </select>
             </Field>
             <Field label="Ngày hẹn xem *">
-              <DateInput
+              <input
+                type="date"
                 min={minDate}
                 value={form.appointmentDate}
                 onChange={(event) =>
@@ -333,6 +259,7 @@ function Field({ label, error, children }) {
 function TrashModal({
   rows,
   pagination,
+  pageSize,
   onClose,
   onRestore,
   onForceDelete,
@@ -453,10 +380,10 @@ function TrashModal({
 
         <DashboardPagination
           page={pagination.page}
-          size={pagination.size}
+          size={pageSize}
           totalElements={pagination.total}
           totalPages={pagination.totalPages}
-          itemLabel="khách xem phòng trong thùng rác"
+          itemLabel="khách trong thùng rác"
           onPageChange={onPageChange}
           onSizeChange={onSizeChange}
         />
@@ -544,7 +471,7 @@ export default function ViewingCustomersClient() {
   const [trashRows, setTrashRows] = useState([]);
   const [trashPagination, setTrashPagination] = useState({
     page: 1,
-    size: trashPageSize,
+    size: pageSize,
     total: 0,
     totalPages: 0,
   });
@@ -593,7 +520,7 @@ export default function ViewingCustomersClient() {
   }, [filters.propertyId]);
 
   const loadCustomers = useCallback(
-    async (nextPage = 1, nextSize = pageSize) => {
+    async (nextPage = 1) => {
       try {
         const selectedRoom = filterRooms.find(
           (r) => String(r.id) === String(filters.roomId),
@@ -606,7 +533,7 @@ export default function ViewingCustomersClient() {
           fetchViewingCustomers({
             filters: apiFilters,
             page: nextPage,
-            size: nextSize,
+            size: pageSize,
           }),
           fetchViewingCustomerStats(), // API now ignores filters for internal total counting
         ]);
@@ -622,12 +549,12 @@ export default function ViewingCustomersClient() {
   );
 
   const loadTrash = useCallback(
-    async (nextPage = 1, nextSize = trashPageSize) => {
+    async (nextPage = 1) => {
       try {
         const data = await fetchViewingCustomerTrash({
           filters,
           page: nextPage,
-          size: nextSize,
+          size: trashPageSize,
         });
         setTrashRows(data.items);
         setTrashPagination(data);
@@ -646,6 +573,12 @@ export default function ViewingCustomersClient() {
 
     return () => window.clearTimeout(timer);
   }, [loadCustomers]);
+
+  useEffect(() => {
+    if (!trashOpen) return undefined;
+    const timer = window.setTimeout(() => loadTrash(1), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadTrash, trashOpen]);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({
@@ -770,9 +703,8 @@ export default function ViewingCustomersClient() {
     }
   };
 
-  const openTrash = async () => {
+  const openTrash = () => {
     setTrashOpen(true);
-    await loadTrash(1);
   };
 
   const restoreCustomer = async (customer) => {
@@ -809,36 +741,40 @@ export default function ViewingCustomersClient() {
               {errorMessage}
             </div>
           )}
-          <DashboardPageHeader
-            title="Danh sách khách xem phòng"
-            description="Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng."
-            actions={
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <select
-                  value={filters.propertyId}
-                  onChange={(event) =>
-                    updateFilter("propertyId", event.target.value)
-                  }
-                  className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white shadow-sm outline-none focus:border-[#1e40af] sm:w-auto"
-                >
-                  <option value="all">Tất cả cơ sở</option>
-                  {properties.map((property) => (
-                    <option key={property.id} value={property.id}>
-                      {property.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
-                >
-                  <Plus className="h-4 w-4" />
-                  Thêm khách xem
-                </button>
-              </div>
-            }
-          />
+          <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+                Danh sách khách xem phòng
+              </h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                value={filters.propertyId}
+                onChange={(event) =>
+                  updateFilter("propertyId", event.target.value)
+                }
+                className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white shadow-sm outline-none focus:border-[#1e40af] sm:w-auto"
+              >
+                <option value="all">Tất cả cơ sở</option>
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
+              >
+                <Plus className="h-4 w-4" />
+                Thêm khách xem
+              </button>
+            </div>
+          </section>
 
           <section className="mt-7 grid gap-5 md:grid-cols-3">
             <DashboardStatCard
@@ -900,7 +836,8 @@ export default function ViewingCustomersClient() {
                 ))}
               </select>
               <span className="font-semibold text-slate-900 dark:text-white">Thời gian:</span>
-              <DateInput
+              <input
+                type="date"
                 value={filters.fromDate}
                 onChange={(event) =>
                   updateFilter("fromDate", event.target.value)
@@ -908,7 +845,8 @@ export default function ViewingCustomersClient() {
                 className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
               />
               <span>đến</span>
-              <DateInput
+              <input
+                type="date"
                 value={filters.toDate}
                 onChange={(event) => updateFilter("toDate", event.target.value)}
                 className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
@@ -1046,15 +984,12 @@ export default function ViewingCustomersClient() {
 
             <DashboardPagination
               page={pagination.page}
-              size={pagination.size}
+              size={pageSize}
               totalElements={pagination.total}
               totalPages={pagination.totalPages}
               itemLabel="khách xem phòng"
               onPageChange={loadCustomers}
-              onSizeChange={(nextSize) => {
-                setPageSize(nextSize);
-                loadCustomers(1, nextSize);
-              }}
+              onSizeChange={setPageSize}
             />
           </section>
         </div>
@@ -1087,10 +1022,8 @@ export default function ViewingCustomersClient() {
           onRestore={restoreCustomer}
           onForceDelete={forceDeleteCustomer}
           onPageChange={loadTrash}
-          onSizeChange={(nextSize) => {
-            setTrashPageSize(nextSize);
-            loadTrash(1, nextSize);
-          }}
+          onSizeChange={setTrashPageSize}
+          pageSize={trashPageSize}
         />
       )}
 

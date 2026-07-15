@@ -18,6 +18,7 @@ function loadTransactionService({ authenticatedFetch = async () => ({}), fetchTo
     "readPageItems",
     `${source}
 return {
+  buildExportFallbackFilename,
   normalizeTransaction,
   fetchTransactionHistory,
   fetchTransactionHistoryExportFile,
@@ -39,6 +40,32 @@ return {
     (payload) => (Array.isArray(payload?.data) ? payload.data : []),
   );
 }
+
+test("buildExportFallbackFilename uses the selected invoice period", () => {
+  const { buildExportFallbackFilename } = loadTransactionService();
+
+  assert.equal(
+    buildExportFallbackFilename("excel", { periodType: "MONTH", billingPeriod: "2026-07" }),
+    "Hóa đơn tháng 07-2026.xlsx",
+  );
+  assert.equal(
+    buildExportFallbackFilename("excel", { periodType: "YEAR", year: "2026" }),
+    "Hóa đơn năm 2026.xlsx",
+  );
+  assert.equal(
+    buildExportFallbackFilename("excel", {
+      periodType: "DATE_RANGE",
+      issueFromDate: "2026-07-01",
+      issueToDate: "2026-07-14",
+    }),
+    "Hóa đơn từ 01-07-2026 đến 14-07-2026.xlsx",
+  );
+  assert.equal(
+    buildExportFallbackFilename("excel", { periodType: "ALL" }),
+    "Danh sách tất cả hóa đơn.xlsx",
+  );
+  assert.equal(buildExportFallbackFilename("pdf"), "lich-su-thanh-toan.pdf");
+});
 
 test("fetchTransactionHistory sends filters and normalizes rows", async () => {
   const calls = [];
@@ -107,10 +134,18 @@ test("fetchTransactionHistoryExportFile downloads requested format with auth hea
   };
 
   try {
-    const file = await fetchTransactionHistoryExportFile({ roomId: "12" }, "pdf");
+    const file = await fetchTransactionHistoryExportFile({
+      roomId: "12",
+      periodType: "DATE_RANGE",
+      issueFromDate: "2026-07-01",
+      issueToDate: "2026-07-14",
+    }, "pdf");
 
     assert.match(calls[0][0], /\/admin\/transactions\/export\?/);
     assert.match(calls[0][0], /roomId=12/);
+    assert.match(calls[0][0], /periodType=DATE_RANGE/);
+    assert.match(calls[0][0], /issueFromDate=2026-07-01/);
+    assert.match(calls[0][0], /issueToDate=2026-07-14/);
     assert.match(calls[0][0], /format=pdf/);
     assert.equal(calls[0][1].headers.Authorization, "Bearer token");
     assert.equal(file.blob, expectedBlob);

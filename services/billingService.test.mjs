@@ -99,3 +99,27 @@ test("billing API helpers send numeric override and manual payment payloads", as
   assert.deepEqual(calls[1].body, { amount: 500000, payerName: "Cash", note: "received" });
   assert.equal(payment.invoice.remainingAmount, 2700000);
 });
+
+test("billing page renders API invoices without legacy mock room codes", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/billing/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /paginatedInvoices\.map\(\(invoice\) =>/);
+  assert.match(source, /displayRoomCode\(invoice\.roomCode\)/);
+  assert.doesNotMatch(source, /mockInvoices|A101|A203|B105|B302|C204|C310/);
+});
+
+test("billing page uses the shared dashboard pagination without changing totals", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/billing/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /import \{ DashboardPagination \}/);
+  assert.match(source, /const paginatedInvoices = useMemo/);
+  assert.match(source, /return invoices\.slice\(firstIndex, firstIndex \+ size\)/);
+  assert.match(source, /const totals = invoices\.reduce/);
+  assert.match(source, /<DashboardPagination[\s\S]*itemLabel="hóa đơn"/);
+});

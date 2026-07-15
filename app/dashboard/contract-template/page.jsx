@@ -42,7 +42,8 @@ import { fetchContractHandover } from "@/services/contractHandoverService";
 import ContractActivationFlow from "./ContractActivationFlow";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
-import ContractWorkflowStepper from "./ContractWorkflowStepper";
+import HandoverDocumentCard from "./HandoverDocumentCard";
+import { formatDraftCreationError } from "./contractDraftErrors";
 import { toast } from "sonner";
 import {
   formatDate as formatDisplayDate,
@@ -497,10 +498,6 @@ function hasHandoverReadings(handover) {
   return Boolean(handover?.electricity && handover?.water);
 }
 
-function hasSignedHandoverDocument(handover) {
-  return Boolean(handover?.signedDocumentId || handover?.signed_document_id);
-}
-
 function matchesStatusFilter(item, statusFilter) {
   const workflow = getWorkflow(item);
   if (statusFilter === "all") return true;
@@ -529,18 +526,37 @@ function getStatusLabel(item) {
 }
 
 function FileBadge({ item }) {
-  const uploaded = Boolean(getLeaseSignedFileId(item));
-  const Icon = uploaded ? FileCheck2 : FileWarning;
+  const workflow = getWorkflow(item);
+  const leaseUploaded = Boolean(getLeaseSignedFileId(item));
+  const requiresMoveInHandover =
+    !item?.previousContractId && !item?.transferRequestId;
+  const activeDossierComplete =
+    workflow === "ACTIVE" &&
+    (!requiresMoveInHandover || Boolean(item?.handoverSignedFileId));
+  const activeDossierPending = workflow === "ACTIVE" && !activeDossierComplete;
+  const complete = workflow === "ACTIVE" ? activeDossierComplete : leaseUploaded;
+  const label =
+    workflow === "ACTIVE"
+      ? activeDossierComplete
+        ? "Đủ hồ sơ"
+        : "Chưa có biên bản ký"
+      : leaseUploaded
+        ? "Đã upload"
+        : "Chưa upload";
+  const Icon = complete ? FileCheck2 : FileWarning;
+
   return (
     <span
       className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
-        uploaded
-          ? "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          : "border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300"
+        complete
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+          : activeDossierPending
+            ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
+            : "border-red-200 bg-red-50 text-red-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300"
       }`}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" />
-      {uploaded ? "Đã upload" : "Chưa upload"}
+      {label}
     </span>
   );
 }
@@ -916,10 +932,7 @@ export default function ContractTemplatePage() {
             throw new Error("Không lấy được mã hợp đồng sau khi tạo.");
           }
         } catch (err) {
-          setError(
-            err?.message ||
-              "Không tự động tạo được hợp đồng thuê từ cọc để in.",
-          );
+          setError(formatDraftCreationError(err, item, contracts));
           setActionLoading("");
           return;
         }
@@ -1005,7 +1018,7 @@ export default function ContractTemplatePage() {
       }
       return nextSelected;
     } catch (err) {
-      setError(err?.message || "Không tạo được hợp đồng thuê từ cọc.");
+      setError(formatDraftCreationError(err, item, contracts));
     } finally {
       setActionLoading("");
     }
@@ -1053,10 +1066,7 @@ export default function ContractTemplatePage() {
         const handoverData = unwrapHandoverResponse(
           await fetchContractHandover(item.leaseContractId, "MOVE_IN"),
         );
-        if (
-          !hasHandoverReadings(handoverData) ||
-          !hasSignedHandoverDocument(handoverData)
-        ) {
+        if (!hasHandoverReadings(handoverData)) {
           throw new Error("Missing handover data");
         }
       } catch (err) {
@@ -1552,16 +1562,6 @@ export default function ContractTemplatePage() {
   }
 
   const isBusy = Boolean(actionLoading);
-  const stepperVisible =
-    mergedSelected &&
-    ([
-      "DRAFT",
-      "PENDING_SIGNATURE",
-      "MISSING_FILE",
-      "PENDING_ACTIVATION",
-    ].includes(getWorkflow(mergedSelected)) ||
-      (getWorkflow(mergedSelected) === "ACTIVE" &&
-        !["SENT", "ACTIVE"].includes(details?.accountProvisioningStatus)));
 
   return (
     <div className="w-full min-w-0 flex flex-col gap-6 text-slate-900 dark:text-white text-[13px] xl:text-sm">
@@ -1668,17 +1668,6 @@ export default function ContractTemplatePage() {
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Dọn dữ liệu cũ
-                </button>
-                <button
-                  type="button"
-                  onClick={loadContracts}
-                  disabled={loading}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d1d7e0] bg-white px-4 text-xs font-extrabold text-slate-800 transition hover:bg-[#f8fafc] disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                  />
-                  Làm mới
                 </button>
                 <button
                   type="button"
@@ -1799,16 +1788,16 @@ export default function ContractTemplatePage() {
           <table className="w-full table-auto text-left text-[12px] xl:text-sm [&_td]:px-3 [&_td]:py-4 xl:[&_td]:px-5 xl:[&_td]:py-5 [&_th]:px-3 [&_th]:py-3 xl:[&_th]:px-5 xl:[&_th]:py-4">
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
-                <th className="min-w-32">Mã HĐ</th>
-                {/* <th className="min-w-24">Loại HĐ</th> */}
-                <th className="min-w-20">Phòng</th>
-                <th className="min-w-40">Người ký chính</th>
-                {/* <th className="min-w-24">Số người</th> */}
-                <th className="min-w-36">Thời hạn</th>
-                <th className="min-w-32">Giá thuê</th>
-                <th className="min-w-28">File</th>
-                <th className="min-w-32">Trạng thái</th>
-                {/* <th className="min-w-20 text-center">Xem</th> */}
+                <th scope="col" className="min-w-32 whitespace-nowrap">Mã HĐ</th>
+                <th scope="col" className="min-w-24 whitespace-nowrap">Loại HĐ</th>
+                <th scope="col" className="min-w-20 whitespace-nowrap">Phòng</th>
+                <th scope="col" className="min-w-40 whitespace-nowrap">Người ký chính</th>
+                <th scope="col" className="min-w-24 whitespace-nowrap">Số người</th>
+                <th scope="col" className="min-w-36 whitespace-nowrap">Thời hạn</th>
+                <th scope="col" className="min-w-32 whitespace-nowrap">Giá thuê</th>
+                <th scope="col" className="min-w-36 whitespace-nowrap">File</th>
+                <th scope="col" className="min-w-32 whitespace-nowrap">Trạng thái</th>
+                <th scope="col" className="min-w-36 whitespace-nowrap text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
@@ -1955,7 +1944,7 @@ export default function ContractTemplatePage() {
                     <td data-label="Trạng thái" className="align-middle">
                       <StatusBadge item={item} />
                     </td>
-                    <td data-label="Xem" className="text-center align-middle">
+                    <td data-label="Thao tác" className="text-center align-middle">
                       <div className="flex items-center justify-center">
                         <button
                           type="button"
@@ -2150,6 +2139,7 @@ export default function ContractTemplatePage() {
                 <ContractActivationFlow
                   contract={mergedSelected}
                   actionLoading={actionLoading}
+                  draftError={error}
                   handoverRefreshKey={handoverRefreshKey}
                   onCreateDraft={handleCreateDraft}
                   onContractUpdated={handleContractUpdated}
@@ -2713,21 +2703,16 @@ export default function ContractTemplatePage() {
                     />
                   )}
 
-                  {mergedSelected.leaseContractId && stepperVisible && (
-                    <div className="lg:col-span-2">
-                      <ContractWorkflowStepper
-                        contractDetails={mergedSelected}
-                        onContractUpdated={handleContractUpdated}
-                        onActivate={() => handleActivate(mergedSelected)}
-                        isActivating={
-                          actionLoading ===
-                          `activate-${mergedSelected.leaseContractId}`
-                        }
+                  {mergedSelected.leaseContractId &&
+                    getWorkflow(mergedSelected) !== "CANCELLED" && (
+                      <HandoverDocumentCard
+                        contract={mergedSelected}
+                        refreshKey={handoverRefreshKey}
+                        onUpdated={handleContractUpdated}
                       />
-                    </div>
-                  )}
+                    )}
 
-                  {mergedSelected.leaseContractId && !stepperVisible && (
+                  {mergedSelected.leaseContractId && (
                     <DetailCard
                       title="File hợp đồng đã ký"
                       icon={FileCheck2}

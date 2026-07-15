@@ -60,6 +60,16 @@ test("buildLeaseContractDocumentFilename formats HDT filename from room and star
   assert.equal(buildLeaseContractDocumentFilename({}), "HDT_Phong-X_Chua-Ro-Ngay.pdf");
 });
 
+test("normalizeLeaseContractItem exposes the signed handover file for list badges", () => {
+  const { normalizeLeaseContractItem } = loadLeaseContractsService();
+
+  assert.equal(
+    normalizeLeaseContractItem({ handover_signed_file_id: 73 })
+      .handoverSignedFileId,
+    73,
+  );
+});
+
 test("lease contract download fallbacks do not use legacy hop-dong-thue filenames", () => {
   const serviceSource = readFileSync(new URL("./leaseContractsService.js", import.meta.url), "utf8");
   const pageSource = readFileSync(

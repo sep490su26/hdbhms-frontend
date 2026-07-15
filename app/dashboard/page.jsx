@@ -113,15 +113,6 @@ export default function DashboardPage() {
             Số liệu phòng được tổng hợp trực tiếp từ hệ thống.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadDashboard}
-          disabled={loading}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
-        </button>
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-5">

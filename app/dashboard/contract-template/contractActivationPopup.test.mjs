@@ -11,6 +11,14 @@ const activationFlowSource = readFileSync(
   "utf8",
 );
 const pageSource = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
+const handoverDocumentCardSource = readFileSync(
+  new URL("./HandoverDocumentCard.jsx", import.meta.url),
+  "utf8",
+);
+const handoverDocumentStateSource = readFileSync(
+  new URL("./contractHandoverDocumentState.js", import.meta.url),
+  "utf8",
+);
 
 test("activation popup renders the two-stage onboarding workflow", () => {
   assert.match(workflowSource, /Chuẩn bị hồ sơ/);
@@ -33,8 +41,64 @@ test("signed document inputs enforce PDF and the 15 MB client limit", () => {
   assert.match(workflowSource, /replace: Boolean\(leaseSignedFileId\)/);
 });
 
+test("signed handover upload is optional for activation", () => {
+  assert.match(workflowSource, /tùy chọn, có thể tải sau khi kích hoạt/);
+  assert.doesNotMatch(pageSource, /hasSignedHandoverDocument/);
+});
+
 test("contract list activation action opens the integrated dialog", () => {
   assert.match(pageSource, /\? "Kích hoạt hợp đồng"/);
   assert.match(pageSource, /id="contract-detail-dialog"/);
   assert.match(pageSource, /<ContractActivationFlow/);
+});
+
+test("activated contract details do not render the activation stepper", () => {
+  const activationStatuses = pageSource.match(
+    /const ACTIVATION_FLOW_WORKFLOWS = new Set\(\[([\s\S]*?)\]\);/,
+  )?.[1];
+
+  assert.ok(activationStatuses);
+  assert.doesNotMatch(activationStatuses, /"ACTIVE"/);
+  assert.doesNotMatch(pageSource, /import ContractWorkflowStepper/);
+  assert.doesNotMatch(pageSource, /stepperVisible/);
+});
+
+test("activated contract details expose the optional handover document actions", () => {
+  assert.match(pageSource, /<HandoverDocumentCard/);
+  assert.match(handoverDocumentStateSource, /Chờ bổ sung bản ký/);
+  assert.match(handoverDocumentCardSource, /Tải bản in/);
+  assert.match(
+    handoverDocumentCardSource,
+    /documentState\.key !== "COMPLETE"/,
+  );
+  assert.match(handoverDocumentCardSource, /Upload bản đã ký/);
+  assert.match(handoverDocumentCardSource, /"COMPLETE" \? "Thay"/);
+  assert.match(handoverDocumentCardSource, /sm:grid-cols-3/);
+  assert.match(handoverDocumentCardSource, /h-11.*text-sm/);
+});
+
+test("active contracts show one context-aware dossier badge", () => {
+  assert.match(pageSource, /Chưa có biên bản ký/);
+  assert.match(pageSource, /Đủ hồ sơ/);
+  assert.match(pageSource, /activeDossierComplete/);
+  assert.doesNotMatch(pageSource, /flex flex-col items-start gap-1\.5/);
+});
+
+test("management table headers align with all ten contract columns", () => {
+  const header = pageSource.match(/<thead[\s\S]*?<\/thead>/)?.[0] || "";
+  const labels = [
+    "Mã HĐ",
+    "Loại HĐ",
+    "Phòng",
+    "Người ký chính",
+    "Số người",
+    "Thời hạn",
+    "Giá thuê",
+    "File",
+    "Trạng thái",
+    "Thao tác",
+  ];
+
+  assert.equal((header.match(/<th\b/g) || []).length, labels.length);
+  labels.forEach((label) => assert.match(header, new RegExp(label)));
 });

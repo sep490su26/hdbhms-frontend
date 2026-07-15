@@ -413,7 +413,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                 return {
                                     name: a.asset_name || a.assetName || "",
                                     unit: "Cái",
-                                    quantity: a.quantity || 1,
+                                    quantity: a.quantity ?? 1,
                                     condition: condition === "GOOD" ? "Hoạt động bình thường" :
                                         condition === "ATTENTION" ? "Có trầy xước nhẹ" :
                                             condition === "BROKEN" ? "Hỏng cần sửa" : "Thiếu thiết bị",
@@ -651,9 +651,12 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                                     <td key={field} className="px-3 py-2">
                                                         <input
                                                             type={field === "quantity" ? "number" : "text"}
+                                                            min={field === "quantity" ? "0" : undefined}
+                                                            step={field === "quantity" ? "1" : undefined}
+                                                            inputMode={field === "quantity" ? "numeric" : undefined}
                                                             value={asset[field]}
                                                             onChange={(event) => updateAsset(index, field, event.target.value)}
-                                                            className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af]"
+                                                            className={`h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] ${field === "quantity" ? "appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" : ""}`}
                                                         />
                                                     </td>
                                                 ))}

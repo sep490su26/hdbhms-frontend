@@ -1277,14 +1277,6 @@ export default function TenantsPage() {
             người ở cùng.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadProfiles}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          Làm mới
-        </button>
       </section>
 
       <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">

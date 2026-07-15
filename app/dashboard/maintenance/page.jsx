@@ -10,7 +10,6 @@ import {
   ImagePlus,
   Loader2,
   Plus,
-  RefreshCcw,
   Search,
   ShieldAlert,
   SlidersHorizontal,
@@ -708,16 +707,6 @@ export default function MaintenancePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={loadTickets}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-            />
-            Làm mới
-          </button>
           {canManage && (
             <button
               type="button"

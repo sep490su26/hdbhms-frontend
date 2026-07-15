@@ -144,6 +144,7 @@ function UploadRow({
   title,
   description,
   complete,
+  optional = false,
   fileName,
   loading,
   disabled,
@@ -160,7 +161,7 @@ function UploadRow({
             {title}
           </p>
           <StatusPill complete={complete}>
-            {complete ? "Đã có file" : "Chưa có file"}
+            {complete ? "Đã có file" : optional ? "Tùy chọn" : "Chưa có file"}
           </StatusPill>
         </div>
         <p
@@ -257,7 +258,7 @@ export default function ContractWorkflowStepper({
     ) {
       setConfirmedLeaseVersion(0);
       toast.info(
-        "Bản hợp đồng thuê đã thay đổi. Vui lòng tải và lưu lại biên bản bàn giao đã ký.",
+        "Bản hợp đồng thuê đã thay đổi. Vui lòng kiểm tra và lưu lại thông tin bàn giao.",
       );
     }
     prevLeaseVersionRef.current = leaseVersion;
@@ -313,7 +314,6 @@ export default function ContractWorkflowStepper({
     depositSignedFileId,
     leaseSignedFileId,
     hasHandoverData: handoverReady,
-    handoverSignedFileId: signedHandoverReady ? handoverSignedFileId : null,
   });
   const isBusy = loadingStep != null;
   const uploadLeaseDisabled = isLeaseSignedUploadDisabled({
@@ -321,10 +321,9 @@ export default function ContractWorkflowStepper({
     leaseContractId: contractDetails?.leaseContractId,
     loadingStep,
   });
-  const uploadTotal = hasDeposit ? 3 : 2;
-  const uploadedCount =
+  const requiredUploadTotal = hasDeposit ? 2 : 1;
+  const requiredUploadedCount =
     Number(Boolean(leaseSignedFileId)) +
-    Number(signedHandoverReady) +
     (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0);
   const missingCount = readiness.totalCount - readiness.completedCount;
   const electricValue = getReadingValue(handoverData?.electricity);
@@ -605,7 +604,7 @@ export default function ContractWorkflowStepper({
           kicker="Lưu bản đã ký"
           title="Upload các bản PDF đã ký"
           description="Chọn đúng loại tài liệu; có thể thay từng file nếu bản scan cần chỉnh lại."
-          count={`${uploadedCount}/${uploadTotal}`}
+          count={`${requiredUploadedCount}/${requiredUploadTotal}`}
         />
 
         {hasDeposit && (
@@ -637,10 +636,11 @@ export default function ContractWorkflowStepper({
           title="Biên bản bàn giao đã ký"
           description={
             handoverHasData
-              ? "PDF tối đa 15 MB · cần đủ chữ ký các bên"
-              : "Chỉ mở sau khi hoàn tất thông tin bàn giao"
+              ? "PDF tối đa 15 MB · tùy chọn, có thể tải sau khi kích hoạt"
+              : "Tùy chọn · mở sau khi hoàn tất thông tin bàn giao"
           }
           complete={signedHandoverReady}
+          optional
           fileName="Biên bản bàn giao đã được lưu"
           loading={loadingStep === ACTION.UPLOAD_HANDOVER}
           disabled={isBusy || handoverLoading || !handoverHasData}
@@ -667,7 +667,6 @@ export default function ContractWorkflowStepper({
               deposit: "Upload đúng file PDF có đầy đủ chữ ký.",
               lease: "Upload đúng file PDF có đầy đủ chữ ký.",
               "handover-data": "Chỉ số điện, nước và thiết bị đã được chốt.",
-              "handover-document": "Upload bản scan hoàn chỉnh sau buổi ký.",
             };
             return (
               <ChecklistItem

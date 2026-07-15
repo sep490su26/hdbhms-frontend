@@ -1,8 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Gauge, Loader2, RefreshCw, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  Gauge,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Save,
+  Trash2,
+} from "lucide-react";
 import Image from "next/image";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ASSET_CONDITION_VALUES,
   fetchRoomAssets,
@@ -14,8 +31,11 @@ import {
   uploadFile,
 } from "@/services/contractHandoverService";
 import {
+  createEmptyHandoverAsset,
   createDefaultHandoverAssets,
+  getPersistedAssetIds,
   mergeHandoverAssets,
+  withAssetRowKeys,
 } from "./contractHandoverAssets";
 
 /* ------------------------------------------------------------------ */
@@ -105,7 +125,11 @@ export default function ContractHandoverSection({
   const [waterImageUrl, setWaterImageUrl] = useState("");
 
   /* assets ---------------------------------------------------------- */
-  const [assets, setAssets] = useState(createDefaultHandoverAssets);
+  const [assets, setAssets] = useState(() =>
+    withAssetRowKeys(createDefaultHandoverAssets(), "default"),
+  );
+  const [removedAssets, setRemovedAssets] = useState([]);
+  const [latestNewAssetKey, setLatestNewAssetKey] = useState(null);
   const [fromApi, setFromApi] = useState(false);   // true once loaded from backend
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [loadError, setLoadError] = useState(null);
@@ -116,9 +140,13 @@ export default function ContractHandoverSection({
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [saveConfirmationOpen, setSaveConfirmationOpen] = useState(false);
 
   const previewUrlsRef = useRef(new Set());
+  const newAssetInputRef = useRef(null);
+  const newAssetSequenceRef = useRef(0);
   const effectiveReadonly = readonly || isConfirmed;
+  const assetEditingDisabled = effectiveReadonly || saving || loadingAssets;
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
@@ -137,12 +165,21 @@ export default function ContractHandoverSection({
         if (signal?.aborted) return;
         console.log("[ContractHandoverSection] API response:", data);
         if (Array.isArray(data) && data.length > 0) {
-          setAssets(mergeHandoverAssets(data.map(apiAssetToRow)));
+          setAssets(
+            withAssetRowKeys(
+              mergeHandoverAssets(data.map(apiAssetToRow)),
+              `room-${roomId}`,
+            ),
+          );
           setFromApi(true);
         } else {
-          setAssets(createDefaultHandoverAssets());
+          setAssets(
+            withAssetRowKeys(createDefaultHandoverAssets(), `room-${roomId}`),
+          );
           setFromApi(false);
         }
+        setRemovedAssets([]);
+        setLatestNewAssetKey(null);
       })
       .catch((err) => {
         if (signal?.aborted) return;
@@ -274,6 +311,49 @@ export default function ContractHandoverSection({
     );
   }, []);
 
+  function handleAddAsset() {
+    if (assetEditingDisabled) return;
+
+    const clientKey = `added-${newAssetSequenceRef.current++}`;
+    setLatestNewAssetKey(clientKey);
+    setSaveSuccess(false);
+    setAssets((prev) => [
+      ...prev,
+      { ...createEmptyHandoverAsset(), _clientKey: clientKey },
+    ]);
+
+    window.requestAnimationFrame(() => {
+      newAssetInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      newAssetInputRef.current?.focus({ preventScroll: true });
+    });
+  }
+
+  function handleRemoveAsset(index) {
+    if (assetEditingDisabled) return;
+
+    const removed = assets[index];
+    if (!removed) return;
+    setSaveSuccess(false);
+    setAssets((prev) => prev.filter((_, assetIndex) => assetIndex !== index));
+    setRemovedAssets((prev) => [...prev, { asset: removed, index }]);
+  }
+
+  function handleUndoRemove() {
+    const removed = removedAssets.at(-1);
+    if (!removed || assetEditingDisabled) return;
+
+    setSaveSuccess(false);
+    setAssets((prev) => {
+      const restored = [...prev];
+      restored.splice(Math.min(removed.index, restored.length), 0, removed.asset);
+      return restored;
+    });
+    setRemovedAssets((prev) => prev.slice(0, -1));
+  }
+
   function handleAssetImageChange(index, file) {
     if (!file) return;
     const url = makeBlobUrl(file);
@@ -295,16 +375,31 @@ export default function ContractHandoverSection({
     waterReading !== "" &&
     Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
     Number.isFinite(Number(waterReading)) && Number(waterReading) >= 0 &&
-    assets.every((a) => a.assetName.trim() && a.assetCategory.trim() && Number(a.quantity) > 0);
+    assets.every((a) =>
+      a.assetName.trim() &&
+      a.assetCategory.trim() &&
+      Number.isInteger(Number(a.quantity)) &&
+      Number(a.quantity) >= 0
+    );
+
+  function validateBeforeSave() {
+    if (!isValid) {
+      window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
+      return false;
+    }
+    return true;
+  }
+
+  function requestSave() {
+    if (effectiveReadonly || saving || !validateBeforeSave()) return;
+    setSaveConfirmationOpen(true);
+  }
 
   /* Save — single atomic call via /handover/submit ----------------- */
   async function handleSave() {
-    if (effectiveReadonly) return;
+    if (effectiveReadonly || saving || !validateBeforeSave()) return;
 
-    if (!isValid) {
-      window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
-      return;
-    }
+    setSaveConfirmationOpen(false);
 
     setSaving(true);
     setSaveError(null);
@@ -361,7 +456,7 @@ export default function ContractHandoverSection({
               assetName: source.assetName.trim(),
               assetCategory:
                 source.assetCategory?.trim() || asset.assetCategory.trim(),
-              quantity: Number(source.quantity) > 0 ? Number(source.quantity) : 1,
+              quantity: Number(asset.quantity),
               currentCondition,
               description: source.description?.trim() ?? "",
               fileImageId: source.fileImageId ?? undefined,
@@ -371,6 +466,11 @@ export default function ContractHandoverSection({
         }),
       );
       const assetPayloads = assetPayloadGroups.flat();
+      const deletedAssetIds = [
+        ...new Set(
+          removedAssets.flatMap(({ asset }) => getPersistedAssetIds(asset)),
+        ),
+      ];
 
       // 3. Single atomic submit: readings + assets + confirm
       await submitHandover(contractId, {
@@ -388,10 +488,12 @@ export default function ContractHandoverSection({
           readingDate: waterReadingDate || undefined,
         },
         assets: assetPayloads,
+        deletedAssetIds,
       });
 
       // Update local asset IDs from response
       setFromApi(true);
+      setRemovedAssets([]);
       setSaveSuccess(true);
       setIsConfirmed(true);
       onSaved?.();
@@ -537,8 +639,8 @@ export default function ContractHandoverSection({
 
       {/* Assets Table */}
       <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a]">
-        <div className="flex items-center justify-between border-b border-[#dfe5ef] dark:border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#dfe5ef] dark:border-white/10 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             <h4 className="font-extrabold text-slate-900 dark:text-white">Hiện trạng thiết bị</h4>
             {fromApi && (
               <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
@@ -551,22 +653,23 @@ export default function ContractHandoverSection({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!effectiveReadonly && (
+              <button
+                type="button"
+                onClick={handleAddAsset}
+                disabled={assetEditingDisabled}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#1e40af] px-3 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Thêm thiết bị
+              </button>
+            )}
             {loadingAssets && (
               <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Đang tải…
               </span>
-            )}
-            {!loadingAssets && roomId && (
-              <button
-                type="button"
-                onClick={loadAssets}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-[#f3f5f9] dark:hover:bg-white/5"
-              >
-                <RefreshCw className="h-3 w-3" />
-                Tải lại
-              </button>
             )}
           </div>
         </div>
@@ -574,6 +677,33 @@ export default function ContractHandoverSection({
         {loadError && (
           <div className="border-b border-red-100 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-4 py-2 text-sm font-semibold text-red-700 dark:text-rose-300">
             {loadError}
+          </div>
+        )}
+
+        {removedAssets.length > 0 && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
+          >
+            <span>
+              Đã bỏ{" "}
+              <strong>
+                {removedAssets.at(-1).asset.assetName || "thiết bị chưa đặt tên"}
+              </strong>{" "}
+              khỏi danh sách.
+              {removedAssets.length > 1 &&
+                ` Có ${removedAssets.length} thiết bị đang chờ xóa.`}
+              {" "}Thay đổi sẽ được áp dụng khi lưu bàn giao.
+            </span>
+            <button
+              type="button"
+              onClick={handleUndoRemove}
+              disabled={assetEditingDisabled}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-2.5 font-extrabold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-500/30 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-500/10"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Hoàn tác
+            </button>
           </div>
         )}
 
@@ -588,43 +718,55 @@ export default function ContractHandoverSection({
                 <th className="min-w-44 px-3 py-3">Tình trạng</th>
                 <th className="min-w-44 px-3 py-3">Mô tả</th>
                 <th className="w-32 px-3 py-3">Ảnh</th>
+                {!effectiveReadonly && (
+                  <th className="w-20 px-3 py-3 text-center">Thao tác</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#edf1f6]">
               {assets.map((asset, index) => (
-                <tr key={asset.id ?? `new-${index}`} className="hover:bg-[#fafbff] dark:hover:bg-white/5">
+                <tr key={asset._clientKey} className="hover:bg-[#fafbff] dark:hover:bg-white/5">
                   <td className="px-3 py-2.5 font-bold text-slate-500 dark:text-slate-400">{index + 1}</td>
                   <td className="px-3 py-2.5">
                     <input
+                      ref={asset._clientKey === latestNewAssetKey ? newAssetInputRef : null}
                       value={asset.assetName}
-                      disabled={effectiveReadonly}
+                      disabled={assetEditingDisabled}
                       onChange={(e) => updateAsset(index, "assetName", e.target.value)}
+                      placeholder="Nhập tên thiết bị"
+                      aria-label={`Tên thiết bị dòng ${index + 1}`}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.assetCategory}
-                      disabled={effectiveReadonly}
+                      disabled={assetEditingDisabled}
                       onChange={(e) => updateAsset(index, "assetCategory", e.target.value)}
+                      placeholder="Nhập danh mục"
+                      aria-label={`Danh mục thiết bị dòng ${index + 1}`}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     <input
                       type="number"
-                      min="1"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
                       value={asset.quantity}
-                      disabled={effectiveReadonly}
+                      disabled={assetEditingDisabled}
                       onChange={(e) => updateAsset(index, "quantity", e.target.value)}
-                      className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
+                      aria-label={`Số lượng thiết bị dòng ${index + 1}`}
+                      className="h-9 w-full appearance-none rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 outline-none [appearance:textfield] focus:border-[#1e40af] disabled:bg-slate-100 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     <select
                       value={asset.currentCondition}
-                      disabled={effectiveReadonly}
+                      disabled={assetEditingDisabled}
                       onChange={(e) => updateAsset(index, "currentCondition", e.target.value)}
+                      aria-label={`Tình trạng thiết bị dòng ${index + 1}`}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-2 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     >
                       {CONDITION_OPTIONS.map(({ value, label }) => (
@@ -637,15 +779,16 @@ export default function ContractHandoverSection({
                   <td className="px-3 py-2.5">
                     <input
                       value={asset.description}
-                      disabled={effectiveReadonly}
+                      disabled={assetEditingDisabled}
                       onChange={(e) => updateAsset(index, "description", e.target.value)}
                       placeholder="Chưa cập nhật"
+                      aria-label={`Mô tả thiết bị dòng ${index + 1}`}
                       className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     <label
-                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 text-[11px] font-bold ${effectiveReadonly
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2 text-[11px] font-bold ${assetEditingDisabled
                           ? "cursor-not-allowed bg-slate-100 text-slate-400"
                           : "cursor-pointer hover:bg-[#f8fafc] dark:hover:bg-white/5"
                         }`}
@@ -655,7 +798,7 @@ export default function ContractHandoverSection({
                       <input
                         type="file"
                         accept="image/*"
-                        disabled={effectiveReadonly}
+                        disabled={assetEditingDisabled}
                         className="hidden"
                         onChange={(e) => handleAssetImageChange(index, e.target.files?.[0])}
                       />
@@ -671,8 +814,50 @@ export default function ContractHandoverSection({
                       />
                     )}
                   </td>
+                  {!effectiveReadonly && (
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAsset(index)}
+                        disabled={assetEditingDisabled}
+                        aria-label={`Xóa ${
+                          asset.assetName || `thiết bị dòng ${index + 1}`
+                        }`}
+                        title="Xóa khỏi danh sách bàn giao"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:border-rose-500/20 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
+              {assets.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={effectiveReadonly ? 7 : 8}
+                    className="px-4 py-10 text-center"
+                  >
+                    <p className="font-bold text-slate-700 dark:text-slate-200">
+                      Chưa có thiết bị bàn giao
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Thêm thiết bị thực tế có trong phòng để hoàn thiện biên bản.
+                    </p>
+                    {!effectiveReadonly && (
+                      <button
+                        type="button"
+                        onClick={handleAddAsset}
+                        disabled={assetEditingDisabled}
+                        className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#1e40af] px-3 text-xs font-extrabold text-[#1e40af] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Thêm thiết bị đầu tiên
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -708,7 +893,7 @@ export default function ContractHandoverSection({
         <div className="mt-4 flex justify-end">
           <button
             type="button"
-            onClick={handleSave}
+            onClick={requestSave}
             disabled={saving || loadingAssets}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-extrabold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
           >
@@ -721,6 +906,65 @@ export default function ContractHandoverSection({
           </button>
         </div>
       )}
+
+      <Dialog
+        open={saveConfirmationOpen}
+        onOpenChange={(open) => {
+          if (!saving) setSaveConfirmationOpen(open);
+        }}
+      >
+        <DialogContent
+          showCloseButton={!saving}
+          className="overflow-hidden border-0 bg-white p-0 shadow-2xl dark:bg-[#0f172a]"
+        >
+          <div className="border-b border-amber-100 bg-amber-50 px-6 py-5 dark:border-amber-500/20 dark:bg-amber-500/10">
+            <DialogHeader className="pr-8">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                  <AlertTriangle className="h-5 w-5" />
+                </span>
+                <div className="pt-0.5">
+                  <DialogTitle className="text-lg font-extrabold text-slate-900 dark:text-white">
+                    Xác nhận lưu bàn giao
+                  </DialogTitle>
+                  <DialogDescription className="mt-2 leading-6 text-slate-600 dark:text-slate-300">
+                    Bạn đã kiểm tra và hoàn tất toàn bộ thông tin bàn giao chưa?
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 pb-6">
+            <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold leading-6 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+              Sau khi xác nhận lưu, dữ liệu bàn giao sẽ được chốt và không thể chỉnh sửa.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Hãy kiểm tra lại ngày bàn giao, chỉ số điện nước và hiện trạng thiết bị trước khi tiếp tục.
+            </p>
+
+            <DialogFooter className="mt-6">
+              <button
+                type="button"
+                onClick={() => setSaveConfirmationOpen(false)}
+                disabled={saving}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                Kiểm tra lại
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-extrabold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60 dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Xác nhận lưu
+              </button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

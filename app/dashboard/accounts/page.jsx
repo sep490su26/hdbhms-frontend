@@ -371,15 +371,6 @@ export default function AccountsPage() {
             đồng thuê đã ACTIVE.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadData}
-          disabled={loading}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
-        </button>
       </section>
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">

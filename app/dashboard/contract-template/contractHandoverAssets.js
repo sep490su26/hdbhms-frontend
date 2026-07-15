@@ -123,6 +123,47 @@ export function createDefaultHandoverAssets() {
   return ASSET_DEFINITIONS.map(createTemplateRow);
 }
 
+export function createEmptyHandoverAsset() {
+  return {
+    id: null,
+    assetName: "",
+    assetCategory: "",
+    quantity: 1,
+    currentCondition: "GOOD",
+    description: "",
+    fileImageId: null,
+    imageFile: null,
+    imageUrl: "",
+    sourceAssets: [],
+  };
+}
+
+export function withAssetRowKeys(rows = [], prefix = "asset") {
+  const usedKeys = new Set();
+
+  return rows.map((asset, index) => {
+    const identity = asset.id != null ? `id-${asset.id}` : `new-${index}`;
+    const baseKey = asset._clientKey ?? `${prefix}-${identity}`;
+    let clientKey = baseKey;
+    let duplicateIndex = 1;
+
+    while (usedKeys.has(clientKey)) {
+      clientKey = `${baseKey}-duplicate-${duplicateIndex++}`;
+    }
+    usedKeys.add(clientKey);
+
+    return { ...asset, _clientKey: clientKey };
+  });
+}
+
+export function getPersistedAssetIds(asset) {
+  const ids = [asset?.id, ...(asset?.sourceAssets ?? []).map((row) => row.id)];
+
+  return [...new Set(ids.filter((id) => id != null).map(Number))].filter(
+    Number.isFinite,
+  );
+}
+
 export function mergeHandoverAssets(systemAssets = []) {
   const rows = Array.isArray(systemAssets) ? systemAssets : [];
   const usedIndexes = new Set();
@@ -161,7 +202,10 @@ export function mergeHandoverAssets(systemAssets = []) {
       ...primary,
       assetName: definition.assetName,
       assetCategory: definition.assetCategory,
-      quantity: Number(primary.quantity) > 0 ? Number(primary.quantity) : 1,
+      quantity:
+        Number.isFinite(Number(primary.quantity)) && Number(primary.quantity) >= 0
+          ? Number(primary.quantity)
+          : 1,
       currentCondition: getMostSevereCondition(sourceAssets),
       description:
         rowWithDescription.description?.trim() || definition.description,

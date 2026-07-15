@@ -32,7 +32,7 @@ test("lease signed upload is disabled while another document action is running",
   );
 });
 
-test("activation requires every signed document when a deposit exists", () => {
+test("activation does not require the optional signed handover document", () => {
   const readiness = getContractActivationReadiness({
     hasDeposit: true,
     depositSignedFileId: 11,
@@ -41,9 +41,9 @@ test("activation requires every signed document when a deposit exists", () => {
     handoverSignedFileId: null,
   });
 
-  assert.equal(readiness.ready, false);
+  assert.equal(readiness.ready, true);
   assert.equal(readiness.completedCount, 3);
-  assert.equal(readiness.totalCount, 4);
+  assert.equal(readiness.totalCount, 3);
 });
 
 test("direct lease activation does not require a deposit document", () => {
@@ -51,12 +51,11 @@ test("direct lease activation does not require a deposit document", () => {
     hasDeposit: false,
     leaseSignedFileId: 12,
     hasHandoverData: true,
-    handoverSignedFileId: 13,
   });
 
   assert.equal(readiness.ready, true);
   assert.deepEqual(
     readiness.requirements.map((item) => item.key),
-    ["lease", "handover-data", "handover-document"],
+    ["lease", "handover-data"],
   );
 });

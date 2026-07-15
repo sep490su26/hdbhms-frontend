@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import ContractHandoverSection from "./ContractHandoverSection";
@@ -9,6 +9,7 @@ import ContractWorkflowStepper from "./ContractWorkflowStepper";
 export default function ContractActivationFlow({
   contract,
   actionLoading = "",
+  draftError = "",
   handoverRefreshKey = 0,
   onCreateDraft,
   onContractUpdated,
@@ -113,9 +114,41 @@ export default function ContractActivationFlow({
           </div>
         )
       ) : (
-        <section className="flex items-center gap-3 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-6 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
-          <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-blue-300" />
-          Đang tạo hợp đồng thuê từ hợp đồng đặt cọc...
+        <section
+          role={draftError && !creatingDraft ? "alert" : "status"}
+          className={`flex items-start gap-3 rounded-xl border px-4 py-5 text-sm font-semibold leading-6 ${
+            draftError && !creatingDraft
+              ? "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200"
+              : "border-[#dfe5ef] bg-white text-slate-500 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400"
+          }`}
+        >
+          {draftError && !creatingDraft ? (
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-300" />
+          ) : (
+            <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-indigo-600 dark:text-blue-300" />
+          )}
+          <div className="min-w-0">
+            <p className="font-extrabold text-slate-900 dark:text-white">
+              {draftError && !creatingDraft
+                ? "Chưa thể tạo hợp đồng thuê"
+                : "Đang tạo hợp đồng thuê từ hợp đồng đặt cọc..."}
+            </p>
+            {draftError && !creatingDraft && (
+              <>
+                <p className="mt-1 font-semibold text-rose-700 dark:text-rose-200">
+                  {draftError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onCreateDraft?.(contract)}
+                  className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-transparent dark:text-rose-200 dark:hover:bg-rose-500/10"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Thử tạo lại
+                </button>
+              </>
+            )}
+          </div>
         </section>
       )}
     </div>

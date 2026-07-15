@@ -201,6 +201,8 @@ export function normalizeLeaseContractItem(item = {}) {
       item.signedFile?.uploadedAt ??
       item.signed_file?.uploaded_at ??
       null,
+    handoverSignedFileId:
+      item.handoverSignedFileId ?? item.handover_signed_file_id ?? null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
     accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,

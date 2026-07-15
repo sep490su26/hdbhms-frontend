@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, ReceiptText, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import { CalendarDays, Download, ReceiptText, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -13,30 +13,199 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { fetchPaidExpenseRequests } from "@/services/expenseReportService";
+import { fetchRevenueReport } from "@/services/revenueReportService";
 
 const money = new Intl.NumberFormat("vi-VN");
-
-const baseReports = [
-  { label: "T10", period: "Tháng 10/2023", income: 112, expense: 34, reconciled: true },
-  { label: "T11", period: "Tháng 11/2023", income: 124, expense: 36, reconciled: true },
-  { label: "T12", period: "Tháng 12/2023", income: 118, expense: 32, reconciled: true },
-  { label: "T1/24", period: "Tháng 01/2024", income: 135, expense: 40, reconciled: true },
-  { label: "T2", period: "Tháng 02/2024", income: 140, expense: 42, reconciled: true },
-  { label: "Tháng này", period: "Tháng 03/2024", income: 155, expense: 45, reconciled: true },
-];
+const PERIOD_COUNT = 6;
 
 const periodOptions = {
-  month: { label: "Tháng", factor: 1 },
-  quarter: { label: "Quý", factor: 3 },
-  year: { label: "Năm", factor: 12 },
+  month: { label: "Tháng" },
+  quarter: { label: "Quý" },
+  year: { label: "Năm" },
+};
+
+const emptyReport = {
+  label: "",
+  period: "",
+  periodKey: "",
+  income: 0,
+  expense: 0,
+  profit: 0,
+  reconciled: true,
 };
 
 function formatCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
+  return `${money.format(Math.round(Number(value) || 0))} VNĐ`;
 }
 
-function formatCompactCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
+function formatChartTick(value) {
+  const millions = (Number(value) || 0) / 1_000_000;
+  if (Math.abs(millions) >= 1000) return `${(millions / 1000).toFixed(1)}B`;
+  return `${Math.round(millions)}M`;
+}
+
+function numberValue(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+}
+
+function parseYearMonth(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || ""));
+  if (match) return { year: Number(match[1]), month: Number(match[2]) };
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+function addMonths(year, month, offset) {
+  const date = new Date(year, month - 1 + offset, 1);
+  return { year: date.getFullYear(), month: date.getMonth() + 1 };
+}
+
+function formatIsoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function monthStartDate(year, month) {
+  return `${year}-${pad2(month)}-01`;
+}
+
+function monthEndDate(year, month) {
+  return formatIsoDate(new Date(year, month, 0));
+}
+
+function displayPeriod(key, periodType) {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(key);
+  if (periodType === "month" && monthMatch) {
+    return `Tháng ${monthMatch[2]}/${monthMatch[1]}`;
+  }
+  const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(key);
+  if (periodType === "quarter" && quarterMatch) {
+    return `Quý ${quarterMatch[2]}/${quarterMatch[1]}`;
+  }
+  return key;
+}
+
+function buildPeriodWindows(periodType, endPeriod, count = PERIOD_COUNT) {
+  const end = parseYearMonth(endPeriod);
+  const windows = [];
+
+  for (let index = count - 1; index >= 0; index -= 1) {
+    if (periodType === "year") {
+      const year = end.year - index;
+      windows.push({
+        key: String(year),
+        label: String(year),
+        period: String(year),
+        fromDate: `${year}-01-01`,
+        toDate: `${year}-12-31`,
+      });
+      continue;
+    }
+
+    if (periodType === "quarter") {
+      const quarterStartMonth = Math.floor((end.month - 1) / 3) * 3 + 1;
+      const start = addMonths(end.year, quarterStartMonth, -index * 3);
+      const quarter = Math.floor((start.month - 1) / 3) + 1;
+      const endMonth = addMonths(start.year, start.month, 2);
+      const key = `${start.year}-Q${quarter}`;
+      windows.push({
+        key,
+        label: `Q${quarter}/${start.year}`,
+        period: displayPeriod(key, periodType),
+        fromDate: monthStartDate(start.year, start.month),
+        toDate: monthEndDate(endMonth.year, endMonth.month),
+      });
+      continue;
+    }
+
+    const month = addMonths(end.year, end.month, -index);
+    const key = `${month.year}-${pad2(month.month)}`;
+    windows.push({
+      key,
+      label: `T${month.month}`,
+      period: displayPeriod(key, periodType),
+      fromDate: monthStartDate(month.year, month.month),
+      toDate: monthEndDate(month.year, month.month),
+    });
+  }
+
+  return windows;
+}
+
+function periodKeyFromDate(value, periodType) {
+  const match = /^(\d{4})-(\d{2})-\d{2}/.exec(String(value || ""));
+  if (!match) return "";
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (periodType === "year") return String(year);
+  if (periodType === "quarter") return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
+  return `${year}-${pad2(month)}`;
+}
+
+function expenseReportDate(item = {}) {
+  return item.expenseDate || item.paymentDate || item.expectedPaymentDate || item.createdAt?.slice(0, 10) || "";
+}
+
+function buildExpenseBuckets(expenses, periodType) {
+  return expenses.reduce((buckets, item) => {
+    const key = periodKeyFromDate(expenseReportDate(item), periodType);
+    if (!key) return buckets;
+    buckets.set(key, (buckets.get(key) || 0) + numberValue(item.amount));
+    return buckets;
+  }, new Map());
+}
+
+function periodIncome(item = {}) {
+  return numberValue(item.total) || (
+    numberValue(item.room) +
+    numberValue(item.utilities) +
+    numberValue(item.service) +
+    numberValue(item.extra)
+  );
+}
+
+function buildReports(revenueReport, expenses, periodType, endPeriod) {
+  const windows = buildPeriodWindows(periodType, revenueReport?.endPeriod || endPeriod);
+  const revenueByKey = new Map((revenueReport?.periods || []).map((item) => [item.period, item]));
+  const expenseByKey = buildExpenseBuckets(expenses, periodType);
+
+  return windows.map((window) => {
+    const revenue = revenueByKey.get(window.key) || {};
+    const income = periodIncome(revenue);
+    const expense = expenseByKey.get(window.key) || 0;
+    return {
+      label: revenue.label || window.label,
+      period: window.period,
+      periodKey: window.key,
+      income,
+      expense,
+      profit: income - expense,
+      reconciled: true,
+    };
+  });
+}
+
+function growthPercent(current, previous) {
+  if (!previous) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) * 1000) / previous) / 10;
+}
+
+function signedPercent(value) {
+  return `${value >= 0 ? "+" : ""}${value}%`;
+}
+
+function signedMoney(value) {
+  return `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value))}`;
 }
 
 function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inverse = false }) {
@@ -72,7 +241,7 @@ function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inve
         </span>
       </div>
       <p className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b]"}`}>{label}</p>
-      <p className="mt-1 text-xl font-black">{formatCompactCurrency(value)}</p>
+      <p className="mt-1 text-xl font-black">{formatCurrency(value)}</p>
       <p className={`mt-4 border-t border-current/10 pt-3 text-[10px] italic ${theme.note}`}>{note}</p>
     </article>
   );
@@ -94,18 +263,65 @@ function ChartTooltip({ active, payload, label }) {
 
 export default function IncomeExpenseReportPage() {
   const [periodType, setPeriodType] = useState("month");
-  const factor = periodOptions[periodType].factor;
-  const reports = useMemo(
-    () => baseReports.map((item) => ({
-      ...item,
-      income: item.income * factor,
-      expense: item.expense * factor,
-      profit: (item.income - item.expense) * factor,
-    })),
-    [factor],
-  );
-  const current = reports.at(-1);
-  const profitMargin = Math.round((current.profit / current.income) * 1000) / 10;
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
+  const [reports, setReports] = useState(() => buildReports(null, [], "month", currentYearMonth()));
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    const windows = buildPeriodWindows(periodType, selectedMonth);
+    const firstWindow = windows[0];
+    const lastWindow = windows.at(-1);
+
+    Promise.all([
+      fetchRevenueReport({ periodType, endPeriod: selectedMonth }),
+      fetchPaidExpenseRequests({
+        fromDate: firstWindow?.fromDate,
+        toDate: lastWindow?.toDate,
+      }),
+    ])
+      .then(([revenueReport, expenses]) => {
+        if (!ignore) setReports(buildReports(revenueReport, expenses, periodType, selectedMonth));
+      })
+      .catch((error) => {
+        if (!ignore) {
+          setReports(buildReports(null, [], periodType, selectedMonth));
+          setErrorMessage(error?.message || "Không tải được báo cáo thu chi");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [periodType, selectedMonth]);
+
+  const current = reports.at(-1) || emptyReport;
+  const previous = reports.at(-2) || emptyReport;
+  const incomeGrowth = growthPercent(current.income, previous.income);
+  const expenseGrowth = growthPercent(current.expense, previous.expense);
+  const profitGrowth = growthPercent(current.profit, previous.profit);
+  const profitMargin = current.income > 0 ? Math.round((current.profit / current.income) * 1000) / 10 : 0;
+
+  const beginReload = () => {
+    setIsLoading(true);
+    setErrorMessage("");
+  };
+
+  const handlePeriodTypeChange = (key) => {
+    if (key === periodType) return;
+    beginReload();
+    setPeriodType(key);
+  };
+
+  const handleSelectedMonthChange = (value) => {
+    if (!value || value === selectedMonth) return;
+    beginReload();
+    setSelectedMonth(value);
+  };
 
   const exportReport = () => {
     const header = ["Thời gian", "Doanh thu", "Chi phí", "Lợi nhuận", "Trạng thái"];
@@ -114,7 +330,7 @@ export default function IncomeExpenseReportPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `bao-cao-thu-chi-${periodType}.csv`;
+    link.download = `bao-cao-thu-chi-${periodType}-${selectedMonth}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -125,17 +341,28 @@ export default function IncomeExpenseReportPage() {
         title="Báo cáo thu chi tổng hợp"
         description="Đối chiếu doanh thu, chi phí và lợi nhuận theo kỳ báo cáo."
         actions={
-          <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
-            {Object.entries(periodOptions).map(([key, item]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setPeriodType(key)}
-                className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm" : "text-[#5f6b7c]"}`}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
+              {Object.entries(periodOptions).map(([key, item]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handlePeriodTypeChange(key)}
+                  className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm" : "text-[#5f6b7c]"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <label className="relative">
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(event) => handleSelectedMonthChange(event.target.value)}
+                className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]"
+              />
+            </label>
           </div>
         }
       />
@@ -145,28 +372,40 @@ export default function IncomeExpenseReportPage() {
         <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
       </nav>
 
+      {errorMessage && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border border-[#dce2ec] bg-white px-4 py-3 text-xs font-semibold text-[#5f6b7c]">
+          Đang tải báo cáo thu chi...
+        </div>
+      )}
+
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
           icon={WalletCards}
           label="Tổng doanh thu"
           value={current.income}
-          badge="12.5%"
-          note={`So với tháng trước: +${formatCurrency(15.8 * factor)}`}
+          badge={signedPercent(incomeGrowth)}
+          note={`So với kỳ trước: ${signedMoney(current.income - previous.income)}`}
         />
         <MetricCard
           icon={ReceiptText}
           label="Tổng chi phí"
           value={current.expense}
-          badge="4.2%"
-          note={`Điện nước chiếm ${Math.round((29.25 / 45) * 100)}% tổng chi`}
+          badge={signedPercent(expenseGrowth)}
+          note={`So với kỳ trước: ${signedMoney(current.expense - previous.expense)}`}
           tone="red"
-          inverse
+          inverse={expenseGrowth < 0}
         />
         <MetricCard
           icon={TrendingUp}
           label="Lợi nhuận ròng"
           value={current.profit}
-          badge="18.3%"
+          badge={signedPercent(profitGrowth)}
           note={`Biên lợi nhuận: ${profitMargin}%`}
           tone="dark"
         />
@@ -188,7 +427,7 @@ export default function IncomeExpenseReportPage() {
             <BarChart data={reports} barGap={4} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="#edf1f6" />
               <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }} />
-              <YAxis axisLine={false} tickLine={false} width={42} tick={{ fontSize: 9, fill: "#94a3b8" }} tickFormatter={(value) => `${value}M`} />
+              <YAxis axisLine={false} tickLine={false} width={42} tick={{ fontSize: 9, fill: "#94a3b8" }} tickFormatter={formatChartTick} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f8faff" }} />
               <Bar dataKey="income" name="Doanh thu" fill="#3f5db5" radius={[3, 3, 0, 0]} maxBarSize={28} />
               <Bar dataKey="expense" name="Chi phí" fill="#e89ca2" radius={[3, 3, 0, 0]} maxBarSize={28} />
@@ -218,7 +457,7 @@ export default function IncomeExpenseReportPage() {
             </thead>
             <tbody>
               {[...reports].reverse().map((item, index) => (
-                <tr key={item.period} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
+                <tr key={item.periodKey} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
                   <td className={`px-5 py-4 ${index < 3 ? "font-black" : "font-semibold"}`}>{item.period}</td>
                   <td className="px-5 py-4 font-semibold text-[#3156b6]">{formatCurrency(item.income)}</td>
                   <td className="px-5 py-4 font-semibold text-rose-600">{formatCurrency(item.expense)}</td>

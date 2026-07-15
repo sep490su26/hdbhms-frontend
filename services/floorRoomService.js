@@ -99,19 +99,22 @@ export async function createRoom({ propertyId, floorId, roomCode, name, areaM2, 
   }).then(normalizeRoom);
 }
 
-export async function updateRoom(roomId, { floorId, roomCode, name, areaM2, listedPrice, maxOccupants, sortOrder, publicNote }) {
+export async function updateRoom(roomId, { floorId, roomCode, name, areaM2, listedPrice, maxOccupants, sortOrder, currentStatus, publicNote }) {
+  const body = {
+    floorId,
+    roomCode,
+    name,
+    areaM2,
+    listedPrice,
+    maxOccupants,
+    publicNote,
+  };
+  if (sortOrder !== undefined) body.sortOrder = sortOrder;
+  if (currentStatus !== undefined) body.currentStatus = currentStatus;
+
   return authenticatedFetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      floorId,
-      roomCode,
-      name,
-      areaM2,
-      listedPrice,
-      maxOccupants,
-      sortOrder,
-      publicNote,
-    }),
+    body: JSON.stringify(body),
   });
 }

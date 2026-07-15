@@ -33,7 +33,7 @@ function dashboardRoomsByFloor(dashboard, propertyId) {
         name: room.name ?? room.roomCode ?? room.code ?? "",
         areaM2: numberValue(room.areaM2 ?? room.area),
         listedPrice: numberValue(room.listedPrice ?? room.listed_price ?? room.price),
-        maxOccupants: numberValue(room.maxOccupants),
+        maxOccupants: numberValue(room.maxOccupants ?? room.max_occupants),
         sortOrder: numberValue(room.sortOrder ?? room.sort_order),
         currentStatus: room.currentStatus ?? room.status ?? "DRAFT",
       })),

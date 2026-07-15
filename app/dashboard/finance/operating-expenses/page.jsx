@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -9,6 +9,8 @@ import {
   Filter,
   Gavel,
   ListFilter,
+  Package,
+  Sparkles,
   TrendingUp,
   Wrench,
   Zap,
@@ -27,46 +29,231 @@ import {
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { compareByNewest } from "@/lib/sortByNewest.mjs";
+import { fetchAllExpenseRequests } from "@/services/expenseReportService";
 
 const money = new Intl.NumberFormat("vi-VN");
-
-const expenseRows = [
-  { id: "MSC-2938", date: "15/06/2023", category: "Sửa chữa", detail: "Thay máy bơm nước lầu 2", amount: 3.2, status: "Đã thanh toán" },
-  { id: "EVN-0623", date: "12/06/2023", category: "Điện", detail: "Tiền điện tổng EVN - Kỳ 06/23", amount: 12.54, status: "Đã thanh toán" },
-  { id: "VP-042", date: "10/06/2023", category: "Phạt", detail: "Vi phạm PCCC (Tự ý lắp thêm bếp)", amount: 0.5, status: "Chờ xử lý" },
-  { id: "NUOC-0623", date: "08/06/2023", category: "Nước", detail: "Tiền nước toàn khu - Kỳ 06/23", amount: 4.2, status: "Đã thanh toán" },
-  { id: "SC-2910", date: "03/06/2023", category: "Sửa chữa", detail: "Bảo dưỡng hệ thống camera", amount: 5.8, status: "Đã thanh toán" },
-  { id: "DV-0601", date: "01/06/2023", category: "Dịch vụ", detail: "Thu gom rác và vệ sinh khu chung", amount: 2.1, status: "Đã thanh toán" },
-];
-
-const trendData = [
-  { label: "T1", value: 28.5 },
-  { label: "T2", value: 34.2 },
-  { label: "T3", value: 30.1 },
-  { label: "T4", value: 39.4 },
-  { label: "T5", value: 45.28 },
-  { label: "T6", value: 41.7 },
-];
+const PERIOD_COUNT = 6;
 
 const periodOptions = {
-  month: { label: "Tháng", factor: 1 },
-  quarter: { label: "Quý", factor: 3 },
-  year: { label: "Năm", factor: 12 },
+  month: { label: "Tháng" },
+  quarter: { label: "Quý" },
+  year: { label: "Năm" },
 };
 
-const categoryMeta = {
-  "Sửa chữa": { color: "#3f5db5", bg: "bg-amber-50", text: "text-amber-700" },
-  Điện: { color: "#9abcf5", bg: "bg-blue-50", text: "text-blue-700" },
-  Nước: { color: "#0f1d33", bg: "bg-cyan-50", text: "text-cyan-700" },
-  "Dịch vụ": { color: "#f5c8bd", bg: "bg-violet-50", text: "text-violet-700" },
-  Phạt: { color: "#ef627f", bg: "bg-rose-50", text: "text-rose-700" },
+const expenseTypeOrder = [
+  "REPAIR",
+  "COMMON_UTILITY",
+  "SUPPLIES",
+  "REPLACEMENT",
+  "CLEANING",
+  "OTHER",
+];
+
+const expenseTypeMeta = {
+  REPAIR: { label: "Sửa chữa", color: "#3f5db5", bg: "bg-amber-50", text: "text-amber-700", icon: Wrench, note: "Bảo trì, sửa chữa" },
+  COMMON_UTILITY: { label: "Điện nước", color: "#9abcf5", bg: "bg-blue-50", text: "text-blue-700", icon: Zap, note: "Chi phí dùng chung" },
+  SUPPLIES: { label: "Vật tư", color: "#0f1d33", bg: "bg-cyan-50", text: "text-cyan-700", icon: Package, note: "Mua sắm vật tư" },
+  REPLACEMENT: { label: "Thay thế", color: "#f5c8bd", bg: "bg-violet-50", text: "text-violet-700", icon: Gavel, note: "Thay mới thiết bị" },
+  CLEANING: { label: "Vệ sinh", color: "#19a9c7", bg: "bg-emerald-50", text: "text-emerald-700", icon: Sparkles, note: "Vệ sinh khu chung" },
+  OTHER: { label: "Khác", color: "#ef627f", bg: "bg-rose-50", text: "text-rose-700", icon: Droplets, note: "Chi phí khác" },
+};
+
+const statusLabels = {
+  DRAFT: "Nháp",
+  PENDING_APPROVAL: "Chờ duyệt",
+  APPROVED: "Đã duyệt",
+  READY_FOR_PAYMENT: "Chờ thanh toán",
+  REJECTED: "Từ chối",
+  PAID: "Đã thanh toán",
+  CANCELLED: "Đã hủy",
 };
 
 function formatCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
+  return `${money.format(Math.round(Number(value) || 0))} VNĐ`;
 }
 
-function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note }) {
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+}
+
+function parseYearMonth(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(value || ""));
+  if (match) return { year: Number(match[1]), month: Number(match[2]) };
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+function addMonths(year, month, offset) {
+  const date = new Date(year, month - 1 + offset, 1);
+  return { year: date.getFullYear(), month: date.getMonth() + 1 };
+}
+
+function formatIsoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function monthStartDate(year, month) {
+  return `${year}-${pad2(month)}-01`;
+}
+
+function monthEndDate(year, month) {
+  return formatIsoDate(new Date(year, month, 0));
+}
+
+function displayPeriod(key, periodType) {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(key);
+  if (periodType === "month" && monthMatch) return `Tháng ${monthMatch[2]}/${monthMatch[1]}`;
+  const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(key);
+  if (periodType === "quarter" && quarterMatch) return `Quý ${quarterMatch[2]}/${quarterMatch[1]}`;
+  return key;
+}
+
+function buildPeriodWindows(periodType, endPeriod, count = PERIOD_COUNT) {
+  const end = parseYearMonth(endPeriod);
+  const windows = [];
+
+  for (let index = count - 1; index >= 0; index -= 1) {
+    if (periodType === "year") {
+      const year = end.year - index;
+      windows.push({
+        key: String(year),
+        label: String(year),
+        period: String(year),
+        fromDate: `${year}-01-01`,
+        toDate: `${year}-12-31`,
+      });
+      continue;
+    }
+
+    if (periodType === "quarter") {
+      const quarterStartMonth = Math.floor((end.month - 1) / 3) * 3 + 1;
+      const start = addMonths(end.year, quarterStartMonth, -index * 3);
+      const quarter = Math.floor((start.month - 1) / 3) + 1;
+      const endMonth = addMonths(start.year, start.month, 2);
+      const key = `${start.year}-Q${quarter}`;
+      windows.push({
+        key,
+        label: `Q${quarter}/${start.year}`,
+        period: displayPeriod(key, periodType),
+        fromDate: monthStartDate(start.year, start.month),
+        toDate: monthEndDate(endMonth.year, endMonth.month),
+      });
+      continue;
+    }
+
+    const month = addMonths(end.year, end.month, -index);
+    const key = `${month.year}-${pad2(month.month)}`;
+    windows.push({
+      key,
+      label: `T${month.month}`,
+      period: displayPeriod(key, periodType),
+      fromDate: monthStartDate(month.year, month.month),
+      toDate: monthEndDate(month.year, month.month),
+    });
+  }
+
+  return windows;
+}
+
+function periodKeyFromDate(value, periodType) {
+  const match = /^(\d{4})-(\d{2})-\d{2}/.exec(String(value || ""));
+  if (!match) return "";
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (periodType === "year") return String(year);
+  if (periodType === "quarter") return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
+  return `${year}-${pad2(month)}`;
+}
+
+function expenseReportDate(item = {}) {
+  return item.expenseDate || item.paymentDate || item.expectedPaymentDate || item.createdAt?.slice(0, 10) || "";
+}
+
+function formatDisplayDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function statusTone(status) {
+  if (status === "PAID" || status === "APPROVED") return "bg-emerald-50 text-emerald-600";
+  if (status === "REJECTED" || status === "CANCELLED") return "bg-rose-50 text-rose-600";
+  return "bg-amber-50 text-amber-600";
+}
+
+function statusMark(status) {
+  if (status === "PAID" || status === "APPROVED") return "✓";
+  if (status === "REJECTED" || status === "CANCELLED") return "×";
+  return "…";
+}
+
+function normalizeExpenseRow(item = {}) {
+  const categoryKey = expenseTypeMeta[item.expenseType] ? item.expenseType : "OTHER";
+  const meta = expenseTypeMeta[categoryKey];
+  const dateValue = expenseReportDate(item);
+  return {
+    id: item.expenseCode || `EXP-${item.id || ""}`.trim(),
+    rawId: item.id,
+    date: formatDisplayDate(dateValue),
+    rawDate: dateValue,
+    categoryKey,
+    category: meta.label,
+    detail: item.description || "Khoản chi vận hành",
+    amount: Number(item.amount) || 0,
+    status: item.status || "",
+    statusLabel: statusLabels[item.status] || item.status || "Chưa rõ",
+  };
+}
+
+function buildTrendData(expenses, windows, periodType) {
+  const buckets = new Map(windows.map((window) => [window.key, 0]));
+  expenses.forEach((item) => {
+    const key = periodKeyFromDate(expenseReportDate(item), periodType);
+    if (buckets.has(key)) buckets.set(key, buckets.get(key) + (Number(item.amount) || 0));
+  });
+  return windows.map((window) => ({
+    ...window,
+    value: buckets.get(window.key) || 0,
+  }));
+}
+
+function buildCategories(rows) {
+  const byType = new Map(expenseTypeOrder.map((key) => {
+    const meta = expenseTypeMeta[key];
+    return [key, { key, name: meta.label, value: 0, color: meta.color, icon: meta.icon, note: meta.note }];
+  }));
+
+  rows.forEach((row) => {
+    const current = byType.get(row.categoryKey) || byType.get("OTHER");
+    current.value += row.amount;
+  });
+
+  return Array.from(byType.values());
+}
+
+function growthPercent(current, previous) {
+  if (!previous) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) * 1000) / previous) / 10;
+}
+
+function signedPercent(value) {
+  return `${value >= 0 ? "+" : ""}${value}%`;
+}
+
+function signedMoney(value) {
+  return `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value))}`;
+}
+
+function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note, badge }) {
   const dark = tone === "dark";
   return (
     <article className={`min-h-[132px] rounded-lg border p-4 shadow-sm ${dark ? "border-[#14243d] bg-[#0d1b31] text-white" : "border-[#dce2ec] bg-white text-[#0f1d33]"}`}>
@@ -74,7 +261,7 @@ function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note }) 
         <span className={`grid h-9 w-9 place-items-center rounded ${dark ? "bg-[#172b4b] text-[#8ca8ff]" : "bg-[#eef3ff]"}`} style={!dark ? { color } : undefined}>
           <Icon className="h-4 w-4" />
         </span>
-        {dark && <span className="inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />12.4%</span>}
+        {badge && <span className="inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />{badge}</span>}
       </div>
       <p className={`mt-3 text-[10px] font-bold uppercase ${dark ? "text-slate-400" : "text-[#5f6b7c]"}`}>{label}</p>
       <p className="mt-1 text-lg font-black">{formatCurrency(value)}</p>
@@ -95,37 +282,102 @@ function ExpenseTooltip({ active, payload, label }) {
 
 export default function OperatingExpensesPage() {
   const [periodType, setPeriodType] = useState("month");
-  const [selectedMonth, setSelectedMonth] = useState("2023-10");
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
+  const [expenses, setExpenses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [category, setCategory] = useState("all");
   const [descending, setDescending] = useState(true);
-  const factor = periodOptions[periodType].factor;
 
-  const categories = [
-    { name: "Sửa chữa", value: 18 * factor, color: "#3f5db5" },
-    { name: "Điện", value: 12.5 * factor, color: "#9abcf5" },
-    { name: "Nước", value: 6.8 * factor, color: "#0f1d33" },
-    { name: "Khác", value: 7.98 * factor, color: "#f5c8bd" },
-  ];
+  const windows = useMemo(() => buildPeriodWindows(periodType, selectedMonth), [periodType, selectedMonth]);
+
+  useEffect(() => {
+    let ignore = false;
+    const firstWindow = windows[0];
+    const lastWindow = windows.at(-1);
+
+    fetchAllExpenseRequests({
+      fromDate: firstWindow?.fromDate,
+      toDate: lastWindow?.toDate,
+    })
+      .then((data) => {
+        if (!ignore) setExpenses(data);
+      })
+      .catch((error) => {
+        if (!ignore) {
+          setExpenses([]);
+          setErrorMessage(error?.message || "Không tải được báo cáo chi phí");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [windows]);
+
+  const rows = useMemo(() => expenses.map(normalizeExpenseRow), [expenses]);
+  const currentWindowKey = windows.at(-1)?.key || "";
+  const currentRows = useMemo(
+    () => rows.filter((row) => periodKeyFromDate(row.rawDate, periodType) === currentWindowKey),
+    [currentWindowKey, periodType, rows],
+  );
+  const categories = useMemo(() => buildCategories(currentRows), [currentRows]);
+  const filterCategories = useMemo(() => buildCategories(rows), [rows]);
   const totalExpense = categories.reduce((sum, item) => sum + item.value, 0);
-  const chartData = trendData.map((item) => ({ ...item, value: item.value * factor }));
+  const chartData = useMemo(() => buildTrendData(expenses, windows, periodType), [expenses, periodType, windows]);
+  const currentExpense = chartData.at(-1)?.value || 0;
+  const previousExpense = chartData.at(-2)?.value || 0;
+  const expenseGrowth = growthPercent(currentExpense, previousExpense);
+  const visibleCategories = categories.filter((item) => item.value > 0);
+  const pieCategories = visibleCategories.length
+    ? visibleCategories
+    : [{ key: "empty", name: "Chưa có dữ liệu", value: 1, color: "#e8edf7" }];
+  const cardCategories = (visibleCategories.length ? visibleCategories : categories).slice(0, 4);
   const visibleRows = useMemo(() => {
-    const filtered = category === "all" ? expenseRows : expenseRows.filter((item) => item.category === category);
+    const filtered = category === "all" ? rows : rows.filter((item) => item.categoryKey === category);
     return [...filtered].sort((left, right) => {
-      const dateDiff = compareByNewest(left, right, ["date"], ["id"]);
+      const dateDiff = compareByNewest(left, right, ["rawDate"], ["rawId"]);
       if (dateDiff !== 0) return dateDiff;
       return descending ? right.amount - left.amount : left.amount - right.amount;
     });
-  }, [category, descending]);
+  }, [category, descending, rows]);
+
+  const beginReload = () => {
+    setIsLoading(true);
+    setErrorMessage("");
+  };
+
+  const handlePeriodTypeChange = (key) => {
+    if (key === periodType) return;
+    beginReload();
+    setPeriodType(key);
+  };
+
+  const handleSelectedMonthChange = (value) => {
+    if (!value || value === selectedMonth) return;
+    beginReload();
+    setSelectedMonth(value);
+  };
 
   const exportReport = () => {
     const header = ["Thời gian", "Hạng mục", "Nội dung chi tiết", "Mã chứng từ", "Số tiền", "Trạng thái"];
-    const rows = visibleRows.map((item) => [item.date, item.category, `"${item.detail}"`, item.id, item.amount, item.status].join(","));
-    const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const exportRows = visibleRows.map((item) => [
+      item.date,
+      item.category,
+      item.detail,
+      item.id,
+      item.amount,
+      item.statusLabel,
+    ].map(csvCell).join(","));
+    const blob = new Blob([`\uFEFF${[header.join(","), ...exportRows].join("\n")}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `bao-cao-chi-phi-${selectedMonth}.csv`;
+    link.download = `bao-cao-chi-phi-${periodType}-${selectedMonth}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -139,14 +391,14 @@ export default function OperatingExpensesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
               {Object.entries(periodOptions).map(([key, item]) => (
-                <button key={key} type="button" onClick={() => setPeriodType(key)} className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}>{item.label}</button>
+                <button key={key} type="button" onClick={() => handlePeriodTypeChange(key)} className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}>{item.label}</button>
               ))}
             </div>
             <label className="relative">
               <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
-              <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]" />
+              <input type="month" value={selectedMonth} onChange={(event) => handleSelectedMonthChange(event.target.value)} className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]" />
             </label>
-            <button type="button" onClick={exportReport} className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a]"><Download className="h-4 w-4" />Xuất báo cáo</button>
+            <button type="button" onClick={exportReport} disabled={isLoading} className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a] disabled:cursor-not-allowed disabled:bg-[#64748b]"><Download className="h-4 w-4" />Xuất báo cáo</button>
           </div>
         }
       />
@@ -156,17 +408,35 @@ export default function OperatingExpensesPage() {
         <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
       </nav>
 
+      {errorMessage && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border border-[#dce2ec] bg-white px-4 py-3 text-xs font-semibold text-[#5f6b7c]">
+          Đang tải báo cáo chi phí...
+        </div>
+      )}
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" note={`+${formatCurrency(4.9 * factor)} so với tháng trước`} />
-        <ExpenseCard icon={Zap} label="Điện nước" value={12.5 * factor} color="#3f5db5" note="Điện toàn trọ" />
-        <ExpenseCard icon={Droplets} label="Phí dịch vụ" value={4.2 * factor} color="#19a9c7" note="Nước toàn trọ" />
-        <ExpenseCard icon={Wrench} label="Sửa chữa" value={18 * factor} color="#e87822" note="Chi phí bảo trì" />
-        <ExpenseCard icon={Gavel} label="Phạt" value={2.5 * factor} color="#ef627f" note="Phạt vi phạm" />
+        <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" badge={signedPercent(expenseGrowth)} note={`So với kỳ trước: ${signedMoney(currentExpense - previousExpense)}`} />
+        {cardCategories.map((item) => (
+          <ExpenseCard
+            key={item.key}
+            icon={item.icon}
+            label={item.name}
+            value={item.value}
+            color={item.color}
+            note={`${totalExpense > 0 ? Math.round((item.value / totalExpense) * 100) : 0}% tổng chi`}
+          />
+        ))}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div className="min-h-[310px] rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between"><h2 className="text-sm font-black">Xu hướng chi phí (6 tháng)</h2><span className="text-lg font-black text-[#64748b]">...</span></div>
+          <div className="flex items-center justify-between"><h2 className="text-sm font-black">Xu hướng chi phí (6 kỳ)</h2><span className="text-lg font-black text-[#64748b]">...</span></div>
           <div className="mt-5 h-[235px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 5, left: -24, bottom: 0 }}>
@@ -175,7 +445,7 @@ export default function OperatingExpensesPage() {
                 <YAxis hide />
                 <Tooltip content={<ExpenseTooltip />} cursor={{ fill: "#f8faff" }} />
                 <Bar dataKey="value" fill="#dbe7fb" radius={[3, 3, 0, 0]} maxBarSize={34}>
-                  {chartData.map((item, index) => <Cell key={item.label} fill={index === 4 ? "#3f5db5" : "#dbe7fb"} />)}
+                  {chartData.map((item, index) => <Cell key={item.key} fill={index === chartData.length - 1 ? "#3f5db5" : "#dbe7fb"} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -188,17 +458,17 @@ export default function OperatingExpensesPage() {
             <div className="relative mx-auto h-48 w-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={categories} dataKey="value" nameKey="name" innerRadius={58} outerRadius={78} paddingAngle={1} stroke="none">
-                    {categories.map((item) => <Cell key={item.name} fill={item.color} />)}
+                  <Pie data={pieCategories} dataKey="value" nameKey="name" innerRadius={58} outerRadius={78} paddingAngle={1} stroke="none">
+                    {pieCategories.map((item) => <Cell key={item.key} fill={item.color} />)}
                   </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Tooltip formatter={(value, name) => [formatCurrency(value), name]} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 grid place-items-center text-center"><div><p className="text-[10px] font-semibold text-[#64748b]">Hạng mục</p><p className="text-sm font-black">Tháng 6</p></div></div>
+              <div className="pointer-events-none absolute inset-0 grid place-items-center text-center"><div><p className="text-[10px] font-semibold text-[#64748b]">Hạng mục</p><p className="text-sm font-black">{windows.at(-1)?.period}</p></div></div>
             </div>
             <div className="grid gap-3">
-              {categories.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-[#64748b]"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span><strong>{Math.round((item.value / totalExpense) * 100)}%</strong></div>
+              {(visibleCategories.length ? visibleCategories : categories.slice(0, 4)).map((item) => (
+                <div key={item.key} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-[#64748b]"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span><strong>{totalExpense > 0 ? Math.round((item.value / totalExpense) * 100) : 0}%</strong></div>
               ))}
             </div>
           </div>
@@ -218,7 +488,7 @@ export default function OperatingExpensesPage() {
             <label className="flex max-w-xs items-center gap-3 text-xs font-bold">Hạng mục
               <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-9 flex-1 rounded border border-[#cbd5e1] bg-white px-3 outline-none">
                 <option value="all">Tất cả</option>
-                {[...new Set(expenseRows.map((item) => item.category))].map((item) => <option key={item} value={item}>{item}</option>)}
+                {filterCategories.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
               </select>
             </label>
           </div>
@@ -228,21 +498,26 @@ export default function OperatingExpensesPage() {
             <thead className="bg-[#eef3fb] text-[10px] font-black uppercase text-[#5f6b7c]"><tr><th className="px-5 py-3.5">Thời gian</th><th className="px-5 py-3.5">Hạng mục</th><th className="px-5 py-3.5">Nội dung chi tiết</th><th className="px-5 py-3.5">Số tiền</th><th className="px-5 py-3.5 text-right">Trạng thái</th></tr></thead>
             <tbody>
               {visibleRows.map((item) => {
-                const meta = categoryMeta[item.category] || categoryMeta["Dịch vụ"];
+                const meta = expenseTypeMeta[item.categoryKey] || expenseTypeMeta.OTHER;
                 return (
-                  <tr key={item.id} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
-                    <td className="px-5 py-4 font-semibold">{item.date}</td>
+                  <tr key={`${item.id}-${item.rawId || item.rawDate}`} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
+                    <td className="px-5 py-4 font-semibold">{item.date || "-"}</td>
                     <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.bg} ${meta.text}`}>{item.category}</span></td>
                     <td className="px-5 py-4 text-[#334155]">{item.detail} <span className="ml-2 rounded bg-[#e8edf5] px-1.5 py-0.5 text-[9px] text-[#64748b]">#{item.id}</span></td>
-                    <td className="px-5 py-4 font-black">{formatCurrency(item.amount * factor)}</td>
-                    <td className="px-5 py-4 text-right"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${item.status === "Đã thanh toán" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>{item.status === "Đã thanh toán" ? "✓" : "…"}</span></td>
+                    <td className="px-5 py-4 font-black">{formatCurrency(item.amount)}</td>
+                    <td className="px-5 py-4 text-right"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${statusTone(item.status)}`} title={item.statusLabel}>{statusMark(item.status)}</span></td>
                   </tr>
                 );
               })}
+              {!visibleRows.length && (
+                <tr className="border-t border-[#e7ebf2]">
+                  <td colSpan={5} className="px-5 py-8 text-center text-xs font-semibold text-[#64748b]">Không có khoản chi trong kỳ này</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-        <footer className="border-t border-[#dce2ec] bg-[#eef3fb] px-5 py-3 text-[10px] text-[#64748b]">Hiển thị {visibleRows.length} trong tổng số 42 bản ghi chi phí</footer>
+        <footer className="border-t border-[#dce2ec] bg-[#eef3fb] px-5 py-3 text-[10px] text-[#64748b]">Hiển thị {visibleRows.length} trong tổng số {rows.length} bản ghi chi phí</footer>
       </section>
     </div>
   );

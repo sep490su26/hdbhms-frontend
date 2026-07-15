@@ -383,6 +383,33 @@ const STATUS_ORDER = [
   "EXPIRED",
 ];
 
+const ROOM_STATUS_OPTIONS = [
+  { value: "DRAFT", label: "Bản nháp" },
+  { value: "VACANT", label: "Trống" },
+  { value: "ON_HOLD", label: "Đang giữ cọc" },
+  { value: "RESERVED", label: "Đã đặt cọc" },
+  { value: "RESERVED_FOR_TRANSFER", label: "Giữ chuyển phòng" },
+  { value: "OCCUPIED", label: "Đang thuê" },
+  { value: "SOON_VACANT", label: "Sắp trống" },
+  { value: "MAINTENANCE", label: "Bảo trì" },
+  { value: "EXPIRED", label: "Hết hạn HĐ" },
+];
+
+const ROOM_STATUS_FORM_ALIASES = {
+  draft: "DRAFT",
+  available: "VACANT",
+  vacant: "VACANT",
+  onhold: "ON_HOLD",
+  on_hold: "ON_HOLD",
+  deposited: "RESERVED",
+  reserved: "RESERVED",
+  soonvacant: "SOON_VACANT",
+  soon_vacant: "SOON_VACANT",
+  maintenance: "MAINTENANCE",
+  occupied: "OCCUPIED",
+  expired: "EXPIRED",
+};
+
 function mapStatusToColor(status) {
   return STATUS_META[normalizeStatus(status)] ?? STATUS_META.OCCUPIED;
 }
@@ -392,9 +419,17 @@ function normalizeStatus(status) {
     .trim()
     .toUpperCase();
   if (value === "AVAILABLE") return "VACANT";
-  if (value === "DEPOSITED" || value === "ON_HOLD") return "RESERVED";
+  if (value === "DEPOSITED" || value === "ON_HOLD" || value === "RESERVED_FOR_TRANSFER") return "RESERVED";
   if (value === "SOONVACANT") return "SOON_VACANT";
   return STATUS_META[value] ? value : "OCCUPIED";
+}
+
+function statusToEditValue(status) {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "DRAFT";
+  const upper = raw.toUpperCase();
+  if (ROOM_STATUS_OPTIONS.some((option) => option.value === upper)) return upper;
+  return ROOM_STATUS_FORM_ALIASES[raw.replace(/\s+/g, "").toLowerCase()] ?? normalizeStatus(raw);
 }
 
 function formatRoomCode(code) {
@@ -525,7 +560,7 @@ function roomToEditForm(room) {
     areaM2: String(room?.areaM2 ?? room?.area ?? ""),
     listedPrice: String(room?.listedPrice ?? room?.price ?? ""),
     maxOccupants: String(room?.maxOccupants ?? room?.maxPeople ?? ""),
-    sortOrder: String(room?.sortOrder ?? ""),
+    currentStatus: statusToEditValue(room?.currentStatus ?? room?.status),
     publicNote: String(room?.publicNote ?? room?.note ?? room?.description ?? ""),
   };
 }
@@ -974,7 +1009,6 @@ function RoomEditModal({ room, propertyId: fallbackPropertyId = "", isSaving, er
     const floorId = Number(form.floorId);
     const listedPrice = toNullableNumber(form.listedPrice);
     const maxOccupants = toNullableNumber(form.maxOccupants);
-    const sortOrder = toNullableNumber(form.sortOrder);
 
     if (!roomCode || !name) {
       setLocalError("Mã phòng và tên phòng là bắt buộc.");
@@ -1003,7 +1037,7 @@ function RoomEditModal({ room, propertyId: fallbackPropertyId = "", isSaving, er
       areaM2: toNullableNumber(form.areaM2),
       listedPrice: listedPrice ?? 0,
       maxOccupants: maxOccupants ?? 1,
-      sortOrder: sortOrder ?? 0,
+      currentStatus: form.currentStatus,
       publicNote: form.publicNote.trim(),
     });
   }
@@ -1115,15 +1149,18 @@ function RoomEditModal({ room, propertyId: fallbackPropertyId = "", isSaving, er
             />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-            Thứ tự
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={form.sortOrder}
-              onChange={(event) => updateField("sortOrder", event.target.value)}
+            Trạng thái
+            <select
+              value={form.currentStatus}
+              onChange={(event) => updateField("currentStatus", event.target.value)}
               className={inputClass}
-            />
+            >
+              {ROOM_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 

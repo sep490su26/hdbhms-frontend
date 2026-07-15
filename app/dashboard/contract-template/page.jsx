@@ -385,6 +385,10 @@ function getContractType(item = {}) {
   return item?.leaseContractId || item?.contractId ? "lease" : "deposit";
 }
 
+function isVisibleLeaseContract(item) {
+  return !isRoomTransferManagedContract(item) && getContractType(item) === "lease";
+}
+
 function getContractDateValue(item = {}) {
   return (
     item.createdAt ||
@@ -649,7 +653,6 @@ export default function ContractTemplatePage() {
   const [timePopoverOpen, setTimePopoverOpen] = useState(false);
   const [timePanelQuarter, setTimePanelQuarter] = useState("Q1");
   const [roomFilter, setRoomFilter] = useState("all");
-  const [contractTypeFilter, setContractTypeFilter] = useState("all");
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [termsForm, setTermsForm] = useState(buildTermsForm());
   const [termsError, setTermsError] = useState("");
@@ -682,10 +685,10 @@ export default function ContractTemplatePage() {
         page: 0,
         size: CONTRACT_MANAGEMENT_FETCH_SIZE,
       });
-      const visibleContracts = data.items.filter((item) => !isRoomTransferManagedContract(item));
+      const visibleContracts = data.items.filter(isVisibleLeaseContract);
       setContracts(visibleContracts);
-      setSelected((current) => (isRoomTransferManagedContract(current) ? null : current));
-      setDetails((current) => (isRoomTransferManagedContract(current) ? null : current));
+      setSelected((current) => (isVisibleLeaseContract(current) ? current : null));
+      setDetails((current) => (isVisibleLeaseContract(current) ? current : null));
       return visibleContracts;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
@@ -776,9 +779,6 @@ export default function ContractTemplatePage() {
           `M${contractMonth}` === timeFilter;
         const matchesRoom =
           roomFilter === "all" || item.roomCode === roomFilter;
-        const matchesContractType =
-          contractTypeFilter === "all" ||
-          getContractType(item) === contractTypeFilter;
         const normalizedKeyword = normalizeKeyword(keyword);
         const matchesKeyword =
           !normalizedKeyword ||
@@ -804,14 +804,12 @@ export default function ContractTemplatePage() {
           matchesYear &&
           matchesTime &&
           matchesRoom &&
-          matchesContractType &&
           matchesKeyword &&
           matchesFile
         );
       })
       .sort((a, b) => getContractTimestamp(b) - getContractTimestamp(a));
   }, [
-    contractTypeFilter,
     contracts,
     fileFilter,
     keyword,
@@ -1428,15 +1426,9 @@ export default function ContractTemplatePage() {
       selectedYear === "all" ? "tat-ca-nam" : `nam-${selectedYear}`,
       timeFilter === "all" ? "tat-ca-thoi-gian" : timeFilter.toLowerCase(),
       roomFilter === "all" ? "tat-ca-phong" : `phong-${roomFilter}`,
-      contractTypeFilter === "all"
-        ? "tat-ca-loai"
-        : contractTypeFilter === "lease"
-          ? "hop-dong-thue"
-          : "hop-dong-coc",
     ].join("-");
     const header = [
       "Ma HD",
-      "Loai HD",
       "Phong",
       "Nguoi ky chinh",
       "So nguoi",
@@ -1447,7 +1439,6 @@ export default function ContractTemplatePage() {
     ];
     const rows = filteredContracts.map((item) => [
       getContractDisplayName(item),
-      getContractType(item) === "lease" ? "Thue" : "Coc",
       item.roomCode || "",
       item.primaryTenantName || item.customerName || "",
       getOccupantsCount(item),
@@ -1516,7 +1507,7 @@ export default function ContractTemplatePage() {
       </section>
 
       <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <input
@@ -1631,21 +1622,6 @@ export default function ContractTemplatePage() {
               ))}
             </select>
           </label>
-          <label>
-            <span className="sr-only">Loại hợp đồng</span>
-            <select
-              value={contractTypeFilter}
-              onChange={(event) => {
-                setContractTypeFilter(event.target.value);
-                setPage(1);
-              }}
-              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
-            >
-              <option value="all">Tất cả loại HĐ</option>
-              <option value="lease">Hợp đồng thuê</option>
-              <option value="deposit">Hợp đồng cọc</option>
-            </select>
-          </label>
         </div>
         <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -1736,24 +1712,22 @@ export default function ContractTemplatePage() {
         >
           <table
             className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3"
-            style={{ minWidth: 1080, width: "100%" }}
+            style={{ minWidth: 1000, width: "100%" }}
           >
             <colgroup>
-              <col style={{ width: "18%" }} />
+              <col style={{ width: "20%" }} />
               <col style={{ width: "8%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "11%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "12%" }} />
               <col style={{ width: "10%" }} />
-              <col style={{ width: "11%" }} />
+              <col style={{ width: "12%" }} />
               <col style={{ width: "12%" }} />
             </colgroup>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="!pl-5 xl:!pl-6">Mã HĐ</th>
-                <th>Loại HĐ</th>
                 <th>Phòng</th>
                 <th>Người ký chính</th>
                 <th>Số người</th>
@@ -1767,7 +1741,7 @@ export default function ContractTemplatePage() {
             <tbody className="divide-y divide-[#edf1f6]">
               {loading && (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-sm font-bold text-[#607089]">
+                  <td colSpan={9} className="py-12 text-center text-sm font-bold text-[#607089]">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Đang tải dữ liệu hợp đồng...
@@ -1843,11 +1817,6 @@ export default function ContractTemplatePage() {
                         </button>
                       )}
                     </td>
-                    <td data-label="Loại HĐ" className="align-middle">
-                      <span className="inline-flex rounded-full border border-[#d8e1f2] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs">
-                        {getContractType(item) === "lease" ? "Thuê" : "Cọc"}
-                      </span>
-                    </td>
                     <td data-label="Phòng" className="align-middle">
                       <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
                         <Home className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 xl:h-4 xl:w-4" />
@@ -1897,7 +1866,7 @@ export default function ContractTemplatePage() {
 
               {!loading && filteredContracts.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
                     Không có hợp đồng phù hợp với bộ lọc.
                   </td>
                 </tr>

@@ -34,6 +34,7 @@ import {
 } from "@/services/viewingCustomersService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const STATUS_OPTIONS = [
   ["all", "Tất cả trạng thái"],
@@ -409,7 +410,7 @@ export default function MaintenancePage() {
         page: page - 1,
         size,
       });
-      setTickets(result.tickets);
+      setTickets(sortByNewest(result.tickets, ["createdAt", "created_at", "updatedAt", "updated_at"]));
       setTotalElements(result.total);
       setTotalPages(result.totalPages);
     } catch (loadError) {

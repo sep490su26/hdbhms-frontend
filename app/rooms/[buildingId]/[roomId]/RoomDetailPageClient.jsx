@@ -34,6 +34,7 @@ import {
 import { formatHoldCountdown, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
 import { formatDate } from "../../../../lib/dateFormat";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DateInput } from "@/components/DateInput";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -49,12 +50,31 @@ const normalizeHoldStatus = (status) => {
   };
 };
 
-const DATE_ERROR_MESSAGE = "Ngày chọn phải bắt đầu từ ngày mai trở đi.";
+const dateToLocalIso = (date) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
 
 const getTomorrowDateString = () => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().split("T")[0];
+  return dateToLocalIso(tomorrow);
+};
+
+const addDaysToDateString = (value, days) => {
+  const text = String(value || "").slice(0, 10);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+
+  const [, rawYear, rawMonth, rawDay] = match;
+  const date = new Date(Number(rawYear), Number(rawMonth) - 1, Number(rawDay));
+  if (Number.isNaN(date.getTime())) return "";
+
+  date.setDate(date.getDate() + days);
+  return dateToLocalIso(date);
+};
+
+const getLatestDateString = (...values) => {
+  return values.filter(Boolean).sort().at(-1) || "";
 };
 
 const formatShortDate = (value) => {
@@ -207,11 +227,17 @@ function BookingCard({ room }) {
   const isOnHold = effectiveStatus === "onHold";
   const isDeposited = effectiveStatus === "deposited";
   const isOccupied = effectiveStatus === "occupied";
+  const isDraft = effectiveStatus === "draft";
   const holdCountdownLabel = formatHoldCountdown(remainingMs);
   const isCountdownActive = room.status === "onHold" && remainingMs > 0;
   const roomLabel = room.roomCode || room.name || room.id;
   const vacantDateLabel = formatShortDate(room.expectedVacantDate);
   const tomorrowDate = getTomorrowDateString();
+  const soonVacantViewingDate = isSoonVacant ? addDaysToDateString(room.expectedVacantDate, 1) : "";
+  const minViewingDate = isSoonVacant ? getLatestDateString(tomorrowDate, soonVacantViewingDate) : tomorrowDate;
+  const viewingDateErrorMessage = isSoonVacant && soonVacantViewingDate
+    ? `Phòng sắp trống chỉ nhận lịch xem từ ${formatShortDate(minViewingDate)} trở đi.`
+    : VIEWING_DATE_ERROR_MESSAGE;
   const [isViewingModalOpen, setIsViewingModalOpen] = useState(false);
   const [viewingForm, setViewingForm] = useState({
     fullName: "",
@@ -250,6 +276,7 @@ function BookingCard({ room }) {
     if (isSoonVacant) return "border-orange-200 bg-orange-50 text-orange-700";
     if (isOnHold) return "border-amber-200 bg-amber-50 text-amber-700";
     if (isDeposited) return "border-orange-200 bg-orange-50 text-orange-700";
+    if (isDraft) return "border-slate-200 bg-slate-50 text-slate-600";
     return "border-slate-200 bg-slate-50 text-slate-600";
   };
 
@@ -268,8 +295,8 @@ function BookingCard({ room }) {
       return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
     }
 
-    if (name === "viewingDate" && normalizedValue < tomorrowDate) {
-      return VIEWING_DATE_ERROR_MESSAGE;
+    if (name === "viewingDate" && normalizedValue < minViewingDate) {
+      return viewingDateErrorMessage;
     }
 
     return "";
@@ -304,19 +331,6 @@ function BookingCard({ room }) {
     setViewingNotice({ type: "", message: "" });
   };
 
-  const validateViewingDate = (value) => {
-    return validateAndSetViewingField("viewingDate", value);
-  };
-
-  const handleViewingDateInvalid = (event) => {
-    if (event.target.validity.rangeUnderflow) {
-      setViewingErrors((currentErrors) => ({
-        ...currentErrors,
-        viewingDate: VIEWING_DATE_ERROR_MESSAGE,
-      }));
-    }
-  };
-
   const handleViewingSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = {
@@ -335,11 +349,21 @@ function BookingCard({ room }) {
     setViewingNotice({ type: "", message: "" });
     try {
       const appointmentAt = combineAppointmentParts(viewingForm.viewingDate, viewingForm.viewingTime);
+      const propertyId = room.propertyId ?? room.buildingId;
+      const apiRoomId = room.roomId;
+      if (!propertyId || !apiRoomId) {
+        setViewingNotice({
+          type: "error",
+          message: "Không xác định được cơ sở hoặc phòng. Vui lòng quay lại danh sách phòng và thử lại.",
+        });
+        return;
+      }
+
       const payload = {
         fullName: viewingForm.fullName.trim(),
         phone: viewingForm.phone.trim(),
-        propertyId: room.propertyId || 1, // Must be numeric for backend
-        roomId: room.roomId,         // Numeric ID
+        propertyId,
+        roomId: apiRoomId,
         appointmentAt,
         note: `Yêu cầu từ trang chi tiết phòng ${roomLabel}`,
       };
@@ -379,6 +403,7 @@ function BookingCard({ room }) {
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
             {isSoonVacant && `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
             {isOnHold && "Đang giữ chỗ"}
+            {isDraft && "Bản nháp - Chưa mở cho thuê"}
             {isOccupied && "Đã thuê - Không còn trống"}
             {isDeposited && "Đã đặt cọc - Không còn trống"}
           </div>
@@ -386,7 +411,7 @@ function BookingCard({ room }) {
           <div className="grid gap-3">
             {isBookable ? (
               <Link
-                href={`/rooms/deposit?roomCode=${encodeURIComponent(room.roomCode || room.id)}`}
+                href={`/rooms/deposit?roomCode=${encodeURIComponent(room.roomCode || room.id)}&propertyId=${encodeURIComponent(room.propertyId ?? room.buildingId ?? "")}`}
                 className="flex min-h-14 items-center justify-center gap-2 rounded-[16px] bg-[#232946] px-4 py-3 text-center text-sm font-bold text-white shadow-lg shadow-[#232946]/20 transition hover:bg-[#091426] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#232946]/25"
               >
                 Gửi yêu cầu đặt cọc
@@ -395,11 +420,17 @@ function BookingCard({ room }) {
             ) : (
               <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : isDeposited ? "border-orange-200 bg-orange-50 text-orange-700" : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}>
-                {isOnHold ? `Phòng đang được giữ chỗ, vui lòng chờ ${holdCountdownLabel}.` : "Phòng đã được thuê, vui lòng chọn phòng khác."}
+                {isOnHold
+                  ? `Phòng đang được giữ chỗ, vui lòng chờ ${holdCountdownLabel}.`
+                  : isDraft
+                    ? "Phòng đang ở trạng thái bản nháp, chưa mở đặt cọc."
+                    : isDeposited
+                      ? "Phòng đã được đặt cọc, vui lòng chọn phòng khác."
+                      : "Phòng đã được thuê, vui lòng chọn phòng khác."}
               </div>
             )}
 
-            {!isOccupied && (
+            {!isOccupied && !isDraft && (
               <button
                 type="button"
                 onClick={() => setIsViewingModalOpen(true)}
@@ -538,15 +569,13 @@ function BookingCard({ room }) {
                   <RequiredLabel htmlFor="viewing-date">
                     Ngày xem phòng
                   </RequiredLabel>
-                  <input
+                  <DateInput
                     id="viewing-date"
                     name="viewingDate"
-                    type="date"
-                    min={tomorrowDate}
+                    min={minViewingDate}
                     value={viewingForm.viewingDate}
                     onChange={handleViewingFormChange}
                     onBlur={handleViewingFieldBlur}
-                    onInvalid={handleViewingDateInvalid}
                     aria-invalid={viewingErrors.viewingDate ? "true" : "false"}
                     aria-describedby={viewingErrors.viewingDate ? "viewing-date-error" : undefined}
                     className={viewingInputClass(viewingErrors.viewingDate)}
@@ -602,7 +631,7 @@ function BookingCard({ room }) {
   );
 }
 
-export function RoomDetailPageClient({ roomId }) {
+export function RoomDetailPageClient({ buildingId, roomId }) {
   const [room, setRoom] = useState(null);
   const [activeImage, setActiveImage] = useState("");
   const galleryImages = useMemo(() => normalizeRoomImages(room ?? {}), [room]);
@@ -619,7 +648,9 @@ export function RoomDetailPageClient({ roomId }) {
     async function loadRoom() {
       try {
         setIsLoading(true);
-        const apiRoom = await fetchPublicRoomById(roomId);
+        const apiRoom = await fetchPublicRoomById(roomId, {
+          propertyId: buildingId,
+        });
         const nextRoom = apiRoom ? normalizeApiRoom(apiRoom) : null;
 
         if (!isMounted) return;
@@ -639,7 +670,7 @@ export function RoomDetailPageClient({ roomId }) {
     return () => {
       isMounted = false;
     };
-  }, [roomId]);
+  }, [buildingId, roomId]);
 
   useEffect(() => {
     const refreshLocalHolds = () => {
@@ -705,6 +736,7 @@ export function RoomDetailPageClient({ roomId }) {
     const localHold = roomHolds[room.id];
     const serverRoomStatus = String(serverHoldStatus?.roomStatus || "").toUpperCase();
     const hasServerHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs > 0;
+    const isServerDraft = serverRoomStatus === "DRAFT";
     const isServerReserved = serverRoomStatus === "RESERVED";
     const isServerOccupied = serverRoomStatus === "OCCUPIED";
     const isServerVacant = serverRoomStatus === "VACANT";
@@ -716,7 +748,9 @@ export function RoomDetailPageClient({ roomId }) {
 
     return {
       ...room,
-      status: isServerReserved || room.status === "deposited"
+      status: isServerDraft
+        ? "draft"
+        : isServerReserved || room.status === "deposited"
         ? "deposited"
         : isServerOccupied || room.status === "occupied"
           ? "occupied"

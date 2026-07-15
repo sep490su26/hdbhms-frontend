@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { AlertCircle, Camera, CheckCircle2, IdCard, Loader2, ScanLine, Upload, X } from "lucide-react";
 import CameraCapture from "@/components/CameraCapture";
@@ -84,13 +84,13 @@ function EmptyCccdPreview({ side }) {
   );
 }
 
-function CccdSideCard({ side, slot, disabled, isScanning, onPickFile, onCapture, onRemove }) {
+function CccdSideCard({ side, slot, disabled, isScanning, error = "", onPickFile, onCapture, onRemove }) {
   const copy = SIDE_COPY[side];
   const actionDisabled = disabled || isScanning;
   const hasFile = Boolean(slot.file);
 
   return (
-    <div className="rounded-lg border border-[#d8dde6] bg-[#f8fafc] p-3">
+    <div className={`rounded-lg border p-3 ${error ? "border-rose-500 bg-rose-50/40" : "border-[#d8dde6] bg-[#f8fafc]"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-bold text-[#091426]">{copy.title}</h3>
@@ -127,7 +127,9 @@ function CccdSideCard({ side, slot, disabled, isScanning, onPickFile, onCapture,
         onClick={() => onPickFile(side)}
         disabled={actionDisabled}
         className={`mt-3 flex aspect-[1.58/1] w-full overflow-hidden rounded-lg border bg-white text-left transition disabled:cursor-not-allowed disabled:opacity-70 ${
-          hasFile
+          error
+            ? "border-rose-500"
+            : hasFile
             ? "border-[#c5c6cd] hover:border-[#091426]"
             : "border-dashed border-[#aeb1bb] hover:border-[#091426] hover:bg-[#f5f3f4]"
         }`}
@@ -144,6 +146,7 @@ function CccdSideCard({ side, slot, disabled, isScanning, onPickFile, onCapture,
           <EmptyCccdPreview side={side} />
         )}
       </button>
+      {error && <p className="mt-2 text-xs font-medium text-rose-600">{error}</p>}
     </div>
   );
 }
@@ -153,21 +156,48 @@ export default function CccdUploadFlow({
   onFilesChange,
   onExtract,
   disabled = false,
+  scanEnabled = true,
+  errors = {},
   maxFileSize = 10 * 1024 * 1024,
   className = "",
 }) {
   const inputRef = useRef(null);
   const activeSideRef = useRef("front");
   const lastScanSignatureRef = useRef("");
+  const scanEnabledRef = useRef(scanEnabled);
+  const isMountedRef = useRef(true);
   const [cameraSide, setCameraSide] = useState(null);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
   const slots = toSlotsFromValue(value);
-  const isScanning = status === "scanning";
-  const StatusIcon = status === "success" ? CheckCircle2 : status === "error" ? AlertCircle : ScanLine;
+  const isScanning = scanEnabled && status === "scanning";
+  const StatusIcon = scanEnabled
+    ? status === "success"
+      ? CheckCircle2
+      : status === "error"
+        ? AlertCircle
+        : ScanLine
+    : IdCard;
+
+  const canApplyScanResult = () => isMountedRef.current && scanEnabledRef.current;
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    scanEnabledRef.current = scanEnabled;
+    if (!scanEnabled) {
+      lastScanSignatureRef.current = "";
+    }
+  }, [scanEnabled]);
 
   const extractIdentity = async (nextSlots) => {
+    if (!canApplyScanResult()) return;
+
     const signature = `${fileSignature(nextSlots.front.file)}|${fileSignature(nextSlots.back.file)}`;
     if (!nextSlots.front.file || !nextSlots.back.file || lastScanSignatureRef.current === signature) return;
 
@@ -177,10 +207,14 @@ export default function CccdUploadFlow({
 
     try {
       let result = await scanCccdQrImage(nextSlots.front.file);
+      if (!canApplyScanResult()) return;
+
       let sourceSide = "front";
       if (!isSuccessfulScanResult(result) && nextSlots.back.file) {
         setMessage("Không đọc được ảnh đầu, đang thử ảnh còn lại...");
         result = await scanCccdQrImage(nextSlots.back.file);
+        if (!canApplyScanResult()) return;
+
         sourceSide = "back";
       }
 
@@ -203,6 +237,8 @@ export default function CccdUploadFlow({
         ...toPayload(nextSlots),
       });
     } catch (error) {
+      if (!isMountedRef.current) return;
+
       setStatus("error");
       setMessage(error?.message || "Không thể trích xuất thông tin CCCD lúc này.");
     }
@@ -233,13 +269,17 @@ export default function CccdUploadFlow({
 
     onFilesChange?.(toPayload(nextSlots));
 
-    if (nextSlots.front.file && nextSlots.back.file) {
+    if (scanEnabled && nextSlots.front.file && nextSlots.back.file) {
       await extractIdentity(nextSlots);
       return;
     }
 
     setStatus("ready");
-    setMessage(`Đã chọn ${SIDE_COPY[side].title.toLowerCase()}, chọn tiếp mặt còn lại.`);
+    setMessage(
+      scanEnabled
+        ? `Đã chọn ${SIDE_COPY[side].title.toLowerCase()}, chọn tiếp mặt còn lại.`
+        : "Đã lưu ảnh CCCD. Thông tin định danh được nhập thủ công ở form."
+    );
   };
 
   const removeSideFile = (side) => {
@@ -278,9 +318,12 @@ export default function CccdUploadFlow({
           {isScanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <StatusIcon className="h-5 w-5" />}
         </span>
         <div>
-          <h2 className="text-base font-bold text-[#091426]">Upload CCCD</h2>
+          <h2 className="text-base font-bold text-[#091426]">{scanEnabled ? "Quét CCCD" : "Upload CCCD"}</h2>
           <p className="mt-1 text-sm leading-6 text-[#5a6678]">
-            {message || "Chụp hoặc tải đủ 2 mặt CCCD để tự điền thông tin."}
+            {message || (scanEnabled
+              ? "Chụp hoặc tải đủ 2 mặt CCCD để tự điền thông tin."
+              : "Tải ảnh 2 mặt CCCD để lưu hồ sơ. Chức năng quét đang tắt."
+            )}
           </p>
         </div>
       </div>
@@ -291,6 +334,7 @@ export default function CccdUploadFlow({
           slot={slots.front}
           disabled={disabled}
           isScanning={isScanning}
+          error={errors.citizenIdFront}
           onPickFile={openFilePicker}
           onCapture={openCamera}
           onRemove={removeSideFile}
@@ -300,6 +344,7 @@ export default function CccdUploadFlow({
           slot={slots.back}
           disabled={disabled}
           isScanning={isScanning}
+          error={errors.citizenIdBack}
           onPickFile={openFilePicker}
           onCapture={openCamera}
           onRemove={removeSideFile}

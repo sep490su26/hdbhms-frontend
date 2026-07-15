@@ -31,18 +31,18 @@ export const SECTION_PERMISSIONS = {
   debt: [ROLES.OWNER, ROLES.MANAGER],
   deposits: [ROLES.OWNER, ROLES.MANAGER],
   contract: [ROLES.OWNER],
-  finance: [ROLES.PUBLIC, ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT],
+  finance: [ROLES.OWNER, ROLES.ACCOUNTANT],
   settings: [ROLES.OWNER],
   notificationTemplates: [ROLES.OWNER],
   requests: [ROLES.OWNER, ROLES.MANAGER],
-  facilities: [ROLES.OWNER, ROLES.MANAGER],
+  facilities: [ROLES.OWNER],
 };
 
 export const ACTION_PERMISSIONS = {
   approveEmployeeAccount: [ROLES.OWNER],
   editSystemConfig: [ROLES.OWNER],
-  viewFinancialReports: [ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  exportFinancialReports: [ROLES.OWNER, ROLES.MANAGER, ROLES.ACCOUNTANT],
+  viewFinancialReports: [ROLES.OWNER, ROLES.ACCOUNTANT],
+  exportFinancialReports: [ROLES.OWNER, ROLES.ACCOUNTANT],
   mutateInvoice: [ROLES.OWNER],
   enterMeterReadings: [ROLES.OWNER, ROLES.MANAGER],
   createIncidentTicket: [ROLES.OWNER, ROLES.MANAGER],

@@ -243,7 +243,7 @@ export async function fetchLeaseContractManagementList({ page = 0, size = 10 } =
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
-    sort: "signedAt,desc",
+    sort: "createdAt,desc",
   });
   const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management?${params.toString()}`, {
     method: "GET",

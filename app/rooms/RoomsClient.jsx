@@ -20,7 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  fetchPublicProperties,
+  fetchPublicActiveProperties,
   fetchPublicRoomCatalog,
   getRoomDetailHref,
   normalizeApiRoom,
@@ -37,7 +37,7 @@ function formatMoney(value) {
 }
 
 /**
- * @typedef {"empty" | "rented" | "available" | "occupied" | "soonVacant" | "maintenance" | "expired"} RoomStatus
+ * @typedef {"draft" | "empty" | "rented" | "available" | "onHold" | "deposited" | "occupied" | "soonVacant" | "maintenance" | "expired"} RoomStatus
  *
  * @typedef {Object} Facility
  * @property {string} id
@@ -123,7 +123,7 @@ async function fetchRoomsData(facilityId, filters) {
   const propertyId =
     facilityId === DEFAULT_FACILITY_ID ? undefined : facilityId;
   const [properties, catalog] = await Promise.all([
-    fetchPublicProperties().catch(() => []),
+    fetchPublicActiveProperties().catch(() => []),
     fetchPublicRoomCatalog({ propertyId }),
   ]);
   const selectedFacilityId = String(
@@ -160,15 +160,17 @@ async function fetchRoomsData(facilityId, filters) {
 
 function guestStatusCopy(status) {
   const copy = {
+    draft: "Bản nháp",
     available: "Trống",
     occupied: "Đã thuê",
     soonVacant: "Sắp trống",
     onHold: "Đang đặt cọc",
+    deposited: "Đã đặt cọc",
     // maintenance: "Bảo trì",   // tạm ẩn
     // expired: "Hết hạn",       // tạm ẩn
   };
 
-  return copy[status] || "Đã thuê";
+  return copy[status] || "Chưa rõ";
 }
 
 function isVacantOrSoonVacant(room) {
@@ -178,12 +180,23 @@ function isVacantOrSoonVacant(room) {
 function publicStatusClass(status) {
   if (status === "available")
     return "border-emerald-400/30 bg-emerald-400/15 text-emerald-100";
-  return "border-slate-400/20 bg-slate-900/50 text-slate-200";
+  if (status === "soonVacant")
+    return "border-purple-400/30 bg-purple-400/15 text-purple-100";
   if (status === "onHold")
     return "border-orange-400/30 bg-orange-400/15 text-orange-100";
+  if (status === "deposited")
+    return "border-amber-400/30 bg-amber-400/15 text-amber-100";
+  if (status === "draft")
+    return "border-slate-400/25 bg-slate-900/60 text-slate-200";
+  return "border-slate-400/20 bg-slate-900/50 text-slate-200";
 }
 
 function floorPlanStatusStyle(status) {
+  if (status === "draft")
+    return {
+      box: "border-2 border-slate-300 bg-slate-50 text-slate-500",
+      dot: "bg-slate-400",
+    };
   if (status === "available")
     return {
       box: "border-2 border-emerald-400 bg-emerald-50/50 text-emerald-700",
@@ -243,6 +256,13 @@ function StairBox() {
 }
 
 const FLOOR_PLAN_STATUS_META = {
+  DRAFT: {
+    label: "Bản nháp",
+    dot: "bg-slate-400",
+    fill: "#f8fafc",
+    stroke: "#94a3b8",
+    text: "text-slate-500",
+  },
   VACANT: {
     label: "Còn trống",
     dot: "bg-emerald-500",
@@ -288,9 +308,21 @@ const FLOOR_PLAN_STATUS_META = {
 };
 
 function getFloorPlanStatus(room) {
-  if (room.status === "available") return "VACANT";
-  if (room.status === "soonVacant") return "SOON_VACANT";
-  if (room.status === "onHold") return "HOLDING";
+  const status = String(
+    room?.status ??
+      room?.currentStatus ??
+      room?.current_status ??
+      room?.publicStatus ??
+      room?.public_status ??
+      "",
+  ).trim();
+  const normalized = status.toLowerCase();
+
+  if (!normalized || normalized === "draft") return "DRAFT";
+  if (normalized === "available" || normalized === "vacant") return "VACANT";
+  if (normalized === "soonvacant" || normalized === "soon_vacant") return "SOON_VACANT";
+  if (normalized === "onhold" || normalized === "on_hold" || normalized === "holding") return "HOLDING";
+  if (normalized === "reserved" || normalized === "deposited" || normalized === "reserved_for_transfer") return "HOLDING";
   // if (room.status === "maintenance") return "MAINTENANCE";   // tạm ẩn
   // if (room.status === "expired") return "EXPIRED";           // tạm ẩn
   return "OCCUPIED";
@@ -1346,9 +1378,22 @@ function SavedMiniFloorOverview({
             const room = roomsById.get(
               String(planValue(item, "roomId", "room_id")),
             );
+            const statusSource =
+              room ??
+              {
+                publicStatus: planValue(
+                  item,
+                  "publicStatus",
+                  "public_status",
+                  "currentStatus",
+                  "current_status",
+                ),
+              };
+            const statusKey = getFloorPlanStatus(statusSource);
+            if (statusKey === "DRAFT") return null;
+
             const meta =
-              FLOOR_PLAN_STATUS_META[getFloorPlanStatus(room ?? {})] ??
-              FLOOR_PLAN_STATUS_META.OCCUPIED;
+              FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
             const code = room
               ? getMiniRoomLabel(room)
               : (planValue(item, "roomCode", "room_code") ?? label);

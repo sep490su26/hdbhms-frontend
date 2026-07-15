@@ -20,6 +20,7 @@ import {
   sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 
@@ -320,7 +321,16 @@ export default function AccountsPage() {
         page: 0,
         size: TENANT_ACCOUNT_FETCH_SIZE,
       });
-      setItems(Array.isArray(data.items) ? data.items : []);
+      setItems(sortByNewest(data.items, [
+        "accountCreatedAt",
+        "account_created_at",
+        "createdAt",
+        "created_at",
+        "sentAt",
+        "sent_at",
+        "signedAt",
+        "signed_at",
+      ]));
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
     } finally {
@@ -337,7 +347,16 @@ export default function AccountsPage() {
           size: TENANT_ACCOUNT_FETCH_SIZE,
         });
         if (active) {
-          setItems(Array.isArray(data.items) ? data.items : []);
+          setItems(sortByNewest(data.items, [
+            "accountCreatedAt",
+            "account_created_at",
+            "createdAt",
+            "created_at",
+            "sentAt",
+            "sent_at",
+            "signedAt",
+            "signed_at",
+          ]));
         }
       } catch (loadError) {
         if (active)
@@ -388,7 +407,7 @@ export default function AccountsPage() {
 
   const filteredItems = useMemo(() => {
     const keyword = normalize(query);
-    return items.filter((item) => {
+    return sortByNewest(items.filter((item) => {
       const state = resolveAccountState(item);
       const matchesQuery =
         !keyword ||
@@ -405,7 +424,16 @@ export default function AccountsPage() {
       const matchesRole =
         roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
       return matchesQuery && matchesProperty && matchesState && matchesRole;
-    });
+    }), [
+      "accountCreatedAt",
+      "account_created_at",
+      "createdAt",
+      "created_at",
+      "sentAt",
+      "sent_at",
+      "signedAt",
+      "signed_at",
+    ]);
   }, [items, propertyFilter, query, roleFilter, stateFilter]);
 
   const filteredTotalElements = filteredItems.length;

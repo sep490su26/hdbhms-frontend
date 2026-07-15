@@ -279,9 +279,16 @@ function formatNotificationTime(value) {
 }
 
 function notificationHref(notification) {
+  const targetRoute = notification?.data?.targetRoute;
+  if (typeof targetRoute === "string" && targetRoute.startsWith("/dashboard")) {
+    return targetRoute;
+  }
   const eventType = String(notification?.eventType || "").toUpperCase();
   const targetType = String(notification?.targetType || "").toUpperCase();
 
+  if (eventType === "VISIT_REQUEST_CREATED" || targetType === "VISIT_REQUEST") {
+    return "/dashboard/viewing-customers";
+  }
   if (eventType === "TENANT_PROFILE_ACCESS_REQUESTED" || targetType === "CHANGE_REQUEST") {
     return "/dashboard/requests";
   }
@@ -938,7 +945,7 @@ function DashboardLayoutShell({ children }) {
   const allowedRoles = permissionKey
     ? SECTION_PERMISSIONS[permissionKey] || []
     : [];
-  const isPublicRoute = pathname?.startsWith("/dashboard/finance");
+  const isPublicRoute = false;
   const isAllowed = permissionKey
     ? canAccessRole(effectiveRole, allowedRoles)
     : false;

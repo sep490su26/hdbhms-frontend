@@ -171,6 +171,7 @@ export async function fetchViewingCustomers({filters, page, size}) {
         to: filters.toDate ? `${filters.toDate}T23:59:59` : undefined,
         page: page - 1,
         size,
+        sort: "createdAt,desc",
     })}`);
 
     return {
@@ -190,6 +191,7 @@ export async function fetchViewingCustomerStats() {
         const data = await authenticatedFetch(`/visit-requests${toQuery({
             page: 0,
             size: 500,
+            sort: "createdAt,desc",
         })}`);
         const items = (data.data || []).map(mapVisitRequest);
 
@@ -217,6 +219,7 @@ export async function fetchViewingCustomerTrash({page, size}) {
     const data = await authenticatedFetch(`/visit-requests/trash${toQuery({
         page: page - 1,
         size,
+        sort: "deletedAt,desc",
     })}`);
     return {
         items: (data.data || []).map(mapVisitRequest),

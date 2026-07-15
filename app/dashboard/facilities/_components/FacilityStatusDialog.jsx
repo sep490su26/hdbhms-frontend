@@ -24,6 +24,7 @@ function getStatusLabel(status) {
     status
   );
 }
+
 function DialogIcon({ type }) {
   const variants = {
     blocked: {
@@ -62,6 +63,12 @@ export function FacilityStatusDialog({
 
   const isBlocked = flow.type === "blocked";
   const isWarning = flow.type === "warning";
+  const blockedTitle = flow.blockTitle || "Không thể thay đổi trạng thái";
+  const blockedDescription =
+    flow.blockReason ||
+    `${flow.facility.name} vẫn còn công nợ chưa thanh toán. Trạng thái sẽ được giữ nguyên.`;
+  const showDebtBlock =
+    isBlocked && (flow.blockKind === "debt" || flow.facility.hasOutstandingDebts);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -74,22 +81,22 @@ export function FacilityStatusDialog({
           <DialogHeader className="mt-5 items-center">
             <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
               {isBlocked
-                ? "Không thể đóng cơ sở"
+                ? blockedTitle
                 : isWarning
                   ? "Cơ sở vẫn còn hợp đồng"
                   : "Xác nhận thay đổi trạng thái"}
             </DialogTitle>
             <DialogDescription className="max-w-md leading-6">
               {isBlocked
-                ? `${flow.facility.name} v?n còn công n? chua thanh toán. Trạng thái s? du?c gi? nguyên.`
+                ? blockedDescription
                 : isWarning
                   ? `${flow.facility.name} đang có hợp đồng còn hiệu lực. Việc đóng vĩnh viễn có thể ảnh hưởng người thuê.`
-                  : `Chuyển ${flow.facility.name} sang trạng thái “${getStatusLabel(flow.nextStatus)}”?`}
+                  : `Chuyển ${flow.facility.name} sang trạng thái "${getStatusLabel(flow.nextStatus)}"?`}
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        {isBlocked && (
+        {showDebtBlock && (
           <div className="mx-6 rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-4">
             <div className="flex items-start gap-3">
               <WalletCards className="mt-0.5 h-5 w-5 shrink-0 text-rose-700 dark:text-rose-300" />
@@ -98,7 +105,7 @@ export function FacilityStatusDialog({
                   Công nợ cần xử lý
                 </p>
                 <p className="mt-1 text-2xl font-black text-rose-700 dark:text-rose-300">
-                  {money.format(flow.facility.outstandingDebtAmount || 0)} d
+                  {money.format(flow.facility.outstandingDebtAmount || 0)} đ
                 </p>
                 <p className="mt-2 text-xs leading-5 text-rose-800 dark:text-rose-300">
                   Vui lòng hoàn tất đối soát và thu hồi công nợ trước khi đóng

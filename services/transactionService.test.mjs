@@ -106,6 +106,7 @@ test("fetchTransactionHistory sends filters and normalizes rows", async () => {
   assert.match(calls[0], /toDate=2026-07-31/);
   assert.match(calls[0], /page=1/);
   assert.match(calls[0], /size=20/);
+  assert.match(calls[0], /sort=createdAt%2Cdesc/);
   assert.equal(result.items[0].transactionCode, "PAYOS-7");
   assert.equal(result.items[0].amount, 500000);
   assert.equal(result.items[0].roomCode, "P201");

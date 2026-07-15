@@ -203,6 +203,32 @@ export async function loginWithPhonePassword({ phone, password }) {
     return parseEnvelope(response);
 }
 
+export async function requestPasswordReset({ email }) {
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Client-Type": "web",
+        },
+        body: JSON.stringify({ email }),
+    });
+    return parseEnvelope(response);
+}
+
+export async function resetPasswordWithToken({ token, newPassword }) {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Client-Type": "web",
+        },
+        body: JSON.stringify({ token, newPassword }),
+    });
+    return parseEnvelope(response);
+}
+
 export async function logout() {
     const token = getAuthToken();
     try {
@@ -281,7 +307,7 @@ function normalizeSimpleProperty(item = {}) {
     };
 }
 
-export async function createStaffAccount({ phone, email, fullName, role }) {
+export async function createStaffAccount({ phone, email, fullName, role, propertyId }) {
     const data = await authenticatedFetch(`${API_BASE_URL}/users/staff`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -290,6 +316,7 @@ export async function createStaffAccount({ phone, email, fullName, role }) {
             email,
             fullName,
             initialRole: role,
+            propertyId: propertyId || null,
         }),
     });
     return normalizeUserAccount(data);
@@ -299,6 +326,7 @@ export async function fetchUsers({ page = 0, size = 10, status, role, roles, sea
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
+        sort: "createdAt,desc",
     });
     if (status && status !== "all") params.set("status", status);
     if (Array.isArray(roles)) {
@@ -329,6 +357,15 @@ export async function updateUserRole(userId, role) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
+    });
+    return normalizeUserAccount(data);
+}
+
+export async function updateUserAssignedProperty(userId, propertyId) {
+    const data = await authenticatedFetch(`${API_BASE_URL}/users/${userId}/assigned-property`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId }),
     });
     return normalizeUserAccount(data);
 }
@@ -382,6 +419,7 @@ function normalizeTenantAccountCandidate(item = {}) {
         mustChangePassword: item.mustChangePassword ?? item.must_change_password ?? null,
         lastLoginAt: item.lastLoginAt ?? item.last_login_at ?? null,
         accountCreatedAt: item.accountCreatedAt ?? item.account_created_at ?? null,
+        createdAt: item.createdAt ?? item.created_at ?? null,
         accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
         emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
         provisioningStatus:
@@ -413,6 +451,7 @@ export async function fetchTenantAccountCandidates({ page = 0, size = 10 } = {})
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
+        sort: "createdAt,desc",
     });
     const data = await authenticatedFetch(`${API_BASE_URL}/users/tenant-account-candidates?${params.toString()}`, {
         method: "GET",

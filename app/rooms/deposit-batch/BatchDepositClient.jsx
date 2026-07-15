@@ -46,9 +46,12 @@ import { previewDepositContract } from "../../../services/depositContractsServic
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
 import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
+import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
+import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
 
 const DEPOSIT_PER_ROOM = 2000;
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
+const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
@@ -364,6 +367,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   });
   const [files, setFiles] = useState({ front: null, back: null, portrait: null });
   const [filePreviews, setFilePreviews] = useState({ front: "", back: "", portrait: "" });
+  const [identityEntryMode, setIdentityEntryMode] = useState("scan");
   const [checkout, setCheckout] = useState(null);
   const [batchStatus, setBatchStatus] = useState(null);
   const [qrImage, setQrImage] = useState("");
@@ -392,6 +396,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     const review = contractReviews[room.roomId];
     return review?.accepted && review.signature === contractSignature(room, form);
   });
+  const isCccdScanMode = identityEntryMode === "scan";
   const initialRoomKey = useMemo(
     () => initialRooms.map((room) => String(room.roomId)).join(","),
     [initialRooms],
@@ -774,6 +779,54 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       setFilePreviews((current) => ({ ...current, [name]: String(reader.result || "") }));
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCccdFilesChange = ({ files: cccdFiles = {}, previews = {} }) => {
+    const nextFront = cccdFiles.citizenIdFront || null;
+    const nextBack = cccdFiles.citizenIdBack || null;
+
+    setFiles((current) => ({
+      ...current,
+      front: nextFront,
+      back: nextBack,
+    }));
+    setFilePreviews((current) => ({
+      ...current,
+      front: previews.citizenIdFront || "",
+      back: previews.citizenIdBack || "",
+    }));
+    setFieldErrors((current) => ({
+      ...current,
+      front: nextFront ? "" : current.front,
+      back: nextBack ? "" : current.back,
+    }));
+  };
+
+  const handleCccdExtracted = ({ identity } = {}) => {
+    const extractedValues = {
+      fullName: identity?.fullName || "",
+      dob: identity?.dob || "",
+      idNumber: identity?.idNumber || "",
+      idIssueDate: identity?.issuedDate || "",
+      permanentAddress: identity?.address || "",
+    };
+    const nextForm = { ...form };
+
+    Object.entries(extractedValues).forEach(([name, value]) => {
+      if (value) nextForm[name] = value;
+    });
+
+    setForm(nextForm);
+    setFieldErrors((current) => {
+      const nextErrors = { ...current };
+      Object.entries(extractedValues).forEach(([name, value]) => {
+        if (value) nextErrors[name] = validateField(name, value, nextForm);
+      });
+      if (nextForm.dob && nextForm.idIssueDate) {
+        nextErrors.idIssueDate = validateField("idIssueDate", nextForm.idIssueDate, nextForm);
+      }
+      return nextErrors;
+    });
   };
 
   const validateForm = () => {
@@ -1518,6 +1571,39 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                   Một hồ sơ dùng để đặt cọc {rooms.length} phòng. Mỗi phòng sẽ có một hợp đồng đặt cọc riêng.
                 </p>
               </div>
+
+              <IdentityEntryModeSelector
+                value={identityEntryMode}
+                onChange={setIdentityEntryMode}
+                disabled={submitting}
+                className="mt-5"
+              />
+
+              {isCccdScanMode && (
+                <CccdUploadFlow
+                  value={{
+                    files: {
+                      citizenIdFront: files.front,
+                      citizenIdBack: files.back,
+                    },
+                    previews: {
+                      citizenIdFront: filePreviews.front,
+                      citizenIdBack: filePreviews.back,
+                    },
+                  }}
+                  onFilesChange={handleCccdFilesChange}
+                  onExtract={handleCccdExtracted}
+                  disabled={submitting}
+                  scanEnabled
+                  errors={{
+                    citizenIdFront: fieldErrors.front,
+                    citizenIdBack: fieldErrors.back,
+                  }}
+                  maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+                  className="mt-4"
+                />
+              )}
+
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <TextField label="Họ và tên" required error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
@@ -1654,24 +1740,13 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                 </div>
               </section>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <BatchFileUploadZone
-                  id="batch-id-front"
-                  label="Mặt trước CCCD"
-                  helperText="Tải ảnh rõ nét để xác thực thông tin"
-                  preview={filePreviews.front}
-                  error={fieldErrors.front}
-                  onChange={(event) => updateFile("front", event.target.files?.[0] || null)}
-                />
-                <BatchFileUploadZone
-                  id="batch-id-back"
-                  label="Mặt sau CCCD"
-                  helperText="Tải ảnh rõ nét để xác thực thông tin"
-                  preview={filePreviews.back}
-                  error={fieldErrors.back}
-                  onChange={(event) => updateFile("back", event.target.files?.[0] || null)}
-                />
-                <div className="sm:col-span-2">
+              <section className="mt-6 rounded-xl border border-[#d8dde6] bg-white p-5">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-[#4f46e5]" />
+                  <h2 className="text-lg font-black text-[#091426]">Hồ sơ bổ sung</h2>
+                </div>
+
+                <div className="mt-5 grid gap-5">
                   <BatchFileUploadZone
                     id="batch-portrait"
                     label="Ảnh chân dung"
@@ -1680,8 +1755,32 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                     error={fieldErrors.portrait}
                     onChange={(event) => updateFile("portrait", event.target.files?.[0] || null)}
                   />
+
+                  {!isCccdScanMode && (
+                    <CccdUploadFlow
+                      value={{
+                        files: {
+                          citizenIdFront: files.front,
+                          citizenIdBack: files.back,
+                        },
+                        previews: {
+                          citizenIdFront: filePreviews.front,
+                          citizenIdBack: filePreviews.back,
+                        },
+                      }}
+                      onFilesChange={handleCccdFilesChange}
+                      disabled={submitting}
+                      scanEnabled={false}
+                      errors={{
+                        citizenIdFront: fieldErrors.front,
+                        citizenIdBack: fieldErrors.back,
+                      }}
+                      maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+                      className="w-full"
+                    />
+                  )}
                 </div>
-              </div>
+              </section>
             </section>
 
             {rooms.map((room) => {

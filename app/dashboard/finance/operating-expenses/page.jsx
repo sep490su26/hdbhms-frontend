@@ -26,6 +26,7 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { compareByNewest } from "@/lib/sortByNewest.mjs";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -110,7 +111,11 @@ export default function OperatingExpensesPage() {
   const chartData = trendData.map((item) => ({ ...item, value: item.value * factor }));
   const visibleRows = useMemo(() => {
     const filtered = category === "all" ? expenseRows : expenseRows.filter((item) => item.category === category);
-    return [...filtered].sort((left, right) => descending ? right.amount - left.amount : left.amount - right.amount);
+    return [...filtered].sort((left, right) => {
+      const dateDiff = compareByNewest(left, right, ["date"], ["id"]);
+      if (dateDiff !== 0) return dateDiff;
+      return descending ? right.amount - left.amount : left.amount - right.amount;
+    });
   }, [category, descending]);
 
   const exportReport = () => {

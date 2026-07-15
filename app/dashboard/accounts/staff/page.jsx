@@ -19,10 +19,12 @@ import {
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { formatDateTime } from "@/lib/dateFormat";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import {
   createStaffAccount,
   fetchSimpleProperties,
   fetchUsers,
+  updateUserAssignedProperty,
   updateUserRole,
   updateUserStatus,
 } from "@/services/identityAccessService";
@@ -48,7 +50,7 @@ const blankForm = {
   fullName: "",
   phone: "",
   email: "",
-  role: "MANAGER",
+  propertyId: "",
 };
 
 function roleLabel(role) {
@@ -213,7 +215,7 @@ export default function StaffAccountsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(blankForm);
   const [editTarget, setEditTarget] = useState(null);
-  const [editForm, setEditForm] = useState({ role: "MANAGER", status: "ACTIVE" });
+  const [editForm, setEditForm] = useState({ role: "MANAGER", status: "ACTIVE", propertyId: "" });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -226,7 +228,7 @@ export default function StaffAccountsPage() {
         status: statusFilter,
         search: query,
       });
-      setItems(Array.isArray(data.items) ? data.items : []);
+      setItems(sortByNewest(data.items, ["createdAt", "created_at"]));
       setTotalElements(data.totalElements);
       setTotalPages(data.totalPages);
     } catch (loadError) {
@@ -294,8 +296,8 @@ export default function StaffAccountsPage() {
     if (!createForm.fullName.trim()) return "Vui lòng nhập họ tên nhân viên.";
     if (!createForm.phone.trim()) return "Vui lòng nhập số điện thoại.";
     if (!createForm.email.trim()) return "Vui lòng nhập email.";
-    if (!ROLE_OPTIONS.some((item) => item.value === createForm.role)) {
-      return "Vai trò nhân viên không hợp lệ.";
+    if (!createForm.propertyId) {
+      return "Vui lòng chọn cơ sở phụ trách cho tài khoản quản lý.";
     }
     return "";
   };
@@ -315,14 +317,15 @@ export default function StaffAccountsPage() {
         fullName: createForm.fullName.trim(),
         phone: createForm.phone.trim(),
         email: createForm.email.trim(),
-        role: createForm.role,
+        role: "MANAGER",
+        propertyId: createForm.propertyId,
       });
-      setMessage("Đã tạo tài khoản nhân viên và gửi thông tin đăng nhập qua email.");
+      setMessage("Đã tạo tài khoản quản lý và gửi thông tin đăng nhập qua email.");
       setCreateForm(blankForm);
       setCreateOpen(false);
       await loadUsers();
     } catch (createError) {
-      setError(createError?.message || "Không tạo được tài khoản nhân viên.");
+      setError(createError?.message || "Không tạo được tài khoản quản lý.");
     } finally {
       setSaving(false);
     }
@@ -332,11 +335,15 @@ export default function StaffAccountsPage() {
     setError("");
     setMessage("");
     setEditTarget(account);
+    const assignedProperty = Array.isArray(account.assignedProperties)
+      ? account.assignedProperties[0]
+      : null;
     setEditForm({
       role: ROLE_OPTIONS.some((item) => item.value === account.role)
         ? account.role
         : "MANAGER",
       status: account.status || "ACTIVE",
+      propertyId: assignedProperty?.id ? String(assignedProperty.id) : "",
     });
   };
 
@@ -350,6 +357,10 @@ export default function StaffAccountsPage() {
       setError("Vai trò nhân viên không hợp lệ.");
       return;
     }
+    if (editForm.role === "MANAGER" && !editForm.propertyId) {
+      setError("Vui lòng chọn cơ sở phụ trách cho tài khoản quản lý.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -360,6 +371,16 @@ export default function StaffAccountsPage() {
       }
       if (editForm.status !== editTarget.status && MUTABLE_STATUSES.has(editForm.status)) {
         await updateUserStatus(editTarget.id, { status: editForm.status });
+      }
+      const currentAssignedPropertyId = Array.isArray(editTarget.assignedProperties)
+        ? editTarget.assignedProperties[0]?.id
+        : "";
+      if (
+        editForm.role === "MANAGER" &&
+        editForm.propertyId &&
+        String(editForm.propertyId) !== String(currentAssignedPropertyId || "")
+      ) {
+        await updateUserAssignedProperty(editTarget.id, editForm.propertyId);
       }
       setMessage("Đã cập nhật tài khoản nhân viên.");
       setEditTarget(null);
@@ -412,7 +433,7 @@ export default function StaffAccountsPage() {
     <div className="grid gap-7 text-[#0f1d33]">
       <DashboardPageHeader
         title="Quản lý tài khoản nhân viên"
-        description="Tạo và quản lý tài khoản web cho quản lý, kế toán; kiểm soát role, trạng thái đăng nhập và chuẩn bị gán cơ sở phụ trách."
+        description="Tạo tài khoản web cho quản lý; theo dõi role, trạng thái đăng nhập và cơ sở phụ trách của tài khoản nhân viên."
         actions={
           <div className="flex flex-col gap-2 sm:flex-row">
           <button
@@ -435,7 +456,7 @@ export default function StaffAccountsPage() {
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842]"
           >
             <UserPlus className="h-4 w-4" />
-            Tạo tài khoản nhân viên
+            Tạo tài khoản quản lý
           </button>
           </div>
         }
@@ -486,7 +507,7 @@ export default function StaffAccountsPage() {
           </label>
         </div>
         <p className="mt-3 text-xs font-semibold text-[#687184]">
-          Phần cơ sở phụ trách đang chờ API backend để lưu assignment, nên chưa cho chỉnh trực tiếp ở web.
+          Cơ sở phụ trách lấy từ backend và được lưu qua API gán cơ sở cho tài khoản quản lý.
         </p>
       </section>
 
@@ -637,7 +658,7 @@ export default function StaffAccountsPage() {
 
       {createOpen ? (
         <Modal
-          title="Tạo tài khoản nhân viên"
+          title="Tạo tài khoản quản lý"
           onClose={() => setCreateOpen(false)}
           footer={
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
@@ -693,27 +714,22 @@ export default function StaffAccountsPage() {
                 placeholder="nhanvien@example.com"
               />
             </label>
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-bold text-[#0f1d33]">Vai trò</span>
+            <div className="rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] p-4 md:col-span-2">
+              <p className="text-sm font-bold text-[#0f1d33]">Cơ sở phụ trách</p>
               <select
-                value={createForm.role}
+                value={createForm.propertyId}
                 onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, role: event.target.value }))
+                  setCreateForm((current) => ({ ...current, propertyId: event.target.value }))
                 }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+                className="mt-3 h-11 w-full rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
               >
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="">Chọn cơ sở phụ trách</option>
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.name}
                   </option>
                 ))}
               </select>
-            </label>
-            <div className="rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] p-4 md:col-span-2">
-              <p className="text-sm font-bold text-[#0f1d33]">Cơ sở phụ trách</p>
-              <p className="mt-1 text-sm font-semibold text-[#687184]">
-                Đã tải {properties.length} cơ sở. Chưa thể lưu gán cơ sở vì backend chưa có API assignment cho nhân viên.
-              </p>
             </div>
           </div>
         </Modal>
@@ -789,12 +805,26 @@ export default function StaffAccountsPage() {
                 Phase này chỉ cho đổi giữa đang hoạt động và tạm khóa.
               </span>
             </label>
-            <div className="rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] p-4">
-              <p className="text-sm font-bold text-[#0f1d33]">Cơ sở phụ trách</p>
-              <p className="mt-1 text-sm font-semibold text-[#687184]">
-                Chưa có endpoint lưu assignment, nên phần này chỉ hiển thị sau khi backend bổ sung API.
-              </p>
-            </div>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold text-[#0f1d33]">Cơ sở phụ trách</span>
+              <select
+                value={editForm.propertyId}
+                onChange={(event) =>
+                  setEditForm((current) => ({ ...current, propertyId: event.target.value }))
+                }
+                disabled={editForm.role !== "MANAGER"}
+                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 disabled:cursor-not-allowed disabled:bg-[#eef2f7] disabled:text-[#8490a5]"
+              >
+                <option value="">
+                  {editForm.role === "MANAGER" ? "Chọn cơ sở phụ trách" : "Chỉ áp dụng cho quản lý"}
+                </option>
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>
+                    {property.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </Modal>
       ) : null}

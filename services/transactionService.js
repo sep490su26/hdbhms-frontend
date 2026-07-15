@@ -99,6 +99,7 @@ export function normalizeTransaction(raw = {}) {
     id: read(raw, "id"),
     transactionId: read(raw, "transactionId", "transaction_id"),
     transactionCode: read(raw, "transactionCode", "transaction_code") || "",
+    createdAt: read(raw, "createdAt", "created_at") || "",
     transactionTime: read(raw, "transactionTime", "transaction_time") || "",
     roomId: read(raw, "roomId", "room_id"),
     roomCode: read(raw, "roomCode", "room_code") || "",
@@ -122,6 +123,7 @@ export async function fetchTransactionHistory(filters = {}) {
   const params = buildParams(filters);
   params.set("page", String(page - 1));
   params.set("size", String(size));
+  params.set("sort", "createdAt,desc");
 
   const data = await authenticatedFetch(`${API_BASE_URL}/admin/transactions?${params.toString()}`);
   const items = readPageItems(data).map(normalizeTransaction);

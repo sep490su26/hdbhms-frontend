@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Download, TrendingUp } from "lucide-react";
 import {
@@ -13,22 +13,32 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { fetchRevenueReport } from "@/services/revenueReportService";
 
 const money = new Intl.NumberFormat("vi-VN");
 
-const monthlyReports = [
-  { period: "Tháng 5, 2023", short: "T5", room: 27.5, utilities: 5.1, service: 4.7, extra: 0.9 },
-  { period: "Tháng 6, 2023", short: "T6", room: 30, utilities: 5.7, service: 5, extra: 0.3 },
-  { period: "Tháng 7, 2023", short: "T7", room: 30, utilities: 5.9, service: 5, extra: 1.2 },
-  { period: "Tháng 8, 2023", short: "T8", room: 31.5, utilities: 6.2, service: 5.2, extra: 0.45 },
-  { period: "Tháng 9, 2023", short: "T9", room: 32, utilities: 5.8, service: 5.2, extra: 0.8 },
-  { period: "Tháng 10, 2023", short: "T10", room: 32, utilities: 6, service: 5.5, extra: 1.7 },
-];
-
 const periodConfig = {
-  month: { label: "Tháng", factor: 1 },
-  quarter: { label: "Quý", factor: 3 },
-  year: { label: "Năm", factor: 12 },
+  month: { label: "Tháng" },
+  quarter: { label: "Quý" },
+  year: { label: "Năm" },
+};
+
+const sourceLabels = {
+  room: "Tiền phòng",
+  utilities: "Điện/Nước",
+  service: "Dịch vụ",
+  extra: "Khác",
+};
+
+const emptyPeriod = {
+  period: "",
+  label: "",
+  room: 0,
+  utilities: 0,
+  service: 0,
+  extra: 0,
+  total: 0,
+  previous: 0,
 };
 
 const sourceColors = {
@@ -39,11 +49,34 @@ const sourceColors = {
 };
 
 function formatCurrency(value) {
-  return `${money.format(Math.round(value * 1_000_000))} VNĐ`;
+  return `${money.format(Math.round(Number(value) || 0))} VNĐ`;
 }
 
 function formatCompact(value) {
-  return `${value.toFixed(1)}M`;
+  const millions = (Number(value) || 0) / 1_000_000;
+  return `${millions.toFixed(1)}M`;
+}
+
+function currentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function percentOf(value, total) {
+  return total > 0 ? Math.round(((Number(value) || 0) / total) * 100) : 0;
+}
+
+function displayPeriod(item, periodType) {
+  const period = item.period || "";
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(period);
+  if (periodType === "month" && monthMatch) {
+    return `Tháng ${monthMatch[2]}/${monthMatch[1]}`;
+  }
+  const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(period);
+  if (periodType === "quarter" && quarterMatch) {
+    return `Quý ${quarterMatch[2]}/${quarterMatch[1]}`;
+  }
+  return period || item.label || "";
 }
 
 function SummaryCard({ label, value, note, color, trend }) {
@@ -76,46 +109,79 @@ function RevenueTooltip({ active, payload, label }) {
 
 export default function FinancePage() {
   const [periodType, setPeriodType] = useState("month");
-  const [selectedMonth, setSelectedMonth] = useState("2023-10");
-  const factor = periodConfig[periodType].factor;
+  const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
+  const [report, setReport] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const reports = useMemo(
-    () => monthlyReports.map((item) => ({
-      ...item,
-      room: item.room * factor,
-      utilities: item.utilities * factor,
-      service: item.service * factor,
-      extra: item.extra * factor,
-    })),
-    [factor],
-  );
+  useEffect(() => {
+    let ignore = false;
 
-  const selectedReport = reports.at(-1);
-  const totalRevenue = selectedReport.room + selectedReport.utilities + selectedReport.service + selectedReport.extra;
-  const chartData = reports.map((item, index) => ({
+    Promise.resolve()
+      .then(() => {
+        if (ignore) return null;
+        setIsLoading(true);
+        setErrorMessage("");
+        return fetchRevenueReport({ periodType, endPeriod: selectedMonth });
+      })
+      .then((data) => {
+        if (!ignore && data) setReport(data);
+      })
+      .catch((error) => {
+        if (!ignore) setErrorMessage(error?.message || "Không tải được báo cáo doanh thu");
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [periodType, selectedMonth]);
+
+  const reports = report?.periods ?? [];
+  const selectedReport = reports.at(-1) ?? emptyPeriod;
+  const totalRevenue = selectedReport.total || selectedReport.room + selectedReport.utilities + selectedReport.service + selectedReport.extra;
+  const growth = report?.revenueGrowthPercent ?? 0;
+  const chartData = reports.map((item) => ({
     ...item,
-    previous: Math.max(0, item.room - (3.5 + index * 0.35) * factor),
-    current: item.room,
+    short: item.label || item.period,
+    previous: item.previous,
+    current: item.total,
   }));
-  const sources = [
-    { key: "room", label: "Tiền phòng", value: selectedReport.room },
-    { key: "utilities", label: "Điện/Nước", value: selectedReport.utilities },
-    { key: "service", label: "Dịch vụ", value: selectedReport.service },
-    { key: "extra", label: "Khác", value: selectedReport.extra },
-  ];
-  const donutStops = sources.reduce((result, source, index) => {
-    const previous = index === 0 ? 0 : result.end;
-    const end = previous + (source.value / totalRevenue) * 100;
-    result.parts.push(`${sourceColors[source.key]} ${previous}% ${end}%`);
-    result.end = end;
-    return result;
-  }, { parts: [], end: 0 });
+  const sources = (report?.sources?.length
+    ? report.sources
+    : Object.keys(sourceLabels).map((key) => ({
+        key,
+        amount: selectedReport[key] ?? 0,
+        percent: percentOf(selectedReport[key], totalRevenue),
+      }))
+  ).map((source) => ({
+    ...source,
+    label: sourceLabels[source.key] || source.key,
+    value: source.amount,
+    percent: source.percent ?? percentOf(source.amount, totalRevenue),
+  }));
+  const sourceByKey = Object.fromEntries(sources.map((source) => [source.key, source]));
+  const donutStops = useMemo(() => {
+    if (totalRevenue <= 0) {
+      return { parts: ["#e8edf7 0% 100%"], end: 100 };
+    }
+    return sources.reduce((result, source, index) => {
+      const previous = index === 0 ? 0 : result.end;
+      const end = previous + (source.value / totalRevenue) * 100;
+      result.parts.push(`${sourceColors[source.key]} ${previous}% ${end}%`);
+      result.end = end;
+      return result;
+    }, { parts: [], end: 0 });
+  }, [sources, totalRevenue]);
 
   const exportReport = () => {
+    if (!reports.length) return;
     const header = ["Kỳ báo cáo", "Doanh thu phòng", "Tiền điện nước", "Phí dịch vụ", "Phát sinh", "Tổng cộng"];
     const rows = reports.map((item) => {
-      const total = item.room + item.utilities + item.service + item.extra;
-      return [item.period, item.room, item.utilities, item.service, item.extra, total].join(",");
+      const total = item.total || item.room + item.utilities + item.service + item.extra;
+      return [displayPeriod(item, periodType), item.room, item.utilities, item.service, item.extra, total].join(",");
     });
     const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -157,6 +223,7 @@ export default function FinancePage() {
             <button
               type="button"
               onClick={exportReport}
+              disabled={isLoading || !reports.length}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#080f1f] px-4 text-xs font-bold text-white hover:bg-[#17233a]"
             >
               <Download className="h-4 w-4" />
@@ -176,12 +243,24 @@ export default function FinancePage() {
             </Link>
       </nav>
 
+      {errorMessage && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading && !report && (
+        <div className="rounded-lg border border-[#dce2ec] bg-white px-4 py-3 text-xs font-semibold text-[#5f6b7c]">
+          Đang tải báo cáo doanh thu...
+        </div>
+      )}
+
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <SummaryCard label="Tổng doanh thu" value={totalRevenue} note="+12.5%" color="#3f5db5" trend />
-        <SummaryCard label="Tiền phòng" value={selectedReport.room} note={`${Math.round((selectedReport.room / totalRevenue) * 100)}% tổng thu`} color="#82b4ff" />
-        <SummaryCard label="Tiền điện nước" value={selectedReport.utilities} note={`${Math.round((selectedReport.utilities / totalRevenue) * 100)}% tổng thu`} color="#f8b91f" />
-        <SummaryCard label="Phí dịch vụ" value={selectedReport.service} note={`${Math.round((selectedReport.service / totalRevenue) * 100)}% tổng thu`} color="#a865ef" />
-        <SummaryCard label="Phát sinh" value={selectedReport.extra} note={`${Math.round((selectedReport.extra / totalRevenue) * 100)}% tổng thu`} color="#ef627f" />
+        <SummaryCard label="Tổng doanh thu" value={totalRevenue} note={`${growth >= 0 ? "+" : ""}${growth}%`} color="#3f5db5" trend={growth >= 0} />
+        <SummaryCard label="Tiền phòng" value={sourceByKey.room?.value ?? 0} note={`${sourceByKey.room?.percent ?? 0}% tổng thu`} color="#82b4ff" />
+        <SummaryCard label="Tiền điện nước" value={sourceByKey.utilities?.value ?? 0} note={`${sourceByKey.utilities?.percent ?? 0}% tổng thu`} color="#f8b91f" />
+        <SummaryCard label="Phí dịch vụ" value={sourceByKey.service?.value ?? 0} note={`${sourceByKey.service?.percent ?? 0}% tổng thu`} color="#a865ef" />
+        <SummaryCard label="Phát sinh" value={sourceByKey.extra?.value ?? 0} note={`${sourceByKey.extra?.percent ?? 0}% tổng thu`} color="#ef627f" />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(250px,0.95fr)]">
@@ -224,7 +303,7 @@ export default function FinancePage() {
                   <i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: sourceColors[source.key] }} />
                   {source.label}
                 </span>
-                <strong>{Math.round((source.value / totalRevenue) * 100)}%</strong>
+                <strong>{source.percent}%</strong>
               </div>
             ))}
           </div>
@@ -255,12 +334,12 @@ export default function FinancePage() {
                 const total = item.room + item.utilities + item.service + item.extra;
                 return (
                   <tr key={item.period} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
-                    <td className="px-5 py-4 font-bold">{item.period}</td>
+                    <td className="px-5 py-4 font-bold">{displayPeriod(item, periodType)}</td>
                     <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.room)}</td>
                     <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.utilities)}</td>
                     <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.service)}</td>
                     <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.extra)}</td>
-                    <td className="px-5 py-4 text-right font-black">{formatCurrency(total)}</td>
+                    <td className="px-5 py-4 text-right font-black">{formatCurrency(item.total || total)}</td>
                   </tr>
                 );
               })}

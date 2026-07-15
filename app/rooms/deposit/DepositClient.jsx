@@ -44,6 +44,7 @@ import CameraCapture from "../../../components/CameraCapture";
 import DateInput from "../../../components/DateInput";
 import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
+import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
 
 function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
@@ -927,6 +928,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     citizenIdBack: null,
     portraitImage: null,
   });
+  const [identityEntryMode, setIdentityEntryMode] = useState("scan");
   const [isPortraitCameraOpen, setIsPortraitCameraOpen] = useState(false);
   const [contractPreview, setContractPreview] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -938,6 +940,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     1: { fullName: "", phone: "" },
     2: { fullName: "", phone: "" },
   });
+  const isCccdScanMode = identityEntryMode === "scan";
 
   useEffect(() => {
     let isMounted = true;
@@ -1405,13 +1408,26 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           noValidate
           className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2"
         >
-          <CccdUploadFlow
-            value={{ files: selectedFiles, previews: imagePreviews }}
-            onFilesChange={handleCccdFilesChange}
-            onExtract={handleCccdExtracted}
+          <IdentityEntryModeSelector
+            value={identityEntryMode}
+            onChange={setIdentityEntryMode}
             disabled={isSubmitting}
-            maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
           />
+
+          {isCccdScanMode && (
+            <CccdUploadFlow
+              value={{ files: selectedFiles, previews: imagePreviews }}
+              onFilesChange={handleCccdFilesChange}
+              onExtract={handleCccdExtracted}
+              disabled={isSubmitting}
+              scanEnabled
+              errors={{
+                citizenIdFront: fieldErrors.citizenIdFront,
+                citizenIdBack: fieldErrors.citizenIdBack,
+              }}
+              maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+            />
+          )}
 
           <FormSection title="Thông tin định danh" icon={ShieldCheck}>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -1565,28 +1581,45 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           </FormSection>
 
           <FormSection title="Hồ sơ bổ sung" icon={FileText}>
-            <PortraitUploadZone
-              id="portrait-image"
-              name="portraitImage"
-              file={selectedFiles.portraitImage}
-              preview={imagePreviews.portraitImage}
-              onChange={handleFileChange("portraitImage")}
-              onCapture={() => setIsPortraitCameraOpen(true)}
-              onRemove={() => handleFileRemove("portraitImage")}
-              disabled={isSubmitting}
-              error={fieldErrors.portraitImage}
-            />
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>
-              <textarea
-                name="note"
-                rows={4}
-                placeholder="Yêu cầu về nội thất hoặc thời gian nhận phòng..."
-                defaultValue={savedDraft.note}
-                className="rounded-lg border border-[#c5c6cd] bg-white px-4 py-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+            <div className="grid gap-5">
+              <PortraitUploadZone
+                id="portrait-image"
+                name="portraitImage"
+                file={selectedFiles.portraitImage}
+                preview={imagePreviews.portraitImage}
+                onChange={handleFileChange("portraitImage")}
+                onCapture={() => setIsPortraitCameraOpen(true)}
+                onRemove={() => handleFileRemove("portraitImage")}
+                disabled={isSubmitting}
+                error={fieldErrors.portraitImage}
               />
-            </label>
+
+              {!isCccdScanMode && (
+                <CccdUploadFlow
+                  value={{ files: selectedFiles, previews: imagePreviews }}
+                  onFilesChange={handleCccdFilesChange}
+                  disabled={isSubmitting}
+                  scanEnabled={false}
+                  errors={{
+                    citizenIdFront: fieldErrors.citizenIdFront,
+                    citizenIdBack: fieldErrors.citizenIdBack,
+                  }}
+                  maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+                  className="w-full"
+                />
+              )}
+
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>
+                <textarea
+                  name="note"
+                  rows={4}
+                  placeholder="Yêu cầu về nội thất hoặc thời gian nhận phòng..."
+                  defaultValue={savedDraft.note}
+                  className="rounded-lg border border-[#c5c6cd] bg-white px-4 py-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
+                />
+              </label>
+            </div>
           </FormSection>
 
           <div className="grid gap-3 rounded-xl border border-[#d8dde6] bg-white p-4 sm:col-span-2">
@@ -2050,6 +2083,7 @@ export function DepositClient({ room: initialRoom = null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryRoomIdentifier = searchParams.get("roomCode") || searchParams.get("roomId") || "";
+  const queryPropertyId = searchParams.get("propertyId") || searchParams.get("buildingId") || "";
   const [room, setRoom] = useState(initialRoom);
   const [roomLookup, setRoomLookup] = useState(() => ({
     identifier: initialRoom ? queryRoomIdentifier : "",
@@ -2073,7 +2107,7 @@ export function DepositClient({ room: initialRoom = null }) {
 
     let isActive = true;
 
-    fetchPublicRoomById(queryRoomIdentifier)
+    fetchPublicRoomById(queryRoomIdentifier, { propertyId: queryPropertyId })
       .then((apiRoom) => {
         if (!isActive) return;
         setRoom(apiRoom ? normalizeApiRoom(apiRoom) : null);
@@ -2091,7 +2125,7 @@ export function DepositClient({ room: initialRoom = null }) {
     return () => {
       isActive = false;
     };
-  }, [initialRoom, queryRoomIdentifier]);
+  }, [initialRoom, queryPropertyId, queryRoomIdentifier]);
 
   const applyRoomHoldStatus = useCallback((status) => {
     const nextBlockingStatus = toBlockingStatus(status);

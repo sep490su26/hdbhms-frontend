@@ -31,6 +31,7 @@ function normalizePayment(raw = {}) {
     confirmedAt: read(raw, "confirmedAt", "confirmed_at") || "",
     allocatedBy: read(raw, "allocatedBy", "allocated_by"),
     allocatedAt: read(raw, "allocatedAt", "allocated_at") || "",
+    createdAt: read(raw, "createdAt", "created_at") || "",
   };
 }
 
@@ -48,6 +49,7 @@ export function normalizeInvoice(raw = {}) {
     contractId: read(raw, "contractId", "contract_id"),
     contractCode: read(raw, "contractCode", "contract_code") || "",
     tenantName: read(raw, "tenantName", "tenant_name") || "",
+    createdAt: read(raw, "createdAt", "created_at") || "",
     issueDate: read(raw, "issueDate", "issue_date") || "",
     dueDate: read(raw, "dueDate", "due_date") || "",
     subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
@@ -69,6 +71,7 @@ export async function fetchBillingInvoices(filters = {}) {
   if (filters.invoiceType && filters.invoiceType !== "ALL") params.set("invoiceType", filters.invoiceType);
   if (filters.propertyId) params.set("propertyId", filters.propertyId);
   if (filters.roomId) params.set("roomId", filters.roomId);
+  params.set("sort", "createdAt,desc");
   const query = params.toString();
   const data = await authenticatedFetch(`${API_BASE_URL}/admin/invoices${query ? `?${query}` : ""}`);
   return Array.isArray(data) ? data.map(normalizeInvoice) : [];

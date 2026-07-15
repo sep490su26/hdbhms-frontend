@@ -125,6 +125,7 @@ export function DateInput({
   min,
   max,
   className,
+  wrapperClassName,
   disabled,
   required,
   ...props
@@ -204,7 +205,7 @@ export function DateInput({
   };
 
   return (
-    <div className="relative w-full">
+    <div className={cn("relative w-full", wrapperClassName)}>
       {name && <input type="hidden" name={name} value={fieldValue} />}
       <input
         {...props}
@@ -220,7 +221,7 @@ export function DateInput({
           updateValue(event, nextDisplayValue, onChange, false);
         }}
         onBlur={(event) => commit(event, { notifyOnInvalid: true })}
-        className={cn(className, "pr-11")}
+        className={cn("w-full", className, "pr-11")}
       />
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>

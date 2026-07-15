@@ -48,6 +48,7 @@ import {
 } from "@/services/viewingCustomersService";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const emptyForm = {
   fullName: "",
@@ -440,7 +441,7 @@ export default function ViewingCustomersClient() {
         fetchViewingCustomers({ filters, page: nextPage, size: pageSize }),
         fetchViewingCustomerStats(filters),
       ]);
-      setCustomers(listData.items);
+      setCustomers(sortByNewest(listData.items, ["createdAt", "created_at"]));
       setPagination(listData);
       setStats(statsData);
       setErrorMessage("");
@@ -452,7 +453,7 @@ export default function ViewingCustomersClient() {
   const loadTrash = useCallback(async (nextPage = 1) => {
     try {
       const data = await fetchViewingCustomerTrash({ filters, page: nextPage, size: pageSize });
-      setTrashRows(data.items);
+      setTrashRows(sortByNewest(data.items, ["deletedAt", "deleted_at", "createdAt", "created_at"]));
       setTrashPagination(data);
       setErrorMessage("");
     } catch (error) {

@@ -226,12 +226,9 @@ export default function MeterReadings() {
     });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
-    useEffect(() => {
-        setBackendFacilityName("");
-    }, [propertyId]);
-
     const loadData = useCallback(async () => {
         setLoading(true);
+        setBackendFacilityName("");
         try {
             const res = await fetchBatchMeterReadingsStatus(period, propertyId);
             if (res) {

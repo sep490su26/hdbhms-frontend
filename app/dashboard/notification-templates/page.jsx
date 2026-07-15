@@ -38,7 +38,6 @@ import {
 const CHANNEL_OPTIONS = [
   { value: "WEB", label: "Web" },
   { value: "PUSH", label: "Mobile push" },
-  { value: "IN_APP", label: "In-app" },
   { value: "EMAIL", label: "Email" },
   { value: "SMS", label: "SMS" },
 ];
@@ -49,6 +48,28 @@ const ROLE_OPTIONS = [
   { value: "ACCOUNTANT", label: "Kế toán" },
   { value: "OWNER", label: "Chủ trọ" },
 ];
+
+const STAFF_ROLE_VALUES = new Set(["MANAGER", "ACCOUNTANT", "OWNER"]);
+
+function allowedBroadcastChannelsForRoles(roles = []) {
+  const selectedRoles = roles.map((role) => String(role || "").toUpperCase());
+  return CHANNEL_OPTIONS.filter((channel) => {
+    if (selectedRoles.includes("TENANT") && channel.value === "WEB") return false;
+    if (selectedRoles.some((role) => STAFF_ROLE_VALUES.has(role)) && channel.value === "PUSH") return false;
+    return true;
+  });
+}
+
+function channelDisabledReason(channelValue, roles = []) {
+  const selectedRoles = roles.map((role) => String(role || "").toUpperCase());
+  if (channelValue === "WEB" && selectedRoles.includes("TENANT")) {
+    return "Khách thuê không nhận kênh Web.";
+  }
+  if (channelValue === "PUSH" && selectedRoles.some((role) => STAFF_ROLE_VALUES.has(role))) {
+    return "Nhóm staff không nhận Mobile push.";
+  }
+  return "";
+}
 
 const SCOPE_OPTIONS = [
   { value: "SYSTEM", label: "Toàn hệ thống" },
@@ -97,6 +118,11 @@ const EVENT_TEXTS = {
     description:
       "Gửi cho quản lý khi chủ trọ từ chối quyền xem hồ sơ khách thuê.",
   },
+  VISIT_REQUEST_CREATED: {
+    displayName: "Khách đặt lịch xem phòng",
+    description:
+      "Gửi cho chủ trọ và quản lý khi có khách đặt lịch xem phòng.",
+  },
   DEBT_DIRECT_VISIT_REQUIRED: {
     displayName: "Cần gặp trực tiếp khách thuê nợ quá hạn",
     description:
@@ -116,6 +142,7 @@ const TARGET_TYPE_LABELS = {
   ROOM_TRANSFER: "Chuyển phòng",
   TENANT_ACCOUNT_PROVISIONING: "Tài khoản khách thuê",
   TENANT_PROFILE: "Hồ sơ khách thuê",
+  VISIT_REQUEST: "Khách xem phòng",
 };
 
 const VARIABLE_LABELS = {
@@ -132,7 +159,10 @@ const VARIABLE_LABELS = {
   nominatorUserId: "ID người đề cử",
   oldRoomId: "ID phòng cũ",
   oldRoomName: "Phòng cũ",
+  notes: "Ghi chú",
+  preferredStart: "Thời gian hẹn xem",
   profileId: "ID hồ sơ",
+  propertyId: "ID cơ sở",
   propertyName: "Tên cơ sở",
   reason: "Lý do",
   recipientEmail: "Email người nhận",
@@ -144,13 +174,19 @@ const VARIABLE_LABELS = {
   requesterUserId: "ID người yêu cầu",
   resolutionNote: "Ghi chú xử lý",
   roomName: "Tên phòng",
+  roomId: "ID phòng",
   supportContact: "Liên hệ hỗ trợ",
+  targetRoute: "Đường dẫn xử lý",
   targetContractId: "ID hợp đồng phòng mới",
   targetRoomId: "ID phòng mới",
   targetRoomName: "Phòng mới",
   tenantName: "Tên khách thuê",
   tenantProfileIds: "Danh sách hồ sơ khách thuê",
   totalDebt: "Tổng nợ",
+  visitRequestId: "ID lịch xem phòng",
+  visitorEmail: "Email khách xem",
+  visitorName: "Tên khách xem",
+  visitorPhone: "SĐT khách xem",
 };
 
 const EMPTY_BROADCAST_FORM = {
@@ -159,7 +195,7 @@ const EMPTY_BROADCAST_FORM = {
   floorId: "",
   roomIds: [],
   roles: ["TENANT"],
-  channels: ["WEB"],
+  channels: ["EMAIL"],
   title: "",
   body: "",
 };
@@ -762,10 +798,14 @@ export default function NotificationTemplatesPage() {
         setProperties(propertyData);
 
         const firstEventType = definitionData[0]?.eventType ?? "";
+        const firstAllowedChannels = (definitionData[0]?.allowedChannels ?? []).filter(
+          (channel) => channel !== "IN_APP",
+        );
         const firstChannel =
-          definitionData[0]?.allowedChannels?.[0] ??
-          templateData.find((item) => item.eventType === firstEventType)
-            ?.channel ??
+          firstAllowedChannels[0] ??
+          templateData.find(
+            (item) => item.eventType === firstEventType && item.channel !== "IN_APP",
+          )?.channel ??
           "";
         const firstTemplate =
           templateData.find(
@@ -899,14 +939,18 @@ export default function NotificationTemplatesPage() {
     [templates, selectedChannel, selectedEventType],
   );
 
-  const channels = selectedDefinition?.allowedChannels ?? [];
+  const channels = (selectedDefinition?.allowedChannels ?? []).filter(
+    (channel) => channel !== "IN_APP",
+  );
   const variables = selectedDefinition?.variables ?? [];
   const sampleEntries = Object.entries(selectedDefinition?.sampleData ?? {});
 
   useEffect(() => {
     if (!selectedDefinition) return;
 
-    const allowedChannels = selectedDefinition.allowedChannels ?? [];
+    const allowedChannels = (selectedDefinition.allowedChannels ?? []).filter(
+      (channel) => channel !== "IN_APP",
+    );
     const validChannels = selectedChannels.filter((channel) =>
       allowedChannels.includes(channel),
     );
@@ -963,29 +1007,52 @@ export default function NotificationTemplatesPage() {
     return broadcastScopeIds.length > 0;
   }, [broadcastForm.scopeType, broadcastScopeIds.length]);
 
+  const effectiveBroadcastRoles = useMemo(() => {
+    if (broadcastForm.scopeType === "ROLE") return broadcastForm.roles;
+    if (["FLOOR", "ROOM"].includes(broadcastForm.scopeType)) return ["TENANT"];
+    return [];
+  }, [broadcastForm.roles, broadcastForm.scopeType]);
+
+  const allowedBroadcastChannels = useMemo(
+    () => allowedBroadcastChannelsForRoles(effectiveBroadcastRoles),
+    [effectiveBroadcastRoles],
+  );
+
+  const allowedBroadcastChannelValues = useMemo(
+    () => new Set(allowedBroadcastChannels.map((channel) => channel.value)),
+    [allowedBroadcastChannels],
+  );
+
+  const sanitizedBroadcastChannels = useMemo(
+    () => broadcastForm.channels.filter((channel) => allowedBroadcastChannelValues.has(channel)),
+    [allowedBroadcastChannelValues, broadcastForm.channels],
+  );
+
   const broadcastPayload = useMemo(
     () => ({
       scopeType: broadcastForm.scopeType,
       scopeIds: broadcastScopeIds,
-      roles: broadcastForm.roles,
-      channels: broadcastForm.channels,
+      roles: effectiveBroadcastRoles,
+      channels: sanitizedBroadcastChannels,
       title: broadcastForm.title,
       body: broadcastForm.body,
     }),
-    [broadcastForm, broadcastScopeIds],
+    [broadcastForm, broadcastScopeIds, effectiveBroadcastRoles, sanitizedBroadcastChannels],
   );
 
   const canSendBroadcast =
     broadcastScopeReady &&
-    broadcastForm.roles.length > 0 &&
-    broadcastForm.channels.length > 0 &&
+    (broadcastForm.scopeType !== "ROLE" || effectiveBroadcastRoles.length > 0) &&
+    sanitizedBroadcastChannels.length > 0 &&
     broadcastForm.title.trim().length > 0 &&
     broadcastForm.body.trim().length > 0;
 
   function selectDefinition(definition) {
     setSelectedEventType(definition.eventType);
     setSelectedChannels(
-      definition.allowedChannels?.[0] ? [definition.allowedChannels[0]] : [],
+      definition.allowedChannels?.find((channel) => channel !== "IN_APP")
+        ? [definition.allowedChannels.find((channel) => channel !== "IN_APP")]
+        : [],
     );
     setPreview(null);
     setNotice("");
@@ -1241,7 +1308,12 @@ export default function NotificationTemplatesPage() {
       const values = new Set(current[key]);
       if (values.has(value)) values.delete(value);
       else values.add(value);
-      return { ...current, [key]: Array.from(values) };
+      const patch = { [key]: Array.from(values) };
+      if (key === "roles") {
+        const allowedValues = new Set(allowedBroadcastChannelsForRoles(patch.roles).map((channel) => channel.value));
+        patch.channels = current.channels.filter((channel) => allowedValues.has(channel));
+      }
+      return { ...current, ...patch };
     });
     setRecipientPreview(null);
     setNotice("");
@@ -1284,7 +1356,7 @@ export default function NotificationTemplatesPage() {
 
     const estimatedOutboxCount =
       recipientPreview?.outboxCount ??
-      `${broadcastForm.channels.length} kênh x số người nhận`;
+      `${sanitizedBroadcastChannels.length} kênh x số người nhận`;
     const confirmed = window.confirm(
       `Gửi thông báo hàng loạt này? Hệ thống sẽ tạo ${estimatedOutboxCount} thông báo.`,
     );
@@ -1372,8 +1444,10 @@ export default function NotificationTemplatesPage() {
       ) : null}
 
       {activeTab === "templates" ? (
-        <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-          <aside className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid min-w-0 items-start gap-5 xl:flex">
+          <aside
+            className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:w-[320px] xl:min-w-[260px] xl:max-w-[560px] xl:resize-x xl:overflow-auto"
+          >
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -1418,7 +1492,9 @@ export default function NotificationTemplatesPage() {
                       {definition.description}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {(definition.allowedChannels ?? []).map((channel) => (
+                      {(definition.allowedChannels ?? [])
+                        .filter((channel) => channel !== "IN_APP")
+                        .map((channel) => (
                         <span
                           key={channel}
                           className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600"
@@ -1433,7 +1509,7 @@ export default function NotificationTemplatesPage() {
             </div>
           </aside>
 
-          <main className="grid min-w-0 gap-5">
+          <main className="grid min-w-0 flex-1 gap-5">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
@@ -1856,45 +1932,58 @@ export default function NotificationTemplatesPage() {
                 </div>
               ) : null}
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div>
-                  <SelectionLabel
-                    note={`Chọn nhiều - ${broadcastForm.roles.length}/${ROLE_OPTIONS.length}`}
-                  >
-                    Vai trò nhận
-                  </SelectionLabel>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {ROLE_OPTIONS.map((role) => (
-                      <TogglePill
-                        key={role.value}
-                        active={broadcastForm.roles.includes(role.value)}
-                        multi
-                        onClick={() => toggleBroadcastValue("roles", role.value)}
-                      >
-                        {role.label}
-                      </TogglePill>
-                    ))}
+              <div className={`grid gap-4 ${broadcastForm.scopeType === "ROLE" ? "lg:grid-cols-2" : ""}`}>
+                {broadcastForm.scopeType === "ROLE" ? (
+                  <div>
+                    <SelectionLabel
+                      note={`Chọn nhiều - ${broadcastForm.roles.length}/${ROLE_OPTIONS.length}`}
+                    >
+                      Vai trò nhận
+                    </SelectionLabel>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {ROLE_OPTIONS.map((role) => (
+                        <TogglePill
+                          key={role.value}
+                          active={broadcastForm.roles.includes(role.value)}
+                          multi
+                          onClick={() => toggleBroadcastValue("roles", role.value)}
+                        >
+                          {role.label}
+                        </TogglePill>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div>
                   <SelectionLabel
-                    note={`Chọn nhiều - ${broadcastForm.channels.length}/${CHANNEL_OPTIONS.length}`}
+                    note={`Chọn nhiều - ${sanitizedBroadcastChannels.length}/${allowedBroadcastChannels.length}`}
                   >
                     Kênh gửi
                   </SelectionLabel>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {CHANNEL_OPTIONS.map((channel) => (
-                      <TogglePill
-                        key={channel.value}
-                        active={broadcastForm.channels.includes(channel.value)}
-                        multi
-                        onClick={() => toggleBroadcastValue("channels", channel.value)}
-                      >
-                        {channel.label}
-                      </TogglePill>
-                    ))}
+                    {CHANNEL_OPTIONS.map((channel) => {
+                      const disabledReason = channelDisabledReason(channel.value, effectiveBroadcastRoles);
+                      const disabled = Boolean(disabledReason);
+                      return (
+                        <TogglePill
+                          key={channel.value}
+                          active={sanitizedBroadcastChannels.includes(channel.value)}
+                          multi
+                          disabled={disabled}
+                          title={disabledReason || undefined}
+                          onClick={() => {
+                            if (!disabled) toggleBroadcastValue("channels", channel.value);
+                          }}
+                        >
+                          {channel.label}
+                        </TogglePill>
+                      );
+                    })}
                   </div>
+                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                    In-app đã bỏ. Khách thuê không có kênh Web; nhóm staff không có Mobile push.
+                  </p>
                 </div>
               </div>
 
@@ -1969,22 +2058,25 @@ export default function NotificationTemplatesPage() {
                   {optionLabel(SCOPE_OPTIONS, broadcastForm.scopeType)}
                 </p>
               </div>
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-xs font-black uppercase text-slate-500">
-                  Vai trò
-                </p>
-                <p className="mt-1 font-bold">
-                  {broadcastForm.roles
-                    .map((role) => optionLabel(ROLE_OPTIONS, role))
-                    .join(", ") || "Chưa chọn"}
-                </p>
-              </div>
+              {effectiveBroadcastRoles.length ? (
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-xs font-black uppercase text-slate-500">
+                    Vai trò
+                  </p>
+                  <p className="mt-1 font-bold">
+                    {effectiveBroadcastRoles
+                      .map((role) => optionLabel(ROLE_OPTIONS, role))
+                      .join(", ")}
+                    {["FLOOR", "ROOM"].includes(broadcastForm.scopeType) ? " (mặc định)" : ""}
+                  </p>
+                </div>
+              ) : null}
               <div className="rounded-lg bg-slate-50 p-3">
                 <p className="text-xs font-black uppercase text-slate-500">
                   Kênh
                 </p>
                 <p className="mt-1 font-bold">
-                  {broadcastForm.channels
+                  {sanitizedBroadcastChannels
                     .map((channel) => optionLabel(CHANNEL_OPTIONS, channel))
                     .join(", ") || "Chưa chọn"}
                 </p>

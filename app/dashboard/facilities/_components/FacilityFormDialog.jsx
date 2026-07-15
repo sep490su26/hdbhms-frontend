@@ -27,6 +27,9 @@ export function FacilityFormDialog({
   onSubmit,
 }) {
   const isEditing = formState.mode === "edit";
+  const statusLocked =
+    isEditing &&
+    (!formState.values.hasFloorPlan || (formState.values.roomCount ?? 0) <= 0);
   const openAddressPicker = () => {
     const query = formState.values.address?.trim() || "Vietnam";
     window.open(
@@ -143,7 +146,7 @@ export function FacilityFormDialog({
               />
             </div>
 
-            {isEditing && (
+            {isEditing && !statusLocked && (
               <label className="grid gap-2">
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                   Trạng thái <span className="text-rose-600 dark:text-rose-300">*</span>

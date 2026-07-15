@@ -16,7 +16,9 @@ import {
   Grid3X3,
   Home,
   ListFilter,
+  LoaderCircle,
   Map,
+  Save,
   UserRound,
   Wrench,
   X,
@@ -27,10 +29,12 @@ import {
   normalizeRoomImages,
   statusCopy,
 } from "@/services/roomsService";
+import { fetchFloors, updateRoom } from "@/services/floorRoomService";
 import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
 import { authenticatedFetch } from "@/services/identityAccessService";
 import { fetchManagementRoomRentalHistory } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import {
@@ -428,6 +432,7 @@ function normalizeApiFloorPlanRoom(apiRoom) {
     apiRoom.roomCode ?? apiRoom.room_code ?? apiRoom.code ?? apiRoom.name ?? "";
   const floorName =
     apiRoom.floorName ?? apiRoom.floor_name ?? apiRoom.floor?.name ?? "";
+  const property = apiRoom.property ?? apiRoom.floor?.property ?? null;
   const floorNumber =
     Number.parseInt(String(floorName).replace(/\D/g, ""), 10) ||
     Number.parseInt(String(rawCode).replace(/\D/g, "").slice(0, 1), 10) ||
@@ -457,6 +462,9 @@ function normalizeApiFloorPlanRoom(apiRoom) {
     id: apiRoom.id ? `api-${apiRoom.id}` : `api-${rawCode}`,
     roomId: apiRoom.id ?? null,
     roomCode: String(rawCode),
+    floorId: apiRoom.floorId ?? apiRoom.floor_id ?? apiRoom.floor?.id ?? null,
+    floorCode: apiRoom.floorCode ?? apiRoom.floor_code ?? apiRoom.floor?.floorCode ?? apiRoom.floor?.floor_code ?? null,
+    propertyId: apiRoom.propertyId ?? apiRoom.property_id ?? property?.id ?? null,
     displayCode: formatRoomCode(rawCode),
     name: apiRoom.name ?? `Phòng ${rawCode}`,
     floorNumber,
@@ -467,14 +475,17 @@ function normalizeApiFloorPlanRoom(apiRoom) {
     ),
     currentOccupants,
     maxOccupants,
+    maxPeople: maxOccupants,
+    sortOrder: apiRoom.sortOrder ?? apiRoom.sort_order ?? 0,
     status,
     badges,
     note: apiRoom.publicNote ?? apiRoom.public_note ?? "",
+    publicNote: apiRoom.publicNote ?? apiRoom.public_note ?? "",
     image: imageUrls[0] ?? ROOM_PLACEHOLDER_IMAGE,
     images: imageUrls,
     buildingName:
-      apiRoom.propertyName ?? apiRoom.property_name ?? "Hải Đăng House",
-    buildingId: apiRoom.propertyId ?? apiRoom.property_id ?? "hai-dang-house",
+      apiRoom.propertyName ?? apiRoom.property_name ?? property?.name ?? "Hải Đăng House",
+    buildingId: apiRoom.propertyId ?? apiRoom.property_id ?? property?.id ?? "hai-dang-house",
   };
 }
 
@@ -482,6 +493,55 @@ function getRoomDetailHref(room) {
   const buildingId = encodeURIComponent(room.buildingId || "hai-dang-house");
   const roomCode = encodeURIComponent(room.roomCode || room.displayCode);
   return `/rooms/${buildingId}/${roomCode}`;
+}
+
+function getRoomIdentity(room) {
+  return String(room?.roomId ?? room?.id ?? room?.roomCode ?? "").trim();
+}
+
+function isSameRoom(left, right) {
+  const leftIdentity = getRoomIdentity(left);
+  const rightIdentity = getRoomIdentity(right);
+  return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
+}
+
+function getRoomDisplayCode(room) {
+  return room?.displayCode || formatRoomCode(room?.roomCode ?? room?.id);
+}
+
+function getRoomPropertyId(room, fallback = "") {
+  return room?.propertyId ?? room?.buildingId ?? room?.floor?.property?.id ?? fallback;
+}
+
+function getRoomFloorId(room) {
+  return room?.floorId ?? room?.floor?.id ?? "";
+}
+
+function roomToEditForm(room) {
+  return {
+    roomCode: String(room?.roomCode ?? room?.id ?? "").trim(),
+    name: String(room?.name ?? room?.roomCode ?? room?.id ?? "").trim(),
+    floorId: String(getRoomFloorId(room) ?? ""),
+    areaM2: String(room?.areaM2 ?? room?.area ?? ""),
+    listedPrice: String(room?.listedPrice ?? room?.price ?? ""),
+    maxOccupants: String(room?.maxOccupants ?? room?.maxPeople ?? ""),
+    sortOrder: String(room?.sortOrder ?? ""),
+    publicNote: String(room?.publicNote ?? room?.note ?? room?.description ?? ""),
+  };
+}
+
+function toNullableNumber(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sortRoomList(rooms) {
+  return sortByNewest(
+    rooms,
+    ["createdAt", "created_at", "updatedAt", "updated_at"],
+    ["roomId", "id"],
+  );
 }
 
 function FloorTabs({ activeFloor, floors, onChange }) {
@@ -845,7 +905,243 @@ function RentalHistoryPanel({ history, isLoading, error }) {
   );
 }
 
-function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
+function RoomEditModal({ room, propertyId: fallbackPropertyId = "", isSaving, error, onClose, onSubmit }) {
+  const [floors, setFloors] = useState([]);
+  const [isFloorsLoading, setIsFloorsLoading] = useState(false);
+  const [floorError, setFloorError] = useState("");
+  const [localError, setLocalError] = useState("");
+  const [form, setForm] = useState(() => roomToEditForm(room));
+  const propertyId = getRoomPropertyId(room, fallbackPropertyId);
+  const roomLabel = getRoomDisplayCode(room);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFloors() {
+      if (!propertyId) {
+        setFloors([]);
+        return;
+      }
+
+      try {
+        setIsFloorsLoading(true);
+        setFloorError("");
+        const data = await fetchFloors(propertyId);
+        if (!isMounted) return;
+        setFloors(data);
+        setForm((current) => {
+          if (current.floorId || !data.length) return current;
+          return { ...current, floorId: String(data[0].id) };
+        });
+      } catch (loadError) {
+        if (isMounted) {
+          setFloors([]);
+          setFloorError(loadError.message || "Không thể tải danh sách tầng.");
+        }
+      } finally {
+        if (isMounted) setIsFloorsLoading(false);
+      }
+    }
+
+    loadFloors();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propertyId]);
+
+  if (!room) return null;
+
+  const fallbackFloorId = getRoomFloorId(room);
+  const floorOptions = floors.length
+    ? floors
+    : fallbackFloorId
+      ? [{ id: fallbackFloorId, name: room.floorName || room.floor || "Tầng hiện tại" }]
+      : [];
+  const inputClass =
+    "h-11 w-full rounded-lg border border-[#cfd8e3] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20";
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setLocalError("");
+
+    const roomCode = form.roomCode.trim();
+    const name = form.name.trim();
+    const floorId = Number(form.floorId);
+    const listedPrice = toNullableNumber(form.listedPrice);
+    const maxOccupants = toNullableNumber(form.maxOccupants);
+    const sortOrder = toNullableNumber(form.sortOrder);
+
+    if (!roomCode || !name) {
+      setLocalError("Mã phòng và tên phòng là bắt buộc.");
+      return;
+    }
+
+    if (!Number.isFinite(floorId)) {
+      setLocalError("Vui lòng chọn tầng cho phòng.");
+      return;
+    }
+
+    if (listedPrice !== null && listedPrice < 0) {
+      setLocalError("Giá niêm yết không được âm.");
+      return;
+    }
+
+    if (maxOccupants !== null && maxOccupants < 1) {
+      setLocalError("Sức chứa phải lớn hơn 0.");
+      return;
+    }
+
+    await onSubmit({
+      floorId,
+      roomCode,
+      name,
+      areaM2: toNullableNumber(form.areaM2),
+      listedPrice: listedPrice ?? 0,
+      maxOccupants: maxOccupants ?? 1,
+      sortOrder: sortOrder ?? 0,
+      publicNote: form.publicNote.trim(),
+    });
+  }
+
+  return (
+    <Modal
+      title={`Sửa ${roomLabel}`}
+      onClose={isSaving ? () => {} : onClose}
+      footer={
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="h-10 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-4 text-sm font-bold text-slate-900 dark:text-white disabled:opacity-60"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            form="room-edit-form"
+            disabled={isSaving || isFloorsLoading}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white disabled:opacity-60"
+          >
+            {isSaving ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Lưu thay đổi
+          </button>
+        </div>
+      }
+    >
+      <form id="room-edit-form" onSubmit={handleSubmit} className="grid gap-5">
+        {(localError || error || floorError) && (
+          <div className="rounded-lg border border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
+            {localError || error || floorError}
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Mã phòng
+            <input
+              value={form.roomCode}
+              onChange={(event) => updateField("roomCode", event.target.value)}
+              className={inputClass}
+              required
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Tên phòng
+            <input
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              className={inputClass}
+              required
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Tầng
+            <select
+              value={form.floorId}
+              onChange={(event) => updateField("floorId", event.target.value)}
+              className={inputClass}
+              disabled={isFloorsLoading}
+              required
+            >
+              <option value="">{isFloorsLoading ? "Đang tải tầng..." : "Chọn tầng"}</option>
+              {floorOptions.map((floor) => (
+                <option key={floor.id} value={floor.id}>
+                  {floor.name || floor.floorCode || `Tầng ${floor.sortOrder ?? floor.id}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Diện tích (m²)
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.areaM2}
+              onChange={(event) => updateField("areaM2", event.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Giá niêm yết
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={form.listedPrice}
+              onChange={(event) => updateField("listedPrice", event.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Sức chứa
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={form.maxOccupants}
+              onChange={(event) => updateField("maxOccupants", event.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Thứ tự
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.sortOrder}
+              onChange={(event) => updateField("sortOrder", event.target.value)}
+              className={inputClass}
+            />
+          </label>
+        </div>
+
+        <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+          Ghi chú công khai
+          <textarea
+            value={form.publicNote}
+            onChange={(event) => updateField("publicNote", event.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-[#cfd8e3] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 py-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+          />
+        </label>
+      </form>
+    </Modal>
+  );
+}
+
+function RoomDetailDrawer({ room, tenantList, activeRole, onClose, onEdit }) {
   const [roomDetail, setRoomDetail] = useState(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -855,7 +1151,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
   const tenant = room
     ? tenantList.find(
         (item) =>
-          item.roomId === room.displayCode || item.roomId === room.roomCode,
+          item.roomId === getRoomDisplayCode(room) || item.roomId === room.roomCode,
       )
     : null;
   const meta = room ? mapStatusToColor(room.status) : STATUS_META.OCCUPIED;
@@ -936,12 +1232,17 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
 
   if (!room) return null;
 
+  const roomLabel = getRoomDisplayCode(room);
+  const roomBadges = Array.isArray(room.badges) ? room.badges : [];
+  const currentOccupants = Number(room.currentOccupants ?? 0);
+  const roomFloorName =
+    roomDetail?.floor?.name ?? room.floorName ?? room.floor ?? "Chưa có";
   const detail = {
-    name: roomDetail?.name ?? room.name,
-    area: roomDetail?.areaM2 ?? room.area,
-    price: roomDetail?.listedPrice ?? room.listedPrice,
-    maxOccupants: roomDetail?.maxOccupants ?? room.maxOccupants,
-    note: roomDetail?.publicNote ?? room.note,
+    name: roomDetail?.name ?? room.name ?? roomLabel,
+    area: roomDetail?.areaM2 ?? room.areaM2 ?? room.area,
+    price: roomDetail?.listedPrice ?? room.listedPrice ?? room.price,
+    maxOccupants: roomDetail?.maxOccupants ?? room.maxOccupants ?? room.maxPeople,
+    note: roomDetail?.publicNote ?? room.publicNote ?? room.note,
   };
 
   return (
@@ -954,7 +1255,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
         className="fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-[#f2f4f6] dark:bg-white/5 shadow-2xl sm:max-w-[430px]"
         role="dialog"
         aria-modal="true"
-        aria-label={`Chi tiết ${room.displayCode}`}
+        aria-label={`Chi tiết ${roomLabel}`}
       >
         <div className="shrink-0 overflow-hidden bg-[#1e40af] dark:bg-[#2563eb]">
           <div className="relative h-56 overflow-hidden bg-[#1e40af] dark:bg-[#2563eb]">
@@ -1037,7 +1338,7 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                   Mã phòng
                 </p>
                 <p className="truncate text-3xl font-black text-slate-900 dark:text-white">
-                  {room.displayCode}
+                  {roomLabel}
                 </p>
               </div>
               <span
@@ -1064,10 +1365,10 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
                     value: `${formatMoney(detail.price || 0)}/tháng`,
                   },
                   { label: "Diện tích", value: `${detail.area || "--"} m²` },
-                  { label: "Tầng", value: room.floorName },
+                  { label: "Tầng", value: roomFloorName },
                   {
                     label: "Số người",
-                    value: `${room.currentOccupants}/${detail.maxOccupants}`,
+                    value: `${currentOccupants}/${detail.maxOccupants ?? "--"}`,
                   },
                 ].map(({ label, value }) => (
                   <div
@@ -1085,9 +1386,9 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
               </div>
             )}
 
-            {room.badges.length > 0 && (
+            {roomBadges.length > 0 && (
               <div className="mt-5 flex flex-wrap gap-2">
-                {room.badges.map((badge) => (
+                {roomBadges.map((badge) => (
                   <span
                     key={badge}
                     className="rounded-full bg-[#edf2f7] px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-200"
@@ -1138,7 +1439,17 @@ function RoomDetailDrawer({ room, tenantList, activeRole, onClose }) {
             <Eye className="h-4 w-4" />
             Xem chi tiết
           </Link>
-          {room.status === "VACANT" && (
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(room)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f7f9fb] dark:hover:bg-white/5"
+            >
+              <Edit3 className="h-4 w-4" />
+              Sửa phòng
+            </button>
+          )}
+          {normalizeStatus(room.status) === "VACANT" && (
             <button
               type="button"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d7deea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-black text-slate-900 dark:text-white hover:bg-[#f7f9fb] dark:hover:bg-white/5"
@@ -1172,6 +1483,9 @@ function FloorPlanPage({
   const [sourceWarning, setSourceWarning] = useState("");
   const [activeFloor, setActiveFloor] = useState(1);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [isSavingRoom, setIsSavingRoom] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -1233,6 +1547,37 @@ function FloorPlanPage({
 
   function handleRoomClick(room) {
     setSelectedRoom(room);
+  }
+
+  function handleEditRoom(room) {
+    setEditError("");
+    setEditingRoom(room);
+  }
+
+  async function handleSaveRoom(payload) {
+    if (!editingRoom?.roomId) {
+      setEditError("Không xác định được phòng cần sửa.");
+      return;
+    }
+
+    try {
+      setIsSavingRoom(true);
+      setEditError("");
+      const data = await updateRoom(editingRoom.roomId, payload);
+      const normalizedRoom = normalizeApiFloorPlanRoom(data);
+      setRooms((currentRooms) =>
+        currentRooms.map((item) => (isSameRoom(item, normalizedRoom) ? normalizedRoom : item)),
+      );
+      setSelectedRoom((currentRoom) =>
+        isSameRoom(currentRoom, normalizedRoom) ? normalizedRoom : currentRoom,
+      );
+      setActiveFloor(normalizedRoom.floorNumber);
+      setEditingRoom(null);
+    } catch (saveError) {
+      setEditError(saveError.message || "Không thể lưu thay đổi phòng.");
+    } finally {
+      setIsSavingRoom(false);
+    }
   }
 
   return (
@@ -1303,13 +1648,27 @@ function FloorPlanPage({
           tenantList={tenantList}
           activeRole={activeRole}
           onClose={() => setSelectedRoom(null)}
+          onEdit={handleEditRoom}
+        />
+      )}
+      {editingRoom && (
+        <RoomEditModal
+          key={getRoomIdentity(editingRoom)}
+          room={editingRoom}
+          propertyId={propertyId}
+          isSaving={isSavingRoom}
+          error={editError}
+          onClose={() => {
+            if (!isSavingRoom) setEditingRoom(null);
+          }}
+          onSubmit={handleSaveRoom}
         />
       )}
     </section>
   );
 }
 
-function RoomsListPage({ query, propertyId }) {
+function RoomsListPage({ query, propertyId, activeRole = "owner" }) {
   const [exportPrompt, setExportPrompt] = useState(false);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -1317,8 +1676,10 @@ function RoomsListPage({ query, propertyId }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isError, setIsError] = useState(false);
-  const [activeFloor, setActiveFloor] = useState(2);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [isSavingRoom, setIsSavingRoom] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     const fetchStaffRooms = async () => {
@@ -1327,11 +1688,12 @@ function RoomsListPage({ query, propertyId }) {
         const params = new URLSearchParams({
           page: "0",
           size: String(ROOM_LIST_FETCH_SIZE),
+          sort: "createdAt,desc",
         });
         if (propertyId) params.set("propertyId", String(propertyId));
 
         const data = await authenticatedFetch(`/rooms?${params.toString()}`);
-        const rows = readPageRows(data).map((room) => normalizeApiRoom(room));
+        const rows = sortRoomList(readPageRows(data).map((room) => normalizeApiRoom(room)));
         setApiRooms(rows);
         setIsSuccess(true);
       } catch (error) {
@@ -1343,7 +1705,7 @@ function RoomsListPage({ query, propertyId }) {
     fetchStaffRooms();
   }, [propertyId]);
 
-  const filteredRooms = apiRooms.filter((room) => {
+  const filteredRooms = sortRoomList(apiRooms.filter((room) => {
     if (!query?.trim()) return true;
     const q = query.trim().toLowerCase();
     const searchableText = [
@@ -1357,7 +1719,7 @@ function RoomsListPage({ query, propertyId }) {
       .map((value) => String(value ?? "").toLowerCase())
       .join(" ");
     return searchableText.includes(q);
-  });
+  }));
   const filteredTotalElements = filteredRooms.length;
   const filteredTotalPages =
     filteredTotalElements === 0
@@ -1396,6 +1758,44 @@ function RoomsListPage({ query, propertyId }) {
     if (s === "reserved") return "deposited";
     if (s === "maintenance") return "maintenance";
     return "occupied";
+  }
+
+  function handleViewRoom(room) {
+    setSelectedRoom(room);
+  }
+
+  function handleEditRoom(room) {
+    setEditError("");
+    setEditingRoom(room);
+  }
+
+  async function handleSaveRoom(payload) {
+    if (!editingRoom?.roomId) {
+      setEditError("Không xác định được phòng cần sửa.");
+      return;
+    }
+
+    try {
+      setIsSavingRoom(true);
+      setEditError("");
+      const data = await updateRoom(editingRoom.roomId, payload);
+      const normalizedRoom = normalizeApiRoom(data);
+      setApiRooms((currentRooms) =>
+        sortRoomList(
+          currentRooms.map((item) =>
+            isSameRoom(item, normalizedRoom) ? { ...item, ...normalizedRoom } : item,
+          ),
+        ),
+      );
+      setSelectedRoom((currentRoom) =>
+        isSameRoom(currentRoom, normalizedRoom) ? { ...currentRoom, ...normalizedRoom } : currentRoom,
+      );
+      setEditingRoom(null);
+    } catch (saveError) {
+      setEditError(saveError.message || "Không thể lưu thay đổi phòng.");
+    } finally {
+      setIsSavingRoom(false);
+    }
   }
 
   /*<PageHeader
@@ -1508,8 +1908,16 @@ function RoomsListPage({ query, propertyId }) {
                       </td>
                       <td data-label="Thao tác" className="px-6 py-4">
                         <div className="flex justify-end gap-1">
-                          <IconButton label={`Xem ${room.id}`} icon={Eye} />
-                          <IconButton label={`Sửa ${room.id}`} icon={Edit3} />
+                          <IconButton
+                            label={`Xem ${room.roomCode || room.id}`}
+                            icon={Eye}
+                            onClick={() => handleViewRoom(room)}
+                          />
+                          <IconButton
+                            label={`Sửa ${room.roomCode || room.id}`}
+                            icon={Edit3}
+                            onClick={() => handleEditRoom(room)}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1543,6 +1951,31 @@ function RoomsListPage({ query, propertyId }) {
             exportRooms();
             setExportPrompt(false);
           }}
+        />
+      )}
+
+      {selectedRoom && (
+        <RoomDetailDrawer
+          key={getRoomIdentity(selectedRoom)}
+          room={selectedRoom}
+          tenantList={[]}
+          activeRole={activeRole}
+          onClose={() => setSelectedRoom(null)}
+          onEdit={handleEditRoom}
+        />
+      )}
+
+      {editingRoom && (
+        <RoomEditModal
+          key={getRoomIdentity(editingRoom)}
+          room={editingRoom}
+          propertyId={propertyId}
+          isSaving={isSavingRoom}
+          error={editError}
+          onClose={() => {
+            if (!isSavingRoom) setEditingRoom(null);
+          }}
+          onSubmit={handleSaveRoom}
         />
       )}
 
@@ -1595,7 +2028,7 @@ export function RoomsManagementContent({
       {view === "floor-map" ? (
         <FloorPlanPage activeRole={activeRole} propertyId={propertyId} />
       ) : (
-        <RoomsListPage query={query} propertyId={propertyId} />
+        <RoomsListPage query={query} propertyId={propertyId} activeRole={activeRole} />
       )}
     </section>
   );

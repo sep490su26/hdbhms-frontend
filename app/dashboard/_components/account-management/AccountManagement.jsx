@@ -23,6 +23,7 @@ import {
 } from "./data";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 function StatusBadge({ status }) {
   const meta = accountStatusMeta[status] || accountStatusMeta.pending;
@@ -87,7 +88,7 @@ export function AccountManagement() {
   const filteredAccounts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return accounts.filter((account) => {
+    return sortByNewest(accounts.filter((account) => {
       const matchesType = typeFilter === "all" || account.accountType === typeFilter;
       const matchesStatus = statusFilter === "all" || account.status === statusFilter;
       const matchesQuery =
@@ -97,7 +98,7 @@ export function AccountManagement() {
         account.phone.toLowerCase().includes(normalizedQuery);
 
       return matchesType && matchesStatus && matchesQuery;
-    });
+    }), ["createdAt", "created_at"], ["id"]);
   }, [accounts, query, statusFilter, typeFilter]);
 
   const metrics = useMemo(() => {

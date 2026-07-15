@@ -55,6 +55,9 @@ function normalizeFacility(facility = {}) {
     roomCount: numberValue(facility.roomCount ?? facility.room_count),
     occupiedRoomCount: numberValue(facility.occupiedRoomCount ?? facility.occupied_room_count),
     vacantRoomCount: numberValue(facility.vacantRoomCount ?? facility.vacant_room_count),
+    createdAt: facility.createdAt ?? facility.created_at ?? null,
+    updatedAt: facility.updatedAt ?? facility.updated_at ?? null,
+    hasFloorPlan: Boolean(facility.hasFloorPlan ?? facility.has_floor_plan ?? false),
     hasActiveContracts: Boolean(facility.hasActiveContracts ?? facility.has_active_contracts ?? false),
     hasOutstandingDebts: Boolean(facility.hasOutstandingDebts ?? facility.has_outstanding_debts ?? false),
     outstandingDebtAmount: numberValue(facility.outstandingDebtAmount ?? facility.outstanding_debt_amount),
@@ -76,6 +79,7 @@ export async function getFacilitiesDashboard({ keyword = "", status = "", page =
   if (status && status !== "ALL") params.set("status", status);
   params.set("page", String(page));
   params.set("size", String(size));
+  params.set("sort", "createdAt,desc");
 
   const query = params.toString();
   const data = await authenticatedFetch(

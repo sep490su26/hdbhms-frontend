@@ -13,6 +13,7 @@ import {
   normalizeOrientation,
 } from "./FloorPlanItem";
 import { alignRoomItems } from "./floorPlanAlign";
+import { floorPlanCanvasSize } from "./floorPlanCanvas";
 import { createFloor, createRoom, deleteFloor as deleteFloorRequest, deleteRoom as deleteRoomRequest } from "@/services/floorRoomService";
 import { fetchFloorPlanDesignerData } from "@/services/floorPlanDesignerService";
 import { fetchAdminFloorPlan, saveAdminFloorPlan } from "@/services/floorPlanService";
@@ -289,11 +290,16 @@ function normalizeLayoutPosition(rooms, blocks) {
 }
 
 function PreviewPanel({ rooms, blocks, onClose }) {
+  const canvasSize = floorPlanCanvasSize(rooms, blocks);
+
   return (
     <div className="absolute inset-6 z-40 overflow-auto rounded-3xl border bg-[#e9e9e9] p-6 shadow-2xl">
       <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-white dark:bg-[#0f172a] p-2 shadow"><X className="h-4 w-4" /></button>
       <h2 className="mb-4 text-lg font-black text-slate-950">Xem trước sơ đồ</h2>
-      <div className="relative min-h-[720px] min-w-[1100px] rounded-2xl bg-white/50">
+      <div
+        className="relative rounded-2xl bg-white/50"
+        style={{ width: canvasSize.width, height: canvasSize.height }}
+      >
         {blocks.map((block) => (
           <div key={block.id} className="group absolute" style={{ left: block.x, top: block.y, width: block.width, height: block.height }}>
             <FloorPlanItem item={{ ...block, label: BLOCK_TYPES[block.type]?.label }} />
@@ -578,6 +584,10 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
 
   const currentRooms = useMemo(() => layouts[selectedFloorId] || [], [layouts, selectedFloorId]);
   const currentBlocks = useMemo(() => blocksByFloor[selectedFloorId] || [], [blocksByFloor, selectedFloorId]);
+  const canvasSize = useMemo(
+    () => floorPlanCanvasSize(currentRooms, currentBlocks, { gridSize: GRID }),
+    [currentBlocks, currentRooms],
+  );
   const selectedFloor = useMemo(
     () => data?.floors?.find((floor) => String(floor.id) === String(selectedFloorId)) ?? null,
     [data?.floors, selectedFloorId],
@@ -1055,21 +1065,29 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
         </aside>
 
         <main
-          className="relative flex-1 overflow-auto bg-[#f1f5f9] dark:bg-white/5 p-8"
-          style={{ backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: `${GRID}px ${GRID}px` }}
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
-            if (placementActive) finishPlacement();
-            clearSelection();
-          }}
+          className="relative min-w-0 flex-1 overflow-auto bg-[#f1f5f9] dark:bg-white/5"
         >
           <FloorPlanSvgDefs />
+          {previewOpen && <PreviewPanel rooms={currentRooms} blocks={currentBlocks} onClose={() => setPreviewOpen(false)} />}
+          <div
+            className="relative min-h-full min-w-full"
+            style={{
+              width: canvasSize.width,
+              height: canvasSize.height,
+              backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
+              backgroundSize: `${GRID}px ${GRID}px`,
+            }}
+            onClick={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (placementActive) finishPlacement();
+              clearSelection();
+            }}
+          >
           {placementActive && (
             <div className="sticky left-1/2 top-2 z-50 mx-auto mb-3 w-fit -translate-x-1/2 rounded-full bg-slate-950/90 px-4 py-2 text-sm font-bold text-white shadow-xl">
               Bấm vào tường phòng để đặt {placementMode === "door" ? "cửa" : "cửa sổ"}. Nhấn ESC để hủy.
             </div>
           )}
-          {previewOpen && <PreviewPanel rooms={currentRooms} blocks={currentBlocks} onClose={() => setPreviewOpen(false)} />}
           {currentBlocks.map((block) => (
             <Rnd
               key={block.id}
@@ -1132,6 +1150,7 @@ export function FacilityFloorPlanDesigner({ propertyId }) {
             </Rnd>
           ))}
           {!currentRooms.length && !currentBlocks.length && <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-500">Tầng này chưa có phòng.</div>}
+          </div>
         </main>
       </div>
 

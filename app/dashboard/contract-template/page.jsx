@@ -1610,7 +1610,6 @@ export default function ContractTemplatePage() {
           label="Quá hạn"
           value={summary.overdue}
           tone="orange"
-          subtitle="Cần xử lý"
         />
         <DashboardStatCard
           icon={FileWarning}

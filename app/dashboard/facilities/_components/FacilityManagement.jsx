@@ -17,10 +17,43 @@ import {
 import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
+import { FacilityUtilitySettingsDialog } from "./FacilityUtilitySettingsDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { facilityStatusOptions } from "@/services/facilityService";
+import {
+  fetchPropertyUtilitySettings,
+  updatePropertyUtilitySettings,
+} from "@/services/propertyUtilitySettingsService";
+import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
+import { ROLES } from "@/app/dashboard/_lib/rbac";
+
+const DEFAULT_UTILITY_VALUES = {
+  electricityUnitPrice: "3500",
+  electricityFreeAllowance: "0",
+  waterUnitPrice: "20000",
+  waterFreeAllowance: "6",
+};
+
+function utilitySettingsToValues(settings) {
+  return {
+    electricityUnitPrice: String(
+      settings?.electricity?.unitPrice ?? DEFAULT_UTILITY_VALUES.electricityUnitPrice,
+    ),
+    electricityFreeAllowance: String(
+      settings?.electricity?.freeAllowance ??
+        DEFAULT_UTILITY_VALUES.electricityFreeAllowance,
+    ),
+    waterUnitPrice: String(
+      settings?.water?.unitPrice ?? DEFAULT_UTILITY_VALUES.waterUnitPrice,
+    ),
+    waterFreeAllowance: String(
+      settings?.water?.freeAllowance ?? DEFAULT_UTILITY_VALUES.waterFreeAllowance,
+    ),
+  };
+}
 
 const statCards = [
   {
@@ -127,6 +160,15 @@ export function FacilityManagement() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [utilityState, setUtilityState] = useState({
+    isOpen: false,
+    facility: null,
+    values: DEFAULT_UTILITY_VALUES,
+    loading: false,
+    saving: false,
+    error: "",
+  });
+  const { user } = useAuth();
   const facility = useFacilityManagement({
     keyword: query,
     status: statusFilter,
@@ -144,27 +186,88 @@ export function FacilityManagement() {
     setPage(1);
   }
 
+  async function openUtilitySettings(targetFacility) {
+    setUtilityState({
+      isOpen: true,
+      facility: targetFacility,
+      values: DEFAULT_UTILITY_VALUES,
+      loading: true,
+      saving: false,
+      error: "",
+    });
+
+    try {
+      const settings = await fetchPropertyUtilitySettings(targetFacility.id);
+      setUtilityState((current) => ({
+        ...current,
+        values: utilitySettingsToValues(settings),
+        loading: false,
+      }));
+    } catch (error) {
+      setUtilityState((current) => ({
+        ...current,
+        loading: false,
+        error: error?.message || "Không thể tải giá điện nước.",
+      }));
+    }
+  }
+
+  function closeUtilitySettings() {
+    setUtilityState((current) =>
+      current.saving ? current : { ...current, isOpen: false, error: "" },
+    );
+  }
+
+  function updateUtilityValue(name, value) {
+    setUtilityState((current) => ({
+      ...current,
+      values: { ...current.values, [name]: value },
+      error: "",
+    }));
+  }
+
+  async function submitUtilitySettings(event) {
+    event.preventDefault();
+    if (!utilityState.facility?.id) return;
+
+    setUtilityState((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const settings = await updatePropertyUtilitySettings(
+        utilityState.facility.id,
+        utilityState.values,
+      );
+      setUtilityState((current) => ({
+        ...current,
+        values: utilitySettingsToValues(settings),
+        saving: false,
+        isOpen: false,
+      }));
+      facility.pushToast("Đã cập nhật giá điện nước");
+    } catch (error) {
+      setUtilityState((current) => ({
+        ...current,
+        saving: false,
+        error: error?.message || "Không thể lưu giá điện nước.",
+      }));
+    }
+  }
+
   return (
     <>
-      <section className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Quản lý cơ sở
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi cấu trúc cơ sở, tầng và phòng; cập nhật trạng thái vận hành
-            với kiểm soát hợp đồng và công nợ.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={facility.openCreateForm}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] hover:shadow-md"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm cơ sở mới
-        </button>
-      </section>
+      <DashboardPageHeader
+        title="Quản lý cơ sở"
+        description="Theo dõi cấu trúc cơ sở, tầng và phòng; cập nhật trạng thái vận hành với kiểm soát hợp đồng và công nợ."
+        actions={
+          <button
+            type="button"
+            onClick={facility.openCreateForm}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] hover:shadow-md"
+          >
+            <Plus className="h-4 w-4" />
+            Thêm cơ sở mới
+          </button>
+        }
+      />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map(({ key, label, icon: Icon, tone, suffix = "" }) => (
@@ -212,8 +315,10 @@ export function FacilityManagement() {
 
       <FacilityList
         facilities={facility.facilities}
+        showMeterReadingsAction={user?.role === ROLES.OWNER}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
+        onUtilitySettings={openUtilitySettings}
       />
       <DashboardPagination
         page={page}
@@ -239,6 +344,12 @@ export function FacilityManagement() {
         onAcknowledgedChange={facility.setStatusAcknowledged}
         onClose={facility.closeStatusFlow}
         onConfirm={facility.confirmStatusChange}
+      />
+      <FacilityUtilitySettingsDialog
+        state={utilityState}
+        onClose={closeUtilitySettings}
+        onChange={updateUtilityValue}
+        onSubmit={submitUtilitySettings}
       />
       <ToastViewport
         toasts={facility.toasts}

@@ -1,11 +1,6 @@
-import { API_BASE_URL, ApiError, authenticatedFetch, refreshTokenApi } from "@/services/identityAccessService";
+import { API_BASE_URL, ApiError, authenticatedFetch, getAuthToken, refreshTokenApi } from "@/services/identityAccessService";
 
 const BASE = API_BASE_URL;
-
-function getAuthToken() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem("token") || "";
-}
 
 function authHeaders(extraHeaders = {}) {
   const token = getAuthToken();
@@ -127,7 +122,7 @@ export async function fetchLatestReadings(roomId) {
       `${BASE}/rooms/${encodeURIComponent(roomId)}/meter-readings/latest`,
     );
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
+    if (error instanceof ApiError || error?.isApiError) return null;
     throw error;
   }
 }
@@ -155,6 +150,10 @@ export async function fetchContractHandover(contractId, handoverType = "MOVE_IN"
   );
 }
 
+/**
+ * Single-shot submit: saves readings + assets + confirms handover atomically.
+ * POST /api/v1/lease-contracts/{contractId}/handover/submit
+ */
 export async function submitHandover(contractId, payload) {
   if (!contractId) throw new Error("Missing contractId");
 
@@ -274,10 +273,7 @@ export async function downloadHandoverSignedPdf(
   URL.revokeObjectURL(url);
 }
 
-/**
- * Confirm handover
- * PATCH /api/v1/lease-contracts/{contractId}/handover/confirm
- */
+
 export async function confirmHandover(contractId, body) {
   if (!contractId) throw new Error("Missing contractId");
   return authenticatedFetch(`${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/confirm`, {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -29,6 +30,7 @@ import {
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import { getAuthToken } from "@/services/identityAccessService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const STATUS_META = {
   PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
@@ -113,7 +115,7 @@ function formatDateTime(value) {
 
 function formatMoney(value) {
   const amount = Number(value || 0);
-  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} đ`;
+  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} VNĐ`;
 }
 
 function formatMoneyInput(value) {
@@ -294,14 +296,14 @@ function AuthorizedAttachmentLink({ attachment, title }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="group overflow-hidden rounded-lg border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5"
+      className="group relative block h-36 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5"
     >
       {failed ? (
         <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
           Không tải được ảnh.
         </div>
       ) : objectUrl ? (
-        <img src={objectUrl} alt={attachment.name || title} className="h-36 w-full object-cover transition group-hover:scale-[1.02]" />
+        <Image src={objectUrl} alt={attachment.name || title} fill sizes="240px" className="object-cover transition group-hover:scale-[1.02]" unoptimized />
       ) : (
         <div className="grid h-36 place-items-center text-xs font-bold text-slate-500 dark:text-slate-400">
           Đang tải ảnh...
@@ -529,20 +531,22 @@ export default function MaintenanceTicketDetailPage() {
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
-            <ArrowLeft className="h-4 w-4" />
-            Danh sách bảo trì
-          </Link>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white">{ticket.ticketCode}</h1>
-            <StatusBadge status={ticket.status} />
-          </div>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{ticket.title || ticket.description}</p>
-        </div>
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
+      <div>
+        <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
+          <ArrowLeft className="h-4 w-4" />
+          Danh sách bảo trì
+        </Link>
+        <DashboardPageHeader
+          className="mt-4"
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              {ticket.ticketCode}
+              <StatusBadge status={ticket.status} />
+            </span>
+          }
+          description={ticket.title || ticket.description}
+          actions={canManage ? (
+            <div className="flex flex-wrap gap-2">
             {ticket.status === "PENDING" && (
               <>
                 <button
@@ -587,8 +591,9 @@ export default function MaintenanceTicketDetailPage() {
                 Xác nhận hoàn tất
               </button>
             )}
-          </div>
-        )}
+            </div>
+          ) : null}
+        />
       </div>
 
       {error && <Notice type="error">{error}</Notice>}
@@ -714,8 +719,8 @@ export default function MaintenanceTicketDetailPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap gap-3">
               {completeForm.images.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5">
-                  <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-cover" />
+                <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5">
+                  <Image src={URL.createObjectURL(file)} alt={file.name} fill sizes="80px" className="object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => setCompleteForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}

@@ -171,12 +171,13 @@ export async function fetchViewingCustomers({filters, page, size}) {
         to: filters.toDate ? `${filters.toDate}T23:59:59` : undefined,
         page: page - 1,
         size,
+        sort: "createdAt,desc",
     })}`);
 
     return {
         items: (data.data || []).map(mapVisitRequest),
         total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 0,
+        page: Number(page) || 1,
         size: readField(data, "pageSize", "page_size") || size,
         totalPages: readField(data, "totalPages", "total_pages") || 0,
     };
@@ -190,6 +191,7 @@ export async function fetchViewingCustomerStats() {
         const data = await authenticatedFetch(`/visit-requests${toQuery({
             page: 0,
             size: 500,
+            sort: "createdAt,desc",
         })}`);
         const items = (data.data || []).map(mapVisitRequest);
 
@@ -217,11 +219,12 @@ export async function fetchViewingCustomerTrash({page, size}) {
     const data = await authenticatedFetch(`/visit-requests/trash${toQuery({
         page: page - 1,
         size,
+        sort: "deletedAt,desc",
     })}`);
     return {
         items: (data.data || []).map(mapVisitRequest),
         total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 1,
+        page: Number(page) || 1,
         size: readField(data, "pageSize", "page_size") || size,
         totalPages: readField(data, "totalPages", "total_pages") || 0,
     };

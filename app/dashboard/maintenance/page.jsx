@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -10,6 +11,7 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  RefreshCcw,
   Search,
   ShieldAlert,
   SlidersHorizontal,
@@ -30,7 +32,9 @@ import {
   fetchViewingProperties,
   fetchViewingRooms,
 } from "@/services/viewingCustomersService";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const STATUS_OPTIONS = [
   ["all", "Tất cả trạng thái"],
@@ -131,7 +135,7 @@ function formatDateTime(value) {
 
 function formatMoney(value) {
   const amount = Number(value || 0);
-  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} đ`;
+  return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} VNĐ`;
 }
 
 function formatMoneyInput(value) {
@@ -406,7 +410,7 @@ export default function MaintenancePage() {
         page: page - 1,
         size,
       });
-      setTickets(result.tickets);
+      setTickets(sortByNewest(result.tickets, ["createdAt", "created_at", "updatedAt", "updated_at"]));
       setTotalElements(result.total);
       setTotalPages(result.totalPages);
     } catch (loadError) {
@@ -696,17 +700,21 @@ export default function MaintenancePage() {
 
   return (
     <section className="grid gap-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Báo sự cố & Bảo trì
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn
-            tất.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
+      <DashboardPageHeader
+        title="Báo sự cố & Bảo trì"
+        description="Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất."
+        actions={
+          <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={loadTickets}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
+          >
+            <RefreshCcw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Làm mới
+          </button>
           {canManage && (
             <button
               type="button"
@@ -757,8 +765,9 @@ export default function MaintenancePage() {
               {isViolationOpen ? "Đóng vi phạm" : "Ghi nhận vi phạm"}
             </button>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-4">
         {metrics.map((item) => (

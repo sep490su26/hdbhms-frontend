@@ -29,7 +29,7 @@ function normalizeRoom(raw = {}) {
     listedPrice: numberValue(raw.listedPrice),
     maxOccupants: numberValue(raw.maxOccupants),
     sortOrder: numberValue(raw.sortOrder),
-    currentStatus: raw.currentStatus ?? raw.status ?? "VACANT",
+    currentStatus: raw.currentStatus ?? raw.status ?? "DRAFT",
   };
 }
 
@@ -97,4 +97,21 @@ export async function createRoom({ propertyId, floorId, roomCode, name, areaM2, 
       sortOrder,
     }),
   }).then(normalizeRoom);
+}
+
+export async function updateRoom(roomId, { floorId, roomCode, name, areaM2, listedPrice, maxOccupants, sortOrder, publicNote }) {
+  return authenticatedFetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      floorId,
+      roomCode,
+      name,
+      areaM2,
+      listedPrice,
+      maxOccupants,
+      sortOrder,
+      publicNote,
+    }),
+  });
 }

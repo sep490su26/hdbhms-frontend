@@ -1,17 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-export default function CameraCapture({ open, onClose, onCapture }) {
+export default function CameraCapture({ open, onClose, onCapture, facingMode = "environment", title = "Chụp ảnh minh chứng" }) {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-    const [stream, setStream] = useState(null);
+    const [, setStream] = useState(null);
     const [error, setError] = useState(null);
 
-    const startCamera = async () => {
+    const startCamera = useCallback(async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" }
+                video: { facingMode }
             });
             setStream(mediaStream);
             if (videoRef.current) {
@@ -21,14 +21,14 @@ export default function CameraCapture({ open, onClose, onCapture }) {
             console.error("Lỗi khi mở camera:", err);
             setError(err.message || "Không thể truy cập camera");
         }
-    };
+    }, [facingMode]);
 
-    const stopCamera = () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-        }
-    };
+    const stopCamera = useCallback(() => {
+        setStream((currentStream) => {
+            currentStream?.getTracks().forEach(track => track.stop());
+            return null;
+        });
+    }, []);
 
     const handleFallbackUpload = (e) => {
         const file = e.target.files?.[0];
@@ -60,26 +60,26 @@ export default function CameraCapture({ open, onClose, onCapture }) {
     };
 
     useEffect(() => {
-        const timeoutId = window.setTimeout(() => {
-            if (open) {
+        if (open) {
+            const timer = window.setTimeout(() => {
                 setError(null);
-                startCamera();
-            } else {
+                void startCamera();
+            }, 0);
+            return () => {
+                window.clearTimeout(timer);
                 stopCamera();
-            }
-        }, 0);
-        return () => {
-            window.clearTimeout(timeoutId);
-            stopCamera();
-        };
-    }, [open]);
+            };
+        }
+        return () => stopCamera();
+    }, [open, startCamera, stopCamera]);
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
             <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-black border-none [&>button]:hidden">
-                <DialogTitle className="sr-only">Chụp ảnh minh chứng</DialogTitle>
+                <DialogTitle className="sr-only">{title}</DialogTitle>
                 <div className="relative w-full h-[70vh] bg-black flex flex-col">
-                    <button 
+                    <button
+                        type="button"
                         onClick={onClose}
                         className="absolute top-4 right-4 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black/70"
                     >
@@ -98,7 +98,7 @@ export default function CameraCapture({ open, onClose, onCapture }) {
                                     <input 
                                         type="file" 
                                         accept="image/*" 
-                                        capture="environment" 
+                                        capture={facingMode}
                                         className="hidden" 
                                         onChange={handleFallbackUpload} 
                                     />
@@ -119,7 +119,8 @@ export default function CameraCapture({ open, onClose, onCapture }) {
 
                     {!error && (
                         <div className="p-6 bg-black flex justify-center items-center h-24 shrink-0">
-                            <button 
+                            <button
+                                type="button"
                                 onClick={handleCapture}
                                 className="w-16 h-16 rounded-full bg-white border-4 border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors focus:outline-none"
                             >

@@ -1,17 +1,20 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
   Building2,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
   DoorOpen,
+  Eye,
+  Gauge,
+  LayoutGrid,
   Layers3,
   MapPin,
   Pencil,
-  LayoutGrid
 } from "lucide-react";
 import {
   FACILITY_STATUS,
@@ -19,6 +22,11 @@ import {
 } from "@/services/facilityService";
 
 const statusMeta = {
+  [FACILITY_STATUS.DRAFT]: {
+    label: "Bản nháp",
+    badge: "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
+    dot: "bg-slate-400",
+  },
   [FACILITY_STATUS.ACTIVE]: {
     label: "Đang hoạt động",
     badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
@@ -57,6 +65,26 @@ function StatusBadge({ status }) {
       {meta.label}
     </span>
   );
+}
+
+function getFacilityRoomsHref(facility) {
+  const params = new URLSearchParams({
+    from: "facilities",
+    propertyId: String(facility.id),
+  });
+
+  if (facility.name) params.set("facilityName", facility.name);
+
+  return `/dashboard/rooms?${params.toString()}`;
+}
+
+function getFacilityMeterReadingsHref(facility) {
+  const params = new URLSearchParams({
+    from: "facilities",
+    propertyId: String(facility.id),
+  });
+
+  return `/dashboard/meter-readings?${params.toString()}`;
 }
 
 function FacilityTree({ facility }) {
@@ -103,11 +131,17 @@ function FacilityTree({ facility }) {
                 <span
                   key={room.id}
                   title={
-                    room.status === "OCCUPIED" ? "Đang thuê" : "Phòng trống"
+                    room.status === "OCCUPIED"
+                      ? "Đang thuê"
+                      : room.status === "DRAFT"
+                        ? "Bản nháp"
+                        : "Phòng trống"
                   }
                   className={`rounded-md px-2 py-1 text-[10px] font-bold ${
                     room.status === "OCCUPIED"
                       ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                      : room.status === "DRAFT"
+                        ? "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300"
                       : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                   }`}
                 >
@@ -128,6 +162,8 @@ function MobileFacilityCard({
   onToggle,
   onEdit,
   onStatusChange,
+  onUtilitySettings,
+  showMeterReadingsAction,
 }) {
   const counts = getFacilityCounts(facility);
 
@@ -169,11 +205,11 @@ function MobileFacilityCard({
         </div>
         <div className="mt-4 grid gap-2">
           <Link
-            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+            href={getFacilityRoomsHref(facility)}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Thiết kế sơ đồ
+            <Eye className="h-3.5 w-3.5" />
+            Xem chi tiết
           </Link>
          
           <div className="grid grid-cols-2 gap-2">
@@ -184,6 +220,30 @@ function MobileFacilityCard({
             >
               <Pencil className="h-3.5 w-3.5" />
               Chỉnh sửa
+            </button>
+            <Link
+              href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Sơ đồ
+            </Link>
+            {showMeterReadingsAction && (
+              <Link
+                href={getFacilityMeterReadingsHref(facility)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+              >
+                <Gauge className="h-3.5 w-3.5" />
+                Điện nước
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => onUtilitySettings(facility)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+            >
+              <CircleDollarSign className="h-3.5 w-3.5" />
+              Giá điện nước
             </button>
             <button
               type="button"
@@ -211,16 +271,32 @@ function MobileFacilityCard({
 
 export function FacilityList({
   facilities,
+  showMeterReadingsAction = false,
   onEdit,
   onStatusChange,
+  onUtilitySettings,
 }) {
   const [expandedIds, setExpandedIds] = useState(
     () => new Set([facilities[0]?.id].filter(Boolean)),
   );
 
+  const visibleIds = useMemo(
+    () => new Set(facilities.map((facility) => facility.id)),
+    [facilities],
+  );
+  const activeExpandedIds = useMemo(() => {
+    const firstFacilityId = facilities[0]?.id;
+    if (!firstFacilityId) return new Set();
+    if ([...expandedIds].some((id) => visibleIds.has(id))) return expandedIds;
+    return new Set([firstFacilityId]);
+  }, [expandedIds, facilities, visibleIds]);
+
   const toggleFacility = (id) => {
     setExpandedIds((current) => {
-      const next = new Set(current);
+      const currentVisible = [...current].some((itemId) => visibleIds.has(itemId))
+        ? current
+        : activeExpandedIds;
+      const next = new Set(currentVisible);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -248,10 +324,12 @@ export function FacilityList({
           <MobileFacilityCard
             key={facility.id}
             facility={facility}
-            expanded={expandedIds.has(facility.id)}
+            expanded={activeExpandedIds.has(facility.id)}
             onToggle={() => toggleFacility(facility.id)}
             onEdit={onEdit}
             onStatusChange={onStatusChange}
+            onUtilitySettings={onUtilitySettings}
+            showMeterReadingsAction={showMeterReadingsAction}
           />
         ))}
       </div>
@@ -273,7 +351,7 @@ export function FacilityList({
             <tbody>
               {facilities.map((facility) => {
                 const counts = getFacilityCounts(facility);
-                const expanded = expandedIds.has(facility.id);
+                const expanded = activeExpandedIds.has(facility.id);
 
                 return (
                   <Fragment key={facility.id}>
@@ -337,14 +415,39 @@ export function FacilityList({
                           <Link
                             href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
                             className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            title="Thiết kế sơ đồ tầng"
+                            title="Chỉnh sửa sơ đồ tầng"
+                            aria-label={`Chỉnh sửa sơ đồ tầng ${facility.name}`}
                           >
                             <LayoutGrid className="h-4 w-4" />
                           </Link>
+                          <Link
+                            href={getFacilityRoomsHref(facility)}
+                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                            title="Xem chi tiết tầng/phòng"
+                            aria-label={`Xem chi tiết ${facility.name}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          {showMeterReadingsAction && (
+                            <Link
+                              href={getFacilityMeterReadingsHref(facility)}
+                              className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                              title="Quản lý điện nước"
+                              aria-label={`Quản lý điện nước ${facility.name}`}
+                            >
+                              <Gauge className="h-4 w-4" />
+                            </Link>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onUtilitySettings(facility)}
+                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                            title="Giá điện nước"
+                            aria-label={`Giá điện nước ${facility.name}`}
+                          >
+                            <CircleDollarSign className="h-4 w-4" />
+                          </button>
                         </div>
-                      </td>
-                      <td>
-                        
                       </td>
                     </tr>
                     {expanded && (
@@ -378,4 +481,3 @@ export function FacilityList({
     </>
   );
 }
-

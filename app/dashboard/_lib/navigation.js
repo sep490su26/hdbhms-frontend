@@ -1,4 +1,5 @@
 import {
+    BellRing,
     Building2,
     FileCheck2,
     FileText,
@@ -23,9 +24,10 @@ export const navigation = [
     { path: "/dashboard/billing", label: "Hóa đơn & Thu tiền", icon: ReceiptText },
     { path: "/dashboard/debt", label: "Công nợ", icon: WalletCards },
     { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2 },
-    { path: "/dashboard/contract-template", label: "Hợp đồng thuê", icon: FileText },
+    { path: "/dashboard/contract-management", label: "Quản lý hợp đồng", icon: FileText },
     { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
-    { path: "/dashboard/finance", label: "Báo cáo Tài chính", icon: WalletCards },
+    { path: "/dashboard/notification-templates", label: "Template thông báo", icon: BellRing },
+    { path: "/dashboard/finance", label: "Báo cáo doanh thu", icon: WalletCards },
     { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings },
 ];
 
@@ -39,8 +41,9 @@ export const navigationPermissionKeys = {
     "/dashboard/billing": "billing",
     "/dashboard/debt": "debt",
     "/dashboard/deposits": "deposits",
-    "/dashboard/contract-template": "contract",
+    "/dashboard/contract-management": "contract",
     "/dashboard/requests": "requests",
+    "/dashboard/notification-templates": "notificationTemplates",
     "/dashboard/finance": "finance",
     "/dashboard/settings": "settings",
 };

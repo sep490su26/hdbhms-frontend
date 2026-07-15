@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import {
   ArrowLeft,
   BadgeInfo,
@@ -65,7 +66,7 @@ const repairItems = [
 ];
 
 function moneyFormat(value) {
-  return new Intl.NumberFormat("vi-VN").format(value);
+  return `${new Intl.NumberFormat("vi-VN").format(value)} VNĐ`;
 }
 
 function Card({ children, className = "" }) {
@@ -253,43 +254,44 @@ export default function MaintenanceDetailTestPage() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid gap-6">
-            <section className="flex flex-col gap-4 rounded-xl border border-[#d9e1ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-black tracking-[-0.02em] text-slate-900 dark:text-white">
-                    Ticket T-1002
-                  </h1>
+            <DashboardPageHeader
+              title={
+                <span className="flex flex-wrap items-center gap-3">
+                  Ticket T-1002
                   <span
                     className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${progressTone}`}
                   >
                     {status}
                   </span>
-                </div>
-                <p className="mt-2 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                </span>
+              }
+              description={
+                <span className="flex items-center gap-2">
                   <Clock3 className="h-4 w-4" />
                   Ngày tạo: 24/10/2023 · 09:15 AM
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={advanceProgress}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c9d4ea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f7faff] dark:hover:bg-white/5"
-                >
-                  <ChevronRight className="h-4 w-4 rotate-180" />
-                  Cập nhật tiến độ
-                </button>
-                <button
-                  type="button"
-                  onClick={completeTicket}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f172a] px-4 text-sm font-bold text-white hover:bg-[#111827]"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Đánh dấu hoàn tất
-                </button>
-              </div>
-            </section>
+                </span>
+              }
+              actions={
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={advanceProgress}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#c9d4ea] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f7faff] dark:hover:bg-white/5"
+                  >
+                    <ChevronRight className="h-4 w-4 rotate-180" />
+                    Cập nhật tiến độ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={completeTicket}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f172a] px-4 text-sm font-bold text-white hover:bg-[#111827]"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Đánh dấu hoàn tất
+                  </button>
+                </div>
+              }
+            />
 
             <Card className="p-5">
               <SectionTitle icon={BadgeInfo} title="Chi tiết sự cố" />
@@ -388,9 +390,6 @@ export default function MaintenanceDetailTestPage() {
                   </p>
                   <p className="mt-3 text-4xl font-black tracking-[-0.03em] text-[#163fa3]">
                     {moneyFormat(summary.totalCost)}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-[#3556a8]">
-                    VND
                   </p>
                 </div>
               </div>

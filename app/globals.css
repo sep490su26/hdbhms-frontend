@@ -164,6 +164,8 @@
 
 :root {
   --navbar-height: 7rem;
+  --font-sans: "Be Vietnam Pro", "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-geist-mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -194,7 +196,7 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(0.145 0 0);
+  --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
 }
 
@@ -333,6 +335,11 @@ body {
   table-layout: auto;
 }
 
+.dashboard-table--scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .dashboard-table th {
   min-width: max-content;
   white-space: nowrap;
@@ -382,9 +389,87 @@ body {
   white-space: nowrap;
 }
 
+.dashboard-table.contract-management-table .contract-management-table__action {
+  width: 12%;
+  min-width: 8rem;
+  max-width: none;
+  overflow: visible;
+}
+
+.dashboard-table.contract-management-table {
+  overflow-x: scroll;
+  overflow-y: hidden;
+}
+
+.dashboard-table.contract-management-table > table {
+  min-width: 1080px !important;
+  width: 100% !important;
+  table-layout: fixed;
+}
+
+.dashboard-table.contract-management-table::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dashboard-table.contract-management-table::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.dashboard-table.contract-management-table th.contract-management-table__action {
+  background: #f7f9fe;
+}
+
+.dashboard-table.contract-management-table .contract-management-table__action > * {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.dark .dashboard-table.contract-management-table th.contract-management-table__action {
+  background: #172033;
+}
+
 @media (max-width: 1279px) {
   .dashboard-table {
     overflow: visible;
+  }
+
+  .dashboard-table.dashboard-table--scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .dashboard-table.dashboard-table--scroll table {
+    display: table;
+    width: 100%;
+  }
+
+  .dashboard-table.dashboard-table--scroll thead {
+    display: table-header-group;
+  }
+
+  .dashboard-table.dashboard-table--scroll tbody {
+    display: table-row-group;
+    padding: 0;
+  }
+
+  .dashboard-table.dashboard-table--scroll tr {
+    display: table-row;
+    width: auto;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dashboard-table.dashboard-table--scroll td {
+    display: table-cell;
+    width: auto;
+    border-bottom: 1px solid #edf1f6;
+    padding: 0.75rem 1rem;
+  }
+
+  .dashboard-table.dashboard-table--scroll td::before {
+    content: none;
   }
 
   .dashboard-table table,
@@ -597,4 +682,15 @@ body {
   html {
     @apply font-sans;
   }
+}
+
+/* Re-assert final semantic tokens after imported theme layers */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
 }

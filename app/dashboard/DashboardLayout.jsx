@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Armchair,
   Bell,
+  BellRing,
   Building2,
+  CheckCheck,
   ChevronDown,
-  CircleHelp,
   FileCheck2,
   FileText,
   Gauge,
@@ -45,7 +46,22 @@ import { SidebarProvider, useSidebar } from "./_contexts/SidebarContext";
 import { ThemeProvider, useTheme } from "./_contexts/ThemeContext";
 import { PermissionGuard } from "./_components/PermissionGuard";
 import { ProtectedRoute } from "./_components/ProtectedRoute";
-import { ROLE_LABELS, SECTION_PERMISSIONS, canAccessRole } from "./_lib/rbac";
+import { ROLE_LABELS, ROLES, SECTION_PERMISSIONS, canAccessRole } from "./_lib/rbac";
+import {
+  fetchNotifications,
+  fetchUnreadNotificationCount,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from "@/services/notificationsService";
+
+const currentContractYear = new Date().getFullYear();
+const contractYearChildren = [
+  { path: "/dashboard/contract-management", label: "Tất cả năm" },
+  ...[currentContractYear, currentContractYear - 1].map((year) => ({
+    path: `/dashboard/contract-management?year=${year}`,
+    label: `Năm ${year}`,
+  })),
+];
 
 const navigation = [
   {
@@ -83,6 +99,18 @@ const navigation = [
     label: "Quản lý tài khoản",
     icon: UserRoundCog,
     permissionKey: "accounts",
+    children: [
+      {
+        path: "/dashboard/accounts/tenants",
+        label: "Tài khoản khách thuê",
+        permissionKey: "accounts",
+      },
+      {
+        path: "/dashboard/accounts/staff",
+        label: "Tài khoản nhân viên",
+        permissionKey: "accounts",
+      },
+    ],
   },
   {
     path: "/dashboard/meter-readings",
@@ -115,10 +143,11 @@ const navigation = [
     permissionKey: "deposits",
   },
   {
-    path: "/dashboard/contract-template",
+    path: "/dashboard/contract-management",
     label: "Quản lý hợp đồng",
     icon: FileText,
     permissionKey: "contract",
+    children: contractYearChildren,
   },
   {
     path: "/dashboard/requests",
@@ -127,8 +156,14 @@ const navigation = [
     permissionKey: "requests",
   },
   {
+    path: "/dashboard/notification-templates",
+    label: "Quản lý thông báo",
+    icon: BellRing,
+    permissionKey: "notificationTemplates",
+  },
+  {
     path: "/dashboard/finance",
-    label: "Báo cáo tài chính",
+    label: "Báo cáo doanh thu",
     icon: WalletCards,
     permissionKey: "finance",
   },
@@ -160,6 +195,26 @@ const specialRoutePermissions = [
 
 function getAllowedRoles(item) {
   return SECTION_PERMISSIONS[item.permissionKey] || [];
+}
+
+function getVisibleNavigation(role) {
+  if (role !== ROLES.OWNER) return navigation;
+  return navigation.filter(
+    (item) =>
+      item.path !== "/dashboard/rooms" &&
+      item.path !== "/dashboard/meter-readings",
+  );
+}
+
+function isOwnerFacilityScopedRouteWithoutProperty(role, pathname, propertyId) {
+  return (
+    role === ROLES.OWNER &&
+    !propertyId &&
+    (pathname === "/dashboard/rooms" ||
+      pathname?.startsWith("/dashboard/rooms/") ||
+      pathname === "/dashboard/meter-readings" ||
+      pathname?.startsWith("/dashboard/meter-readings/"))
+  );
 }
 
 function isNavigationPathActive(pathname, path) {
@@ -195,10 +250,10 @@ function getPermissionKeyForPath(pathname) {
 }
 
 function getFirstAllowedPath(role) {
-  return (
-    navigation.find((item) => canAccessRole(role, getAllowedRoles(item)))
-      ?.path || "/dashboard"
+  const item = getVisibleNavigation(role).find((navItem) =>
+    canAccessRole(role, getAllowedRoles(navItem)),
   );
+  return item?.children?.[0]?.path || item?.path || "/dashboard";
 }
 
 function getInitials(name) {
@@ -209,6 +264,42 @@ function getInitials(name) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function formatNotificationTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function notificationHref(notification) {
+  const targetRoute = notification?.data?.targetRoute;
+  if (typeof targetRoute === "string" && targetRoute.startsWith("/dashboard")) {
+    return targetRoute;
+  }
+  const eventType = String(notification?.eventType || "").toUpperCase();
+  const targetType = String(notification?.targetType || "").toUpperCase();
+
+  if (eventType === "VISIT_REQUEST_CREATED" || targetType === "VISIT_REQUEST") {
+    return "/dashboard/viewing-customers";
+  }
+  if (eventType === "TENANT_PROFILE_ACCESS_REQUESTED" || targetType === "CHANGE_REQUEST") {
+    return "/dashboard/requests";
+  }
+  if (
+    eventType === "TENANT_PROFILE_ACCESS_APPROVED" ||
+    eventType === "TENANT_PROFILE_ACCESS_REJECTED" ||
+    targetType === "TENANT_PROFILE"
+  ) {
+    return "/dashboard/tenants";
+  }
+  return "/dashboard/requests";
 }
 
 function UserAvatar({ user, size = "md", className = "" }) {
@@ -282,7 +373,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               <User className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Edit profile
+              Chỉnh sửa hồ sơ
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -294,19 +385,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
             >
               <UserCog className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Account settings
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="rounded-lg p-0 focus:bg-transparent"
-          >
-            <Link
-              href="/dashboard/requests"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
-            >
-              <CircleHelp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-              Support
+              Tùy chọn cá nhân
             </Link>
           </DropdownMenuItem>
         </div>
@@ -322,7 +401,7 @@ function UserMenu({ user, onLogout, isLoggingOut }) {
           ) : (
             <LogOut className="h-5 w-5 text-slate-500 dark:text-slate-400" />
           )}
-          <span>{isLoggingOut ? "Signing out..." : "Sign out"}</span>
+          <span>{isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -350,16 +429,15 @@ export function AccessDeniedPage() {
   );
 }
 
-function Sidebar({ isOpen, onClose }) {
+function Sidebar({ isOpen, onClose, role }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [contractYearsOpen, setContractYearsOpen] = useState(true);
+  const searchParams = useSearchParams();
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const showText = isExpanded || isHovered || isMobileOpen;
-  const contractYears = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return [currentYear, currentYear - 1];
-  }, []);
+  const [openGroups, setOpenGroups] = useState({});
+  const queryString = searchParams.toString();
+  const currentHref = queryString ? `${pathname}?${queryString}` : pathname;
+  const visibleNavigation = useMemo(() => getVisibleNavigation(role), [role]);
 
   return (
     <>
@@ -446,99 +524,102 @@ function Sidebar({ isOpen, onClose }) {
               {showText ? "Menu" : <MoreHorizontal className="h-5 w-5" />}
             </h2>
             <ul className="flex flex-col gap-4">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
-                const isActive = isNavigationPathActive(pathname, item.path);
-                const isContractItem = item.path === "/dashboard/contract-template";
+                const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                const isActive =
+                  isNavigationPathActive(pathname, item.path) ||
+                  item.children?.some((child) =>
+                    isNavigationPathActive(pathname, child.path),
+                  );
+                const isGroupOpen =
+                  showText && (isActive || openGroups[item.path]);
+                const primaryHref = item.children?.[0]?.path || item.path;
+                const itemClasses = `group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  showText ? "justify-start" : "justify-center"
+                } ${
+                  isActive
+                    ? "bg-[#ecf3ff] text-[#465fff] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff]"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                }`;
+                const iconClasses = `h-5 w-5 shrink-0 ${
+                  isActive
+                    ? "text-[#465fff] dark:text-[#9cb9ff]"
+                    : "text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300"
+                }`;
 
                 return (
                   <PermissionGuard
                     key={item.path}
                     allowedRoles={getAllowedRoles(item)}
                   >
-                    {isContractItem ? (
-                      <div>
+                    <li>
+                      {hasChildren && showText ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!showText) {
-                              router.push(item.path);
-                              onClose();
-                              return;
-                            }
-                            setContractYearsOpen((current) => !current);
-                          }}
-                          aria-expanded={contractYearsOpen}
-                          title={showText ? undefined : item.label}
-                          className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                            showText ? "justify-start" : "justify-center"
-                          } ${
-                            isActive
-                              ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
-                              : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
-                          }`}
+                          onClick={() =>
+                            setOpenGroups((current) => ({
+                              ...current,
+                              [item.path]: !current[item.path],
+                            }))
+                          }
+                          aria-expanded={isGroupOpen}
+                          aria-current={isActive ? "page" : undefined}
+                          className={itemClasses}
                         >
-                          <Icon
-                            className={`h-5 w-5 shrink-0 ${
-                              isActive
-                                ? "text-[#1e40af] dark:text-[#93c5fd]"
-                                : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
+                          <Icon className={iconClasses} />
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            {item.label}
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 shrink-0 transition-transform ${
+                              isGroupOpen ? "rotate-180" : ""
                             }`}
                           />
-                          {showText && (
-                            <>
-                              <span className="min-w-0 flex-1 truncate text-left">
-                                {item.label}
-                              </span>
-                              <ChevronDown
-                                className={`h-4 w-4 shrink-0 transition-transform ${
-                                  contractYearsOpen ? "rotate-180" : ""
-                                }`}
-                              />
-                            </>
-                          )}
                         </button>
-                        {showText && contractYearsOpen && (
-                          <div className="mt-2 flex flex-col gap-1 pl-8">
-                            {contractYears.map((year) => (
-                              <Link
-                                key={year}
-                                href={`${item.path}?year=${year}`}
-                                onClick={onClose}
-                                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-gray-100 hover:text-[#1e40af] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-[#93c5fd]"
-                              >
-                                Năm {year}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <Link
-                        href={item.path}
-                        onClick={onClose}
-                        aria-current={isActive ? "page" : undefined}
-                        title={showText ? undefined : item.label}
-                        className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                          showText ? "justify-start" : "justify-center"
-                        } ${
-                          isActive
-                            ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
-                            : "text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-slate-300"
-                        }`}
-                      >
-                        <Icon
-                          className={`h-5 w-5 shrink-0 ${
-                            isActive
-                              ? "text-[#1e40af] dark:text-[#93c5fd]"
-                              : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300"
-                          }`}
-                        />
-                        {showText && (
-                          <span className="truncate">{item.label}</span>
-                        )}
-                      </Link>
-                    )}
+                      ) : (
+                        <Link
+                          href={primaryHref}
+                          onClick={onClose}
+                          aria-current={isActive ? "page" : undefined}
+                          title={showText ? undefined : item.label}
+                          className={itemClasses}
+                        >
+                          <Icon className={iconClasses} />
+                          {showText && (
+                            <span className="truncate">{item.label}</span>
+                          )}
+                        </Link>
+                      )}
+
+                      {hasChildren && isGroupOpen ? (
+                        <ul className="mt-2 grid gap-1 border-l border-gray-200 pl-5 dark:border-gray-800">
+                          {item.children.map((child) => {
+                            const childActive =
+                              child.path === currentHref ||
+                              (!queryString &&
+                                isNavigationPathActive(pathname, child.path));
+
+                            return (
+                              <li key={child.path}>
+                                <Link
+                                  href={child.path}
+                                  onClick={onClose}
+                                  aria-current={childActive ? "page" : undefined}
+                                  className={`block rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                                    childActive
+                                      ? "bg-[#ecf3ff] text-[#465fff] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff]"
+                                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
+                    </li>
                   </PermissionGuard>
                 );
               })}
@@ -558,10 +639,89 @@ function Topbar({
   isLoggingOut,
 }) {
   const { user } = useAuth();
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { isMobileOpen, toggleSidebar } = useSidebar();
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
+  const [isNotificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoadingNotifications, setLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
   const isDarkMode = theme === "dark";
+
+  const loadNotifications = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!user) return;
+      if (!silent) setLoadingNotifications(true);
+      setNotificationError("");
+
+      try {
+        const [list, count] = await Promise.all([
+          fetchNotifications({ page: 0, size: 6 }),
+          fetchUnreadNotificationCount(),
+        ]);
+        setNotifications(list.items || []);
+        setUnreadCount(count);
+      } catch (error) {
+        console.error(error);
+        setNotificationError("Không tải được thông báo.");
+      } finally {
+        if (!silent) setLoadingNotifications(false);
+      }
+    },
+    [user],
+  );
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const initialLoadId = window.setTimeout(() => loadNotifications(), 0);
+    const intervalId = window.setInterval(
+      () => loadNotifications({ silent: true }),
+      60000,
+    );
+    return () => {
+      window.clearTimeout(initialLoadId);
+      window.clearInterval(intervalId);
+    };
+  }, [loadNotifications, user]);
+
+  const handleNotificationClick = useCallback(
+    async (notification) => {
+      setNotificationOpen(false);
+      if (!notification?.isRead && notification?.id) {
+        setNotifications((items) =>
+          items.map((item) =>
+            item.id === notification.id ? { ...item, isRead: true } : item,
+          ),
+        );
+        setUnreadCount((count) => Math.max(0, count - 1));
+        try {
+          await markNotificationAsRead(notification.id);
+        } catch (error) {
+          console.error(error);
+          loadNotifications({ silent: true });
+        }
+      }
+      router.push(notificationHref(notification));
+    },
+    [loadNotifications, router],
+  );
+
+  const handleMarkAllNotificationsRead = useCallback(async () => {
+    if (!unreadCount) return;
+    setNotifications((items) =>
+      items.map((item) => ({ ...item, isRead: true })),
+    );
+    setUnreadCount(0);
+    try {
+      await markAllNotificationsAsRead();
+    } catch (error) {
+      console.error(error);
+      loadNotifications({ silent: true });
+    }
+  }, [loadNotifications, unreadCount]);
 
   const handleToggle = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 1024) {
@@ -645,22 +805,120 @@ function Topbar({
                 <Moon className="h-5 w-5" />
               )}
             </button>
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-slate-500 transition-colors hover:bg-gray-100 hover:text-slate-700 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-orange-400 ring-2 ring-white dark:ring-gray-900" />
-            </button>
-            <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#1e40af]/[0.12] dark:text-[#9cb9ff] sm:flex">
-              {ROLE_LABELS[user?.role] || "Quản lý"}
-            </span>
-            <UserMenu
-              user={user}
-              onLogout={onLogout}
-              isLoggingOut={isLoggingOut}
-            />
+            {user ? (
+              <>
+                <DropdownMenu
+                  modal={false}
+                  open={isNotificationOpen}
+                  onOpenChange={(open) => {
+                    setNotificationOpen(open);
+                    if (open) loadNotifications({ silent: notifications.length > 0 });
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Notifications"
+                      className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                    >
+                      <Bell className="h-5 w-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-900">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={12}
+                    className="w-[360px] max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-xl dark:border-gray-800 dark:bg-[#1a2231]"
+                  >
+                    <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">
+                          Thông báo
+                        </p>
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {unreadCount > 0 ? `${unreadCount} chưa đọc` : "Không có thông báo mới"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleMarkAllNotificationsRead}
+                        disabled={!unreadCount}
+                        title="Đánh dấu tất cả đã đọc"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5"
+                      >
+                        <CheckCheck className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="max-h-[360px] overflow-y-auto p-2">
+                      {isLoadingNotifications && notifications.length === 0 ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải thông báo...
+                        </div>
+                      ) : notificationError ? (
+                        <div className="px-4 py-8 text-center text-sm font-semibold text-rose-600">
+                          {notificationError}
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <Inbox className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600" />
+                          <p className="mt-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+                            Chưa có thông báo.
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <DropdownMenuItem
+                            key={notification.id}
+                            onClick={() => handleNotificationClick(notification)}
+                            className="cursor-pointer items-start gap-3 rounded-lg px-3 py-3 focus:bg-gray-50 dark:focus:bg-white/5"
+                          >
+                            <span
+                              className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                notification.isRead ? "bg-gray-300 dark:bg-gray-600" : "bg-orange-500"
+                              }`}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">
+                                {notification.title || "Thông báo"}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                                {notification.body || "Có cập nhật mới cần xem."}
+                              </span>
+                              {notification.createdAt && (
+                                <span className="mt-2 block text-[11px] font-semibold text-gray-400">
+                                  {formatNotificationTime(notification.createdAt)}
+                                </span>
+                              )}
+                            </span>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span className="hidden h-8 items-center justify-center rounded-full bg-[#ecf3ff] px-3 text-xs font-semibold text-[#0F0F0F] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff] sm:flex">
+                  {ROLE_LABELS[user.role] || "Quản lý"}
+                </span>
+                <UserMenu
+                  user={user}
+                  onLogout={onLogout}
+                  isLoggingOut={isLoggingOut}
+                />
+              </>
+            ) : (
+              <Link
+                href="/login?redirect=%2Fdashboard%2Ffinance"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#465fff] px-4 text-sm font-bold text-white transition hover:bg-[#3641f5]"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -670,6 +928,7 @@ function Topbar({
 
 function DashboardLayoutShell({ children }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, refreshUser, isLoadingUser, logout } = useAuth();
   const { isExpanded, isHovered, isMobileOpen, toggleMobileSidebar } =
@@ -678,11 +937,17 @@ function DashboardLayoutShell({ children }) {
   const [hasHydratedAuth, setHasHydratedAuth] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const effectiveRole = user?.role || "";
+  const routePropertyId =
+    searchParams.get("propertyId") || searchParams.get("facilityId") || "";
 
   const activeNavigationItem = getNavigationItemForPath(pathname);
   const permissionKey = getPermissionKeyForPath(pathname);
+  const allowedRoles = permissionKey
+    ? SECTION_PERMISSIONS[permissionKey] || []
+    : [];
+  const isPublicRoute = false;
   const isAllowed = permissionKey
-    ? canAccessRole(effectiveRole, SECTION_PERMISSIONS[permissionKey] || [])
+    ? canAccessRole(effectiveRole, allowedRoles)
     : false;
 
   useEffect(() => {
@@ -720,12 +985,16 @@ function DashboardLayoutShell({ children }) {
 
   useEffect(() => {
     if (!hasHydratedAuth) return;
-    if (!user) {
+    if (!user && !isPublicRoute) {
       if (isLoggingOut) return;
       const redirect = pathname
         ? `?redirect=${encodeURIComponent(pathname)}`
         : "";
       router.replace(`/login${redirect}`);
+      return;
+    }
+    if (isOwnerFacilityScopedRouteWithoutProperty(effectiveRole, pathname, routePropertyId)) {
+      router.replace("/dashboard/facilities");
       return;
     }
     if (!activeNavigationItem) return;
@@ -738,7 +1007,9 @@ function DashboardLayoutShell({ children }) {
     hasHydratedAuth,
     isAllowed,
     isLoggingOut,
+    isPublicRoute,
     pathname,
+    routePropertyId,
     router,
     user,
   ]);
@@ -769,6 +1040,7 @@ function DashboardLayoutShell({ children }) {
     <DashboardLayoutProvider value={contextValue}>
       <div className="dashboard-shell min-h-screen w-full overflow-x-hidden bg-gray-50 text-slate-900 dark:bg-[#020817] dark:text-white lg:flex">
         <Sidebar
+          role={effectiveRole}
           isOpen={isMobileOpen}
           onClose={() => {
             if (isMobileOpen) {

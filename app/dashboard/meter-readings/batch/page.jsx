@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
-    submitBatchMeterReadings,
     saveProgressiveRoomReading,
-    confirmBatch
+    uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
 import { toast } from "sonner";
 import {
@@ -23,16 +22,36 @@ import {
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { LucideDownload, LucideEdit, LucideImport, LucideSearch, LucideCamera, X } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowRight,
+    Camera,
+    CheckCircle2,
+    CircleDashed,
+    Droplets,
+    Edit3,
+    Home,
+    ImageIcon,
+    Info,
+    RefreshCw,
+    Search,
+    UploadCloud,
+    X,
+    Zap,
+} from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoGallery } from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import {
-    calculateMeterUsage,
-    normalizeMeterReadingRoom,
-} from "./meterReadingBatchMapper";
+    calculateUtilityCharge,
+    DEFAULT_UTILITY_TARIFFS,
+    formatVnd,
+    normalizeUtilityTariff,
+} from "@/lib/meterReadingCost.mjs";
 
 const SAMPLE_PHOTOS = [
     {
@@ -105,26 +124,75 @@ const MOCK_PHOTOS = [
 ];
 
 const STATUS_CONFIG = {
-    synced: { label: "Synced", color: "text-green-500 dark:text-green-300", dot: "bg-green-500" },
-    local: { label: "Local Only", color: "text-orange-400", dot: "bg-orange-400" },
-    error: { label: "Error", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500" },
-    pending: { label: "Pending", color: "text-slate-400 dark:text-slate-500", dot: "bg-gray-300" },
+    warning: { label: "Cần kiểm tra", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" },
+    synced: { label: "Đã lưu", color: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-500" },
+    local: { label: "Chưa đồng bộ", color: "text-orange-500 dark:text-orange-300", dot: "bg-orange-400" },
+    error: { label: "Lỗi chỉ số", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500" },
+    pending: { label: "Chưa nhập", color: "text-slate-500 dark:text-slate-400", dot: "bg-gray-300" },
 };
 
 
-const PER_PAGE = 5;
+function getPeriodParts(value) {
+    const text = String(value || "").trim();
+    const canonical = text.match(/^(\d{4})-(\d{1,2})$/);
+    if (canonical) return { year: canonical[1], month: canonical[2].padStart(2, "0") };
+
+    const legacy = text.match(/^(\d{1,2})\/(\d{4})$/);
+    if (legacy) return { year: legacy[2], month: legacy[1].padStart(2, "0") };
+
+    return null;
+}
+
+function formatPeriodLabel(value) {
+    const parts = getPeriodParts(value);
+    return parts ? `Kỳ ${parts.month}/${parts.year}` : "Kỳ hiện tại";
+}
+
+function formatPeriodRange(value) {
+    const parts = getPeriodParts(value);
+    if (!parts) return "Theo kỳ ghi chỉ số hiện tại";
+
+    const lastDay = new Date(Number(parts.year), Number(parts.month), 0).getDate();
+    return `01/${parts.month}/${parts.year} - ${String(lastDay).padStart(2, "0")}/${parts.month}/${parts.year}`;
+}
+
+function readField(source, ...keys) {
+    return keys.map((key) => source?.[key]).find((value) => value !== undefined && value !== null);
+}
+
+function numberOrNull(value) {
+    if (value === undefined || value === null || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function numberOrZero(value) {
+    return numberOrNull(value) ?? 0;
+}
+
+function normalizePropertyId(value) {
+    const text = String(value || "").trim();
+    return /^\d+$/.test(text) ? text : "";
+}
+
+function getMeterReadingsHref(propertyId, context = {}) {
+    const params = new URLSearchParams();
+    const normalizedPropertyId = normalizePropertyId(propertyId);
+    if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+    if (context.from) params.set("from", context.from);
+    if (context.facilityName) params.set("facilityName", context.facilityName);
+    const query = params.toString();
+    return `/dashboard/meter-readings${query ? `?${query}` : ""}`;
+}
 
 function MeterPhoto({ src }) {
     return (
         <div
             className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative group">
             {src ? (
-                <img src={src} alt="thumbnail" className="w-full h-full object-cover" />
+                <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized />
             ) : (
-                <svg className="w-5 h-5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
-                </svg>
+                <ImageIcon className="w-5 h-5 text-slate-400 dark:text-slate-500" />
             )}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
         </div>
@@ -135,29 +203,68 @@ export default function MeterReadings() {
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState("pending");
+    const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [editingCell, setEditingCell] = useState(null); // { roomId, field }
     const [focusRoomId, setFocusRoomId] = useState(null);
     const [batchId, setBatchId] = useState(null);
-    const [cameraOpen, setCameraOpen] = useState(false);
-    const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { file, previewUrl } }
+    const [cameraTarget, setCameraTarget] = useState(null);
+    const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity, water } }
+    const [tariffs, setTariffs] = useState(DEFAULT_UTILITY_TARIFFS);
+    const [backendFacilityName, setBackendFacilityName] = useState("");
 
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
+    const propertyId =
+        normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
+    const fromFacilities = searchParams.get("from") === "facilities";
+    const facilityName = backendFacilityName;
+    const meterReadingsHref = getMeterReadingsHref(propertyId, {
+        from: fromFacilities ? "facilities" : "",
+        facilityName,
+    });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
+        setBackendFacilityName("");
         try {
-            const res = await fetchBatchMeterReadingsStatus(period, 1);
+            const res = await fetchBatchMeterReadingsStatus(period, propertyId);
             if (res) {
+                setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
                 const fetchedBatchId = res.batchId || res.batch_id;
                 if (fetchedBatchId) setBatchId(fetchedBatchId);
-                console.log("Fetched batchId:", fetchedBatchId);
+                setTariffs({
+                    electricity: normalizeUtilityTariff(
+                        readField(res, "electricityTariff", "electricity_tariff"),
+                        DEFAULT_UTILITY_TARIFFS.electricity,
+                    ),
+                    water: normalizeUtilityTariff(
+                        readField(res, "waterTariff", "water_tariff"),
+                        DEFAULT_UTILITY_TARIFFS.water,
+                    ),
+                });
                 if (res.rooms) {
-                    const mappedRooms = res.rooms.map(normalizeMeterReadingRoom);
+                    const mappedRooms = res.rooms.map((r, index) => {
+                        const roomId = readField(r, "roomId", "room_id");
+                        const roomCode = readField(r, "roomCode", "room_code");
+                        const syncTime = readField(r, "syncTime", "sync_time");
+
+                        return {
+                            id: roomCode || (roomId ? `room-${roomId}` : `room-${index}`),
+                            roomId,
+                            elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
+                            elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
+                            electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
+                            waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
+                            waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
+                            waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
+                            status: readField(r, "status") || "pending",
+                            syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
+                            photos: numberOrZero(readField(r, "photosCount", "photos_count")),
+                        };
+                    });
                     setRooms(mappedRooms);
                 }
             }
@@ -167,13 +274,14 @@ export default function MeterReadings() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [period, propertyId]);
+
     useEffect(() => {
-        const timeoutId = window.setTimeout(() => {
-            loadData();
+        const timer = window.setTimeout(() => {
+            void loadData();
         }, 0);
-        return () => window.clearTimeout(timeoutId);
-    }, [period]);
+        return () => window.clearTimeout(timer);
+    }, [loadData]);
 
     useEffect(() => {
         if (focusRoomId) {
@@ -189,66 +297,126 @@ export default function MeterReadings() {
         };
     }, [focusRoomId]);
 
-    const scrollRef = useRef(null);
-    const handleWheel = useCallback((e) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            e.currentTarget.scrollLeft += e.deltaY;
-        }
-    }, []);
-
-    const horizontalScrollRef = useCallback((node) => {
-        if (scrollRef.current) {
-            scrollRef.current.removeEventListener("wheel", handleWheel);
-        }
-        if (node) {
-            node.addEventListener("wheel", handleWheel, { passive: false });
-        }
-        scrollRef.current = node;
-    }, [handleWheel]);
-
-    // handleSaveBatch removed
-
-    const handleSaveAll = async () => {
-        if (!batchId) {
-            toast.error("Không tìm thấy kỳ ghi chỉ số");
-            return;
-        }
-
-        setSaving(true);
-        try {
-            await confirmBatch(batchId);
-            toast.success("Lưu tất cả thành công");
-            loadData();
-        } catch (error) {
-            toast.error("Lỗi khi lưu dữ liệu");
-            console.error(error);
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const completed = rooms.filter((r) => r.status === "synced").length;
     const pending = rooms.filter((r) => r.status === "pending" || !r.status).length;
     const unsynced = rooms.filter((r) => r.status === "local").length;
-    const errors = rooms.filter((r) => r.status === "error").length;
+    const errors = rooms.filter((r) => r.status === "error" || r.status === "warning").length;
     const total = rooms.length;
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
     const handleCurrChange = (roomId, field, val) => {
+        const room = rooms.find(r => r.id === roomId);
+        if (!room) return;
+
+        const numVal = val === "" ? null : Number(val);
+
+        // Validation: new reading must be >= old reading
+        if (field === "elecCurr" && numVal !== null && room.elecPrev !== null) {
+            if (numVal < room.elecPrev) {
+                toast.error("Chỉ số điện mới không được nhỏ hơn chỉ số cũ");
+                return;
+            }
+        }
+        if (field === "waterCurr" && numVal !== null && room.waterPrev !== null) {
+            if (numVal < room.waterPrev) {
+                toast.error("Chỉ số nước mới không được nhỏ hơn chỉ số cũ");
+                return;
+            }
+        }
+
+        // Validation: old reading must be >= 0
+        if (field === "elecPrev" && numVal !== null && numVal < 0) {
+            toast.error("Chỉ số điện cũ không được âm");
+            return;
+        }
+        if (field === "waterPrev" && numVal !== null && numVal < 0) {
+            toast.error("Chỉ số nước cũ không được âm");
+            return;
+        }
+
         setRooms((prev) =>
             prev.map((r) =>
-                r.id === roomId ? { ...r, [field]: val === "" ? null : Number(val) } : r
+                r.id === roomId ? { ...r, [field]: numVal } : r
             )
         );
     };
 
+    const getCapturedPhoto = (roomId, type) => capturedPhotos[roomId]?.[type] ?? null;
+    const getExistingPhotoId = (room, type) =>
+        type === "electricity" ? room.electricityPhotoId : room.waterPhotoId;
+    const hasEvidencePhoto = (room, type) => Boolean(getCapturedPhoto(room.id, type)?.file || getExistingPhotoId(room, type));
+
+    const removeCapturedPhoto = (roomId, type) => {
+        setCapturedPhotos((prev) => {
+            const next = { ...prev };
+            const roomPhotos = { ...(next[roomId] || {}) };
+            delete roomPhotos[type];
+            if (Object.keys(roomPhotos).length > 0) {
+                next[roomId] = roomPhotos;
+            } else {
+                delete next[roomId];
+            }
+            return next;
+        });
+    };
+
+    const uploadEvidencePhoto = async (room, type) => {
+        const photo = getCapturedPhoto(room.id, type);
+        if (!photo?.file) return getExistingPhotoId(room, type) ?? null;
+
+        const response = await uploadMeterReadingPhoto(photo.file);
+        const fileId = response?.fileId || response?.id;
+        if (!fileId) throw new Error("Không upload được ảnh minh chứng");
+        return fileId;
+    };
+
+    const renderEvidenceCapture = (room, type, label) => {
+        const photo = getCapturedPhoto(room.id, type);
+        const existingPhotoId = getExistingPhotoId(room, type);
+
+        return (
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-white/10 dark:bg-[#020817]">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</span>
+                    {existingPhotoId && !photo ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                            Đã có ảnh
+                        </span>
+                    ) : null}
+                </div>
+                {photo ? (
+                    <div className="relative h-28 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
+                        <Image src={photo.previewUrl} alt={label} fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized />
+                        <button
+                            type="button"
+                            onClick={() => removeCapturedPhoto(room.id, type)}
+                            className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                ) : (
+                    <Button
+                        variant="primary"
+                        onClick={() => setCameraTarget({ roomId: room.id, type })}
+                        className="flex w-full items-center justify-center gap-2"
+                    >
+                        <Camera className="h-4 w-4" />
+                        {existingPhotoId ? "Chụp lại" : "Chụp ảnh minh chứng"}
+                    </Button>
+                )}
+            </div>
+        );
+    };
+
     const handleSaveAndNext = async () => {
+        if (saving) return;
+
         const room = rooms.find(r => r.id === focusRoomId);
         if (!room) return;
 
-        if (room.elecCurr === null && room.waterCurr === null) {
-            toast.error("Vui lòng nhập ít nhất một chỉ số");
+        if (room.elecCurr === null || room.waterCurr === null) {
+            toast.error("Vui lòng nhập đủ chỉ số điện và nước");
             return;
         }
 
@@ -263,16 +431,33 @@ export default function MeterReadings() {
             return;
         }
 
+        if (!hasEvidencePhoto(room, "electricity") || !hasEvidencePhoto(room, "water")) {
+            toast.error("Vui lòng chụp đủ ảnh minh chứng cho điện và nước");
+            return;
+        }
+
+        setSaving(true);
         try {
+            const [electricityPhotoId, waterPhotoId] = await Promise.all([
+                uploadEvidencePhoto(room, "electricity"),
+                uploadEvidencePhoto(room, "water"),
+            ]);
+
             await saveProgressiveRoomReading(batchId, room.roomId, {
                 electricityValue: room.elecCurr,
                 waterValue: room.waterCurr,
-                electricityPhotoId: null,
-                waterPhotoId: null
+                electricityPhotoId,
+                waterPhotoId,
             });
 
             // local update status
-            setRooms(prev => prev.map(r => r.id === focusRoomId ? { ...r, status: "synced" } : r));
+            setRooms(prev => prev.map(r => r.id === focusRoomId ? {
+                ...r,
+                status: "synced",
+                electricityPhotoId,
+                waterPhotoId,
+                photos: Number(Boolean(electricityPhotoId)) + Number(Boolean(waterPhotoId)),
+            } : r));
 
             const focusIndex = filtered.findIndex(r => r.id === focusRoomId);
             if (focusIndex >= 0 && focusIndex < filtered.length - 1) {
@@ -282,8 +467,10 @@ export default function MeterReadings() {
                 loadData();
             }
         } catch (error) {
-            toast.error("Lỗi khi lưu phòng này");
+            toast.error(error?.details || error?.message || "Lỗi khi lưu phòng này");
             console.error(error);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -303,7 +490,7 @@ export default function MeterReadings() {
                 activeTab === "pending" ? isPending :
                     activeTab === "completed" ? r.status === "synced" :
                         activeTab === "unsynced" ? r.status === "local" :
-                            activeTab === "error" ? r.status === "error" : true;
+                            activeTab === "error" ? r.status === "error" || r.status === "warning" : true;
 
         return matchesSearch && matchesTab;
     });
@@ -322,14 +509,28 @@ export default function MeterReadings() {
     }, {});
     const defaultAccordionValues = Object.keys(groupedByFloor);
 
-    const pageButtons = [1, 2, 3, 4, 5, "...", 10];
-
     return (
         <div className="w-full min-w-0 overflow-x-hidden font-sans">
             <Breadcrumb>
                 <BreadcrumbList>
+                    {fromFacilities ? (
+                        <>
+                            <BreadcrumbItem>
+                                <BreadcrumbLink href="/dashboard/facilities">Quản lý cơ sở</BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator />
+                            {facilityName ? (
+                                <>
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink href={meterReadingsHref}>{facilityName}</BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                    <BreadcrumbSeparator />
+                                </>
+                            ) : null}
+                        </>
+                    ) : null}
                     <BreadcrumbItem>
-                        <BreadcrumbLink href={"/dashboard/meter-readings"}>Quản lý điện nước</BreadcrumbLink>
+                        <BreadcrumbLink href={meterReadingsHref}>Quản lý điện nước</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
@@ -338,103 +539,61 @@ export default function MeterReadings() {
                 </BreadcrumbList>
             </Breadcrumb>
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4 mt-2">
-                <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Meter Readings - June 2026</h1>
-                        <span
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20">In Progress</span>
-                    </div>
-                    <p className="text-sm text-slate-400 dark:text-slate-500">Period: 01/06/2026 - 30/06/2026</p>
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                    {(pending > 0 || errors > 0) ? (
-                        <span
-                            className="text-sm font-medium text-amber-600 dark:text-yellow-300 flex items-center gap-1.5 bg-amber-50 dark:bg-yellow-500/10 px-3 py-2 rounded-lg border border-amber-200 dark:border-yellow-500/20">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                                strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                            {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
+            <div className="mb-4 mt-2">
+                <DashboardPageHeader
+                    title={
+                        <span className="flex items-center gap-3">
+                            Nhập chỉ số điện nước - {formatPeriodLabel(period)}
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                                <CircleDashed className="h-3.5 w-3.5" />
+                                Đang nhập
+                            </span>
                         </span>
-                    ) : (
-                        <span
-                            className="text-sm font-medium text-green-600 dark:text-green-300 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 px-3 py-2 rounded-lg border border-green-200 dark:border-green-500/20">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path
-                                strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            Đã đủ điều kiện chốt kỳ
-                        </span>
-                    )}
-                    <Button
-                        onClick={() => {
-                            const firstPending = filtered.find(r => r.status === "pending" || !r.status);
-                            if (firstPending) {
-                                setFocusRoomId(firstPending.id);
-                            } else if (filtered.length > 0) {
-                                setFocusRoomId(filtered[0].id);
-                            }
-                        }}
-                        variant={"default"}
-                        className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                        <LucideEdit className="w-4 h-4" />
-                        Bắt đầu nhập
-                    </Button>
-                    <Button
-                        onClick={handleSaveAll}
-                        disabled={saving || loading || (pending > 0 || errors > 0)}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        {saving ? "Đang lưu..." : "Lưu tất cả"}
-                    </Button>
-                </div>
+                    }
+                    description={formatPeriodRange(period)}
+                    actions={
+                        <div className="mt-1 flex flex-wrap items-center gap-3">
+                            {(pending > 0 || errors > 0) ? (
+                                <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Đã đủ điều kiện chốt kỳ
+                                </span>
+                            )}
+                            <Button
+                                onClick={() => {
+                                    const firstPending = filtered.find(r => r.status === "pending" || !r.status);
+                                    if (firstPending) {
+                                        setFocusRoomId(firstPending.id);
+                                    } else if (filtered.length > 0) {
+                                        setFocusRoomId(filtered[0].id);
+                                    }
+                                }}
+                                variant={"default"}
+                                className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                <Edit3 className="h-4 w-4" />
+                                Bắt đầu nhập
+                            </Button>
+                        </div>
+                    }
+                />
             </div>
 
             {/* Stat cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 my-6">
-                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Total Rooms</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white">{total}</p>
-                </div>
-                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Completed</p>
-                    <div className="flex items-end gap-2">
-                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{completed}</p>
-                        <span
-                            className="text-base font-semibold text-blue-500 dark:text-blue-300 mb-0.5">{total > 0 ? Math.round((completed / total) * 100) : 0}%</span>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Pending</p>
-                    <div className="flex items-end gap-2">
-                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{pending}</p>
-                        <span
-                            className="text-base font-semibold text-orange-400 mb-0.5">{total > 0 ? Math.round((pending / total) * 100) : 0}%</span>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Unsynced Changes</p>
-                    <div className="flex items-center justify-between">
-                        <p className="text-3xl font-bold text-slate-900 dark:text-white">{unsynced}</p>
-                        <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
-                        </svg>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4">
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Last Sync</p>
-                    <div className="flex items-center justify-between">
-                        <p className="text-xl font-bold text-slate-900 dark:text-white">2 mins ago</p>
-                        <svg className="w-6 h-6 text-green-500 dark:text-green-300" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </div>
-                </div>
+            <div className="my-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <DashboardStatCard icon={Home} label="Tổng số phòng" value={total} tone="blue" subtitle="Trong kỳ ghi chỉ số" />
+                <DashboardStatCard icon={CheckCircle2} label="Đã nhập" value={completed} tone="emerald" subtitle={`${total > 0 ? Math.round((completed / total) * 100) : 0}% hoàn thành`} />
+                <DashboardStatCard icon={CircleDashed} label="Chưa nhập" value={pending} tone="orange" subtitle={`${total > 0 ? Math.round((pending / total) * 100) : 0}% còn lại`} />
+                <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber" subtitle="Thay đổi đang chờ lưu" />
+                <DashboardStatCard icon={RefreshCw} label="Cập nhật" value="Vừa tải" tone="slate" subtitle="Theo dữ liệu backend" />
             </div>
 
             {/* Overall progress */}
-            <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 mb-6">
+            <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tiến độ nhập</span>
                     <span className="text-sm text-slate-500 dark:text-slate-400">{completed} / {total} phòng đã nhập</span>
@@ -461,9 +620,9 @@ export default function MeterReadings() {
                 </div>
                 <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
                     <div className="relative w-full min-w-0 md:w-auto">
-                        <LucideSearch className={"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4"} />
+                        <Search className={"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4"} />
                         <input
-                            className="w-full rounded-lg border border-gray-200 dark:border-white/10 py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 md:w-64"
+                            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-[#0f172a] dark:text-white md:w-64"
                             placeholder="Tìm phòng..."
                             value={search}
                             onChange={(e) => {
@@ -480,64 +639,63 @@ export default function MeterReadings() {
                     <Accordion type="multiple" defaultValue={defaultAccordionValues} className="w-full space-y-4">
                     {Object.entries(groupedByFloor).map(([floor, floorRooms]) => (
                         <AccordionItem key={floor} value={floor}
-                            className="border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#0f172a] shadow-sm">
+                            className="rounded-lg border border-gray-200 bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
                             <AccordionTrigger
                                 className="px-5 py-4 hover:no-underline hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                 <div className="flex items-center gap-3">
                                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">{floor}</h3>
                                     <span
-                                        className="text-xs font-semibold px-2 py-1 rounded-md bg-gray-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-white/10">{floorRooms.length} rooms</span>
+                                        className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{floorRooms.length} phòng</span>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent className="pt-0 pb-0">
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full overflow-x-auto pb-4">
-                                    <Table className="w-full text-sm min-w-[900px]">
+                                    <Table className="w-full text-sm min-w-[1040px]">
                                         <TableHeader>
                                             <TableRow className="bg-gray-50 dark:bg-[#020817] border-y border-gray-200 dark:border-white/10">
                                                 <TableHead
                                                     className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 w-16"
-                                                >Room
+                                                >Phòng
                                                 </TableHead>
                                                 <TableHead
                                                     className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
-                                                >Electricity (kWh)
+                                                >Điện (kWh)
                                                 </TableHead>
                                                 <TableHead
                                                     className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10 border-l border-gray-200 dark:border-white/10"
-                                                >Water (m³)
+                                                >Nước (m³)
                                                 </TableHead>
                                                 <TableHead
                                                     className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
-                                                >Photos
+                                                >Ảnh
                                                 </TableHead>
                                                 <TableHead
                                                     className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                 >
                                                     <span className="flex items-center gap-1">
-                                                        Status
-                                                        <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none"
-                                                            stroke="currentColor" viewBox="0 0 24 24"><path
-                                                                strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        Trạng thái
+                                                        <Info className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                                                     </span>
                                                 </TableHead>
                                                 <TableHead
                                                     className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
-                                                >Actions
+                                                >Thao tác
                                                 </TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {floorRooms.map((room) => {
-                                                const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
-                                                const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
+                                                const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
+                                                const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                                const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                                const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
                                                 const isElecError = elecUsage !== null && elecUsage < 0;
                                                 const isWaterError = waterUsage !== null && waterUsage < 0;
-                                                const st = STATUS_CONFIG[room.status];
+                                                const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
 
                                                 return (
-                                                    <TableRow key={room.key}
+                                                    <TableRow key={room.id}
                                                         className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                         <TableCell
                                                             className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
@@ -547,23 +705,18 @@ export default function MeterReadings() {
                                                             <div className="flex items-center gap-2">
                                                                 <span
                                                                     className="text-slate-500 dark:text-slate-400 w-12 text-right">{room.elecPrev.toLocaleString()}</span>
-                                                                <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0"
-                                                                    fill="none" stroke="currentColor"
-                                                                    viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round"
-                                                                        strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                                                </svg>
+                                                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-14 text-left font-semibold text-xs ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {elecUsage === null ? "" : elecUsage < 0 ? `(${elecUsage})` : `(+${elecUsage})`}
+                                                                    className={`w-28 text-left text-xs font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {elecCharge === null ? "" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
@@ -573,23 +726,18 @@ export default function MeterReadings() {
                                                             <div className="flex items-center gap-2">
                                                                 <span
                                                                     className="text-slate-500 dark:text-slate-400 w-10 text-right">{room.waterPrev}</span>
-                                                                <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0"
-                                                                    fill="none" stroke="currentColor"
-                                                                    viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round"
-                                                                        strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                                                </svg>
+                                                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-12 text-left font-semibold text-xs ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {waterUsage === null ? "" : waterUsage < 0 ? `(${waterUsage})` : `(+${waterUsage})`}
+                                                                    className={`w-28 text-left text-xs font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {waterCharge === null ? "" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
@@ -603,20 +751,9 @@ export default function MeterReadings() {
                                                                         className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white dark:bg-[#0f172a] border-gray-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer shadow-sm" : "bg-gray-50 dark:bg-[#020817] border-transparent text-slate-400 dark:text-slate-500"}`}
                                                                         onClick={() => room.photos > 0 && openPhoto(0)}
                                                                     >
-                                                                        <svg className="w-4 h-4" fill="none"
-                                                                            stroke="currentColor"
-                                                                            viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round"
-                                                                                strokeLinejoin="round"
-                                                                                strokeWidth={1.5}
-                                                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                                                            <path strokeLinecap="round"
-                                                                                strokeLinejoin="round"
-                                                                                strokeWidth={1.5}
-                                                                                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                        </svg>
+                                                                        <Camera className="h-4 w-4" />
                                                                         <span
-                                                                            className="text-xs font-medium whitespace-nowrap">{room.photos > 0 ? `${room.photos} photos` : "Không có"}</span>
+                                                                            className="whitespace-nowrap text-xs font-medium">{room.photos > 0 ? `${room.photos} ảnh` : "Không có"}</span>
                                                                     </div>
                                                                 )}
                                                             />
@@ -632,11 +769,9 @@ export default function MeterReadings() {
                                                                     {room.syncTime &&
                                                                         <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
                                                                     {room.status === "error" &&
-                                                                        <p className="text-xs text-red-400">Check
-                                                                            reading</p>}
+                                                                        <p className="text-xs text-red-400">Kiểm tra lại chỉ số</p>}
                                                                     {room.status === "local" &&
-                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Not
-                                                                            synced</p>}
+                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Chưa đồng bộ</p>}
                                                                 </div>
                                                             </div>
                                                         </TableCell>
@@ -647,7 +782,7 @@ export default function MeterReadings() {
                                                             <button
                                                                 onClick={() => setFocusRoomId(room.id)}
                                                                 className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
-                                                                <LucideEdit size={16} />
+                                                                <Edit3 size={16} />
                                                             </button>
                                                         </TableCell>
                                                     </TableRow>
@@ -660,14 +795,16 @@ export default function MeterReadings() {
                                 {/* Mobile Card List View */}
                                 <div className="flex flex-col gap-4 p-2 md:hidden w-full overflow-x-auto pb-4">
                                     {floorRooms.map((room) => {
-                                        const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
-                                        const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
+                                        const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
+                                        const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                        const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                        const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
                                         const isElecError = elecUsage !== null && elecUsage < 0;
                                         const isWaterError = waterUsage !== null && waterUsage < 0;
-                                        const st = STATUS_CONFIG[room.status];
+                                        const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
 
                                         return (
-                                            <div key={room.key}
+                                            <div key={room.id}
                                                 className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm relative">
                                                 <div className="flex justify-between items-start mb-3">
                                                     <div>
@@ -680,8 +817,9 @@ export default function MeterReadings() {
                                                         </div>
                                                     </div>
                                                     <button
+                                                        onClick={() => setFocusRoomId(room.id)}
                                                         className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-                                                        <LucideEdit size={18} />
+                                                        <Edit3 size={18} />
                                                     </button>
                                                 </div>
 
@@ -689,22 +827,23 @@ export default function MeterReadings() {
                                                     {/* Electricity */}
                                                     <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
                                                         <div
-                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Electricity
+                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Điện
                                                             (kWh)
                                                         </div>
                                                         <div
                                                             className="grid grid-cols-3 gap-2 text-sm items-center">
                                                             <div className="flex flex-col">
                                                                 <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500">Previous</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
                                                                 <span
                                                                     className="font-medium text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</span>
                                                             </div>
                                                             <div className="flex flex-col items-center">
                                                                 <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Current</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
@@ -712,10 +851,10 @@ export default function MeterReadings() {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Usage</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
                                                                 <span
-                                                                    className={`font-semibold ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {elecUsage === null ? "—" : elecUsage < 0 ? elecUsage : `+${elecUsage}`}
+                                                                    className={`font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {elecCharge === null ? "—" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -724,22 +863,23 @@ export default function MeterReadings() {
                                                     {/* Water */}
                                                     <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
                                                         <div
-                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Water
+                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Nước
                                                             (m³)
                                                         </div>
                                                         <div
                                                             className="grid grid-cols-3 gap-2 text-sm items-center">
                                                             <div className="flex flex-col">
                                                                 <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500">Previous</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
                                                                 <span
                                                                     className="font-medium text-slate-700 dark:text-slate-200">{room.waterPrev}</span>
                                                             </div>
                                                             <div className="flex flex-col items-center">
                                                                 <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Current</span>
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
                                                                 <input
                                                                     type="number"
+                                                                    min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
@@ -747,10 +887,10 @@ export default function MeterReadings() {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Usage</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
                                                                 <span
-                                                                    className={`font-semibold ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {waterUsage === null ? "—" : waterUsage}
+                                                                    className={`font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {waterCharge === null ? "—" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -761,7 +901,7 @@ export default function MeterReadings() {
                                                     className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
                                                     <div>
                                                         <span
-                                                            className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Photos</span>
+                                                            className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Ảnh</span>
                                                         <PhotoGallery
                                                             photos={MOCK_PHOTOS.slice(0, room.photos)}
                                                             renderTrigger={(openPhoto) => (
@@ -794,9 +934,9 @@ export default function MeterReadings() {
                                                         {room.syncTime &&
                                                             <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
                                                         {room.status === "error" &&
-                                                            <p className="text-xs text-red-400">Check reading</p>}
+                                                            <p className="text-xs text-red-400">Kiểm tra lại chỉ số</p>}
                                                         {room.status === "local" &&
-                                                            <p className="text-xs text-slate-400 dark:text-slate-500">Not synced</p>}
+                                                            <p className="text-xs text-slate-400 dark:text-slate-500">Chưa đồng bộ</p>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -815,62 +955,58 @@ export default function MeterReadings() {
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1.5"><span
-                            className="w-2 h-2 rounded-full bg-green-500"></span>Synced</span>
+                            className="w-2 h-2 rounded-full bg-emerald-500"></span>Đã lưu</span>
                         <span className="flex items-center gap-1.5"><span
-                            className="w-2 h-2 rounded-full bg-orange-400"></span>Local Only</span>
+                            className="w-2 h-2 rounded-full bg-orange-400"></span>Chưa đồng bộ</span>
                         <span className="flex items-center gap-1.5"><span
-                            className="w-2 h-2 rounded-full bg-red-500"></span>Error</span>
+                            className="w-2 h-2 rounded-full bg-red-500"></span>Lỗi chỉ số</span>
                     </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button
-                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors w-full md:w-auto">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Review & Submit Readings
-                    </button>
                 </div>
             </div>
 
             {/* Focus Mode Modal */}
             <Dialog open={!!focusRoomId} onOpenChange={(open) => !open && setFocusRoomId(null)}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden sm:max-w-md">
                     {focusRoomId && (() => {
                         const room = rooms.find(r => r.id === focusRoomId);
                         if (!room) return null;
 
-                        const elecUsage = calculateMeterUsage(room.elecCurr, room.elecPrev);
-                        const waterUsage = calculateMeterUsage(room.waterCurr, room.waterPrev);
+                        const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
+                        const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                        const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                        const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
 
                         return (
                             <>
-                                <DialogHeader>
+                                <DialogHeader className="shrink-0">
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
-                                <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-2 pr-10 scrollbar-hide border-b border-gray-100 dark:border-white/10 mb-2" ref={horizontalScrollRef}>
-                                    {filtered.map(r => (
+                                <div className="mt-4 flex w-full shrink-0 touch-pan-x items-center gap-2 overflow-x-auto border-b border-gray-100 pb-3 pr-8 dark:border-white/10">
+                                    {filtered.map((item) => (
                                         <button
-                                            key={r.id}
-                                            onClick={() => setFocusRoomId(r.id)}
-                                            className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${r.id === focusRoomId ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-gray-200'}`}
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => setFocusRoomId(item.id)}
+                                            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${item.id === focusRoomId ? "bg-blue-600 text-white shadow-sm" : "bg-gray-100 text-slate-600 hover:bg-gray-200 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"}`}
                                         >
-                                            {r.id}
+                                            {item.id}
                                         </button>
                                     ))}
                                 </div>
-                                <div className="space-y-6 py-4">
+                                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto py-4 pr-1">
                                     {/* Electricity */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                                                <Zap className="h-4 w-4 text-amber-500" />
                                                 Điện (kWh)
                                             </h4>
                                             {elecUsage !== null && elecUsage < 0 && (
                                                 <span
-                                                    className="text-xs font-medium text-red-500 dark:text-rose-300 bg-red-50 dark:bg-rose-500/10 px-2 py-1 rounded">⚠ Không hợp lệ</span>
+                                                    className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-500 dark:bg-rose-500/10 dark:text-rose-300">
+                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                    Không hợp lệ
+                                                </span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -882,6 +1018,7 @@ export default function MeterReadings() {
                                                 <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
+                                                    min="0"
                                                     className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.elecCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
@@ -889,18 +1026,37 @@ export default function MeterReadings() {
                                                 />
                                             </div>
                                         </div>
+                                        {elecCharge ? (
+                                            <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span className={`text-sm font-semibold ${elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                        {elecCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(elecCharge.amount)}
+                                                    </span>
+                                                </div>
+                                                {!elecCharge.isInvalid ? (
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {elecCharge.billableUsage} kWh x {formatVnd(elecCharge.unitPrice)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        {renderEvidenceCapture(room, "electricity", "Ảnh minh chứng điện")}
                                     </div>
 
                                     {/* Water */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                                                <Droplets className="h-4 w-4 text-blue-500" />
                                                 Nước (m³)
                                             </h4>
                                             {waterUsage !== null && waterUsage < 0 && (
                                                 <span
-                                                    className="text-xs font-medium text-red-500 dark:text-rose-300 bg-red-50 dark:bg-rose-500/10 px-2 py-1 rounded">⚠ Không hợp lệ</span>
+                                                    className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-500 dark:bg-rose-500/10 dark:text-rose-300">
+                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                    Không hợp lệ
+                                                </span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -912,6 +1068,7 @@ export default function MeterReadings() {
                                                 <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
                                                 <input
                                                     type="number"
+                                                    min="0"
                                                     className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.waterCurr ?? ""}
                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
@@ -919,42 +1076,34 @@ export default function MeterReadings() {
                                                 />
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        {capturedPhotos[room.id] ? (
-                                            <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-white/10">
-                                                <img src={capturedPhotos[room.id].previewUrl} alt="Captured" className="w-full h-48 object-contain bg-gray-50 dark:bg-[#020817] bg-black/5" />
-                                                <button
-                                                    onClick={() => {
-                                                        const newPhotos = {...capturedPhotos};
-                                                        delete newPhotos[room.id];
-                                                        setCapturedPhotos(newPhotos);
-                                                    }}
-                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
+                                        {waterCharge ? (
+                                            <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 dark:border-blue-500/20 dark:bg-blue-500/10">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span className={`text-sm font-semibold ${waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                        {waterCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(waterCharge.amount)}
+                                                    </span>
+                                                </div>
+                                                {!waterCharge.isInvalid ? (
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {waterCharge.billableUsage} m³ tính phí sau miễn {waterCharge.freeAllowance} m³ x {formatVnd(waterCharge.unitPrice)}
+                                                    </p>
+                                                ) : null}
                                             </div>
-                                        ) : (
-                                            <Button variant="primary"
-                                                onClick={() => setCameraOpen(true)}
-                                                className="w-full flex items-center gap-2 justify-center">
-                                                <LucideCamera className="w-4 h-4" />
-                                                Chụp ảnh minh chứng
-                                            </Button>
-                                        )}
+                                        ) : null}
+                                        {renderEvidenceCapture(room, "water", "Ảnh minh chứng nước")}
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 mt-4">
+                                <div className="mt-4 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
                                     <Button variant="primary" onClick={() => setFocusRoomId(null)}
                                         className="w-1/3">
                                         Đóng
                                     </Button>
                                     <Button onClick={handleSaveAndNext}
+                                        disabled={saving}
                                         className="w-2/3 bg-blue-600 hover:bg-blue-700">
-                                        Lưu & Tiếp theo
+                                        {saving ? "Đang lưu..." : "Lưu & Tiếp theo"}
                                     </Button>
                                 </div>
                             </>
@@ -964,13 +1113,17 @@ export default function MeterReadings() {
             </Dialog>
 
             <CameraCapture
-                open={cameraOpen}
-                onClose={() => setCameraOpen(false)}
+                open={!!cameraTarget}
+                title={cameraTarget?.type === "water" ? "Chụp ảnh đồng hồ nước" : "Chụp ảnh đồng hồ điện"}
+                onClose={() => setCameraTarget(null)}
                 onCapture={(photoData) => {
-                    if (focusRoomId) {
+                    if (cameraTarget?.roomId && cameraTarget?.type) {
                         setCapturedPhotos(prev => ({
                             ...prev,
-                            [focusRoomId]: photoData
+                            [cameraTarget.roomId]: {
+                                ...(prev[cameraTarget.roomId] || {}),
+                                [cameraTarget.type]: photoData,
+                            },
                         }));
                     }
                 }}

@@ -6,8 +6,10 @@ import {
   Banknote,
   Building2,
   Loader2,
+  RefreshCw,
   WifiOff,
 } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { fetchDebtSummary } from "@/services/debtService";
 
 const CACHE_KEY = "debt_summary_cache";
@@ -21,7 +23,7 @@ const DEBT_TYPE_LABELS = {
 };
 
 function formatMoney(value) {
-  return `${money.format(Number(value || 0))} đ`;
+  return `${money.format(Number(value || 0))} VNĐ`;
 }
 
 function debtTypeLabel(value) {
@@ -119,31 +121,39 @@ export default function DebtDashboardPage() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-            Công nợ tổng hợp
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Theo dõi phòng đang nợ tiền phòng, điện nước và các phòng vượt
-            ngưỡng.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={propertyId}
-            onChange={(event) => setPropertyId(event.target.value)}
-            className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold"
-          >
-            <option value="">Tất cả cơ sở</option>
-            {properties.map((property) => (
-              <option key={property.id} value={property.id}>
-                {property.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+      <DashboardPageHeader
+        title="Công nợ tổng hợp"
+        description="Theo dõi phòng đang nợ tiền phòng, điện nước và các phòng vượt ngưỡng."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={propertyId}
+              onChange={(event) => setPropertyId(event.target.value)}
+              className="h-10 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold"
+            >
+              <option value="">Tất cả cơ sở</option>
+              {properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={loadDebts}
+              disabled={loading}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Làm mới
+            </button>
+          </div>
+        }
+      />
 
       {error && (
         <section

@@ -6,12 +6,15 @@ function loadDepositContractsService() {
   const source = readFileSync(new URL("./depositContractsService.js", import.meta.url), "utf8")
     .replace(/import\s*{\s*API_BASE_URL\s*}\s*from\s*"@\/lib\/apiConfig";\s*/m, "")
     .replace(/import\s*{\s*refreshTokenApi\s*}\s*from\s*"@\/services\/identityAccessService";\s*/m, "")
+    .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/lib\/pageResponse";\s*/m, "")
     .replaceAll("export async function ", "async function ")
     .replaceAll("export function ", "function ");
 
   const factory = new Function(
     "API_BASE_URL",
     "refreshTokenApi",
+    "normalizePageResponse",
+    "readPageItems",
     `${source}
 return {
   downloadDepositContractPdf,
@@ -23,7 +26,18 @@ return {
 };`,
   );
 
-  return factory("https://api.test/api/v1", async () => {});
+  return factory(
+    "https://api.test/api/v1",
+    async () => {},
+    (payload, { page, size, items }) => ({
+      items,
+      page: payload.currentPage ?? page,
+      size: payload.pageSize ?? size,
+      totalElements: payload.totalElements ?? items.length,
+      totalPages: payload.totalPages ?? 1,
+    }),
+    (payload) => (Array.isArray(payload?.data) ? payload.data : []),
+  );
 }
 
 test("buildDepositContractDocumentFilename formats HDC filename from room and expected move-in date", () => {

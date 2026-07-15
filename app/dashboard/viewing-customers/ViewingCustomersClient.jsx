@@ -34,6 +34,7 @@ import {
 } from "@/services/viewingCustomersService";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const emptyForm = {
   fullName: "",
@@ -537,7 +538,7 @@ export default function ViewingCustomersClient() {
           }),
           fetchViewingCustomerStats(), // API now ignores filters for internal total counting
         ]);
-        setCustomers(listData.items);
+        setCustomers(sortByNewest(listData.items, ["createdAt", "created_at"]));
         setPagination(listData);
         setStats(statsData);
         setErrorMessage("");
@@ -556,7 +557,7 @@ export default function ViewingCustomersClient() {
           page: nextPage,
           size: trashPageSize,
         });
-        setTrashRows(data.items);
+        setTrashRows(sortByNewest(data.items, ["deletedAt", "deleted_at", "createdAt", "created_at"]));
         setTrashPagination(data);
         setErrorMessage("");
       } catch (error) {
@@ -842,14 +843,14 @@ export default function ViewingCustomersClient() {
                 onChange={(event) =>
                   updateFilter("fromDate", event.target.value)
                 }
-                className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
+                className="h-9 w-full rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10 sm:w-40"
               />
               <span>đến</span>
               <input
                 type="date"
                 value={filters.toDate}
                 onChange={(event) => updateFilter("toDate", event.target.value)}
-                className="h-9 rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs"
+                className="h-9 w-full rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10 sm:w-40"
               />
               <button
                 type="button"

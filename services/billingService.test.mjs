@@ -68,6 +68,7 @@ test("fetchBillingInvoices forwards property and room filters", async () => {
   assert.equal(url.searchParams.get("invoiceType"), "RENT");
   assert.equal(url.searchParams.get("propertyId"), "3");
   assert.equal(url.searchParams.get("roomId"), "12");
+  assert.equal(url.searchParams.get("sort"), "createdAt,desc");
 });
 
 test("billing API helpers send numeric override and manual payment payloads", async () => {

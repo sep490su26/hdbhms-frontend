@@ -75,12 +75,12 @@ export const ASSET_CONDITION_VALUES = {
 export function normalizeAsset(raw) {
   return {
     id: raw.id ?? null,
-    roomId: raw.roomId ?? raw.room_id ?? null,
-    assetName: raw.assetName ?? raw.asset_name ?? "",
-    assetCategory: raw.assetCategory ?? raw.asset_category ?? "",
+    roomId: raw.roomId ?? null,
+    assetName: raw.assetName ?? "",
+    assetCategory: raw.assetCategory ?? "",
     quantity: raw.quantity ?? 1,
-    currentCondition: raw.currentCondition ?? raw.current_condition ?? "GOOD",
+    currentCondition: raw.currentCondition ?? "GOOD",
     description: raw.description ?? "",
-    fileImageId: raw.fileImageId ?? raw.file_image_id ?? null,
+    fileImageId: raw.fileImageId ?? null,
   };
 }

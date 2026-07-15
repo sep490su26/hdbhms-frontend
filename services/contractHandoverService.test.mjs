@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-function loadContractHandoverService() {
+function loadContractHandoverService(overrides = {}) {
   const source = readFileSync(new URL("./contractHandoverService.js", import.meta.url), "utf8")
     .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/services\/identityAccessService";\s*/m, "")
     .replaceAll("export async function ", "async function ")
@@ -13,12 +13,14 @@ function loadContractHandoverService() {
     "API_BASE_URL",
     "ApiError",
     "authenticatedFetch",
+    "getAuthToken",
     "refreshTokenApi",
     `${source}
 return {
   buildHandoverDocumentFilename,
   downloadHandoverDraftPdf,
   downloadHandoverSignedPdf,
+  fetchLatestReadings,
 };`,
   );
 
@@ -32,7 +34,8 @@ return {
   return factory(
     "https://api.test/api/v1",
     ApiError,
-    async () => ({}),
+    overrides.authenticatedFetch ?? (async () => ({})),
+    () => "",
     async () => {},
   );
 }
@@ -102,6 +105,19 @@ test("handover download fallbacks do not use legacy bien-ban filenames", () => {
     /downloadHandoverDraftPdf\(\s*contractId,\s*"MOVE_IN",\s*buildHandoverDocumentFilename\(contractDetails\),?\s*\)/,
   );
   assert.doesNotMatch(stepperSource, /downloadHandoverDraftPdf\(contractId, "MOVE_IN"\);/);
+});
+
+test("fetchLatestReadings treats optional API errors as unavailable readings", async () => {
+  const { fetchLatestReadings } = loadContractHandoverService({
+    authenticatedFetch: async () => {
+      const error = new Error("Khong the xu ly yeu cau.");
+      error.isApiError = true;
+      error.status = 500;
+      throw error;
+    },
+  });
+
+  assert.equal(await fetchLatestReadings(205), null);
 });
 
 test("downloadHandoverDraftPdf prefers backend content-disposition filename", async () => {

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {useProfile} from "../_hooks/useProfile";
 import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 function getInitials(name) {
   return String(name || "User")
@@ -172,10 +173,10 @@ export function ProfilePage() {
   if (state.isLoading && !state.profile) {
     return (
       <>
-        <header>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Hồ sơ của tôi</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Đang tải thông tin cá nhân và công việc...</p>
-        </header>
+        <DashboardPageHeader
+          title="Hồ sơ của tôi"
+          description="Đang tải thông tin cá nhân và công việc..."
+        />
         <LoadingState />
       </>
     );
@@ -186,15 +187,11 @@ export function ProfilePage() {
 
   return (
     <>
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white">Hồ sơ của tôi</h1>
-          <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Quản lý thông tin cá nhân và thông tin công việc của bạn.
-          </p>
-        </div>
-        {state.missingFields.length > 0 && <CompletionBadge />}
-      </header>
+      <DashboardPageHeader
+        title="Hồ sơ của tôi"
+        description="Quản lý thông tin cá nhân và thông tin công việc của bạn."
+        actions={state.missingFields.length > 0 ? <CompletionBadge /> : null}
+      />
 
       {state.loadError && (
         <div

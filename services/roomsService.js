@@ -41,15 +41,24 @@ async function readApiResponse(response, fallbackMessage) {
 }
 
 export function mapApiRoomStatus(currentStatus) {
-  const statusLower = currentStatus?.toLowerCase() ?? "";
+  const statusLower = String(currentStatus ?? "").trim().toLowerCase();
 
+  if (statusLower === "draft") return "draft";
   if (statusLower === "vacant" || statusLower === "available") return "available";
-  if (statusLower === "on_hold") return "onHold";
-  if (statusLower === "reserved" || statusLower === "deposited") return "deposited";
+  if (statusLower === "on_hold" || statusLower === "holding") return "onHold";
+  if (statusLower === "reserved" || statusLower === "reserved_for_transfer" || statusLower === "deposited") return "deposited";
   if (statusLower === "soon_vacant") return "soonVacant";
   if (statusLower === "maintenance") return "maintenance";
   if (statusLower === "expired") return "expired";
   return "occupied";
+}
+
+function apiRoomStatus(apiRoom) {
+  return apiRoom?.current_status ?? apiRoom?.currentStatus ?? apiRoom?.status;
+}
+
+function isPublicRoomVisible(apiRoom) {
+  return mapApiRoomStatus(apiRoomStatus(apiRoom)) !== "draft";
 }
 
 function normalizeRoomImageValue(image) {
@@ -93,7 +102,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   const floorNumber = floorOrder ?? parseInt(floorName?.replace(/\D/g, "") || "1", 10);
 
   const imageUrls = normalizeRoomImages(apiRoom);
-  const status = mapApiRoomStatus(apiRoom.current_status ?? apiRoom.currentStatus);
+  const status = mapApiRoomStatus(apiRoomStatus(apiRoom));
 
   const normalizedRoom = {
     id: roomCode, // Key for frontend routing/display (e.g., P101)
@@ -106,6 +115,8 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     buildingName: apiRoom.floor?.property?.name ?? apiRoom.property_name ?? apiRoom.propertyName ?? "Hải Đăng House",
     name: apiRoom.name ?? roomCode,
     status,
+    createdAt: apiRoom.created_at ?? apiRoom.createdAt ?? null,
+    updatedAt: apiRoom.updated_at ?? apiRoom.updatedAt ?? null,
     expectedVacantDate: apiRoom.expected_vacant_date ?? apiRoom.expectedVacantDate ?? null,
     type: apiRoom.type ?? "standard",
     image: imageUrls[0],
@@ -115,11 +126,11 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     floorNumber,
     positionX: apiRoom.position_x ?? apiRoom.positionX ?? null,
     positionY: apiRoom.position_y ?? apiRoom.positionY ?? null,
-    priceLabel: listedPrice ? `${(listedPrice / 1000000).toLocaleString("vi-VN")} tr/tháng` : "Liên hệ",
+    priceLabel: listedPrice ? `${listedPrice.toLocaleString("vi-VN")} VNĐ/tháng` : "Liên hệ",
     price: listedPrice,
     listedPrice,
     deposit: listedPrice,
-    depositLabel: listedPrice ? (listedPrice / 1000000).toLocaleString("vi-VN") + "M" : "Liên hệ",
+    depositLabel: listedPrice ? `${listedPrice.toLocaleString("vi-VN")} VNĐ` : "Liên hệ",
     area: apiRoom.area_m2 ?? apiRoom.areaM2 ?? apiRoom.area ?? 0,
     feature: apiRoom.public_note ?? apiRoom.publicNote ?? "Tiện nghi",
     description: apiRoom.description ?? apiRoom.public_note ?? apiRoom.publicNote ?? "Không có mô tả",
@@ -148,6 +159,19 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
 export async function fetchPublicProperties() {
   const response = await fetch(`${API_BASE_URL}/properties/simple`, { cache: "no-store" });
   return readApiResponse(response, "Không thể tải danh sách cơ sở");
+}
+
+function pageRows(pageResponse) {
+  if (Array.isArray(pageResponse)) return pageResponse;
+  if (Array.isArray(pageResponse?.data)) return pageResponse.data;
+  return [];
+}
+
+export async function fetchPublicActiveProperties() {
+  const params = new URLSearchParams({ status: "ACTIVE", size: "500" });
+  const response = await fetch(`${API_BASE_URL}/properties?${params.toString()}`, { cache: "no-store" });
+  const data = await readApiResponse(response, "Không thể tải danh sách cơ sở đang hoạt động");
+  return pageRows(data);
 }
 
 export async function fetchPublicFloors(propertyId) {
@@ -196,7 +220,7 @@ function enrichRoomWithFloor(room, floors, property) {
 }
 
 export async function fetchPublicRoomCatalog({ propertyId } = {}) {
-  const properties = await fetchPublicProperties();
+  const properties = await fetchPublicActiveProperties();
   const property = propertyId
     ? properties.find((item) => String(item.id) === String(propertyId))
     : properties[0];
@@ -215,7 +239,9 @@ export async function fetchPublicRoomCatalog({ propertyId } = {}) {
     const right = b.sort_order ?? b.sortOrder ?? 0;
     return left - right;
   });
-  const roomsWithFloor = roomsData.map((room) => enrichRoomWithFloor(room, sortedFloors, property));
+  const roomsWithFloor = roomsData
+    .filter(isPublicRoomVisible)
+    .map((room) => enrichRoomWithFloor(room, sortedFloors, property));
   const floorsWithRooms = sortedFloors.map((floor) => ({
     ...floor,
     rooms: roomsWithFloor.filter((room) => String(room.floor_id ?? room.floorId) === String(floor.id)),
@@ -228,14 +254,47 @@ export async function fetchPublicRoomCatalog({ propertyId } = {}) {
   };
 }
 
-export async function fetchPublicRoomById(roomIdentifier) {
+function roomMatchesIdentifier(room, roomIdentifier) {
+  const identifiers = [
+    room?.id,
+    room?.room_id,
+    room?.roomId,
+    room?.room_code,
+    room?.roomCode,
+    room?.code,
+    room?.name,
+  ];
+  return identifiers.some((value) => String(value ?? "") === String(roomIdentifier));
+}
+
+function roomMatchesProperty(room, propertyId) {
+  if (!propertyId) return true;
+  const roomPropertyId =
+    room?.property_id ??
+    room?.propertyId ??
+    room?.floor?.property?.id ??
+    null;
+  return String(roomPropertyId ?? "") === String(propertyId);
+}
+
+export async function fetchPublicRoomById(roomIdentifier, { propertyId } = {}) {
   if (!roomIdentifier) return null;
+
+  if (propertyId) {
+    const catalog = await fetchPublicRoomCatalog({ propertyId });
+    const scopedRoom = catalog.rooms.find((room) =>
+      roomMatchesIdentifier(room, roomIdentifier),
+    );
+    if (scopedRoom) return scopedRoom;
+  }
 
   try {
     const response = await fetch(`${PUBLIC_ROOMS_API_URL}/${encodeURIComponent(roomIdentifier)}`, { cache: "no-store" });
     const data = await readApiResponse(response, "Không thể tải chi tiết phòng");
 
     if (data) {
+      if (!isPublicRoomVisible(data)) return null;
+      if (!roomMatchesProperty(data, propertyId)) return null;
       return data;
     }
   } catch {
@@ -243,11 +302,7 @@ export async function fetchPublicRoomById(roomIdentifier) {
   }
 
   const catalog = await fetchPublicRoomCatalog();
-  return catalog.rooms.find((room) => {
-    const id = room.id ?? room.room_id ?? room.roomId;
-    const code = room.room_code ?? room.roomCode;
-    return String(id) === String(roomIdentifier) || String(code) === String(roomIdentifier);
-  }) ?? null;
+  return catalog.rooms.find((room) => roomMatchesIdentifier(room, roomIdentifier)) ?? null;
 }
 
 export async function checkoutDeposit(formData) {
@@ -494,6 +549,7 @@ export function findRoomById(roomId) {
 
 export function statusCopy(status) {
   const copy = {
+    draft: "Bản nháp",
     available: "Trống",
     onHold: "Đang đặt cọc",
     deposited: "Đã đặt cọc",
@@ -503,5 +559,5 @@ export function statusCopy(status) {
     expired: "Hết hạn",
   };
 
-  return copy[status] || "Đang ở";
+  return copy[status] || "Chưa rõ";
 }

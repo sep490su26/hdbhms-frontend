@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import ExpiryModal from "../../../components/ExpiryModal";
 import {
@@ -33,6 +33,8 @@ import {
   expireBatchDeposit,
   fetchBatchDepositStatus,
   fetchDepositRoomHoldStatus,
+  fetchPublicRoomCatalog,
+  normalizeApiRoom,
 } from "../../../services/roomsService";
 import {
   clearDepositBatchDraft,
@@ -42,10 +44,14 @@ import {
 import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
 import { previewDepositContract } from "../../../services/depositContractsService";
 import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
+import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
+import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
 
 const DEPOSIT_PER_ROOM = 2000;
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
+const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
@@ -62,7 +68,7 @@ function todayValue(offsetDays = 0) {
 }
 
 function formatMoney(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+  return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
 }
 
 function normalizePhone(value) {
@@ -128,15 +134,19 @@ function validateField(name, value, form = {}) {
   return "";
 }
 
-function TextField({ label, required, error, ...props }) {
+function TextField({ label, required, error, type, placeholder, ...props }) {
+  const InputComponent = type === "date" ? DateInput : "input";
+
   return (
     <label className="grid gap-2 text-sm font-bold text-slate-700">
       <span>
         {label}
         {required ? <span className="text-rose-600"> *</span> : null}
       </span>
-      <input
+      <InputComponent
         required={required}
+        type={type === "date" ? undefined : type}
+        placeholder={type === "date" ? placeholder || "dd/mm/yyyy" : placeholder}
         {...props}
         aria-invalid={error ? "true" : "false"}
         className={`h-12 w-full rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition ${error
@@ -327,10 +337,21 @@ function createDefaultRoomForms(rooms) {
   );
 }
 
-export function BatchDepositClient({ initialRooms, initialError = "" }) {
+export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const roomIdsParam = searchParams.get("roomIds") || "";
+  const requestedRoomIds = useMemo(
+    () => roomIdsParam.split(",").map((value) => value.trim()).filter(Boolean),
+    [roomIdsParam],
+  );
+  const requestedRoomKey = requestedRoomIds.join(",");
   const [rooms, setRooms] = useState(initialRooms);
   const [roomForms, setRoomForms] = useState(() => createDefaultRoomForms(initialRooms));
+  const [roomLookup, setRoomLookup] = useState(() => ({
+    key: initialRooms.length > 0 ? requestedRoomKey : "",
+    error: "",
+  }));
   const [form, setForm] = useState({
     fullName: "",
     dob: "",
@@ -346,6 +367,7 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
   });
   const [files, setFiles] = useState({ front: null, back: null, portrait: null });
   const [filePreviews, setFilePreviews] = useState({ front: "", back: "", portrait: "" });
+  const [identityEntryMode, setIdentityEntryMode] = useState("scan");
   const [checkout, setCheckout] = useState(null);
   const [batchStatus, setBatchStatus] = useState(null);
   const [qrImage, setQrImage] = useState("");
@@ -365,6 +387,8 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
   const dismissedConflictRef = useRef("");
   const didHandleExpiryRef = useRef(false);
 
+  const isLoadingRooms = Boolean(requestedRoomKey) && roomLookup.key !== requestedRoomKey;
+  const roomLoadError = roomLookup.key === requestedRoomKey ? roomLookup.error : "";
   const totalAmount = rooms.length * DEPOSIT_PER_ROOM;
   const expiresAtMs = useMemo(() => (checkout ? resolveExpiresAtMs(checkout) : null), [checkout]);
   const paymentExpired = Boolean(expiresAtMs && remainingMs !== null && remainingMs <= 0);
@@ -372,6 +396,7 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
     const review = contractReviews[room.roomId];
     return review?.accepted && review.signature === contractSignature(room, form);
   });
+  const isCccdScanMode = identityEntryMode === "scan";
   const initialRoomKey = useMemo(
     () => initialRooms.map((room) => String(room.roomId)).join(","),
     [initialRooms],
@@ -431,6 +456,41 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
   useEffect(() => {
     setError(initialError);
   }, [initialError]);
+
+  useEffect(() => {
+    if (!requestedRoomKey) return undefined;
+
+    let isActive = true;
+
+    fetchPublicRoomCatalog()
+      .then((catalog) => {
+        if (!isActive) return;
+        const requestedIdSet = new Set(requestedRoomIds);
+        const nextRooms = catalog.rooms
+          .map((room) => normalizeApiRoom(room))
+          .filter((room) => requestedIdSet.has(String(room.roomId)));
+        setRooms(nextRooms);
+        setRoomForms((current) => Object.fromEntries(
+          nextRooms.map((room) => [
+            room.roomId,
+            current[room.roomId] || { occupantCount: 1, coOccupants: [] },
+          ]),
+        ));
+        setRoomLookup({ key: requestedRoomKey, error: "" });
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setRooms([]);
+        setRoomLookup({
+          key: requestedRoomKey,
+          error: "Không thể tải danh sách phòng đã chọn. Vui lòng thử lại sau.",
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [requestedRoomIds, requestedRoomKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -719,6 +779,54 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
       setFilePreviews((current) => ({ ...current, [name]: String(reader.result || "") }));
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCccdFilesChange = ({ files: cccdFiles = {}, previews = {} }) => {
+    const nextFront = cccdFiles.citizenIdFront || null;
+    const nextBack = cccdFiles.citizenIdBack || null;
+
+    setFiles((current) => ({
+      ...current,
+      front: nextFront,
+      back: nextBack,
+    }));
+    setFilePreviews((current) => ({
+      ...current,
+      front: previews.citizenIdFront || "",
+      back: previews.citizenIdBack || "",
+    }));
+    setFieldErrors((current) => ({
+      ...current,
+      front: nextFront ? "" : current.front,
+      back: nextBack ? "" : current.back,
+    }));
+  };
+
+  const handleCccdExtracted = ({ identity } = {}) => {
+    const extractedValues = {
+      fullName: identity?.fullName || "",
+      dob: identity?.dob || "",
+      idNumber: identity?.idNumber || "",
+      idIssueDate: identity?.issuedDate || "",
+      permanentAddress: identity?.address || "",
+    };
+    const nextForm = { ...form };
+
+    Object.entries(extractedValues).forEach(([name, value]) => {
+      if (value) nextForm[name] = value;
+    });
+
+    setForm(nextForm);
+    setFieldErrors((current) => {
+      const nextErrors = { ...current };
+      Object.entries(extractedValues).forEach(([name, value]) => {
+        if (value) nextErrors[name] = validateField(name, value, nextForm);
+      });
+      if (nextForm.dob && nextForm.idIssueDate) {
+        nextErrors.idIssueDate = validateField("idIssueDate", nextForm.idIssueDate, nextForm);
+      }
+      return nextErrors;
+    });
   };
 
   const validateForm = () => {
@@ -1060,10 +1168,23 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
     ? contractReviews[activeContractRoom.roomId]
     : null;
 
+  if (isLoadingRooms) {
+    return (
+      <main className="min-h-screen bg-[#f5f3f4] px-4 pb-16 pt-28 text-[#091426] sm:px-6">
+        <div className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-black">Đang tải danh sách phòng</h1>
+          <p className="mt-3 text-sm leading-6 text-[#45474c]">
+            Hệ thống đang kiểm tra các phòng đã chọn trước khi đặt cọc.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (checkout) {
     const paymentUnavailable = terminalError || paymentExpired || isSessionExpired;
     const paymentRooms = checkout.rooms || rooms;
-    const totalAmountLabel = `${Number(checkout.totalAmount || 0).toLocaleString("vi-VN")} VND`;
+    const totalAmountLabel = `${Number(checkout.totalAmount || 0).toLocaleString("vi-VN")} VNĐ`;
     const roomCodesLabel = paymentRooms.map((room) => room.roomCode).filter(Boolean).join(", ");
     const manualTransferAvailable = Boolean(
       checkout.bankShortName
@@ -1154,7 +1275,9 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                                 </div>
                                 {roomPrice > 0 ? (
                                   <p className="whitespace-nowrap text-right">
-                                    <strong className="text-[#006c49]">{(roomPrice / 1_000_000).toFixed(1)}M</strong>
+                                    <strong className="text-[#006c49]">
+                                      {formatMoney(roomPrice)}
+                                    </strong>
                                     <span className="text-xs text-[#45474c]"> /tháng</span>
                                   </p>
                                 ) : null}
@@ -1356,7 +1479,7 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
 
         {rooms.length < 1 && (
           <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-800">
-            Cần có ít nhất 1 phòng để tiếp tục đặt cọc.
+            {roomLoadError || "Cần có ít nhất 1 phòng để tiếp tục đặt cọc."}
           </div>
         )}
         {fieldErrors.rooms ? (
@@ -1405,7 +1528,7 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                           </div>
                           <p className="whitespace-nowrap text-right">
                             <strong className="text-[#00966d]">
-                              {(Number(room.listedPrice || room.price || 0) / 1_000_000).toFixed(1)}M
+                              {formatMoney(room.listedPrice || room.price)}
                             </strong>
                             <span className="text-xs text-[#45474c]"> /tháng</span>
                           </p>
@@ -1448,6 +1571,39 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                   Một hồ sơ dùng để đặt cọc {rooms.length} phòng. Mỗi phòng sẽ có một hợp đồng đặt cọc riêng.
                 </p>
               </div>
+
+              <IdentityEntryModeSelector
+                value={identityEntryMode}
+                onChange={setIdentityEntryMode}
+                disabled={submitting}
+                className="mt-5"
+              />
+
+              {isCccdScanMode && (
+                <CccdUploadFlow
+                  value={{
+                    files: {
+                      citizenIdFront: files.front,
+                      citizenIdBack: files.back,
+                    },
+                    previews: {
+                      citizenIdFront: filePreviews.front,
+                      citizenIdBack: filePreviews.back,
+                    },
+                  }}
+                  onFilesChange={handleCccdFilesChange}
+                  onExtract={handleCccdExtracted}
+                  disabled={submitting}
+                  scanEnabled
+                  errors={{
+                    citizenIdFront: fieldErrors.front,
+                    citizenIdBack: fieldErrors.back,
+                  }}
+                  maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+                  className="mt-4"
+                />
+              )}
+
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <TextField label="Họ và tên" required error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
@@ -1584,24 +1740,13 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                 </div>
               </section>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <BatchFileUploadZone
-                  id="batch-id-front"
-                  label="Mặt trước CCCD"
-                  helperText="Tải ảnh rõ nét để xác thực thông tin"
-                  preview={filePreviews.front}
-                  error={fieldErrors.front}
-                  onChange={(event) => updateFile("front", event.target.files?.[0] || null)}
-                />
-                <BatchFileUploadZone
-                  id="batch-id-back"
-                  label="Mặt sau CCCD"
-                  helperText="Tải ảnh rõ nét để xác thực thông tin"
-                  preview={filePreviews.back}
-                  error={fieldErrors.back}
-                  onChange={(event) => updateFile("back", event.target.files?.[0] || null)}
-                />
-                <div className="sm:col-span-2">
+              <section className="mt-6 rounded-xl border border-[#d8dde6] bg-white p-5">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-[#4f46e5]" />
+                  <h2 className="text-lg font-black text-[#091426]">Hồ sơ bổ sung</h2>
+                </div>
+
+                <div className="mt-5 grid gap-5">
                   <BatchFileUploadZone
                     id="batch-portrait"
                     label="Ảnh chân dung"
@@ -1610,8 +1755,32 @@ export function BatchDepositClient({ initialRooms, initialError = "" }) {
                     error={fieldErrors.portrait}
                     onChange={(event) => updateFile("portrait", event.target.files?.[0] || null)}
                   />
+
+                  {!isCccdScanMode && (
+                    <CccdUploadFlow
+                      value={{
+                        files: {
+                          citizenIdFront: files.front,
+                          citizenIdBack: files.back,
+                        },
+                        previews: {
+                          citizenIdFront: filePreviews.front,
+                          citizenIdBack: filePreviews.back,
+                        },
+                      }}
+                      onFilesChange={handleCccdFilesChange}
+                      disabled={submitting}
+                      scanEnabled={false}
+                      errors={{
+                        citizenIdFront: fieldErrors.front,
+                        citizenIdBack: fieldErrors.back,
+                      }}
+                      maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+                      className="w-full"
+                    />
+                  )}
                 </div>
-              </div>
+              </section>
             </section>
 
             {rooms.map((room) => {

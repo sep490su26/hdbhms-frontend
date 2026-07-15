@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -8,6 +8,7 @@ import {
   updateFacility as updateFacilityRequest,
   updateFacilityStatus as updateFacilityStatusRequest,
 } from "@/services/facilityService";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const EMPTY_FORM = {
   name: "",
@@ -81,12 +82,13 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
     setError("");
     try {
       const data = await getFacilitiesDashboard({ keyword, status, page: page - 1, size });
-      setFacilities(data.facilities);
+      const sortedFacilities = sortByNewest(data.facilities, ["createdAt", "created_at"]);
+      setFacilities(sortedFacilities);
       setSummary(data.summary);
       setPagination({
         page: data.pagination?.page ?? page,
         size: data.pagination?.size ?? size,
-        totalElements: data.pagination?.totalElements ?? data.facilities.length,
+        totalElements: data.pagination?.totalElements ?? sortedFacilities.length,
         totalPages: data.pagination?.totalPages ?? 1,
       });
     } catch (err) {
@@ -124,6 +126,8 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
         address: facility.address,
         description: facility.description || "",
         status: facility.status || FACILITY_STATUS.ACTIVE,
+        hasFloorPlan: Boolean(facility.hasFloorPlan),
+        roomCount: facility.roomCount ?? 0,
       },
       errors: {},
       isSubmitting: false,
@@ -161,8 +165,10 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
       propertyType: formState.values.propertyType || "BOARDING_HOUSE",
       address: formState.values.address.trim(),
       description: formState.values.description.trim(),
-      status: formState.values.status || FACILITY_STATUS.ACTIVE,
     };
+    if (formState.mode === "edit") {
+      payload.status = formState.values.status || FACILITY_STATUS.ACTIVE;
+    }
 
     setFormState((current) => ({ ...current, isSubmitting: true }));
 
@@ -190,6 +196,22 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
   const requestStatusChange = useCallback((facility, nextStatus) => {
     if (facility.status === nextStatus) return;
 
+    const missingSetup = [];
+    if (!facility.hasFloorPlan) missingSetup.push("sơ đồ tầng");
+    if ((facility.roomCount ?? 0) <= 0) missingSetup.push("ít nhất một phòng");
+    if (missingSetup.length) {
+      setStatusFlow({
+        type: "blocked",
+        facility,
+        nextStatus,
+        blockKind: "setup",
+        blockTitle: "Không thể thay đổi trạng thái",
+        blockReason: `${facility.name} cần có ${missingSetup.join(" và ")} trước khi đổi trạng thái.`,
+        acknowledged: false,
+      });
+      return;
+    }
+
     if (
       nextStatus === FACILITY_STATUS.PERMANENTLY_CLOSED &&
       facility.hasOutstandingDebts
@@ -198,6 +220,7 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
         type: "blocked",
         facility,
         nextStatus,
+        blockKind: "debt",
         acknowledged: false,
       });
       return;
@@ -296,6 +319,3 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
     availableStatuses: Object.values(FACILITY_STATUS),
   };
 }
-
-
-

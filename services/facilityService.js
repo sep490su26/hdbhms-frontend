@@ -3,12 +3,14 @@
 import { normalizePageResponse } from "@/lib/pageResponse";
 
 export const FACILITY_STATUS = {
+  DRAFT: "DRAFT",
   ACTIVE: "ACTIVE",
   TEMPORARILY_CLOSED: "TEMP_CLOSED",
   PERMANENTLY_CLOSED: "CLOSED",
 };
 
 export const facilityStatusOptions = [
+  { value: "DRAFT", label: "Bản nháp" },
   { value: "ACTIVE", label: "Đang hoạt động" },
   { value: "TEMP_CLOSED", label: "Tạm ngừng" },
   { value: "CLOSED", label: "Ngừng hoạt động" },
@@ -42,17 +44,20 @@ function normalizeFloor(floor = {}) {
 function normalizeFacility(facility = {}) {
   const floors = Array.isArray(facility.floors) ? facility.floors.map(normalizeFloor) : [];
   return {
-    id: facility.id ?? null,
+    id: facility.id ?? facility.propertyId ?? facility.property_id ?? null,
     code: facility.code ?? facility.propertyCode ?? facility.property_code ?? "",
     name: facility.name ?? "",
     propertyType: facility.propertyType ?? facility.property_type ?? "BOARDING_HOUSE",
     address: facility.address ?? facility.addressLine ?? facility.address_line ?? "",
     description: facility.description ?? "",
-    status: facility.status ?? "ACTIVE",
+    status: facility.status ?? "DRAFT",
     floorCount: numberValue(facility.floorCount ?? facility.floor_count ?? floors.length),
     roomCount: numberValue(facility.roomCount ?? facility.room_count),
     occupiedRoomCount: numberValue(facility.occupiedRoomCount ?? facility.occupied_room_count),
     vacantRoomCount: numberValue(facility.vacantRoomCount ?? facility.vacant_room_count),
+    createdAt: facility.createdAt ?? facility.created_at ?? null,
+    updatedAt: facility.updatedAt ?? facility.updated_at ?? null,
+    hasFloorPlan: Boolean(facility.hasFloorPlan ?? facility.has_floor_plan ?? false),
     hasActiveContracts: Boolean(facility.hasActiveContracts ?? facility.has_active_contracts ?? false),
     hasOutstandingDebts: Boolean(facility.hasOutstandingDebts ?? facility.has_outstanding_debts ?? false),
     outstandingDebtAmount: numberValue(facility.outstandingDebtAmount ?? facility.outstanding_debt_amount),
@@ -74,6 +79,7 @@ export async function getFacilitiesDashboard({ keyword = "", status = "", page =
   if (status && status !== "ALL") params.set("status", status);
   params.set("page", String(page));
   params.set("size", String(size));
+  params.set("sort", "createdAt,desc");
 
   const query = params.toString();
   const data = await authenticatedFetch(
@@ -112,7 +118,6 @@ export async function createFacility(payload) {
       propertyType: payload.propertyType ?? "BOARDING_HOUSE",
       addressLine: payload.address,
       description: payload.description ?? "",
-      status: payload.status ?? "ACTIVE",
     }),
   });
 

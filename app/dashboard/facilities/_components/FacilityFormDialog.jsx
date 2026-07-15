@@ -20,7 +20,6 @@ function FieldError({ id, message }) {
     </p>
   );
 }
-
 export function FacilityFormDialog({
   formState,
   onClose,
@@ -28,6 +27,17 @@ export function FacilityFormDialog({
   onSubmit,
 }) {
   const isEditing = formState.mode === "edit";
+  const statusLocked =
+    isEditing &&
+    (!formState.values.hasFloorPlan || (formState.values.roomCount ?? 0) <= 0);
+  const openAddressPicker = () => {
+    const query = formState.values.address?.trim() || "Vietnam";
+    window.open(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   return (
     <Dialog
@@ -95,13 +105,22 @@ export function FacilityFormDialog({
               />
             </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            <div className="grid gap-2">
+              <label htmlFor="facility-address" className="text-sm font-bold text-slate-700 dark:text-slate-200">
                 Địa chỉ <span className="text-rose-600 dark:text-rose-300">*</span>
-              </span>
+              </label>
               <span className="relative">
-                <MapPin className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <button
+                  type="button"
+                  onClick={openAddressPicker}
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-[#1e40af] dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                  aria-label="Mở Google Maps để chọn địa chỉ"
+                  title="Mở Google Maps để chọn địa chỉ"
+                >
+                  <MapPin className="h-5 w-5" />
+                </button>
                 <input
+                  id="facility-address"
                   value={formState.values.address}
                   onChange={(event) =>
                     onChange("address", event.target.value)
@@ -125,24 +144,26 @@ export function FacilityFormDialog({
                 id="facility-address-error"
                 message={formState.errors.address}
               />
-            </label>
+            </div>
 
-           <label className="grid gap-2">
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                Trạng thái <span className="text-rose-600 dark:text-rose-300">*</span>
-              </span>
-              <select
-                value={formState.values.status || "ACTIVE"} 
-                onChange={(event) => onChange("status", event.target.value)} 
-                className="h-12 w-full rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-medium text-slate-900 dark:text-white outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
-              >
-                {facilityStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isEditing && !statusLocked && (
+              <label className="grid gap-2">
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Trạng thái <span className="text-rose-600 dark:text-rose-300">*</span>
+                </span>
+                <select
+                  value={formState.values.status || "DRAFT"}
+                  onChange={(event) => onChange("status", event.target.value)}
+                  className="h-12 w-full rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-medium text-slate-900 dark:text-white outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                >
+                  {facilityStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <label className="grid gap-2">
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Mô tả</span>
@@ -186,4 +207,3 @@ export function FacilityFormDialog({
     </Dialog>
   );
 }
-

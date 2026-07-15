@@ -218,6 +218,12 @@ export function normalizeLeaseContractItem(item = {}) {
       null,
     tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
     expectedVacantDate: item.expectedVacantDate ?? item.expected_vacant_date ?? null,
+    transferRequestId: item.transferRequestId ?? null,
+    transferRequestCode: item.transferRequestCode ?? null,
+    transferStatus: item.transferStatus ?? null,
+    transferRequestedDate: item.transferRequestedDate ?? null,
+    transferContractRole: item.transferContractRole ?? null,
+    transferActivationLocked: item.transferActivationLocked ?? false,
     intentionRecordedAt: item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
     intentionNote:
       item.intentionNote ??
@@ -237,15 +243,19 @@ export async function fetchLeaseContractManagementList({ page = 0, size = 10 } =
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
-    sort: "signedAt,desc",
+    sort: "createdAt,desc",
   });
   const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management?${params.toString()}`, {
     method: "GET",
   });
   const items = normalizeLeaseContractList(data);
+  const pagination = normalizePageResponse(data, { page: page + 1, size, items });
   return {
-    ...normalizePageResponse(data, { page: page + 1, size, items }),
+    ...pagination,
+    data: items,
     items,
+    currentPage: pagination.page,
+    pageSize: pagination.size,
   };
 }
 
@@ -633,6 +643,12 @@ function normalizeLeaseContractDetails(details = {}) {
       null,
     tenantIntention: details.tenantIntention ?? details.tenant_intention ?? null,
     expectedVacantDate: details.expectedVacantDate ?? details.expected_vacant_date ?? null,
+    transferRequestId: details.transferRequestId ?? null,
+    transferRequestCode: details.transferRequestCode ?? null,
+    transferStatus: details.transferStatus ?? null,
+    transferRequestedDate: details.transferRequestedDate ?? null,
+    transferContractRole: details.transferContractRole ?? null,
+    transferActivationLocked: details.transferActivationLocked ?? false,
     intentionRecordedAt: details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
     intentionNote:
       details.intentionNote ??

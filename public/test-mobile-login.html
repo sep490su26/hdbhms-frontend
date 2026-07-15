@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Webview Auth</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 { margin-top: 0; color: #0f172a; }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 16px 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-family: monospace;
+    }
+    button {
+      width: 100%;
+      background: #006c49;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #005338; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Simulate Mobile Webview</h2>
+    <p>Paste your JWT token below to automatically set cookies and log into the webview in Chrome.</p>
+    
+    <form action="/api/mobile-auth" method="POST">
+      <input type="text" name="token" placeholder="eyJhbGci..." required />
+      <!-- Optional: Add sessionId if your backend requires it -->
+      <input type="hidden" name="sessionId" value="test-session" />
+      <button type="submit">Authenticate & Redirect</button>
+    </form>
+  </div>
+</body>
+</html>

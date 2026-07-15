@@ -1,32 +1,25 @@
-import {Geist, Geist_Mono} from "next/font/google";
-import { Be_Vietnam_Pro } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
-import {SiteChrome} from "@/components/SiteChrome";
-
-const fontSans = Be_Vietnam_Pro({
-    subsets: ["vietnamese"],
-    weight: ["400", "500", "600", "700"],
-    variable: "--font-sans",
-});
-const fontMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
-});
+import { SiteChrome } from "@/components/SiteChrome";
 
 export const metadata = {
-    title: "Hải Đăng – Hệ thống quản lý nhà trọ",
-    description: "Quản lý phòng trọ hiệu quả: theo dõi phòng, khách thuê, hợp đồng và tài chính tại một nơi duy nhất.",
+  title: "Hải Đăng – Hệ thống quản lý nhà trọ",
+  description: "Quản lý phòng trọ hiệu quả: theo dõi phòng, khách thuê, hợp đồng và tài chính tại một nơi duy nhất.",
 };
 
-export default function RootLayout({children}) {
-    return (
-        <html
-            lang="vi"
-            className={`${fontSans.variable} ${fontMono.variable} h-full antialiased`}
-        >
-        <body className="min-h-full flex flex-col font-sans">
-        <SiteChrome>{children}</SiteChrome>
-        </body>
-        </html>
-    );
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const isWebView = cookieStore.get('is_webview')?.value === '1';
+
+  return (
+    <html
+      lang="vi"
+      suppressHydrationWarning
+      className="h-full antialiased"
+    >
+      <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
+        <SiteChrome isWebView={isWebView}>{children}</SiteChrome>
+      </body>
+    </html>
+  );
 }

@@ -3,8 +3,7 @@ import {
     authenticatedFetch,
     parseEnvelope,
 } from "./identityAccessService";
-
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "1";
+import { formatDate } from "@/lib/dateFormat";
 
 export const VIEWING_STATUSES = {
     NOT_VIEWED: "Chờ xem",
@@ -85,7 +84,7 @@ export function formatAppointment(value) {
     const time = date.toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"});
 
     if (sameDay) return `Hôm nay ${time}`;
-    return `${date.toLocaleDateString("vi-VN")} ${time}`;
+    return `${formatDate(date, "")} ${time}`;
 }
 
 export function normalizePhone(value) {
@@ -96,6 +95,33 @@ export function isValidVietnamPhone(value) {
     return /^(0|\+84)\d{9,10}$/.test(normalizePhone(value));
 }
 
+export function getViewingCustomerErrorMessage(error, fallback = "Không thể tải dữ liệu khách xem phòng. Vui lòng thử lại.") {
+    const rawMessage = String(error?.message || error?.details || "").trim();
+    const normalized = rawMessage.toLowerCase();
+
+    if (!rawMessage) return fallback;
+
+    if (
+        normalized.includes("unauthenticated") ||
+        normalized.includes("unauthorized") ||
+        normalized.includes("forbidden") ||
+        error?.status === 401 ||
+        error?.status === 403
+    ) {
+        return "Phiên đăng nhập đã hết hạn hoặc bạn không có quyền truy cập. Vui lòng đăng nhập lại.";
+    }
+
+    if (
+        normalized.includes("failed to fetch") ||
+        normalized.includes("networkerror") ||
+        normalized.includes("load failed")
+    ) {
+        return "Không thể kết nối máy chủ. Vui lòng kiểm tra backend hoặc thử lại sau.";
+    }
+
+    return rawMessage;
+}
+
 /**
  * Maps a VisitRequestResponse (list) or VisitRequestDetailsResponse (detail) to frontend shape.
  * List response: visitorName, visitorPhone, visitorEmail, preferredStart, createdAt (NO id, property, room)
@@ -104,6 +130,7 @@ export function isValidVietnamPhone(value) {
 export function mapVisitRequest(item) {
     const preferredStart = readField(item, "preferredStart", "preferred_start");
     const createdAt = readField(item, "createdAt", "created_at");
+    const deletedAt = readField(item, "deletedAt", "deleted_at");
     const property = readField(item, "property") || {};
     const room = readField(item, "room") || {};
 
@@ -123,6 +150,8 @@ export function mapVisitRequest(item) {
         note: readField(item, "notes") ?? readField(item, "note") ?? "",
         createdAt,
         createdLabel: createdAt ? formatAppointment(createdAt) : "",
+        deletedAt,
+        deletedLabel: deletedAt ? formatAppointment(deletedAt) : "",
     };
 }
 
@@ -142,12 +171,13 @@ export async function fetchViewingCustomers({filters, page, size}) {
         to: filters.toDate ? `${filters.toDate}T23:59:59` : undefined,
         page: page - 1,
         size,
+        sort: "createdAt,desc",
     })}`);
 
     return {
         items: (data.data || []).map(mapVisitRequest),
         total: readField(data, "totalElements", "total_elements") || 0,
-        page: readField(data, "currentPage", "current_page") || 0,
+        page: Number(page) || 1,
         size: readField(data, "pageSize", "page_size") || size,
         totalPages: readField(data, "totalPages", "total_pages") || 0,
     };
@@ -161,6 +191,7 @@ export async function fetchViewingCustomerStats() {
         const data = await authenticatedFetch(`/visit-requests${toQuery({
             page: 0,
             size: 500,
+            sort: "createdAt,desc",
         })}`);
         const items = (data.data || []).map(mapVisitRequest);
 
@@ -182,24 +213,21 @@ export async function fetchViewingCustomerStats() {
 }
 
 /**
- * Trash endpoint doesn't exist in the backend yet — return empty results gracefully.
+ * GET /api/v1/visit-requests/trash
  */
 export async function fetchViewingCustomerTrash({page, size}) {
-    try {
-        const data = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/trash${toQuery({
-            page,
-            size,
-        })}`);
-        return {
-            items: (data.items || []).map(mapVisitRequest),
-            total: readField(data, "total") || 0,
-            page: readField(data, "page") || 1,
-            size: readField(data, "size") || size,
-            totalPages: readField(data, "totalPages", "total_pages") || 0,
-        };
-    } catch {
-        return {items: [], total: 0, page: 1, size, totalPages: 0};
-    }
+    const data = await authenticatedFetch(`/visit-requests/trash${toQuery({
+        page: page - 1,
+        size,
+        sort: "deletedAt,desc",
+    })}`);
+    return {
+        items: (data.data || []).map(mapVisitRequest),
+        total: readField(data, "totalElements", "total_elements") || 0,
+        page: Number(page) || 1,
+        size: readField(data, "pageSize", "page_size") || size,
+        totalPages: readField(data, "totalPages", "total_pages") || 0,
+    };
 }
 
 // Logic hỗ trợ parse và mapping cho các service khác sử dụng
@@ -217,12 +245,12 @@ export async function publicCreateViewingCustomer(payload) {
         method: "POST",
         headers: {"Content-Type": "application/json", "X-Client-Type": "web"},
         body: JSON.stringify({
-            visitor_name: payload.fullName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
+            visitorName: payload.fullName,
+            visitorPhone: payload.phone,
+            visitorEmail: payload.email || "",
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            preferredStart: payload.appointmentAt,
             notes: payload.note,
         }),
     });
@@ -238,12 +266,12 @@ export async function createViewingCustomer(payload) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            visitor_name: payload.customerName,
-            visitor_phone: payload.phone,
-            visitor_email: payload.email || "",
-            property_id: getNumericId(payload.propertyId),
-            room_id: getNumericId(payload.roomId),
-            preferred_start: payload.appointmentAt,
+            visitorName: payload.customerName,
+            visitorPhone: payload.phone,
+            visitorEmail: payload.email || "",
+            propertyId: getNumericId(payload.propertyId),
+            roomId: getNumericId(payload.roomId),
+            preferredStart: payload.appointmentAt,
             notes: payload.note,
         }),
     });
@@ -274,37 +302,25 @@ export async function updateViewingCustomerStatus(id, status) {
 }
 
 /**
- * DELETE endpoint doesn't exist yet — stub gracefully.
+ * DELETE /api/v1/visit-requests/{id} moves the visit request to trash.
  */
 export async function deleteViewingCustomer(id) {
-    try {
-        await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}`, {
-            method: "DELETE",
-        });
-    } catch {
-        // Endpoint not available yet
-    }
+    return authenticatedFetch(`/visit-requests/${id}`, {
+        method: "DELETE",
+    });
 }
 
 export async function restoreViewingCustomer(id) {
-    try {
-        const data = await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/restore`, {
-            method: "POST",
-        });
-        return mapVisitRequest(data);
-    } catch {
-        return null;
-    }
+    const data = await authenticatedFetch(`/visit-requests/${id}/restore`, {
+        method: "POST",
+    });
+    return mapVisitRequest(data);
 }
 
 export async function forceDeleteViewingCustomer(id) {
-    try {
-        await authenticatedFetch(`/tenants/${TENANT_ID}/visit-requests/${id}/force`, {
-            method: "DELETE",
-        });
-    } catch {
-        // Endpoint not available yet
-    }
+    return authenticatedFetch(`/visit-requests/${id}/force`, {
+        method: "DELETE",
+    });
 }
 
 /**
@@ -323,7 +339,7 @@ export async function fetchViewingProperties() {
         }));
     } catch {
         // Fallback only if the API truly fails (network error)
-        return [{id: 1, name: 'Hải Đăng House', propertyCode: 'HDH'}];
+        return [];
     }
 }
 
@@ -333,11 +349,11 @@ export async function fetchViewingProperties() {
 export async function fetchViewingRooms(propertyId) {
     if (!propertyId || propertyId === 'all') return [];
     try {
-        const envelope = await authenticatedFetch(`/rooms?propertyId=${propertyId}`);
-        const propertiesArray = envelope?.data?.data ?? envelope?.data ?? [];
+        const envelope = await authenticatedFetch(`/properties/${propertyId}/rooms/simple`);
+        const propertiesArray = Array.isArray(envelope) ? envelope : (envelope?.data?.data ?? envelope?.data ?? []);
         return propertiesArray.map((room) => ({
             id: room.id,
-            propertyId: room.property?.id ?? propertyId,   // nested object
+            propertyId: room.propertyId ?? room.property_id ?? room.property?.id ?? propertyId,
             roomCode: room.roomCode ?? room.room_code,
             name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
             status: room.currentStatus ?? room.current_status,

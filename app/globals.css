@@ -1,20 +1,178 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
+
+@source not "../.next-*";
 
 @custom-variant dark (&:is(.dark *));
 
+@theme inline {
+  --animate-in: enter 150ms ease-out;
+  --animate-out: exit 150ms ease-in;
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+  --animate-caret-blink: caret-blink 1.25s ease-out infinite;
+
+  @keyframes enter {
+    from {
+      opacity: var(--tw-enter-opacity, 1);
+      transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+    }
+  }
+
+  @keyframes exit {
+    to {
+      opacity: var(--tw-exit-opacity, 1);
+      transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
+    }
+  }
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+
+    to {
+      height: var(--radix-accordion-content-height, var(--accordion-panel-height, auto));
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height, var(--accordion-panel-height, auto));
+    }
+
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes caret-blink {
+    0%,
+    70%,
+    100% {
+      opacity: 1;
+    }
+
+    20%,
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+@utility animate-in {
+  animation: var(--animate-in);
+}
+
+@utility animate-out {
+  animation: var(--animate-out);
+}
+
+@utility animate-accordion-down {
+  animation: var(--animate-accordion-down);
+}
+
+@utility animate-accordion-up {
+  animation: var(--animate-accordion-up);
+}
+
+@utility animate-caret-blink {
+  animation: var(--animate-caret-blink);
+}
+
+@utility fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
+}
+
+@utility zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+
+@utility slide-in-from-top-2 {
+  --tw-enter-translate-y: calc(var(--spacing) * -2);
+}
+
+@utility slide-in-from-right-2 {
+  --tw-enter-translate-x: calc(var(--spacing) * 2);
+}
+
+@utility slide-in-from-bottom-2 {
+  --tw-enter-translate-y: calc(var(--spacing) * 2);
+}
+
+@utility slide-in-from-left-2 {
+  --tw-enter-translate-x: calc(var(--spacing) * -2);
+}
+
+@utility slide-in-from-top-10 {
+  --tw-enter-translate-y: calc(var(--spacing) * -10);
+}
+
+@utility slide-in-from-right-10 {
+  --tw-enter-translate-x: calc(var(--spacing) * 10);
+}
+
+@utility slide-in-from-bottom-10 {
+  --tw-enter-translate-y: calc(var(--spacing) * 10);
+}
+
+@utility slide-in-from-left-10 {
+  --tw-enter-translate-x: calc(var(--spacing) * -10);
+}
+
+@utility slide-out-to-top-10 {
+  --tw-exit-translate-y: calc(var(--spacing) * -10);
+}
+
+@utility slide-out-to-right-10 {
+  --tw-exit-translate-x: calc(var(--spacing) * 10);
+}
+
+@utility slide-out-to-bottom-10 {
+  --tw-exit-translate-y: calc(var(--spacing) * 10);
+}
+
+@utility slide-out-to-left-10 {
+  --tw-exit-translate-x: calc(var(--spacing) * -10);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 :root {
   --navbar-height: 7rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --font-sans: "Be Vietnam Pro", "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-geist-mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.985 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
@@ -38,6 +196,8 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 }
 
 @theme inline {
@@ -98,8 +258,325 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.dashboard-shell,
+.dashboard-main,
+.dashboard-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-shell,
+.dashboard-content {
+  width: 100%;
+}
+
+.dashboard-shell {
+  overflow-x: clip;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-main {
+    width: calc(100% - 280px);
+  }
+}
+
+.dashboard-content>*,
+.dashboard-content :where(.grid, .flex)>* {
+  min-width: 0;
+}
+
+.dashboard-content :where(h1, h2, h3, h4, p, a, td) {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.dashboard-content :where(button, select, option, th),
+.dashboard-content :where(span.inline-flex, a.inline-flex),
+.dashboard-content [class~="rounded-full"] {
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.dashboard-content :where(button, select) {
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.dashboard-content button {
+  overflow: hidden;
+}
+
+.dashboard-content :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.dashboard-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.dashboard-table--scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.dashboard-table th {
+  min-width: max-content;
+  white-space: nowrap;
+}
+
+.dashboard-table td,
+.dashboard-table td>* {
+  min-width: 0;
+}
+
+.dashboard-table td:is([data-label^="Mã"],
+  [data-label^="Ngày"],
+  [data-label^="Số"],
+  [data-label="ID"],
+  [data-label="STT"],
+  [data-label="Phòng"],
+  [data-label="Tầng"],
+  [data-label="Diện tích"],
+  [data-label="Hạn thu"],
+  [data-label="Thời hạn"],
+  [data-label="Vai trò"],
+  [data-label="Mức độ"],
+  [data-label="Trạng thái"],
+  [data-label="File"],
+  [data-label="Xem"],
+  [data-label="Chi tiết"],
+  [data-label="Thao tác"],
+  [data-label="Hành động"]) {
+  overflow: hidden;
+  min-width: max-content;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.dashboard-table td:is([data-label="Vai trò"],
+  [data-label="Mức độ"],
+  [data-label="Trạng thái"],
+  [data-label="File"],
+  [data-label="Xem"],
+  [data-label="Chi tiết"],
+  [data-label="Thao tác"],
+  [data-label="Hành động"])>* {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-table.contract-management-table .contract-management-table__action {
+  width: 12%;
+  min-width: 8rem;
+  max-width: none;
+  overflow: visible;
+}
+
+.dashboard-table.contract-management-table {
+  overflow-x: scroll;
+  overflow-y: hidden;
+}
+
+.dashboard-table.contract-management-table > table {
+  min-width: 1080px !important;
+  width: 100% !important;
+  table-layout: fixed;
+}
+
+.dashboard-table.contract-management-table::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dashboard-table.contract-management-table::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.dashboard-table.contract-management-table th.contract-management-table__action {
+  background: #f7f9fe;
+}
+
+.dashboard-table.contract-management-table .contract-management-table__action > * {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.dark .dashboard-table.contract-management-table th.contract-management-table__action {
+  background: #172033;
+}
+
+@media (max-width: 1279px) {
+  .dashboard-table {
+    overflow: visible;
+  }
+
+  .dashboard-table.dashboard-table--scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .dashboard-table.dashboard-table--scroll table {
+    display: table;
+    width: 100%;
+  }
+
+  .dashboard-table.dashboard-table--scroll thead {
+    display: table-header-group;
+  }
+
+  .dashboard-table.dashboard-table--scroll tbody {
+    display: table-row-group;
+    padding: 0;
+  }
+
+  .dashboard-table.dashboard-table--scroll tr {
+    display: table-row;
+    width: auto;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dashboard-table.dashboard-table--scroll td {
+    display: table-cell;
+    width: auto;
+    border-bottom: 1px solid #edf1f6;
+    padding: 0.75rem 1rem;
+  }
+
+  .dashboard-table.dashboard-table--scroll td::before {
+    content: none;
+  }
+
+  .dashboard-table table,
+  .dashboard-table tbody,
+  .dashboard-table tr,
+  .dashboard-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard-table thead {
+    display: none;
+  }
+
+  .dashboard-table tbody {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .dashboard-table tbody tr {
+    overflow: hidden;
+    border: 1px solid #dfe5ef;
+    border-radius: 0.75rem;
+    background: #fff;
+  }
+
+  .dashboard-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
+    border: 0;
+    border-bottom: 1px solid #edf1f6;
+    padding: 0.75rem 1rem;
+    text-align: left;
+  }
+
+  .dashboard-table tbody td:is([data-label^="Mã"],
+    [data-label^="Ngày"],
+    [data-label^="Số"],
+    [data-label="ID"],
+    [data-label="STT"],
+    [data-label="Phòng"],
+    [data-label="Tầng"],
+    [data-label="Diện tích"],
+    [data-label="Hạn thu"],
+    [data-label="Thời hạn"],
+    [data-label="Vai trò"],
+    [data-label="Mức độ"],
+    [data-label="Trạng thái"],
+    [data-label="File"],
+    [data-label="Xem"],
+    [data-label="Chi tiết"],
+    [data-label="Thao tác"],
+    [data-label="Hành động"]) {
+    min-width: 0;
+  }
+
+  .dashboard-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.25rem;
+    text-transform: uppercase;
+  }
+
+  .dashboard-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .dashboard-table tbody td[colspan] {
+    display: block;
+    text-align: center;
+  }
+
+  .dashboard-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .dashboard-table tbody td>* {
+    min-width: 0;
+    max-width: 100%;
+    justify-self: start;
+  }
+
+  .dashboard-table tbody td:is([data-label^="Mã"],
+    [data-label^="Ngày"],
+    [data-label^="Số"],
+    [data-label="ID"],
+    [data-label="STT"],
+    [data-label="Phòng"],
+    [data-label="Tầng"],
+    [data-label="Diện tích"],
+    [data-label="Hạn thu"],
+    [data-label="Thời hạn"]) {
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 479px) {
+  .dashboard-table tbody td {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
 }
 
 /* Accessible keyboard focus ring */
@@ -112,16 +589,20 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
@@ -151,7 +632,8 @@ body {
   -webkit-line-clamp: 2;
   overflow: hidden;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .dark {
@@ -192,10 +674,23 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
+}
+
+/* Re-assert final semantic tokens after imported theme layers */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
 }

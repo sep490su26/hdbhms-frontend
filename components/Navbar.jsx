@@ -1,16 +1,15 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Home, LayoutDashboard, LogIn, Menu, X } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { Home, LayoutDashboard, LogIn, Menu, X } from "lucide-react";
 
-const STAFF_ROLES = new Set(['OWNER', 'MANAGER', 'owner', 'manager']);
+const STAFF_ROLES = new Set(["OWNER", "MANAGER", "owner", "manager"]);
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [staffRole, setStaffRole] = useState(null);
   const pathname = usePathname();
@@ -21,57 +20,136 @@ export function Navbar() {
       setScrolled(window.scrollY > 20);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
     const syncAuthState = () => {
-      const token = window.localStorage.getItem('token');
-      const role = window.localStorage.getItem('userRole');
+      const token = window.localStorage.getItem("token");
+      const role = window.localStorage.getItem("userRole");
       setStaffRole(token && STAFF_ROLES.has(role) ? role : null);
     };
 
     syncAuthState();
-    window.addEventListener('storage', syncAuthState);
-    window.addEventListener('focus', syncAuthState);
+    window.addEventListener("storage", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
 
     return () => {
-      window.removeEventListener('storage', syncAuthState);
-      window.removeEventListener('focus', syncAuthState);
+      window.removeEventListener("storage", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
     };
   }, []);
 
   const navLinks = [
-    { name: 'Giới thiệu', href: '/about' },
-    { name: 'Phòng trọ', href: '/rooms' },
-    { name: 'Liên hệ', href: '/contact' },
+    { name: "Trang chủ", href: "/" },
+    { name: "Phòng trọ", href: "/rooms" },
+    { name: "Nội quy", href: "/rules" },
+    // { name: "Liên hệ", href: "/contact" },
   ];
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((current) => !current);
-  const toggleDropdown = () => setIsDropdownOpen((current) => !current);
   const goToPrimaryAction = () => {
     setIsMobileMenuOpen(false);
-    router.push(staffRole === 'MANAGER' || staffRole === 'manager' ? '/dashboard/rooms' : staffRole ? '/dashboard' : '/login');
+    if (staffRole === "MANAGER" || staffRole === "manager") {
+      router.push("/dashboard/rooms");
+      return;
+    }
+
+    if (staffRole) {
+      router.push("/dashboard");
+      return;
+    }
+
+    router.push("/login");
   };
-  const primaryActionLabel = staffRole ? 'Quản lý trọ' : 'Đăng nhập';
+  const primaryActionLabel = staffRole ? "Quản lý trọ" : "Đăng nhập";
   const PrimaryActionIcon = staffRole ? LayoutDashboard : LogIn;
 
   return (
     <nav
-      className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${scrolled
-        ? 'border-b border-white/5 bg-[#1a223d]/70 py-4 shadow-lg shadow-black/5 backdrop-blur-md'
-        : 'bg-transparent py-6'
-        }`}
+      className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "border-b border-white/5 bg-[#091426]/80 py-4 shadow-lg shadow-black/5 backdrop-blur-md" // Chỉnh lại màu ở đây cho đồng bộ
+          : "bg-[#091426] py-6"
+      }`}
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center justify-between">
           <div className="shrink-0">
-            <Link href="/" className="group flex items-center gap-3 text-xl font-bold text-white">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md transition-transform duration-300 group-hover:scale-105">
-                <Home className="h-5 w-5 text-[#1a223d]" />
+            <Link
+              href="/"
+              className="group flex items-center gap-3 text-xl font-bold text-white"
+            >
+              <div className="flex items-center gap-3 group cursor-pointer">
+                <div className="group-hover:scale-105 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#091426] to-[#091426] text-white shadow-md transition-transform duration-300">
+                  <svg
+                    viewBox="0 0 64 64"
+                    className="h-6 w-6"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g transform="translate(32 33) scale(1.2) translate(-32 -33)">
+                      <path
+                        d="M14 31L32 16L50 31"
+                        stroke="currentColor"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M20 29V49H44V29"
+                        stroke="currentColor"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M28 49V38H36V49"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  </svg>
+                </div>
+
+                {/* 2. Logo Chữ "HDBHMS" bằng SVG */}
+                <svg
+                  viewBox="0 0 160 40"
+                  className="h-7 w-auto drop-shadow-sm"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    {/* Tạo dải màu gradient từ Trắng sang Xanh nhạt cho chữ */}
+                    <linearGradient
+                      id="textGrad"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="0%"
+                    >
+                      <stop offset="0%" stopColor="#ffffff" />
+                      <stop offset="100%" stopColor="#dbeafe" />{" "}
+                      {/* Màu blue-100 của Tailwind */}
+                    </linearGradient>
+                  </defs>
+
+                  <text
+                    x="0"
+                    y="32"
+                    fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                    fontSize="28"
+                    fontWeight="900"
+                    letterSpacing="1.5"
+                    fill="url(#textGrad)"
+                  >
+                    HDBH<tspan fill="#f6c915">MS</tspan>{" "}
+                    {/* HMS được đổi sang màu xanh blue-500 để làm điểm nhấn */}
+                  </text>
+                </svg>
               </div>
-              <span className="font-bold tracking-tight text-white">Hải Đăng</span>
             </Link>
           </div>
 
@@ -88,8 +166,11 @@ export function Navbar() {
                     className="group relative px-1 py-2 text-sm font-medium transition-colors"
                   >
                     <span
-                      className={`relative z-10 transition-colors duration-200 ${isActive ? 'font-bold text-white' : 'text-slate-300 group-hover:text-white'
-                        }`}
+                      className={`relative z-10 transition-colors duration-200 ${
+                        isActive
+                          ? "font-bold text-white"
+                          : "text-slate-300 group-hover:text-white"
+                      }`}
                     >
                       {link.name}
                     </span>
@@ -97,51 +178,16 @@ export function Navbar() {
                       <motion.span
                         layoutId="navbar-indicator"
                         className="absolute inset-x-1 -bottom-0.5 h-0.5 rounded-full bg-white/70"
-                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 30,
+                        }}
                       />
                     )}
                   </Link>
                 );
               })}
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={toggleDropdown}
-                  onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                  aria-expanded={isDropdownOpen}
-                  aria-haspopup="true"
-                  aria-label="Xem thêm trang"
-                  className={`flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-all ${isDropdownOpen
-                    ? 'bg-white/10 text-white'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                    }`}
-                >
-                  Khác
-                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute right-0 z-50 mt-3 w-44 origin-top-right overflow-hidden rounded-xl border border-white/10 bg-[#1e2746] shadow-2xl"
-                    >
-                      <div className="p-1">
-                        <Link href="/policy" className="block rounded-lg px-4 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white">
-                          Chính sách
-                        </Link>
-                        <Link href="/support" className="block rounded-lg px-4 py-2.5 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white">
-                          Hỗ trợ
-                        </Link>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
             </div>
 
             <button
@@ -159,10 +205,14 @@ export function Navbar() {
               type="button"
               onClick={toggleMobileMenu}
               aria-expanded={isMobileMenuOpen}
-              aria-label={isMobileMenuOpen ? 'Đóng menu' : 'Mở menu'}
+              aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
               className="inline-flex items-center justify-center rounded-xl bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10 focus:outline-none"
             >
-              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {isMobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </button>
           </div>
         </div>
@@ -172,7 +222,7 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="absolute left-0 right-0 top-full px-4 pt-2 md:hidden"
           >
@@ -184,20 +234,16 @@ export function Navbar() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className={`block rounded-xl px-4 py-3 text-base font-medium transition-colors ${isActive ? 'bg-white/10 font-bold text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                      }`}
+                    className={`block rounded-xl px-4 py-3 text-base font-medium transition-colors ${
+                      isActive
+                        ? "bg-white/10 font-bold text-white"
+                        : "text-slate-300 hover:bg-white/5 hover:text-white"
+                    }`}
                   >
                     {link.name}
                   </Link>
                 );
               })}
-              <div className="my-2 h-px bg-white/10" />
-              <Link href="/policy" className="block rounded-xl px-4 py-3 text-base font-medium text-slate-300 hover:bg-white/5">
-                Chính sách
-              </Link>
-              <Link href="/support" className="block rounded-xl px-4 py-3 text-base font-medium text-slate-300 hover:bg-white/5">
-                Hỗ trợ
-              </Link>
               <button
                 type="button"
                 onClick={goToPrimaryAction}

@@ -39,12 +39,16 @@ import {
   forceDeleteViewingCustomer,
   getAppointmentParts,
   getCurrentLocalDateTimeInputValue,
+  getViewingCustomerErrorMessage,
   isFutureAppointment,
   isValidVietnamPhone,
   restoreViewingCustomer,
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const emptyForm = {
   fullName: "",
@@ -151,27 +155,6 @@ function Topbar({ search, onSearchChange }) {
         </button>
       </div>
     </header>
-  );
-}
-
-function MetricCard({ icon: Icon, label, value, tone }) {
-  const tones = {
-    blue: "bg-blue-100 text-blue-700",
-    amber: "bg-amber-100 text-amber-700",
-    green: "bg-emerald-100 text-emerald-700",
-    indigo: "bg-indigo-100 text-indigo-700",
-  };
-
-  return (
-    <article className="flex min-h-[86px] items-center gap-4 rounded-lg border border-[#cfd5de] bg-white px-5 shadow-[0_1px_1px_rgba(9,20,38,0.03)]">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${tones[tone]}`}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#4b5563]">{label}</p>
-        <p className="text-2xl font-extrabold leading-7 text-[#111827]">{value}</p>
-      </div>
-    </article>
   );
 }
 
@@ -429,7 +412,7 @@ export default function ViewingCustomersClient() {
   useEffect(() => {
     fetchViewingProperties()
       .then(setProperties)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, []);
 
   useEffect(() => {
@@ -439,7 +422,7 @@ export default function ViewingCustomersClient() {
     }
     fetchViewingRooms(form.propertyId)
       .then(setFormRooms)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, [form.propertyId]);
 
   useEffect(() => {
@@ -449,7 +432,7 @@ export default function ViewingCustomersClient() {
     }
     fetchViewingRooms(filters.propertyId)
       .then(setFilterRooms)
-      .catch((error) => setErrorMessage(error.message));
+      .catch((error) => setErrorMessage(getViewingCustomerErrorMessage(error)));
   }, [filters.propertyId]);
 
   const loadCustomers = useCallback(async (nextPage = 1) => {
@@ -458,23 +441,23 @@ export default function ViewingCustomersClient() {
         fetchViewingCustomers({ filters, page: nextPage, size: pageSize }),
         fetchViewingCustomerStats(filters),
       ]);
-      setCustomers(listData.items);
+      setCustomers(sortByNewest(listData.items, ["createdAt", "created_at"]));
       setPagination(listData);
       setStats(statsData);
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   }, [filters, pageSize]);
 
   const loadTrash = useCallback(async (nextPage = 1) => {
     try {
       const data = await fetchViewingCustomerTrash({ filters, page: nextPage, size: pageSize });
-      setTrashRows(data.items);
+      setTrashRows(sortByNewest(data.items, ["deletedAt", "deleted_at", "createdAt", "created_at"]));
       setTrashPagination(data);
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   }, [filters, pageSize]);
 
@@ -556,7 +539,7 @@ export default function ViewingCustomersClient() {
       setModalMode(null);
       await loadCustomers(modalMode === "edit" ? pagination.page : 1);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -567,7 +550,7 @@ export default function ViewingCustomersClient() {
         await loadCustomers(pagination.page);
         if (trashOpen) await loadTrash(trashPagination.page);
       } catch (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(getViewingCustomerErrorMessage(error));
       }
     }
   };
@@ -584,7 +567,7 @@ export default function ViewingCustomersClient() {
       setCustomers((current) =>
         current.map((item) => (item.id === customer.id ? { ...item, status: previousStatus } : item)),
       );
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -598,7 +581,7 @@ export default function ViewingCustomersClient() {
       await restoreViewingCustomer(customer.id);
       await Promise.all([loadCustomers(pagination.page), loadTrash(trashPagination.page)]);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -608,7 +591,7 @@ export default function ViewingCustomersClient() {
       await forceDeleteViewingCustomer(customer.id);
       await loadTrash(trashPagination.page);
     } catch (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(getViewingCustomerErrorMessage(error));
     }
   };
 
@@ -652,9 +635,9 @@ export default function ViewingCustomersClient() {
           </section>
 
           <section className="mt-7 grid gap-5 md:grid-cols-3">
-            <MetricCard icon={CalendarDays} label="Hôm nay" value={String(stats.todayCount ?? 0).padStart(2, "0")} tone="blue" />
-            <MetricCard icon={ClipboardList} label="Chưa xem" value={String(stats.pendingCount ?? 0).padStart(2, "0")} tone="amber" />
-            <MetricCard icon={CheckCircle2} label="Đã xem" value={String(stats.viewedCount ?? 0).padStart(2, "0")} tone="green" />
+            <DashboardStatCard icon={CalendarDays} label="Hôm nay" value={String(stats.todayCount ?? 0).padStart(2, "0")} tone="blue" />
+            <DashboardStatCard icon={ClipboardList} label="Chưa xem" value={String(stats.pendingCount ?? 0).padStart(2, "0")} tone="amber" />
+            <DashboardStatCard icon={CheckCircle2} label="Đã xem" value={String(stats.viewedCount ?? 0).padStart(2, "0")} tone="green" />
           </section>
 
           <section className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)]">

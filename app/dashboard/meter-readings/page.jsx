@@ -1,124 +1,715 @@
 "use client";
 
-import { CalendarClock, Check, ClipboardCheck, Gauge } from "lucide-react";
-import { allRooms } from "@/services/dashboardService";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleDashed,
+  ClipboardList,
+  Edit3,
+  History,
+  Loader2,
+  Plus,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import { dedupeBatchHistory, getHistoryRowKey } from "@/lib/meterReadingHistory.mjs";
+import {
+  fetchBatchHistory,
+  fetchUtilityDashboard,
+  startBatchReading,
+} from "@/services/meterReadingService";
 
-function PageHeader({ title, description, actionLabel, actionIcon: ActionIcon = Check, onAction }) {
+const STATUS_MAP = {
+  DRAFT: {
+    label: "Đang nhập dữ liệu",
+    badge:
+      "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20",
+  },
+  PREVIEWED: {
+    label: "Chờ duyệt",
+    badge:
+      "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20",
+  },
+  CONFIRMED: {
+    label: "Đã chốt",
+    badge:
+      "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20",
+  },
+  CANCELLED: {
+    label: "Đã hủy",
+    badge:
+      "bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-400 dark:ring-white/10",
+  },
+};
+
+const workflowSteps = [
+  { num: "1", label: "Tạo kỳ ghi chỉ số", icon: ClipboardList },
+  { num: "2", label: "Nhập chỉ số", icon: Edit3 },
+  { num: "3", label: "Chốt kỳ", icon: CheckCircle2 },
+  { num: "4", label: "Tính tiêu thụ & tạo hóa đơn", icon: BarChart3 },
+];
+
+function formatTime(startDate, endDate) {
+  if (!startDate || !endDate) return "";
+  const [sy, sm, sd] = String(startDate).slice(0, 10).split("-");
+  const [ey, em, ed] = String(endDate).slice(0, 10).split("-");
+  if (!sy || !sm || !sd || !ey || !em || !ed) return "";
+  return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
+}
+
+function formatMonthYearPeriod(date = new Date()) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${month}-${date.getFullYear()}`;
+}
+
+function normalizePropertyId(value) {
+  const text = String(value || "").trim();
+  return /^\d+$/.test(text) ? text : "";
+}
+
+function periodValue(period) {
+  return period?.readingPeriod || period?.reading_period || period?.period || "";
+}
+
+function getBatchHref(period, propertyId, context = {}) {
+  const params = new URLSearchParams();
+  if (period) params.set("period", period);
+  const normalizedPropertyId = normalizePropertyId(propertyId);
+  if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+  if (context.from) params.set("from", context.from);
+  if (context.facilityName) params.set("facilityName", context.facilityName);
+  const query = params.toString();
+  return `/dashboard/meter-readings/batch${query ? `?${query}` : ""}`;
+}
+
+function MeterReadingsBreadcrumb({ facilityName }) {
   return (
-    <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-[-0.01em] text-[#191c1e]">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#45474c]">{description}</p>
-      </div>
-      {actionLabel && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-5 text-sm font-bold text-white hover:bg-[#16253a]"
-        >
-          <ActionIcon className="h-4 w-4" />
-          {actionLabel}
-        </button>
-      )}
-    </section>
+    <Breadcrumb className="-mb-2">
+      <BreadcrumbList>
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/dashboard/facilities">Quản lý cơ sở</Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        {facilityName ? (
+          <>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {facilityName}
+              </span>
+            </BreadcrumbItem>
+          </>
+        ) : null}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }
 
-function KpiCard({ icon: Icon, label, value, subtext, tone = "blue" }) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
+function PeriodBadge({ status }) {
+  const currentStatus = STATUS_MAP[status] || STATUS_MAP.DRAFT;
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${currentStatus.badge}`}>
+      {currentStatus.label}
+    </span>
+  );
+}
+
+function ProgressBar({ value, className = "" }) {
+  return (
+    <div className={`h-2 rounded-full bg-slate-100 dark:bg-white/5 ${className}`}>
+      <div className="h-2 rounded-full bg-[#3156b6]" style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+function EmptyPeriodState({ canStartCurrentPeriod, nextOpenDate }) {
+  return (
+    <div className="grid min-h-36 place-items-center rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-6 text-center dark:border-white/10 dark:bg-white/5">
+      <div>
+        <p className="text-sm font-black text-slate-900 dark:text-white">
+          Chưa có kỳ ghi chỉ số đang hoạt động
+        </p>
+        <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          {canStartCurrentPeriod
+            ? "Bạn có thể bắt đầu kỳ ghi mới."
+            : `Kỳ tiếp theo sẽ mở vào ${nextOpenDate || "-"}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function UtilityManagement() {
+  const [history, setHistory] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [canStartCurrentPeriod, setCanStartCurrentPeriod] = useState(false);
+  const [nextOpenDate, setNextOpenDate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [backendFacilityName, setBackendFacilityName] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const propertyId =
+    normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
+  const fromFacilities = searchParams.get("from") === "facilities";
+  const facilityName = backendFacilityName || "";
+  const batchQueryContext = {
+    from: fromFacilities ? "facilities" : "",
+    facilityName,
   };
 
-  return (
-    <article className="flex min-h-[104px] items-center gap-4 rounded-xl border border-[#e2e8f0] bg-white p-6 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold uppercase tracking-[0.06em] text-[#45474c]">{label}</p>
-        <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-[#191c1e]">{value}</p>
-        {subtext && <p className="mt-1 truncate text-xs text-[#6b7280]">{subtext}</p>}
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setErrorMessage("");
+        setBackendFacilityName("");
+        const [historyRes, dashboardRes] = await Promise.all([
+          fetchBatchHistory(propertyId || null),
+          fetchUtilityDashboard(propertyId || null),
+        ]);
+        if (historyRes?.history) {
+          const normalizedHistory = historyRes.history.map((item) => ({
+            ...item,
+            batchId: item.batchId ?? item.batch_id ?? item.id,
+            isCurrent: item.isCurrent ?? item.is_current,
+            totalRooms: item.totalRooms ?? item.total_rooms,
+            completedRooms: item.completedRooms ?? item.completed_rooms,
+            anomalyCount: item.anomalyCount ?? item.anomaly_count,
+            startDate: item.startDate ?? item.start_date,
+            endDate: item.endDate ?? item.end_date,
+          }));
+          setHistory(dedupeBatchHistory(normalizedHistory));
+        }
+        if (dashboardRes) {
+          setBackendFacilityName(dashboardRes.propertyName ?? dashboardRes.property_name ?? "");
+          const canCreate =
+            dashboardRes.canCreateCurrentPeriod ??
+            dashboardRes.can_create_current_period;
+          const nextDate =
+            dashboardRes.nextAvailableDate ?? dashboardRes.next_available_date;
+
+          setDashboard({
+            ...dashboardRes,
+            canCreateCurrentPeriod: canCreate,
+            nextAvailableDate: nextDate,
+            currentPeriod:
+              dashboardRes.currentPeriod ?? dashboardRes.current_period,
+          });
+          setCanStartCurrentPeriod(Boolean(canCreate));
+
+          if (nextDate) {
+            const dateStr = formatTime(nextDate, nextDate).split(" - ")[0];
+            setNextOpenDate(dateStr);
+          } else {
+            setNextOpenDate(null);
+          }
+        }
+      } catch (error) {
+        setErrorMessage("Không tải được dữ liệu ghi chỉ số điện nước.");
+        console.error("Error fetching data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [propertyId]);
+
+  const displayHistory = dedupeBatchHistory(history);
+  const currentPeriod = displayHistory.find((item) => item.isCurrent);
+
+  const handleStartBatch = async () => {
+    if (!propertyId) {
+      toast.error("Vui lòng chọn cơ sở trước khi tạo kỳ ghi chỉ số");
+      return;
+    }
+
+    try {
+      const periodToStart =
+        dashboard?.currentPeriod?.readingPeriod ||
+        dashboard?.currentPeriod?.reading_period ||
+        periodValue(currentPeriod) ||
+        formatMonthYearPeriod();
+      await startBatchReading(periodToStart, propertyId || undefined);
+      router.push(getBatchHref(periodToStart, propertyId, batchQueryContext));
+    } catch (error) {
+      toast.error("Không thể tạo kỳ ghi chỉ số");
+      console.error(error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="grid min-h-[320px] w-full place-items-center text-slate-900 dark:text-white">
+        <Loader2 className="h-7 w-7 animate-spin text-[#3156b6]" />
       </div>
-    </article>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
+        <DashboardPageHeader
+          title="Nhập điện nước hàng tháng"
+          description="Quản lý kỳ ghi chỉ số, tiến độ nhập liệu và lịch sử chốt điện nước."
+        />
+        <section className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
+          <AlertTriangle className="h-4 w-4" />
+          {errorMessage}
+        </section>
+      </div>
+    );
+  }
+
+  const totalRooms = currentPeriod?.totalRooms || 0;
+  const completedRooms = currentPeriod?.completedRooms || 0;
+  const missingRooms = Math.max(0, totalRooms - completedRooms);
+  const progress =
+    totalRooms === 0 ? 0 : Math.round((completedRooms / totalRooms) * 100);
+  const totalPages = Math.ceil(displayHistory.length / itemsPerPage);
+  const effectiveCurrentPage = Math.min(currentPage, totalPages || 1);
+  const paginatedHistory = displayHistory.slice(
+    (effectiveCurrentPage - 1) * itemsPerPage,
+    effectiveCurrentPage * itemsPerPage,
   );
-}
 
-function Card({ children, className = "" }) {
-  return (
-    <section className={`rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] ${className}`}>
-      {children}
-    </section>
-  );
-}
+  function handlePageChange(page) {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  }
 
-export default function MeterReadingsPage() {
-  const editableRooms = allRooms.slice(0, 6);
+  function openCurrentPeriod() {
+    router.push(getBatchHref(periodValue(currentPeriod), propertyId, batchQueryContext));
+  }
 
   return (
-    <>
-      <PageHeader
-        title="Nhập số điện nước"
-        description="Quản lý và Chủ trọ được nhập chỉ số điện nước thủ công theo từng phòng. Dữ liệu này dùng để đối soát hóa đơn cuối kỳ."
-        actionLabel="Lưu chỉ số"
-        actionIcon={Check}
+    <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
+      {fromFacilities ? (
+        <MeterReadingsBreadcrumb facilityName={facilityName} />
+      ) : null}
+
+      <DashboardPageHeader
+        title="Nhập điện nước hàng tháng"
+        description="Quản lý kỳ ghi chỉ số, tiến độ nhập liệu và lịch sử chốt điện nước."
+        actions={
+          <>
+            {!currentPeriod && canStartCurrentPeriod ? (
+              <button
+                type="button"
+                onClick={handleStartBatch}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] hover:shadow-md"
+              >
+                <Plus className="h-4 w-4" />
+                Bắt đầu kỳ ghi tháng này
+              </button>
+            ) : null}
+            {!currentPeriod && !canStartCurrentPeriod ? (
+              <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-bold text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                <CalendarDays className="h-4 w-4" />
+                Kỳ mới mở từ {nextOpenDate || "-"}
+              </span>
+            ) : null}
+            {currentPeriod ? (
+              <button
+                type="button"
+                onClick={openCurrentPeriod}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] hover:shadow-md"
+              >
+                <ArrowRight className="h-4 w-4" />
+                Tiếp tục nhập
+              </button>
+            ) : null}
+          </>
+        }
       />
-      <section className="grid gap-4 md:grid-cols-3">
-        <KpiCard icon={Gauge} label="Phòng cần nhập" value={editableRooms.length} />
-        <KpiCard icon={CalendarClock} label="Kỳ ghi chỉ số" value="05/2026" tone="amber" />
-        <KpiCard icon={ClipboardCheck} label="Đã rà soát" value="4/6" tone="emerald" />
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <DashboardStatCard
+          icon={CalendarDays}
+          label="Kỳ hiện tại"
+          value={periodValue(currentPeriod) || "Chưa mở"}
+          tone="blue"
+          subtitle={currentPeriod ? formatTime(currentPeriod.startDate, currentPeriod.endDate) : "Chờ tạo kỳ ghi"}
+        />
+        <DashboardStatCard
+          icon={CheckCircle2}
+          label="Đã nhập"
+          value={`${completedRooms}/${totalRooms}`}
+          tone="emerald"
+          subtitle={`${progress}% tiến độ`}
+        />
+        <DashboardStatCard
+          icon={CircleDashed}
+          label="Chưa nhập"
+          value={missingRooms}
+          tone="slate"
+          subtitle="Phòng còn thiếu chỉ số"
+        />
+        <DashboardStatCard
+          icon={AlertTriangle}
+          label="Cảnh báo"
+          value={currentPeriod?.anomalyCount || 0}
+          tone="orange"
+          subtitle="Cần kiểm tra trước khi chốt"
+        />
       </section>
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] p-5">
-          <h2 className="font-bold text-[#091426]">Bảng nhập chỉ số thủ công</h2>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Manager/Admin</span>
+
+      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white">
+              Kỳ ghi chỉ số đang hoạt động
+            </h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Theo dõi kỳ hiện tại, trạng thái và tiến độ nhập chỉ số.
+            </p>
+          </div>
+          {currentPeriod ? <PeriodBadge status={currentPeriod.status} /> : null}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#505f76]">
-              <tr>
-                <th className="px-5 py-4">Phòng</th>
-                <th className="px-5 py-4">Tầng</th>
-                <th className="px-5 py-4">Điện kỳ trước</th>
-                <th className="px-5 py-4">Điện kỳ này</th>
-                <th className="px-5 py-4">Nước kỳ trước</th>
-                <th className="px-5 py-4">Nước kỳ này</th>
-                <th className="px-5 py-4">Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody>
-              {editableRooms.map((room, index) => (
-                <tr key={room.id} className="border-t border-[#e2e8f0]">
-                  <td className="px-5 py-4 font-bold text-[#091426]">{room.id}</td>
-                  <td className="px-5 py-4 text-[#45474c]">{room.floor}</td>
-                  <td className="px-5 py-4 text-[#45474c]">{1200 + index * 18}</td>
-                  <td className="px-5 py-4">
-                    <input
-                      className="h-10 w-28 rounded-lg border border-[#c5c6cd] px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
-                      defaultValue={1236 + index * 18}
-                    />
-                  </td>
-                  <td className="px-5 py-4 text-[#45474c]">{80 + index * 3}</td>
-                  <td className="px-5 py-4">
-                    <input
-                      className="h-10 w-28 rounded-lg border border-[#c5c6cd] px-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
-                      defaultValue={86 + index * 3}
-                    />
-                  </td>
-                  <td className="px-5 py-4">
-                    <input
-                      className="h-10 w-full min-w-44 rounded-lg border border-[#c5c6cd] px-3 text-sm text-[#091426] outline-none focus:border-[#091426]"
-                      placeholder="Nhập ghi chú"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {!currentPeriod ? (
+          <EmptyPeriodState
+            canStartCurrentPeriod={canStartCurrentPeriod}
+            nextOpenDate={nextOpenDate}
+          />
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="border-b border-[#e2e8f0] pb-4 dark:border-white/10 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
+              <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                Kỳ ghi chỉ số
+              </p>
+              <p className="mt-2 text-3xl font-black text-[#3156b6] dark:text-blue-300">
+                {periodValue(currentPeriod)}
+              </p>
+              <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <CalendarDays className="h-4 w-4" />
+                {formatTime(currentPeriod.startDate, currentPeriod.endDate)}
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-black text-slate-700 dark:text-slate-200">
+                    Tiến độ nhập chỉ số
+                  </span>
+                  <span className="font-black text-[#3156b6] dark:text-blue-300">
+                    {progress}%
+                  </span>
+                </div>
+                <ProgressBar value={progress} />
+                <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {completedRooms} / {totalRooms} phòng đã nhập
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Đã nhập</p>
+                  <p className="mt-1 text-2xl font-black">{completedRooms}</p>
+                </div>
+                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Chưa nhập</p>
+                  <p className="mt-1 text-2xl font-black">{missingRooms}</p>
+                </div>
+                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Cảnh báo</p>
+                  <p className="mt-1 text-2xl font-black text-orange-600 dark:text-orange-300">
+                    {currentPeriod?.anomalyCount || 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex items-center gap-2 border-b border-[#e2e8f0] px-4 py-4 dark:border-white/10">
+          <History className="h-4 w-4 text-[#3156b6] dark:text-blue-300" />
+          <div>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white">
+              Lịch sử các kỳ ghi chỉ số
+            </h2>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Xem lại trạng thái, tiến độ và cảnh báo theo từng kỳ.
+            </p>
+          </div>
         </div>
-      </Card>
-    </>
+
+        <div className="hidden overflow-x-auto md:block">
+          <Table className="min-w-[820px]">
+            <TableHeader>
+              <TableRow className="border-b border-[#e2e8f0] bg-[#f8fafc] hover:bg-[#f8fafc] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/5">
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Kỳ ghi chỉ số
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Thời gian
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Trạng thái
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Tiến độ
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Phòng đã nhập
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Cảnh báo
+                </TableHead>
+                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+                  Thao tác
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedHistory.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
+                  >
+                    Chưa có kỳ ghi chỉ số.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedHistory.map((item, index) => {
+                  const prog =
+                    item.totalRooms === 0
+                      ? 0
+                      : Math.round((item.completedRooms / item.totalRooms) * 100);
+                  return (
+                    <TableRow
+                      key={getHistoryRowKey(item, index)}
+                      className="border-t border-[#e2e8f0] transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
+                    >
+                      <TableCell className="px-4 py-3">
+                        <p className="font-black text-slate-900 dark:text-white">
+                          {item.period}
+                        </p>
+                        {item.isCurrent ? (
+                          <p className="text-xs font-semibold text-[#3156b6] dark:text-blue-300">
+                            Hiện tại
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        {formatTime(item.startDate, item.endDate)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <PeriodBadge status={item.status} />
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-10 text-sm font-black text-slate-700 dark:text-slate-200">
+                            {prog}%
+                          </span>
+                          <ProgressBar value={prog} className="w-24" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-300">
+                        {item.completedRooms} / {item.totalRooms}
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <span
+                          className={`text-sm font-black ${item.anomalyCount > 0 ? "text-orange-600 dark:text-orange-300" : "text-slate-400 dark:text-slate-500"}`}
+                        >
+                          {item.anomalyCount}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              getBatchHref(item.period, propertyId, batchQueryContext),
+                            )
+                          }
+                          className="inline-flex h-9 items-center rounded-lg border border-[#cbd5e1] px-3 text-xs font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                        >
+                          Xem chi tiết
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="grid gap-3 p-3 md:hidden">
+          {paginatedHistory.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[#cbd5e1] p-5 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
+              Chưa có kỳ ghi chỉ số.
+            </div>
+          ) : (
+            paginatedHistory.map((item, index) => {
+              const prog =
+                item.totalRooms === 0
+                  ? 0
+                  : Math.round((item.completedRooms / item.totalRooms) * 100);
+              return (
+                <article
+                  key={getHistoryRowKey(item, index)}
+                  className="rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                        {item.period}
+                      </h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {formatTime(item.startDate, item.endDate)}
+                      </p>
+                    </div>
+                    <PeriodBadge status={item.status} />
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-500 dark:text-slate-400">
+                        Tiến độ ({item.completedRooms} / {item.totalRooms})
+                      </span>
+                      <span className="font-black text-slate-700 dark:text-slate-200">
+                        {prog}%
+                      </span>
+                    </div>
+                    <ProgressBar value={prog} />
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold text-slate-500 dark:text-slate-400">
+                      Cảnh báo
+                    </span>
+                    <span
+                      className={`font-black ${item.anomalyCount > 0 ? "text-orange-600 dark:text-orange-300" : "text-slate-700 dark:text-slate-200"}`}
+                    >
+                      {item.anomalyCount}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(getBatchHref(item.period, propertyId, batchQueryContext))
+                    }
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg border border-[#cbd5e1] text-sm font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                  >
+                    Xem chi tiết
+                  </button>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <DashboardPagination
+          page={effectiveCurrentPage}
+          size={itemsPerPage}
+          totalElements={displayHistory.length}
+          totalPages={totalPages}
+          itemLabel="kỳ ghi chỉ số"
+          onPageChange={handlePageChange}
+          onSizeChange={(nextSize) => {
+            setItemsPerPage(nextSize);
+            setCurrentPage(1);
+          }}
+          className="border-t border-[#e2e8f0] dark:border-white/10"
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+              <ClipboardList className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-900 dark:text-white">
+                Hướng dẫn nhanh
+              </p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Quy trình ghi chỉ số điện nước hàng tháng
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-1">
+            {workflowSteps.map((step, index) => {
+              const StepIcon = step.icon;
+              return (
+                <div key={step.num} className="flex flex-1 items-center gap-1">
+                  <div className="flex flex-1 flex-col items-center text-center">
+                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                      <StepIcon className="h-5 w-5" />
+                    </div>
+                    <p className="text-[11px] font-semibold leading-tight text-slate-500 dark:text-slate-400">
+                      {step.num}. {step.label}
+                    </p>
+                  </div>
+                  {index < workflowSteps.length - 1 ? (
+                    <>
+                      <ChevronRight className="hidden h-4 w-4 shrink-0 text-slate-300 sm:block" />
+                      <ChevronDown className="block h-4 w-4 shrink-0 text-slate-300 sm:hidden" />
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-slate-900 dark:text-white">
+                Ghi chú vận hành
+              </p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Điều kiện cần kiểm tra trước khi chốt kỳ
+              </p>
+            </div>
+          </div>
+          <ul className="list-disc space-y-2 pl-5 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+            <li>Nhập chỉ số ít nhất 1 lần trước khi chốt kỳ.</li>
+            <li>Sau khi chốt kỳ, bạn có thể xem nhưng không thể chỉnh sửa.</li>
+            <li>Các phòng có cảnh báo cần được kiểm tra lại trước khi chốt.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
   );
 }

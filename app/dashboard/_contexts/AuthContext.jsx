@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { clearAuthSession, getCurrentUserProfile, logout as logoutApi } from "@/services/identityAccessService";
 import { ROLE_LABELS, normalizeRole } from "../_lib/rbac";
+import {readCachedProfile, writeCachedProfile} from "@/lib/profileCache";
 
 const AuthContext = createContext(null);
 
@@ -39,7 +39,6 @@ function normalizeUser(user, fallbackRole = null) {
 }
 
 export function AuthProvider({ initialUser = null, user: legacyUser = null, children }) {
-  const router = useRouter();
   const [user, setUserState] = useState(() => normalizeUser(initialUser || legacyUser));
   const [isLoadingUser, setIsLoadingUser] = useState(false);
 
@@ -61,22 +60,39 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
       const normalizedProfile = normalizeUser(profile, storedRole);
 
       setUserState(normalizedProfile);
+      writeCachedProfile(normalizedProfile);
       return normalizedProfile;
     } catch (error) {
-      setUserState(null);
-      if (isBrowser) {
-        window.localStorage.removeItem("token");
-        window.localStorage.removeItem("userRole");
+      const cachedProfile = isBrowser ? readCachedProfile() : null;
+      if (error instanceof TypeError && cachedProfile) {
+        const normalizedProfile = normalizeUser(cachedProfile, storedRole);
+        setUserState(normalizedProfile);
+        return normalizedProfile;
       }
+
+      setUserState(null);
+      clearAuthSession();
       throw error;
     } finally {
       setIsLoadingUser(false);
     }
   }, []);
 
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const token = window.localStorage.getItem("token");
+      if (!token) {
+        setUserState(null);
+      }
+    };
+    window.addEventListener("auth-changed", handleAuthChanged);
+    return () => window.removeEventListener("auth-changed", handleAuthChanged);
+  }, []);
+
   const setUser = useCallback((profile) => {
-    console.log(profile);
-    setUserState(normalizeUser(profile));
+    const normalizedProfile = normalizeUser(profile);
+    setUserState(normalizedProfile);
+    writeCachedProfile(normalizedProfile);
   }, []);
 
   const logout = useCallback(async () => {
@@ -86,14 +102,10 @@ export function AuthProvider({ initialUser = null, user: legacyUser = null, chil
       // Ignore API errors for logout to ensure frontend always clears
     }
 
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("token");
-      window.localStorage.removeItem("userRole");
-    }
+    clearAuthSession();
 
     setUserState(null);
-    router.push("/login");
-  }, [router]);
+  }, []);
 
   const value = useMemo(
     () => ({

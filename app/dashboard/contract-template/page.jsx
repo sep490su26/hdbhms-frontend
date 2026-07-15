@@ -1609,15 +1609,6 @@ export default function ContractTemplatePage() {
               <option value="deposit">Hợp đồng cọc</option>
             </select>
           </label>
-          <button
-            type="button"
-            onClick={loadContracts}
-            disabled={loading}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white transition hover:bg-[#16253a] disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Làm mới
-          </button>
         </div>
         <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex gap-2 overflow-x-auto pb-1">

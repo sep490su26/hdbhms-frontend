@@ -1,6 +1,7 @@
 "use client";
 
 const STATUS_META = {
+  DRAFT: { fill: "#f8fafc", stroke: "#94a3b8" },
   VACANT: { fill: "#ecfdf5", stroke: "#10b981" },
   HOLDING: { fill: "#ecfdf5", stroke: "#10b981" },
   RESERVED: { fill: "#ecfdf5", stroke: "#10b981" },

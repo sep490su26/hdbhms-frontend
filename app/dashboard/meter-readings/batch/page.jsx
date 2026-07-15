@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
     saveProgressiveRoomReading,
-    confirmBatch
+    uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
 import { toast } from "sonner";
 import {
@@ -28,15 +28,12 @@ import {
     Camera,
     CheckCircle2,
     CircleDashed,
-    ClipboardCheck,
     Droplets,
     Edit3,
     Home,
     ImageIcon,
     Info,
-    Loader2,
     RefreshCw,
-    Save,
     Search,
     UploadCloud,
     X,
@@ -49,6 +46,12 @@ import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import {
+    calculateUtilityCharge,
+    DEFAULT_UTILITY_TARIFFS,
+    formatVnd,
+    normalizeUtilityTariff,
+} from "@/lib/meterReadingCost.mjs";
 
 const SAMPLE_PHOTOS = [
     {
@@ -121,6 +124,7 @@ const MOCK_PHOTOS = [
 ];
 
 const STATUS_CONFIG = {
+    warning: { label: "Cần kiểm tra", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" },
     synced: { label: "Đã lưu", color: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-500" },
     local: { label: "Chưa đồng bộ", color: "text-orange-500 dark:text-orange-300", dot: "bg-orange-400" },
     error: { label: "Lỗi chỉ số", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500" },
@@ -199,34 +203,51 @@ export default function MeterReadings() {
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState("pending");
+    const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [editingCell, setEditingCell] = useState(null); // { roomId, field }
     const [focusRoomId, setFocusRoomId] = useState(null);
     const [batchId, setBatchId] = useState(null);
-    const [cameraOpen, setCameraOpen] = useState(false);
-    const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { file, previewUrl } }
+    const [cameraTarget, setCameraTarget] = useState(null);
+    const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity, water } }
+    const [tariffs, setTariffs] = useState(DEFAULT_UTILITY_TARIFFS);
+    const [backendFacilityName, setBackendFacilityName] = useState("");
 
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
     const propertyId =
-        normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId")) || "1";
+        normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
     const fromFacilities = searchParams.get("from") === "facilities";
-    const facilityName = searchParams.get("facilityName") || "";
+    const facilityName = backendFacilityName;
     const meterReadingsHref = getMeterReadingsHref(propertyId, {
         from: fromFacilities ? "facilities" : "",
         facilityName,
     });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
+    useEffect(() => {
+        setBackendFacilityName("");
+    }, [propertyId]);
+
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetchBatchMeterReadingsStatus(period, propertyId);
             if (res) {
+                setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
                 const fetchedBatchId = res.batchId || res.batch_id;
                 if (fetchedBatchId) setBatchId(fetchedBatchId);
+                setTariffs({
+                    electricity: normalizeUtilityTariff(
+                        readField(res, "electricityTariff", "electricity_tariff"),
+                        DEFAULT_UTILITY_TARIFFS.electricity,
+                    ),
+                    water: normalizeUtilityTariff(
+                        readField(res, "waterTariff", "water_tariff"),
+                        DEFAULT_UTILITY_TARIFFS.water,
+                    ),
+                });
                 if (res.rooms) {
                     const mappedRooms = res.rooms.map((r, index) => {
                         const roomId = readField(r, "roomId", "room_id");
@@ -238,8 +259,10 @@ export default function MeterReadings() {
                             roomId,
                             elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
                             elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
+                            electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
                             waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
                             waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
+                            waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
                             status: readField(r, "status") || "pending",
                             syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
                             photos: numberOrZero(readField(r, "photosCount", "photos_count")),
@@ -277,31 +300,10 @@ export default function MeterReadings() {
         };
     }, [focusRoomId]);
 
-    // handleSaveBatch removed
-
-    const handleSaveAll = async () => {
-        if (!batchId) {
-            toast.error("Không tìm thấy kỳ ghi chỉ số");
-            return;
-        }
-
-        setSaving(true);
-        try {
-            await confirmBatch(batchId);
-            toast.success("Lưu tất cả thành công");
-            loadData();
-        } catch (error) {
-            toast.error("Lỗi khi lưu dữ liệu");
-            console.error(error);
-        } finally {
-            setSaving(false);
-        }
-    };
-
     const completed = rooms.filter((r) => r.status === "synced").length;
     const pending = rooms.filter((r) => r.status === "pending" || !r.status).length;
     const unsynced = rooms.filter((r) => r.status === "local").length;
-    const errors = rooms.filter((r) => r.status === "error").length;
+    const errors = rooms.filter((r) => r.status === "error" || r.status === "warning").length;
     const total = rooms.length;
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
@@ -342,12 +344,82 @@ export default function MeterReadings() {
         );
     };
 
+    const getCapturedPhoto = (roomId, type) => capturedPhotos[roomId]?.[type] ?? null;
+    const getExistingPhotoId = (room, type) =>
+        type === "electricity" ? room.electricityPhotoId : room.waterPhotoId;
+    const hasEvidencePhoto = (room, type) => Boolean(getCapturedPhoto(room.id, type)?.file || getExistingPhotoId(room, type));
+
+    const removeCapturedPhoto = (roomId, type) => {
+        setCapturedPhotos((prev) => {
+            const next = { ...prev };
+            const roomPhotos = { ...(next[roomId] || {}) };
+            delete roomPhotos[type];
+            if (Object.keys(roomPhotos).length > 0) {
+                next[roomId] = roomPhotos;
+            } else {
+                delete next[roomId];
+            }
+            return next;
+        });
+    };
+
+    const uploadEvidencePhoto = async (room, type) => {
+        const photo = getCapturedPhoto(room.id, type);
+        if (!photo?.file) return getExistingPhotoId(room, type) ?? null;
+
+        const response = await uploadMeterReadingPhoto(photo.file);
+        const fileId = response?.fileId || response?.id;
+        if (!fileId) throw new Error("Không upload được ảnh minh chứng");
+        return fileId;
+    };
+
+    const renderEvidenceCapture = (room, type, label) => {
+        const photo = getCapturedPhoto(room.id, type);
+        const existingPhotoId = getExistingPhotoId(room, type);
+
+        return (
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-white/10 dark:bg-[#020817]">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</span>
+                    {existingPhotoId && !photo ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                            Đã có ảnh
+                        </span>
+                    ) : null}
+                </div>
+                {photo ? (
+                    <div className="relative h-28 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
+                        <Image src={photo.previewUrl} alt={label} fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized />
+                        <button
+                            type="button"
+                            onClick={() => removeCapturedPhoto(room.id, type)}
+                            className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                ) : (
+                    <Button
+                        variant="primary"
+                        onClick={() => setCameraTarget({ roomId: room.id, type })}
+                        className="flex w-full items-center justify-center gap-2"
+                    >
+                        <Camera className="h-4 w-4" />
+                        {existingPhotoId ? "Chụp lại" : "Chụp ảnh minh chứng"}
+                    </Button>
+                )}
+            </div>
+        );
+    };
+
     const handleSaveAndNext = async () => {
+        if (saving) return;
+
         const room = rooms.find(r => r.id === focusRoomId);
         if (!room) return;
 
-        if (room.elecCurr === null && room.waterCurr === null) {
-            toast.error("Vui lòng nhập ít nhất một chỉ số");
+        if (room.elecCurr === null || room.waterCurr === null) {
+            toast.error("Vui lòng nhập đủ chỉ số điện và nước");
             return;
         }
 
@@ -362,16 +434,33 @@ export default function MeterReadings() {
             return;
         }
 
+        if (!hasEvidencePhoto(room, "electricity") || !hasEvidencePhoto(room, "water")) {
+            toast.error("Vui lòng chụp đủ ảnh minh chứng cho điện và nước");
+            return;
+        }
+
+        setSaving(true);
         try {
+            const [electricityPhotoId, waterPhotoId] = await Promise.all([
+                uploadEvidencePhoto(room, "electricity"),
+                uploadEvidencePhoto(room, "water"),
+            ]);
+
             await saveProgressiveRoomReading(batchId, room.roomId, {
                 electricityValue: room.elecCurr,
                 waterValue: room.waterCurr,
-                electricityPhotoId: null,
-                waterPhotoId: null
+                electricityPhotoId,
+                waterPhotoId,
             });
 
             // local update status
-            setRooms(prev => prev.map(r => r.id === focusRoomId ? { ...r, status: "synced" } : r));
+            setRooms(prev => prev.map(r => r.id === focusRoomId ? {
+                ...r,
+                status: "synced",
+                electricityPhotoId,
+                waterPhotoId,
+                photos: Number(Boolean(electricityPhotoId)) + Number(Boolean(waterPhotoId)),
+            } : r));
 
             const focusIndex = filtered.findIndex(r => r.id === focusRoomId);
             if (focusIndex >= 0 && focusIndex < filtered.length - 1) {
@@ -381,8 +470,10 @@ export default function MeterReadings() {
                 loadData();
             }
         } catch (error) {
-            toast.error("Lỗi khi lưu phòng này");
+            toast.error(error?.details || error?.message || "Lỗi khi lưu phòng này");
             console.error(error);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -402,7 +493,7 @@ export default function MeterReadings() {
                 activeTab === "pending" ? isPending :
                     activeTab === "completed" ? r.status === "synced" :
                         activeTab === "unsynced" ? r.status === "local" :
-                            activeTab === "error" ? r.status === "error" : true;
+                            activeTab === "error" ? r.status === "error" || r.status === "warning" : true;
 
         return matchesSearch && matchesTab;
     });
@@ -490,13 +581,6 @@ export default function MeterReadings() {
                                 <Edit3 className="h-4 w-4" />
                                 Bắt đầu nhập
                             </Button>
-                            <Button
-                                onClick={handleSaveAll}
-                                disabled={saving || loading || (pending > 0 || errors > 0)}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                {saving ? "Đang lưu..." : "Lưu tất cả"}
-                            </Button>
                         </div>
                     }
                 />
@@ -570,7 +654,7 @@ export default function MeterReadings() {
                             <AccordionContent className="pt-0 pb-0">
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full overflow-x-auto pb-4">
-                                    <Table className="w-full text-sm min-w-[900px]">
+                                    <Table className="w-full text-sm min-w-[1040px]">
                                         <TableHeader>
                                             <TableRow className="bg-gray-50 dark:bg-[#020817] border-y border-gray-200 dark:border-white/10">
                                                 <TableHead
@@ -607,6 +691,8 @@ export default function MeterReadings() {
                                             {floorRooms.map((room) => {
                                                 const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
                                                 const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                                const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                                const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
                                                 const isElecError = elecUsage !== null && elecUsage < 0;
                                                 const isWaterError = waterUsage !== null && waterUsage < 0;
                                                 const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
@@ -632,8 +718,8 @@ export default function MeterReadings() {
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-14 text-left font-semibold text-xs ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {elecUsage === null ? "" : elecUsage < 0 ? `(${elecUsage})` : `(+${elecUsage})`}
+                                                                    className={`w-28 text-left text-xs font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {elecCharge === null ? "" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
@@ -653,8 +739,8 @@ export default function MeterReadings() {
                                                                     placeholder="—"
                                                                 />
                                                                 <span
-                                                                    className={`w-12 text-left font-semibold text-xs ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {waterUsage === null ? "" : waterUsage < 0 ? `(${waterUsage})` : `(+${waterUsage})`}
+                                                                    className={`w-28 text-left text-xs font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {waterCharge === null ? "" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </TableCell>
@@ -714,6 +800,8 @@ export default function MeterReadings() {
                                     {floorRooms.map((room) => {
                                         const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
                                         const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                        const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                        const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
                                         const isElecError = elecUsage !== null && elecUsage < 0;
                                         const isWaterError = waterUsage !== null && waterUsage < 0;
                                         const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
@@ -732,6 +820,7 @@ export default function MeterReadings() {
                                                         </div>
                                                     </div>
                                                     <button
+                                                        onClick={() => setFocusRoomId(room.id)}
                                                         className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
                                                         <Edit3 size={18} />
                                                     </button>
@@ -765,10 +854,10 @@ export default function MeterReadings() {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Tiêu thụ</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
                                                                 <span
-                                                                    className={`font-semibold ${elecUsage === null ? "text-gray-300" : elecUsage < 0 ? "text-red-500 dark:text-rose-300" : elecUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {elecUsage === null ? "—" : elecUsage < 0 ? elecUsage : `+${elecUsage}`}
+                                                                    className={`font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {elecCharge === null ? "—" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -801,10 +890,10 @@ export default function MeterReadings() {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Tiêu thụ</span>
+                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
                                                                 <span
-                                                                    className={`font-semibold ${waterUsage === null ? "text-gray-300" : waterUsage < 0 ? "text-red-500 dark:text-rose-300" : waterUsage === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {waterUsage === null ? "—" : waterUsage}
+                                                                    className={`font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {waterCharge === null ? "—" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -876,33 +965,38 @@ export default function MeterReadings() {
                             className="w-2 h-2 rounded-full bg-red-500"></span>Lỗi chỉ số</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button
-                        onClick={handleSaveAll}
-                        disabled={saving || loading || pending > 0 || errors > 0}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto">
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
-                        {saving ? "Đang chốt..." : "Kiểm tra & chốt chỉ số"}
-                    </button>
-                </div>
             </div>
 
             {/* Focus Mode Modal */}
             <Dialog open={!!focusRoomId} onOpenChange={(open) => !open && setFocusRoomId(null)}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden sm:max-w-md">
                     {focusRoomId && (() => {
                         const room = rooms.find(r => r.id === focusRoomId);
                         if (!room) return null;
 
                         const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
                         const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                        const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                        const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
 
                         return (
                             <>
-                                <DialogHeader>
+                                <DialogHeader className="shrink-0">
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
-                                <div className="space-y-6 py-4">
+                                <div className="mt-4 flex w-full shrink-0 touch-pan-x items-center gap-2 overflow-x-auto border-b border-gray-100 pb-3 pr-8 dark:border-white/10">
+                                    {filtered.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => setFocusRoomId(item.id)}
+                                            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${item.id === focusRoomId ? "bg-blue-600 text-white shadow-sm" : "bg-gray-100 text-slate-600 hover:bg-gray-200 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"}`}
+                                        >
+                                            {item.id}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto py-4 pr-1">
                                     {/* Electricity */}
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
@@ -935,6 +1029,22 @@ export default function MeterReadings() {
                                                 />
                                             </div>
                                         </div>
+                                        {elecCharge ? (
+                                            <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span className={`text-sm font-semibold ${elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                        {elecCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(elecCharge.amount)}
+                                                    </span>
+                                                </div>
+                                                {!elecCharge.isInvalid ? (
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {elecCharge.billableUsage} kWh x {formatVnd(elecCharge.unitPrice)}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        {renderEvidenceCapture(room, "electricity", "Ảnh minh chứng điện")}
                                     </div>
 
                                     {/* Water */}
@@ -969,42 +1079,34 @@ export default function MeterReadings() {
                                                 />
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        {capturedPhotos[room.id] ? (
-                                            <div className="relative h-32 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#020817]">
-                                                <Image src={capturedPhotos[room.id].previewUrl} alt="Captured" fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized />
-                                                <button
-                                                    onClick={() => {
-                                                        const newPhotos = {...capturedPhotos};
-                                                        delete newPhotos[room.id];
-                                                        setCapturedPhotos(newPhotos);
-                                                    }}
-                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
+                                        {waterCharge ? (
+                                            <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 dark:border-blue-500/20 dark:bg-blue-500/10">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span className={`text-sm font-semibold ${waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                        {waterCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(waterCharge.amount)}
+                                                    </span>
+                                                </div>
+                                                {!waterCharge.isInvalid ? (
+                                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                        {waterCharge.billableUsage} m³ tính phí sau miễn {waterCharge.freeAllowance} m³ x {formatVnd(waterCharge.unitPrice)}
+                                                    </p>
+                                                ) : null}
                                             </div>
-                                        ) : (
-                                            <Button variant="primary"
-                                                onClick={() => setCameraOpen(true)}
-                                                className="w-full flex items-center gap-2 justify-center">
-                                                <Camera className="w-4 h-4" />
-                                                Chụp ảnh minh chứng
-                                            </Button>
-                                        )}
+                                        ) : null}
+                                        {renderEvidenceCapture(room, "water", "Ảnh minh chứng nước")}
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 mt-4">
+                                <div className="mt-4 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
                                     <Button variant="primary" onClick={() => setFocusRoomId(null)}
                                         className="w-1/3">
                                         Đóng
                                     </Button>
                                     <Button onClick={handleSaveAndNext}
+                                        disabled={saving}
                                         className="w-2/3 bg-blue-600 hover:bg-blue-700">
-                                        Lưu & Tiếp theo
+                                        {saving ? "Đang lưu..." : "Lưu & Tiếp theo"}
                                     </Button>
                                 </div>
                             </>
@@ -1014,13 +1116,17 @@ export default function MeterReadings() {
             </Dialog>
 
             <CameraCapture
-                open={cameraOpen}
-                onClose={() => setCameraOpen(false)}
+                open={!!cameraTarget}
+                title={cameraTarget?.type === "water" ? "Chụp ảnh đồng hồ nước" : "Chụp ảnh đồng hồ điện"}
+                onClose={() => setCameraTarget(null)}
                 onCapture={(photoData) => {
-                    if (focusRoomId) {
+                    if (cameraTarget?.roomId && cameraTarget?.type) {
                         setCapturedPhotos(prev => ({
                             ...prev,
-                            [focusRoomId]: photoData
+                            [cameraTarget.roomId]: {
+                                ...(prev[cameraTarget.roomId] || {}),
+                                [cameraTarget.type]: photoData,
+                            },
                         }));
                     }
                 }}

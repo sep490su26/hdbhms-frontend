@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
   DoorOpen,
   Eye,
   Gauge,
@@ -21,6 +22,11 @@ import {
 } from "@/services/facilityService";
 
 const statusMeta = {
+  [FACILITY_STATUS.DRAFT]: {
+    label: "Bản nháp",
+    badge: "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
+    dot: "bg-slate-400",
+  },
   [FACILITY_STATUS.ACTIVE]: {
     label: "Đang hoạt động",
     badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
@@ -78,8 +84,6 @@ function getFacilityMeterReadingsHref(facility) {
     propertyId: String(facility.id),
   });
 
-  if (facility.name) params.set("facilityName", facility.name);
-
   return `/dashboard/meter-readings?${params.toString()}`;
 }
 
@@ -127,11 +131,17 @@ function FacilityTree({ facility }) {
                 <span
                   key={room.id}
                   title={
-                    room.status === "OCCUPIED" ? "Đang thuê" : "Phòng trống"
+                    room.status === "OCCUPIED"
+                      ? "Đang thuê"
+                      : room.status === "DRAFT"
+                        ? "Bản nháp"
+                        : "Phòng trống"
                   }
                   className={`rounded-md px-2 py-1 text-[10px] font-bold ${
                     room.status === "OCCUPIED"
                       ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                      : room.status === "DRAFT"
+                        ? "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300"
                       : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                   }`}
                 >
@@ -152,6 +162,7 @@ function MobileFacilityCard({
   onToggle,
   onEdit,
   onStatusChange,
+  onUtilitySettings,
   showMeterReadingsAction,
 }) {
   const counts = getFacilityCounts(facility);
@@ -201,7 +212,7 @@ function MobileFacilityCard({
             Xem chi tiết
           </Link>
          
-          <div className={`grid gap-2 ${showMeterReadingsAction ? "grid-cols-2" : "grid-cols-3"}`}>
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => onEdit(facility)}
@@ -226,6 +237,14 @@ function MobileFacilityCard({
                 Điện nước
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => onUtilitySettings(facility)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+            >
+              <CircleDollarSign className="h-3.5 w-3.5" />
+              Giá điện nước
+            </button>
             <button
               type="button"
               onClick={onToggle}
@@ -255,6 +274,7 @@ export function FacilityList({
   showMeterReadingsAction = false,
   onEdit,
   onStatusChange,
+  onUtilitySettings,
 }) {
   const [expandedIds, setExpandedIds] = useState(
     () => new Set([facilities[0]?.id].filter(Boolean)),
@@ -308,6 +328,7 @@ export function FacilityList({
             onToggle={() => toggleFacility(facility.id)}
             onEdit={onEdit}
             onStatusChange={onStatusChange}
+            onUtilitySettings={onUtilitySettings}
             showMeterReadingsAction={showMeterReadingsAction}
           />
         ))}
@@ -417,6 +438,15 @@ export function FacilityList({
                               <Gauge className="h-4 w-4" />
                             </Link>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => onUtilitySettings(facility)}
+                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
+                            title="Giá điện nước"
+                            aria-label={`Giá điện nước ${facility.name}`}
+                          >
+                            <CircleDollarSign className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

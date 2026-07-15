@@ -311,6 +311,14 @@ function SelectPill({ icon: Icon, children }) {
 }
 
 const STATUS_META = {
+  DRAFT: {
+    label: "Bản nháp",
+    dot: "bg-slate-400",
+    badge:
+      "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
+    card: "border-slate-200 dark:border-white/10 bg-slate-50/90 dark:bg-white/5 text-slate-900 dark:text-slate-300",
+    icon: "text-slate-500 dark:text-slate-300",
+  },
   VACANT: {
     label: "Trống",
     dot: "bg-emerald-500",
@@ -362,6 +370,7 @@ const STATUS_META = {
 };
 
 const STATUS_ORDER = [
+  "DRAFT",
   "VACANT",
   "OCCUPIED",
   "RESERVED",
@@ -1536,6 +1545,7 @@ function RoomsListPage({ query, propertyId }) {
           }}
         />
       )}
+
     </>
   );
 }

@@ -83,6 +83,18 @@ export async function saveProgressiveRoomReading(batchId, roomId, payload) {
     });
 }
 
+export async function uploadMeterReadingPhoto(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", "METER_PHOTO");
+    formData.append("isSensitive", "false");
+
+    return authenticatedFetch(`${BASE}/files/upload`, {
+        method: "POST",
+        body: formData,
+    });
+}
+
 /**
  * Confirm batch
  * POST /api/v1/meter-readings/batches/{batchId}/confirm

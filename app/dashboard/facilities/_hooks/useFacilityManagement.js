@@ -161,8 +161,10 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
       propertyType: formState.values.propertyType || "BOARDING_HOUSE",
       address: formState.values.address.trim(),
       description: formState.values.description.trim(),
-      status: formState.values.status || FACILITY_STATUS.ACTIVE,
     };
+    if (formState.mode === "edit") {
+      payload.status = formState.values.status || FACILITY_STATUS.ACTIVE;
+    }
 
     setFormState((current) => ({ ...current, isSubmitting: true }));
 

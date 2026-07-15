@@ -228,17 +228,21 @@ export default function UtilityManagement() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [backendFacilityName, setBackendFacilityName] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const propertyId =
-    normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId")) ||
-    "1";
+    normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
   const fromFacilities = searchParams.get("from") === "facilities";
-  const facilityName = searchParams.get("facilityName") || "";
+  const facilityName = backendFacilityName || "";
   const batchQueryContext = {
     from: fromFacilities ? "facilities" : "",
     facilityName,
   };
+
+  useEffect(() => {
+    setBackendFacilityName("");
+  }, [propertyId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -261,6 +265,7 @@ export default function UtilityManagement() {
           setHistory(dedupeBatchHistory(normalizedHistory));
         }
         if (dashboardRes) {
+          setBackendFacilityName(dashboardRes.propertyName ?? dashboardRes.property_name ?? "");
           const canCreate =
             dashboardRes.canCreateCurrentPeriod ??
             dashboardRes.can_create_current_period;
@@ -293,6 +298,11 @@ export default function UtilityManagement() {
   }, [propertyId]);
 
   const handleStartBatch = async () => {
+    if (!propertyId) {
+      toast.error("Vui lòng chọn cơ sở trước khi tạo kỳ ghi chỉ số");
+      return;
+    }
+
     try {
       const periodToStart =
         dashboard?.currentPeriod ||

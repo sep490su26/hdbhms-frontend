@@ -29,7 +29,7 @@ function normalizeRoom(raw = {}) {
     listedPrice: numberValue(raw.listedPrice),
     maxOccupants: numberValue(raw.maxOccupants),
     sortOrder: numberValue(raw.sortOrder),
-    currentStatus: raw.currentStatus ?? raw.status ?? "VACANT",
+    currentStatus: raw.currentStatus ?? raw.status ?? "DRAFT",
   };
 }
 

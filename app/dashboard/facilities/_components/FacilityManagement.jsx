@@ -17,13 +17,43 @@ import {
 import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
+import { FacilityUtilitySettingsDialog } from "./FacilityUtilitySettingsDialog";
 import { useFacilityManagement } from "../_hooks/useFacilityManagement";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { facilityStatusOptions } from "@/services/facilityService";
+import {
+  fetchPropertyUtilitySettings,
+  updatePropertyUtilitySettings,
+} from "@/services/propertyUtilitySettingsService";
 import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
 import { ROLES } from "@/app/dashboard/_lib/rbac";
+
+const DEFAULT_UTILITY_VALUES = {
+  electricityUnitPrice: "3500",
+  electricityFreeAllowance: "0",
+  waterUnitPrice: "20000",
+  waterFreeAllowance: "6",
+};
+
+function utilitySettingsToValues(settings) {
+  return {
+    electricityUnitPrice: String(
+      settings?.electricity?.unitPrice ?? DEFAULT_UTILITY_VALUES.electricityUnitPrice,
+    ),
+    electricityFreeAllowance: String(
+      settings?.electricity?.freeAllowance ??
+        DEFAULT_UTILITY_VALUES.electricityFreeAllowance,
+    ),
+    waterUnitPrice: String(
+      settings?.water?.unitPrice ?? DEFAULT_UTILITY_VALUES.waterUnitPrice,
+    ),
+    waterFreeAllowance: String(
+      settings?.water?.freeAllowance ?? DEFAULT_UTILITY_VALUES.waterFreeAllowance,
+    ),
+  };
+}
 
 const statCards = [
   {
@@ -130,6 +160,14 @@ export function FacilityManagement() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [utilityState, setUtilityState] = useState({
+    isOpen: false,
+    facility: null,
+    values: DEFAULT_UTILITY_VALUES,
+    loading: false,
+    saving: false,
+    error: "",
+  });
   const { user } = useAuth();
   const facility = useFacilityManagement({
     keyword: query,
@@ -146,6 +184,72 @@ export function FacilityManagement() {
   function updateStatus(value) {
     setStatusFilter(value);
     setPage(1);
+  }
+
+  async function openUtilitySettings(targetFacility) {
+    setUtilityState({
+      isOpen: true,
+      facility: targetFacility,
+      values: DEFAULT_UTILITY_VALUES,
+      loading: true,
+      saving: false,
+      error: "",
+    });
+
+    try {
+      const settings = await fetchPropertyUtilitySettings(targetFacility.id);
+      setUtilityState((current) => ({
+        ...current,
+        values: utilitySettingsToValues(settings),
+        loading: false,
+      }));
+    } catch (error) {
+      setUtilityState((current) => ({
+        ...current,
+        loading: false,
+        error: error?.message || "Không thể tải giá điện nước.",
+      }));
+    }
+  }
+
+  function closeUtilitySettings() {
+    setUtilityState((current) =>
+      current.saving ? current : { ...current, isOpen: false, error: "" },
+    );
+  }
+
+  function updateUtilityValue(name, value) {
+    setUtilityState((current) => ({
+      ...current,
+      values: { ...current.values, [name]: value },
+      error: "",
+    }));
+  }
+
+  async function submitUtilitySettings(event) {
+    event.preventDefault();
+    if (!utilityState.facility?.id) return;
+
+    setUtilityState((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const settings = await updatePropertyUtilitySettings(
+        utilityState.facility.id,
+        utilityState.values,
+      );
+      setUtilityState((current) => ({
+        ...current,
+        values: utilitySettingsToValues(settings),
+        saving: false,
+        isOpen: false,
+      }));
+      facility.pushToast("Đã cập nhật giá điện nước");
+    } catch (error) {
+      setUtilityState((current) => ({
+        ...current,
+        saving: false,
+        error: error?.message || "Không thể lưu giá điện nước.",
+      }));
+    }
   }
 
   return (
@@ -214,6 +318,7 @@ export function FacilityManagement() {
         showMeterReadingsAction={user?.role === ROLES.OWNER}
         onEdit={facility.openEditForm}
         onStatusChange={facility.requestStatusChange}
+        onUtilitySettings={openUtilitySettings}
       />
       <DashboardPagination
         page={page}
@@ -239,6 +344,12 @@ export function FacilityManagement() {
         onAcknowledgedChange={facility.setStatusAcknowledged}
         onClose={facility.closeStatusFlow}
         onConfirm={facility.confirmStatusChange}
+      />
+      <FacilityUtilitySettingsDialog
+        state={utilityState}
+        onClose={closeUtilitySettings}
+        onChange={updateUtilityValue}
+        onSubmit={submitUtilitySettings}
       />
       <ToastViewport
         toasts={facility.toasts}

@@ -35,7 +35,7 @@ function dashboardRoomsByFloor(dashboard, propertyId) {
         listedPrice: numberValue(room.listedPrice ?? room.listed_price ?? room.price),
         maxOccupants: numberValue(room.maxOccupants),
         sortOrder: numberValue(room.sortOrder ?? room.sort_order),
-        currentStatus: room.currentStatus ?? room.status ?? "VACANT",
+        currentStatus: room.currentStatus ?? room.status ?? "DRAFT",
       })),
     );
   });

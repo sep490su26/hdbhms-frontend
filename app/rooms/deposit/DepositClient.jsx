@@ -1757,6 +1757,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   const identityDigits = String(customer.phone || customer.citizenId || "00000").replace(/\D/g, "").slice(-5).padStart(5, "0");
   const paymentCode = readPaymentContent(paymentIntent) || `HD-${room.id}-${identityDigits}`;
   const paymentIntentId = readPaymentIntentId(paymentIntent);
+  const accessToken = paymentIntent?.accessToken ?? paymentIntent?.access_token ?? "";
   const checkoutUrl = readCheckoutUrl(paymentIntent);
   const qrPayload = readQrPayload(paymentIntent);
   const paymentLinkId = paymentIntent?.paymentLinkId ?? paymentIntent?.payment_link_id ?? "";
@@ -1839,7 +1840,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
 
     const pollPaymentStatus = async () => {
       try {
-        const status = await fetchDepositPaymentStatus(paymentIntentId);
+        const status = await fetchDepositPaymentStatus(paymentIntentId, accessToken);
         if (status?.message) {
           setPaymentStatusMessage(status.message);
         }
@@ -1866,7 +1867,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     pollPaymentStatus();
     const pollingTimer = window.setInterval(pollPaymentStatus, 2500);
     return () => window.clearInterval(pollingTimer);
-  }, [expiresAtMs, isConfirmed, paymentIntentId, room.id, router]);
+  }, [accessToken, expiresAtMs, isConfirmed, paymentIntentId, room.id, router]);
 
   const handleOpenCheckout = () => {
     if (!checkoutUrl) {
@@ -1897,7 +1898,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
   const handleCancelPayment = async () => {
     try {
       setIsCancelling(true);
-      await cancelDepositPayment(paymentIntentId);
+      await cancelDepositPayment(paymentIntentId, accessToken);
       clearRoomHold(room.id);
       alert("Đã hủy giữ chỗ. Phòng đã được mở lại cho người khác đặt cọc.");
       router.replace("/rooms");
@@ -1915,7 +1916,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     }
 
     try {
-      await openDepositContractByPaymentPdf(paymentIntentId, paymentCode);
+      await openDepositContractByPaymentPdf(paymentIntentId, paymentCode, accessToken);
     } catch (error) {
       alert(error.message || "Không thể mở hợp đồng đặt cọc.");
     }
@@ -1928,7 +1929,12 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     }
 
     try {
-      await downloadDepositContractByPaymentPdf(paymentIntentId, paymentCode, `hop-dong-dat-coc-${room.id}.pdf`);
+      await downloadDepositContractByPaymentPdf(
+        paymentIntentId,
+        paymentCode,
+        `hop-dong-dat-coc-${room.id}.pdf`,
+        accessToken,
+      );
     } catch (error) {
       alert(error.message || "Không thể tải hợp đồng đặt cọc.");
     }

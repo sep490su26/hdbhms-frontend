@@ -377,7 +377,7 @@ export async function uploadSignedDepositContractFile(depositAgreementId, file) 
   return readEnvelope(response, "Không thể upload bản hợp đồng đặt cọc đã ký.");
 }
 
-export async function fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent) {
+export async function fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent, accessToken) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán.");
   }
@@ -393,6 +393,7 @@ export async function fetchDepositContractByPaymentBlob(paymentIntentId, payment
     credentials: "include",
     headers: {
       "X-Client-Type": "web",
+      ...(accessToken ? { "X-Deposit-Access-Token": accessToken } : {}),
     },
   });
 
@@ -441,8 +442,8 @@ export async function openSignedDepositContractPdf(depositAgreementId) {
   return openBlobInNewTab(() => fetchSignedDepositContractBlob(depositAgreementId));
 }
 
-export async function openDepositContractByPaymentPdf(paymentIntentId, paymentContent) {
-  return openBlobInNewTab(() => fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent));
+export async function openDepositContractByPaymentPdf(paymentIntentId, paymentContent, accessToken) {
+  return openBlobInNewTab(() => fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent, accessToken));
 }
 
 export async function downloadDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc.pdf") {
@@ -469,8 +470,13 @@ export async function downloadSignedDepositContractPdf(depositAgreementId, filen
   URL.revokeObjectURL(url);
 }
 
-export async function downloadDepositContractByPaymentPdf(paymentIntentId, paymentContent, filename = "hop-dong-dat-coc.pdf") {
-  const blob = await fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent);
+export async function downloadDepositContractByPaymentPdf(
+  paymentIntentId,
+  paymentContent,
+  filename = "hop-dong-dat-coc.pdf",
+  accessToken,
+) {
+  const blob = await fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent, accessToken);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

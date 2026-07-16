@@ -20,6 +20,7 @@ return {
   downloadDepositContractPdf,
   fetchDepositContractFile,
   fetchDepositContractBlob,
+  fetchDepositContractByPaymentBlob,
   buildDepositContractDocumentFilename,
   fetchDepositAgreements,
   forfeitDepositAgreement,
@@ -156,6 +157,27 @@ test("downloadDepositContractPdf uses caller fallback when header is unavailable
     globalThis.document = originalDocument;
     URL.createObjectURL = originalCreateObjectUrl;
     URL.revokeObjectURL = originalRevokeObjectUrl;
+  }
+});
+
+test("guest contract download carries its checkout capability token", async () => {
+  const { fetchDepositContractByPaymentBlob } = loadDepositContractsService();
+  const originalFetch = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url: String(url), options };
+    return {
+      status: 200,
+      ok: true,
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    };
+  };
+
+  try {
+    await fetchDepositContractByPaymentBlob(41, "PAY-41", "capability-41");
+    assert.equal(request.options.headers["X-Deposit-Access-Token"], "capability-41");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 

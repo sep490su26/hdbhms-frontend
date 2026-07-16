@@ -376,7 +376,14 @@ export async function checkoutBatchDeposit(formData) {
   return payload.data ?? payload;
 }
 
-export async function fetchBatchDepositStatus(batchId) {
+function depositAccessHeaders(accessToken, headers = {}) {
+  return {
+    ...headers,
+    ...(accessToken ? { "X-Deposit-Access-Token": accessToken } : {}),
+  };
+}
+
+export async function fetchBatchDepositStatus(batchId, accessToken) {
   if (!batchId) {
     throw new Error("Thiếu mã phiên đặt cọc nhiều phòng.");
   }
@@ -385,9 +392,9 @@ export async function fetchBatchDepositStatus(batchId) {
     `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/status`,
     {
       cache: "no-store",
-      headers: {
+      headers: depositAccessHeaders(accessToken, {
         "X-Client-Type": "web",
-      },
+      }),
     },
   );
   const payload = await response.json().catch(() => ({}));
@@ -399,7 +406,7 @@ export async function fetchBatchDepositStatus(batchId) {
   return payload.data ?? payload;
 }
 
-export async function cancelBatchDeposit(batchId) {
+export async function cancelBatchDeposit(batchId, accessToken) {
   if (!batchId) {
     throw new Error("Thiếu mã phiên đặt cọc để hủy giữ chỗ.");
   }
@@ -408,10 +415,10 @@ export async function cancelBatchDeposit(batchId) {
     `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/cancel`,
     {
       method: "POST",
-      headers: {
+      headers: depositAccessHeaders(accessToken, {
         "Content-Type": "application/json",
         "X-Client-Type": "web",
-      },
+      }),
       body: JSON.stringify({}),
     },
   );
@@ -424,7 +431,7 @@ export async function cancelBatchDeposit(batchId) {
   return payload.data ?? payload;
 }
 
-export async function expireBatchDeposit(batchId) {
+export async function expireBatchDeposit(batchId, accessToken) {
   if (!batchId) {
     throw new Error("Thiếu mã phiên đặt cọc để xác nhận hết hạn.");
   }
@@ -433,10 +440,10 @@ export async function expireBatchDeposit(batchId) {
     `${API_BASE_URL}/public/deposits/batches/${encodeURIComponent(batchId)}/expire`,
     {
       method: "POST",
-      headers: {
+      headers: depositAccessHeaders(accessToken, {
         "Content-Type": "application/json",
         "X-Client-Type": "web",
-      },
+      }),
       body: JSON.stringify({}),
     },
   );
@@ -471,16 +478,16 @@ export async function fetchDepositRoomHoldStatus(roomId, dates = {}) {
   return payload.data ?? null;
 }
 
-export async function fetchDepositPaymentStatus(paymentIntentId) {
+export async function fetchDepositPaymentStatus(paymentIntentId, accessToken) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán.");
   }
 
   const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/status`, {
     cache: "no-store",
-    headers: {
+    headers: depositAccessHeaders(accessToken, {
       "X-Client-Type": "web",
-    },
+    }),
   });
   const payload = await response.json().catch(() => ({}));
 
@@ -491,17 +498,17 @@ export async function fetchDepositPaymentStatus(paymentIntentId) {
   return payload.data ?? null;
 }
 
-export async function cancelDepositPayment(paymentIntentId) {
+export async function cancelDepositPayment(paymentIntentId, accessToken) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán để hủy giữ chỗ.");
   }
 
   const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/cancel`, {
     method: "POST",
-    headers: {
+    headers: depositAccessHeaders(accessToken, {
       "Content-Type": "application/json",
       "X-Client-Type": "web",
-    },
+    }),
     body: JSON.stringify({}),
   });
   const payload = await response.json().catch(() => ({}));
@@ -513,17 +520,17 @@ export async function cancelDepositPayment(paymentIntentId) {
   return payload.data ?? null;
 }
 
-export async function expireDepositPayment(paymentIntentId) {
+export async function expireDepositPayment(paymentIntentId, accessToken) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán để xác nhận hết hạn.");
   }
 
   const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/expire`, {
     method: "POST",
-    headers: {
+    headers: depositAccessHeaders(accessToken, {
       "Content-Type": "application/json",
       "X-Client-Type": "web",
-    },
+    }),
     body: JSON.stringify({}),
   });
   const payload = await response.json().catch(() => ({}));

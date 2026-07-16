@@ -78,6 +78,7 @@ export function PhotoGallery({
                             src={p.thumb ?? p.src}
                             alt={p.alt}
                             fill
+                            unoptimized={String(p.thumb ?? p.src).startsWith("blob:")}
                             className="object-cover transition-transform duration-200 group-hover:scale-105"
                             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                         />
@@ -156,6 +157,7 @@ export function PhotoGallery({
                                 src={photo.src}
                                 alt={photo.alt}
                                 fill
+                                unoptimized={String(photo.src).startsWith("blob:")}
                                 className="object-contain"
                                 sizes="90vw"
                                 priority

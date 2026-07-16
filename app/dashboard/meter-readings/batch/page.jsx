@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
+    fetchMeterReadingPhoto,
     saveProgressiveRoomReading,
     uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
@@ -31,7 +32,6 @@ import {
     Droplets,
     Edit3,
     Home,
-    ImageIcon,
     Info,
     RefreshCw,
     Search,
@@ -52,76 +52,7 @@ import {
     formatVnd,
     normalizeUtilityTariff,
 } from "@/lib/meterReadingCost.mjs";
-
-const SAMPLE_PHOTOS = [
-    {
-        id: "1",
-        src: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&q=70",
-        alt: "Hồ Yosemite",
-        label: "Hồ Yosemite",
-        caption: "California, USA",
-    },
-    {
-        id: "2",
-        src: "https://images.unsplash.com/photo-1494500764479-0c8f2919a3d8?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1494500764479-0c8f2919a3d8?w=400&q=70",
-        alt: "Bình minh trên biển",
-        label: "Bình minh trên biển",
-    },
-    {
-        id: "3",
-        src: "https://images.unsplash.com/photo-1540206395-68808572332f?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1540206395-68808572332f?w=400&q=70",
-        alt: "Dãy núi tuyết",
-        label: "Dãy núi tuyết",
-        caption: "Alps, Switzerland",
-    },
-    {
-        id: "4",
-        src: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=70",
-        alt: "Thành phố đêm",
-        label: "Thành phố đêm",
-    },
-    {
-        id: "5",
-        src: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=70",
-        alt: "Rừng mùa thu",
-        label: "Rừng mùa thu",
-    },
-    {
-        id: "6",
-        src: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=1200&q=80",
-        thumb: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=400&q=70",
-        alt: "Đường mòn rừng",
-        label: "Đường mòn rừng",
-        caption: "Pacific Trail",
-    },
-];
-
-
-const MOCK_PHOTOS = [
-    {
-        id: 1,
-        src: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=500&q=80",
-        alt: "Đồng hồ điện 1",
-        label: "Đồng hồ điện"
-    },
-    {
-        id: 2,
-        src: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=500&q=80",
-        alt: "Đồng hồ nước 1",
-        label: "Đồng hồ nước"
-    },
-    {
-        id: 3,
-        src: "https://images.unsplash.com/photo-1542382257-80da9fb9f5c2?w=500&q=80",
-        alt: "Phòng tổng quan",
-        label: "Tổng quan"
-    },
-];
+import { resolveMeterPhotoState } from "./meterPhotoState.mjs";
 
 const STATUS_CONFIG = {
     warning: { label: "Cần kiểm tra", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" },
@@ -185,17 +116,71 @@ function getMeterReadingsHref(propertyId, context = {}) {
     return `/dashboard/meter-readings${query ? `?${query}` : ""}`;
 }
 
-function MeterPhoto({ src }) {
+function roomEvidenceFiles(room) {
+    return [
+        { type: "electricity", label: "điện", fileId: Number(room.electricityPhotoId) },
+        { type: "water", label: "nước", fileId: Number(room.waterPhotoId) },
+    ].filter(({ fileId }) => Number.isSafeInteger(fileId) && fileId > 0);
+}
+
+function MeterEvidenceGallery({ room }) {
+    const evidenceFiles = roomEvidenceFiles(room);
+    const fileIds = evidenceFiles.map(({ fileId }) => fileId);
+    const fileIdsKey = evidenceFiles.map(({ type, fileId }) => `${type}:${fileId}`).join(",");
+    const [photoResult, setPhotoResult] = useState({ key: "", photos: [], error: null });
+
+    useEffect(() => {
+        const files = fileIdsKey
+            ? fileIdsKey.split(",").map((entry) => {
+                const [type, rawFileId] = entry.split(":");
+                return { type, fileId: Number(rawFileId), label: type === "water" ? "nước" : "điện" };
+            })
+            : [];
+        if (files.length === 0) return undefined;
+
+        const controller = new AbortController();
+        let objectUrls = [];
+        Promise.all(files.map(async ({ fileId, label }) => {
+            const blob = await fetchMeterReadingPhoto(fileId, { signal: controller.signal });
+            const src = URL.createObjectURL(blob);
+            objectUrls.push(src);
+            return { id: fileId, src, alt: `Ảnh đồng hồ ${label}`, label: `Đồng hồ ${label}` };
+        }))
+            .then((loadedPhotos) => setPhotoResult({ key: fileIdsKey, photos: loadedPhotos, error: null }))
+            .catch((error) => {
+                if (error?.name !== "AbortError") {
+                    setPhotoResult({ key: fileIdsKey, photos: [], error });
+                }
+            });
+
+        return () => {
+            controller.abort();
+            objectUrls.forEach((url) => URL.revokeObjectURL(url));
+        };
+    }, [fileIdsKey]);
+
+    const photoLoading = fileIds.length > 0 && photoResult.key !== fileIdsKey;
+    const photoError = photoResult.key === fileIdsKey ? photoResult.error : null;
+    const photos = photoResult.key === fileIdsKey ? photoResult.photos : [];
+    const state = resolveMeterPhotoState({ fileIds, loading: photoLoading, error: photoError });
+    if (state.kind !== "ready") {
+        return <span className="text-xs italic text-slate-400 dark:text-slate-500">{state.label}</span>;
+    }
+
     return (
-        <div
-            className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative group">
-            {src ? (
-                <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized />
-            ) : (
-                <ImageIcon className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+        <PhotoGallery
+            photos={photos}
+            renderTrigger={(openPhoto) => (
+                <button
+                    type="button"
+                    onClick={() => openPhoto(0)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+                >
+                    <Camera className="h-4 w-4" />
+                    {state.label}
+                </button>
             )}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-        </div>
+        />
     );
 }
 
@@ -744,19 +729,7 @@ export default function MeterReadings() {
 
                                                         {/* Photos */}
                                                         <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
-                                                            <PhotoGallery
-                                                                photos={MOCK_PHOTOS.slice(0, room.photos)}
-                                                                renderTrigger={(openPhoto) => (
-                                                                    <div
-                                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white dark:bg-[#0f172a] border-gray-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer shadow-sm" : "bg-gray-50 dark:bg-[#020817] border-transparent text-slate-400 dark:text-slate-500"}`}
-                                                                        onClick={() => room.photos > 0 && openPhoto(0)}
-                                                                    >
-                                                                        <Camera className="h-4 w-4" />
-                                                                        <span
-                                                                            className="whitespace-nowrap text-xs font-medium">{room.photos > 0 ? `${room.photos} ảnh` : "Không có"}</span>
-                                                                    </div>
-                                                                )}
-                                                            />
+                                                            <MeterEvidenceGallery room={room} />
                                                         </TableCell>
 
                                                         {/* Status */}
@@ -902,33 +875,7 @@ export default function MeterReadings() {
                                                     <div>
                                                         <span
                                                             className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Ảnh</span>
-                                                        <PhotoGallery
-                                                            photos={MOCK_PHOTOS.slice(0, room.photos)}
-                                                            renderTrigger={(openPhoto) => (
-                                                                <div
-                                                                    className={`flex items-center gap-1 ${room.photos > 0 ? "cursor-pointer" : ""}`}
-                                                                    onClick={() => room.photos > 0 && openPhoto(0)}
-                                                                >
-                                                                    {room.photos > 0 ? (
-                                                                        <>
-                                                                            <MeterPhoto src={MOCK_PHOTOS[0].src} />
-                                                                            {room.photos > 1 &&
-                                                                                <MeterPhoto
-                                                                                    src={MOCK_PHOTOS[1].src} />}
-                                                                            {room.photos > 2 && (
-                                                                                <div
-                                                                                    className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-gray-200 transition-colors">
-                                                                                    +{room.photos - 2}
-                                                                                </div>
-                                                                            )}
-                                                                        </>
-                                                                    ) : (
-                                                                        <span
-                                                                            className="text-slate-400 dark:text-slate-500 text-xs italic">Không có</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        />
+                                                        <MeterEvidenceGallery room={room} />
                                                     </div>
                                                     <div className="text-right">
                                                         {room.syncTime &&

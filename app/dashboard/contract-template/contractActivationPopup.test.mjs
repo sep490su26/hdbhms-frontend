@@ -84,11 +84,10 @@ test("active contracts show one context-aware dossier badge", () => {
   assert.doesNotMatch(pageSource, /flex flex-col items-start gap-1\.5/);
 });
 
-test("management table headers align with all ten contract columns", () => {
+test("lease-only management table headers align with all nine columns", () => {
   const header = pageSource.match(/<thead[\s\S]*?<\/thead>/)?.[0] || "";
   const labels = [
     "Mã HĐ",
-    "Loại HĐ",
     "Phòng",
     "Người ký chính",
     "Số người",
@@ -101,4 +100,7 @@ test("management table headers align with all ten contract columns", () => {
 
   assert.equal((header.match(/<th\b/g) || []).length, labels.length);
   labels.forEach((label) => assert.match(header, new RegExp(label)));
+  assert.match(pageSource, /function isVisibleLeaseContract\(item\)/);
+  assert.match(pageSource, /getContractType\(item\) === "lease"/);
+  assert.doesNotMatch(header, /Loại HĐ/);
 });

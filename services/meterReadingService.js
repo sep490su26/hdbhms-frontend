@@ -1,4 +1,4 @@
-import { API_BASE_URL, authenticatedFetch } from "@/services/identityAccessService";
+import { API_BASE_URL, authenticatedFetch, getAuthToken } from "@/services/identityAccessService";
 
 const BASE = API_BASE_URL;
 
@@ -93,6 +93,31 @@ export async function uploadMeterReadingPhoto(file) {
         method: "POST",
         body: formData,
     });
+}
+
+export async function fetchMeterReadingPhoto(fileId, { signal } = {}) {
+    const normalizedFileId = Number(fileId);
+    if (!Number.isSafeInteger(normalizedFileId) || normalizedFileId <= 0) {
+        throw new Error("Invalid meter-reading photo file id");
+    }
+
+    const token = getAuthToken();
+    const response = await fetch(`${BASE}/files/download/${normalizedFileId}`, {
+        method: "GET",
+        credentials: "include",
+        signal,
+        headers: {
+            Accept: "image/*",
+            "X-Client-Type": "web",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
+    if (!response.ok) {
+        const error = new Error(`Unable to load meter-reading photo (${response.status})`);
+        error.status = response.status;
+        throw error;
+    }
+    return response.blob();
 }
 
 /**

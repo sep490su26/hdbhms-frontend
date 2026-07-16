@@ -411,7 +411,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     if (didHandleExpiryRef.current) return;
     didHandleExpiryRef.current = true;
     if (checkout?.batchId) {
-      expireBatchDeposit(checkout.batchId)
+      expireBatchDeposit(checkout.batchId, checkout.accessToken)
         .then((status) => {
           if (status) setBatchStatus(status);
         })
@@ -419,7 +419,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
           setBatchStatus((current) => current ?? { status: "EXPIRED", message });
         });
     }
-  }, [checkout?.batchId]);
+  }, [checkout?.accessToken, checkout?.batchId]);
 
   useEffect(() => {
     if (!isSessionExpired) return undefined;
@@ -637,7 +637,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
     const poll = async () => {
       try {
-        const status = await fetchBatchDepositStatus(checkout.batchId);
+        const status = await fetchBatchDepositStatus(checkout.batchId, checkout.accessToken);
         if (!cancelled) setBatchStatus(status);
       } catch {
         // Keep the payment screen usable when one polling request temporarily fails.
@@ -650,7 +650,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [batchStatus?.status, checkout?.batchId, paymentExpired]);
+  }, [batchStatus?.status, checkout?.accessToken, checkout?.batchId, paymentExpired]);
 
   useEffect(() => {
     if (batchStatus?.status === "EXPIRED") {
@@ -1139,7 +1139,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     if (!checkout?.batchId) return;
     try {
       setCancellingPayment(true);
-      await cancelBatchDeposit(checkout.batchId);
+      await cancelBatchDeposit(checkout.batchId, checkout.accessToken);
       setCheckout(null);
       setBatchStatus(null);
       setRemainingMs(null);

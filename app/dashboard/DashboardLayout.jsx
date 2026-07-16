@@ -182,11 +182,6 @@ const specialRoutePermissions = [
     navigationPath: "/dashboard",
   },
   {
-    prefix: "/dashboard/maintenance-details/test",
-    permissionKey: "dashboard",
-    navigationPath: "/dashboard",
-  },
-  {
     prefix: "/dashboard/maintenance-details",
     permissionKey: "maintenance",
     navigationPath: "/dashboard/maintenance",

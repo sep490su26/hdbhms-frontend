@@ -16,6 +16,8 @@ return {
   fetchPublicActiveProperties,
   fetchPublicRoomCatalog,
   fetchPublicRoomById,
+  fetchDepositPaymentStatus,
+  cancelDepositPayment,
   mapApiRoomStatus,
   normalizeApiRoom,
   statusCopy,
@@ -42,6 +44,30 @@ test("maps draft room status without falling back to occupied", () => {
     }).status,
     "draft",
   );
+});
+
+test("deposit follow-up calls carry the checkout capability token", async () => {
+  const { fetchDepositPaymentStatus, cancelDepositPayment } = loadRoomsService();
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    return {
+      ok: true,
+      json: async () => ({ code: 0, data: { status: "PENDING" } }),
+    };
+  };
+
+  try {
+    await fetchDepositPaymentStatus(41, "capability-41");
+    await cancelDepositPayment(41, "capability-41");
+
+    calls.forEach(({ options }) => {
+      assert.equal(options.headers["X-Deposit-Access-Token"], "capability-41");
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("public catalog and detail hide draft rooms", async () => {

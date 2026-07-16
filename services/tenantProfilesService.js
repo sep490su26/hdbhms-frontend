@@ -149,11 +149,11 @@ export async function fetchMyTenantProfile() {
   return data;
 }
 
-export async function requestTenantProfileAccess(profileId) {
+export async function requestTenantProfileAccess(profileId, reason = "") {
   return authenticatedFetch(`${API_BASE_URL}/tenant-profiles/${encodeURIComponent(profileId)}/access-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ reason: String(reason || "").trim() }),
   });
 }
 

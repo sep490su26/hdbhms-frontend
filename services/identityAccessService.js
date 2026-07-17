@@ -208,6 +208,7 @@ export async function requestPasswordReset({ email }) {
         method: "POST",
         credentials: "include",
         headers: {
+            Accept: "application/json",
             "Content-Type": "application/json",
             "X-Client-Type": "web",
         },
@@ -221,6 +222,7 @@ export async function resetPasswordWithToken({ token, newPassword }) {
         method: "POST",
         credentials: "include",
         headers: {
+            Accept: "application/json",
             "Content-Type": "application/json",
             "X-Client-Type": "web",
         },

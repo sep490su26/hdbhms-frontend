@@ -161,7 +161,7 @@ export default function ForgotPasswordClient({ initialResetToken = "" }) {
       setSuccess(
         detectedType === "email"
           ? "Mã đặt lại mật khẩu đã được gửi đến email của bạn."
-          : "Mã đặt lại mật khẩu đã được gửi đến email gắn với số điện thoại này.",
+          : "Mã đặt lại mật khẩu đã được gửi đến email hoặc số điện thoại gắn với tài khoản này.",
       );
       setStep("password");
     } catch (submitError) {
@@ -238,7 +238,7 @@ export default function ForgotPasswordClient({ initialResetToken = "" }) {
   }
 
   const isEmail = identifierType === "email";
-  const destinationLabel = isEmail ? "email" : "email của tài khoản";
+  const destinationLabel = isEmail ? "email" : "email hoặc số điện thoại";
   const formattedTimer = `00:${String(secondsLeft).padStart(2, "0")}`;
 
   return (
@@ -349,6 +349,8 @@ export default function ForgotPasswordClient({ initialResetToken = "" }) {
                     </div>
                   )}
 
+                  <Feedback message={success} tone="success" />
+
                   <div className="mt-7 grid gap-5">
                     <label htmlFor="reset-code" className="grid gap-2 text-sm font-bold text-[#334155]">
                       Mã đặt lại mật khẩu
@@ -416,7 +418,6 @@ export default function ForgotPasswordClient({ initialResetToken = "" }) {
                   )}
 
                   <Feedback message={error} tone="error" />
-                  <Feedback message={success} tone="success" />
                   <SubmitButton loading={isSubmitting} loadingText="Đang cập nhật...">
                     Xác nhận thay đổi
                   </SubmitButton>

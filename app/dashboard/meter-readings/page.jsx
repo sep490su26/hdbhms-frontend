@@ -40,6 +40,7 @@ import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { dedupeBatchHistory, getHistoryRowKey } from "@/lib/meterReadingHistory.mjs";
 import {
   fetchBatchHistory,
+  fetchBatchMeterReadingsStatus,
   fetchUtilityDashboard,
   startBatchReading,
 } from "@/services/meterReadingService";
@@ -257,10 +258,19 @@ export default function UtilityManagement() {
         dashboard?.currentPeriod?.reading_period ||
         periodValue(currentPeriod) ||
         formatMonthYearPeriod();
+      const batchStatus = await fetchBatchMeterReadingsStatus(periodToStart, propertyId);
+      if (!batchStatus?.rooms?.length) {
+        toast.info("Không có phòng cần ghi chỉ số trong kỳ này.");
+        return;
+      }
       await startBatchReading(periodToStart, propertyId || undefined);
       router.push(getBatchHref(periodToStart, propertyId, batchQueryContext));
     } catch (error) {
-      toast.error("Không thể tạo kỳ ghi chỉ số");
+      if (error?.code === 40910) {
+        toast.info("Không có phòng cần ghi chỉ số trong kỳ này.");
+      } else {
+        toast.error(error?.message || "Không thể tạo kỳ ghi chỉ số");
+      }
       console.error(error);
     }
   };

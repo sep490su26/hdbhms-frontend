@@ -473,6 +473,9 @@ export default function ContractWorkflowStepper({
     }
   }
 
+  const depositDocumentFilename = buildDepositContractDocumentFilename(contractDetails);
+  const leaseDocumentFilename = buildLeaseContractDocumentFilename(contractDetails);
+
   return (
     <div className="space-y-4 bg-[#f7f8fb] p-4 dark:bg-[#081225] sm:p-6">
       <section className="grid overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0d182c] sm:grid-cols-2">
@@ -515,7 +518,7 @@ export default function ContractWorkflowStepper({
         {hasDeposit && (
           <DocumentRow
             title="Hợp đồng đặt cọc"
-            meta={`PDF · ${contractDetails?.depositCode || `Mã cọc #${depositAgreementId}`} · 2 bản`}
+            meta={`PDF · ${depositDocumentFilename} · 2 bản`}
             statusLabel="Sẵn sàng tải"
           >
             <button
@@ -536,7 +539,7 @@ export default function ContractWorkflowStepper({
 
         <DocumentRow
           title="Hợp đồng thuê"
-          meta={`PDF · ${contractDetails?.contractCode || contractDetails?.displayCode || `#${contractId}`} · 2 bản`}
+          meta={`PDF · ${leaseDocumentFilename} · 2 bản`}
           statusLabel="Sẵn sàng tải"
         >
           <button

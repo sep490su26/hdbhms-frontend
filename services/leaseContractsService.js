@@ -16,22 +16,22 @@ function authHeaders(extraHeaders = {}) {
   };
 }
 
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
 function toDatePart(value) {
   if (!value) return "";
   return String(value).slice(0, 10);
 }
 
-function formatHdtFilenameDate(value) {
+function formatDocumentFilenameDate(value) {
   const datePart = toDatePart(value);
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return "Chua-Ro-Ngay";
-  return `${match[3]}.${match[2]}.${match[1]}`;
-}
-
-function sanitizeFilenamePart(value, fallback) {
-  if (value == null || String(value).trim() === "") return fallback;
-  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
-  return sanitized || fallback;
+  return `${match[3]}_${match[2]}_${match[1]}`;
 }
 
 function withRoomPrefix(roomCode) {
@@ -45,11 +45,10 @@ export function buildLeaseContractDocumentFilename(item = {}) {
     item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
     "Phong-X",
   ));
-  const date = formatHdtFilenameDate(
+  const date = formatDocumentFilenameDate(
     item.startDate ?? item.start_date ?? item.expectedLeaseSignDate ?? item.expected_lease_sign_date,
   );
-
-  return `HDT_${roomCode}_${date}.pdf`;
+  return `${roomCode}_HDT_${date}.pdf`;
 }
 
 const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME = buildLeaseContractDocumentFilename();

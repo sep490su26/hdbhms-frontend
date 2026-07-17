@@ -56,7 +56,6 @@ import {
 
 const currentContractYear = new Date().getFullYear();
 const contractYearChildren = [
-  { path: "/dashboard/contract-management", label: "Tất cả năm" },
   ...[currentContractYear, currentContractYear - 1].map((year) => ({
     path: `/dashboard/contract-management?year=${year}`,
     label: `Năm ${year}`,

@@ -51,6 +51,7 @@ test("buildDepositContractDocumentFilename formats HDC filename from room and ex
     buildDepositContractDocumentFilename({ roomCode: "P201", startDate: "2026-07-16" }),
     "P201_HDC_16_07_2026.pdf",
   );
+  assert.equal(buildDepositContractDocumentFilename({}), "Phong-X_HDC_Chua-Ro-Ngay.pdf");
 });
 
 test("downloadDepositContractPdf prefers backend content-disposition filename", async () => {
@@ -70,7 +71,7 @@ test("downloadDepositContractPdf prefers backend content-disposition filename", 
       headers: {
         get(name) {
           return name.toLowerCase() === "content-disposition"
-            ? "attachment; filename=\"hop-dong-dat-coc-DC-001.pdf\"; filename*=UTF-8''hop-dong-dat-coc-DC-001.pdf"
+            ? "attachment; filename=\"P201_HDC_16_07_2026.pdf\"; filename*=UTF-8''P201_HDC_16_07_2026.pdf"
             : null;
         },
       },
@@ -97,11 +98,11 @@ test("downloadDepositContractPdf prefers backend content-disposition filename", 
   URL.revokeObjectURL = () => {};
 
   try {
-    await downloadDepositContractPdf(42, "hop-dong-dat-coc.pdf");
+    await downloadDepositContractPdf(42, "Phong-X_HDC_Chua-Ro-Ngay.pdf");
 
     assert.equal(fetchCalls.length, 1);
     assert.equal(fetchCalls[0][0], "https://api.test/api/v1/deposit-agreements/42/draft-pdf");
-    assert.equal(clickedDownload, "hop-dong-dat-coc-DC-001.pdf");
+    assert.equal(clickedDownload, "P201_HDC_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;

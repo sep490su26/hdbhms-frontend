@@ -98,22 +98,22 @@ function extractFilenameFromContentDisposition(headerValue) {
   return filenameMatch[1].trim().replace(/^"|"$/g, "");
 }
 
+function sanitizeFilenamePart(value, fallback) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized || fallback;
+}
+
 function toDatePart(value) {
   if (!value) return "";
   return String(value).slice(0, 10);
 }
 
-function formatHdcFilenameDate(value) {
+function formatDocumentFilenameDate(value) {
   const datePart = toDatePart(value);
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return "Chua-Ro-Ngay";
   return `${match[3]}_${match[2]}_${match[1]}`;
-}
-
-function sanitizeFilenamePart(value, fallback) {
-  if (value == null || String(value).trim() === "") return fallback;
-  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
-  return sanitized || fallback;
 }
 
 function withRoomPrefix(roomCode) {
@@ -127,7 +127,7 @@ export function buildDepositContractDocumentFilename(item = {}) {
     item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
     "Phong-X",
   ));
-  const date = formatHdcFilenameDate(
+  const date = formatDocumentFilenameDate(
     item.expectedMoveInDate ??
       item.expected_move_in_date ??
       item.startDate ??
@@ -135,9 +135,10 @@ export function buildDepositContractDocumentFilename(item = {}) {
       item.expectedLeaseSignDate ??
       item.expected_lease_sign_date,
   );
-
   return `${roomCode}_HDC_${date}.pdf`;
 }
+
+const DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME = buildDepositContractDocumentFilename();
 
 function normalizeDepositContractPreviewMetadata(metadata = {}) {
   return {
@@ -445,7 +446,7 @@ export async function openDepositContractByPaymentPdf(paymentIntentId, paymentCo
   return openBlobInNewTab(() => fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent));
 }
 
-export async function downloadDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc.pdf") {
+export async function downloadDepositContractPdf(depositAgreementId, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
   const { blob, filename: serverFilename } = await fetchDepositContractFile(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -457,7 +458,7 @@ export async function downloadDepositContractPdf(depositAgreementId, filename = 
   URL.revokeObjectURL(url);
 }
 
-export async function downloadSignedDepositContractPdf(depositAgreementId, filename = "hop-dong-dat-coc-da-ky.pdf") {
+export async function downloadSignedDepositContractPdf(depositAgreementId, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
   const blob = await fetchSignedDepositContractBlob(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -469,7 +470,7 @@ export async function downloadSignedDepositContractPdf(depositAgreementId, filen
   URL.revokeObjectURL(url);
 }
 
-export async function downloadDepositContractByPaymentPdf(paymentIntentId, paymentContent, filename = "hop-dong-dat-coc.pdf") {
+export async function downloadDepositContractByPaymentPdf(paymentIntentId, paymentContent, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
   const blob = await fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

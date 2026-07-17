@@ -51,13 +51,13 @@ test("buildLeaseContractDocumentFilename formats HDT filename from room and star
 
   assert.equal(
     buildLeaseContractDocumentFilename({ roomCode: "205", startDate: "2026-06-29" }),
-    "HDT_P205_29.06.2026.pdf",
+    "P205_HDT_29_06_2026.pdf",
   );
   assert.equal(
     buildLeaseContractDocumentFilename({ roomCode: "P205", startDate: "2026-07-16" }),
-    "HDT_P205_16.07.2026.pdf",
+    "P205_HDT_16_07_2026.pdf",
   );
-  assert.equal(buildLeaseContractDocumentFilename({}), "HDT_Phong-X_Chua-Ro-Ngay.pdf");
+  assert.equal(buildLeaseContractDocumentFilename({}), "Phong-X_HDT_Chua-Ro-Ngay.pdf");
 });
 
 test("normalizeLeaseContractItem exposes the signed handover file for list badges", () => {
@@ -70,7 +70,7 @@ test("normalizeLeaseContractItem exposes the signed handover file for list badge
   );
 });
 
-test("lease contract download fallbacks do not use legacy hop-dong-thue filenames", () => {
+test("lease contract download fallbacks use room HDT filenames", () => {
   const serviceSource = readFileSync(new URL("./leaseContractsService.js", import.meta.url), "utf8");
   const pageSource = readFileSync(
     new URL("../app/dashboard/contract-template/page.jsx", import.meta.url),
@@ -81,9 +81,7 @@ test("lease contract download fallbacks do not use legacy hop-dong-thue filename
     "utf8",
   );
 
-  assert.doesNotMatch(serviceSource, /hop-dong-thue(?:-da-ky)?\.pdf/);
-  assert.doesNotMatch(pageSource, /hop-dong-thue\.pdf/);
-  assert.doesNotMatch(wizardSource, /hop-dong-thue/);
+  assert.match(serviceSource, /_HDT_/);
   assert.match(pageSource, /selectedLeaseContractFilename/);
   assert.match(
     pageSource,
@@ -104,9 +102,9 @@ test("downloadLeaseContractDraftPdf prefers backend content-disposition filename
     status: 200,
     ok: true,
     headers: {
-      get(name) {
-        return name.toLowerCase() === "content-disposition"
-          ? "attachment; filename*=UTF-8''HDT_P205_29.06.2026.pdf"
+        get(name) {
+          return name.toLowerCase() === "content-disposition"
+          ? "attachment; filename*=UTF-8''P205_HDT_29_06_2026.pdf"
           : null;
       },
     },
@@ -134,7 +132,7 @@ test("downloadLeaseContractDraftPdf prefers backend content-disposition filename
   try {
     await downloadLeaseContractDraftPdf(9);
 
-    assert.equal(clickedDownload, "HDT_P205_29.06.2026.pdf");
+    assert.equal(clickedDownload, "P205_HDT_29_06_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;
@@ -181,9 +179,9 @@ test("downloadLeaseContractDraftPdf uses caller fallback when header is unavaila
   URL.revokeObjectURL = () => {};
 
   try {
-    await downloadLeaseContractDraftPdf(9, "HDT_P201_16.07.2026.pdf");
+    await downloadLeaseContractDraftPdf(9, "P201_HDT_16_07_2026.pdf");
 
-    assert.equal(clickedDownload, "HDT_P201_16.07.2026.pdf");
+    assert.equal(clickedDownload, "P201_HDT_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;

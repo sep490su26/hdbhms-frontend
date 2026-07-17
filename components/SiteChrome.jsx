@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 export function SiteChrome({ children, isWebView }) {
   const pathname = usePathname();
@@ -14,7 +15,12 @@ export function SiteChrome({ children, isWebView }) {
     pathname?.startsWith("/login") || pathname?.startsWith("/forgot-password");
 
   if (isWebView || isManagementRoute || isAuthRoute) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        <Toaster richColors position="top-right" />
+      </>
+    );
   }
 
   return (
@@ -22,6 +28,7 @@ export function SiteChrome({ children, isWebView }) {
       <Navbar />
       <main className="flex-grow">{children}</main>
       <Footer />
+      <Toaster richColors position="top-right" />
     </>
   );
 }

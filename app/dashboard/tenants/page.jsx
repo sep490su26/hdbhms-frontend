@@ -1757,7 +1757,7 @@ export default function TenantsPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                Export Excel
+                Xuất Excel
               </button>
             )}
             <button

@@ -1,12 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     fetchBatchMeterReadingsStatus,
     saveProgressiveRoomReading,
     uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
+import {
+    cacheBatchMeterReadingsStatus,
+    getCachedBatchMeterReadingsStatus,
+    getQueuedMeterReadings,
+    isOfflineSaveError,
+    OFFLINE_METER_READING_QUEUE_EVENT,
+    queueMeterReadingForSync,
+    syncQueuedMeterReadings,
+} from "@/services/meterReadingOfflineSync";
 import { toast } from "sonner";
 import {
     Accordion,
@@ -175,6 +184,40 @@ function normalizePropertyId(value) {
     return /^\d+$/.test(text) ? text : "";
 }
 
+function countEvidencePhotos(room) {
+    return Number(Boolean(room.electricityPhotoId || room.offlineElectricityPhotoQueued)) +
+        Number(Boolean(room.waterPhotoId || room.offlineWaterPhotoQueued));
+}
+
+function applyOfflineQueueToRooms(rooms, queueItems) {
+    const queuedByRoomId = new Map(
+        (queueItems || []).map((item) => [String(item.roomId), item]),
+    );
+
+    return rooms.map((room) => {
+        const queued = queuedByRoomId.get(String(room.roomId));
+        if (!queued) return room;
+
+        const nextRoom = {
+            ...room,
+            elecCurr: numberOrNull(queued.electricityValue),
+            waterCurr: numberOrNull(queued.waterValue),
+            electricityPhotoId: queued.electricityPhotoId ?? room.electricityPhotoId,
+            waterPhotoId: queued.waterPhotoId ?? room.waterPhotoId,
+            offlineElectricityPhotoQueued: Boolean(queued.electricityPhotoFile),
+            offlineWaterPhotoQueued: Boolean(queued.waterPhotoFile),
+            offlineQueuedAt: queued.updatedAt || queued.createdAt || null,
+            offlineSyncError: queued.lastError || "",
+            status: "local",
+        };
+
+        return {
+            ...nextRoom,
+            photos: countEvidencePhotos(nextRoom),
+        };
+    });
+}
+
 function getMeterReadingsHref(propertyId, context = {}) {
     const params = new URLSearchParams();
     const normalizedPropertyId = normalizePropertyId(propertyId);
@@ -213,6 +256,12 @@ export default function MeterReadings() {
     const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity, water } }
     const [tariffs, setTariffs] = useState(DEFAULT_UTILITY_TARIFFS);
     const [backendFacilityName, setBackendFacilityName] = useState("");
+    const [isOnline, setIsOnline] = useState(() =>
+        typeof navigator === "undefined" ? true : navigator.onLine,
+    );
+    const [syncingOffline, setSyncingOffline] = useState(false);
+    const [lastOfflineSyncAt, setLastOfflineSyncAt] = useState(null);
+    const syncingOfflineRef = useRef(false);
 
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
@@ -226,11 +275,59 @@ export default function MeterReadings() {
     });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
+    const hydrateBatchResponse = useCallback(async (res) => {
+        if (!res) return;
+
+        setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
+        const fetchedBatchId = res.batchId || res.batch_id;
+        if (fetchedBatchId) setBatchId(fetchedBatchId);
+        setTariffs({
+            electricity: normalizeUtilityTariff(
+                readField(res, "electricityTariff", "electricity_tariff"),
+                DEFAULT_UTILITY_TARIFFS.electricity,
+            ),
+            water: normalizeUtilityTariff(
+                readField(res, "waterTariff", "water_tariff"),
+                DEFAULT_UTILITY_TARIFFS.water,
+            ),
+        });
+        if (res.rooms) {
+            const mappedRooms = res.rooms.map((r, index) => {
+                const roomId = readField(r, "roomId", "room_id");
+                const roomCode = readField(r, "roomCode", "room_code");
+                const syncTime = readField(r, "syncTime", "sync_time");
+
+                return {
+                    id: roomCode || (roomId ? `room-${roomId}` : `room-${index}`),
+                    roomId,
+                    elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
+                    elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
+                    electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
+                    offlineElectricityPhotoQueued: false,
+                    waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
+                    waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
+                    waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
+                    offlineWaterPhotoQueued: false,
+                    offlineQueuedAt: null,
+                    offlineSyncError: "",
+                    status: readField(r, "status") || "pending",
+                    syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
+                    photos: numberOrZero(readField(r, "photosCount", "photos_count")),
+                };
+            });
+            const queuedItems = fetchedBatchId
+                ? await getQueuedMeterReadings({ batchId: fetchedBatchId })
+                : [];
+            setRooms(applyOfflineQueueToRooms(mappedRooms, queuedItems));
+        }
+    }, []);
+
     const loadData = useCallback(async () => {
         setLoading(true);
         setBackendFacilityName("");
         try {
             const res = await fetchBatchMeterReadingsStatus(period, propertyId);
+            await cacheBatchMeterReadingsStatus(period, propertyId, res);
             if (res) {
                 setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
                 const fetchedBatchId = res.batchId || res.batch_id;
@@ -257,24 +354,41 @@ export default function MeterReadings() {
                             elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
                             elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
                             electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
+                            offlineElectricityPhotoQueued: false,
                             waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
                             waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
                             waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
+                            offlineWaterPhotoQueued: false,
+                            offlineQueuedAt: null,
+                            offlineSyncError: "",
                             status: readField(r, "status") || "pending",
                             syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
                             photos: numberOrZero(readField(r, "photosCount", "photos_count")),
                         };
                     });
-                    setRooms(mappedRooms);
+                    const queuedItems = fetchedBatchId
+                        ? await getQueuedMeterReadings({ batchId: fetchedBatchId })
+                        : [];
+                    setRooms(applyOfflineQueueToRooms(mappedRooms, queuedItems));
                 }
             }
         } catch (error) {
+            if (isOfflineSaveError(error)) {
+                const cached = await getCachedBatchMeterReadingsStatus(period, propertyId);
+                if (cached) {
+                    await hydrateBatchResponse(cached);
+                    toast.warning("Đang dùng dữ liệu đã lưu offline. Khi có mạng hệ thống sẽ tự đồng bộ.");
+                } else {
+                    toast.error("Chưa có dữ liệu offline cho kỳ này. Vui lòng mở màn này một lần khi có mạng.");
+                }
+            } else {
             toast.error("Lỗi khi tải dữ liệu");
             console.error(error);
+            }
         } finally {
             setLoading(false);
         }
-    }, [period, propertyId]);
+    }, [hydrateBatchResponse, period, propertyId]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -282,6 +396,68 @@ export default function MeterReadings() {
         }, 0);
         return () => window.clearTimeout(timer);
     }, [loadData]);
+
+    const refreshQueuedRooms = useCallback(async () => {
+        const queuedItems = await getQueuedMeterReadings(batchId ? { batchId } : {});
+        setRooms((prev) => applyOfflineQueueToRooms(prev, queuedItems));
+    }, [batchId]);
+
+    const runOfflineSync = useCallback(async ({ silent = false } = {}) => {
+        if (syncingOfflineRef.current) return;
+        if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+
+        syncingOfflineRef.current = true;
+        setSyncingOffline(true);
+        try {
+            const result = await syncQueuedMeterReadings();
+            if (result.synced > 0) {
+                setLastOfflineSyncAt(new Date());
+                toast.success(`Đã đồng bộ ${result.synced} phòng nhập offline.`);
+                await loadData();
+            } else {
+                await refreshQueuedRooms();
+                if (!silent && result.failed > 0) {
+                    toast.error("Chưa đồng bộ được dữ liệu offline. Hệ thống sẽ thử lại khi có mạng.");
+                }
+            }
+        } catch (error) {
+            if (!silent) {
+                toast.error(error?.details || error?.message || "Chưa đồng bộ được dữ liệu offline.");
+            }
+            console.error(error);
+        } finally {
+            syncingOfflineRef.current = false;
+            setSyncingOffline(false);
+        }
+    }, [loadData, refreshQueuedRooms]);
+
+    useEffect(() => {
+        const handleOnline = () => {
+            setIsOnline(true);
+            void runOfflineSync();
+        };
+        const handleOffline = () => setIsOnline(false);
+        const handleQueueChanged = () => {
+            void refreshQueuedRooms();
+            if (typeof navigator === "undefined" || navigator.onLine) {
+                void runOfflineSync({ silent: true });
+            }
+        };
+
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+        window.addEventListener(OFFLINE_METER_READING_QUEUE_EVENT, handleQueueChanged);
+        const syncTimer = window.setTimeout(() => {
+            void runOfflineSync({ silent: true });
+        }, 0);
+
+        return () => {
+            window.clearTimeout(syncTimer);
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+            window.removeEventListener(OFFLINE_METER_READING_QUEUE_EVENT, handleQueueChanged);
+        };
+    }, [refreshQueuedRooms, runOfflineSync]);
 
     useEffect(() => {
         if (focusRoomId) {
@@ -344,7 +520,11 @@ export default function MeterReadings() {
     const getCapturedPhoto = (roomId, type) => capturedPhotos[roomId]?.[type] ?? null;
     const getExistingPhotoId = (room, type) =>
         type === "electricity" ? room.electricityPhotoId : room.waterPhotoId;
-    const hasEvidencePhoto = (room, type) => Boolean(getCapturedPhoto(room.id, type)?.file || getExistingPhotoId(room, type));
+    const hasEvidencePhoto = (room, type) => Boolean(
+        getCapturedPhoto(room.id, type)?.file ||
+        getExistingPhotoId(room, type) ||
+        (type === "electricity" ? room.offlineElectricityPhotoQueued : room.offlineWaterPhotoQueued)
+    );
 
     const removeCapturedPhoto = (roomId, type) => {
         setCapturedPhotos((prev) => {
@@ -368,6 +548,44 @@ export default function MeterReadings() {
         const fileId = response?.fileId || response?.id;
         if (!fileId) throw new Error("Không upload được ảnh minh chứng");
         return fileId;
+    };
+
+    const queueRoomForOfflineSync = async (room, { electricityPhotoId = null, waterPhotoId = null } = {}) => {
+        const electricityPhoto = getCapturedPhoto(room.id, "electricity");
+        const waterPhoto = getCapturedPhoto(room.id, "water");
+        const queuedElectricityPhotoId = electricityPhotoId ?? getExistingPhotoId(room, "electricity") ?? null;
+        const queuedWaterPhotoId = waterPhotoId ?? getExistingPhotoId(room, "water") ?? null;
+        const existingQueuedItems = await getQueuedMeterReadings(batchId ? { batchId } : {});
+        const existingQueuedRoom = existingQueuedItems.find(
+            (item) => String(item.roomId) === String(room.roomId),
+        );
+
+        await queueMeterReadingForSync({
+            batchId,
+            roomId: room.roomId,
+            roomCode: room.id,
+            period,
+            propertyId,
+            electricityValue: room.elecCurr,
+            waterValue: room.waterCurr,
+            electricityPhotoId: queuedElectricityPhotoId,
+            waterPhotoId: queuedWaterPhotoId,
+            electricityPhotoFile: queuedElectricityPhotoId ? null : electricityPhoto?.file ?? existingQueuedRoom?.electricityPhotoFile ?? null,
+            waterPhotoFile: queuedWaterPhotoId ? null : waterPhoto?.file ?? existingQueuedRoom?.waterPhotoFile ?? null,
+        });
+
+        setRooms(prev => prev.map(r => r.id === room.id ? {
+            ...r,
+            status: "local",
+            electricityPhotoId: queuedElectricityPhotoId,
+            waterPhotoId: queuedWaterPhotoId,
+            offlineElectricityPhotoQueued: Boolean(!queuedElectricityPhotoId && (electricityPhoto?.file || existingQueuedRoom?.electricityPhotoFile)),
+            offlineWaterPhotoQueued: Boolean(!queuedWaterPhotoId && (waterPhoto?.file || existingQueuedRoom?.waterPhotoFile)),
+            offlineQueuedAt: new Date().toISOString(),
+            offlineSyncError: "",
+            photos: Number(Boolean(queuedElectricityPhotoId || electricityPhoto?.file)) +
+                Number(Boolean(queuedWaterPhotoId || waterPhoto?.file)),
+        } : r));
     };
 
     const renderEvidenceCapture = (room, type, label) => {
@@ -436,37 +654,61 @@ export default function MeterReadings() {
             return;
         }
 
+        const moveToNextRoom = () => {
+            const focusIndex = filtered.findIndex(r => r.id === focusRoomId);
+            if (focusIndex >= 0 && focusIndex < filtered.length - 1) {
+                setFocusRoomId(filtered[focusIndex + 1].id);
+            } else {
+                setFocusRoomId(null);
+                void loadData();
+            }
+        };
+
+        let savedElectricityPhotoId = getExistingPhotoId(room, "electricity") ?? null;
+        let savedWaterPhotoId = getExistingPhotoId(room, "water") ?? null;
+
         setSaving(true);
         try {
-            const [electricityPhotoId, waterPhotoId] = await Promise.all([
-                uploadEvidencePhoto(room, "electricity"),
-                uploadEvidencePhoto(room, "water"),
-            ]);
+            if (typeof navigator !== "undefined" && navigator.onLine === false) {
+                await queueRoomForOfflineSync(room, {
+                    electricityPhotoId: savedElectricityPhotoId,
+                    waterPhotoId: savedWaterPhotoId,
+                });
+                toast.warning("Đã lưu offline. Khi có mạng hệ thống sẽ tự đồng bộ.");
+                moveToNextRoom();
+                return;
+            }
+
+            savedElectricityPhotoId = await uploadEvidencePhoto(room, "electricity");
+            savedWaterPhotoId = await uploadEvidencePhoto(room, "water");
 
             await saveProgressiveRoomReading(batchId, room.roomId, {
                 electricityValue: room.elecCurr,
                 waterValue: room.waterCurr,
-                electricityPhotoId,
-                waterPhotoId,
+                electricityPhotoId: savedElectricityPhotoId,
+                waterPhotoId: savedWaterPhotoId,
             });
 
             // local update status
             setRooms(prev => prev.map(r => r.id === focusRoomId ? {
                 ...r,
                 status: "synced",
-                electricityPhotoId,
-                waterPhotoId,
-                photos: Number(Boolean(electricityPhotoId)) + Number(Boolean(waterPhotoId)),
+                electricityPhotoId: savedElectricityPhotoId,
+                waterPhotoId: savedWaterPhotoId,
+                photos: Number(Boolean(savedElectricityPhotoId)) + Number(Boolean(savedWaterPhotoId)),
             } : r));
 
-            const focusIndex = filtered.findIndex(r => r.id === focusRoomId);
-            if (focusIndex >= 0 && focusIndex < filtered.length - 1) {
-                setFocusRoomId(filtered[focusIndex + 1].id);
-            } else {
-                setFocusRoomId(null);
-                loadData();
-            }
+            moveToNextRoom();
         } catch (error) {
+            if (isOfflineSaveError(error)) {
+                await queueRoomForOfflineSync(room, {
+                    electricityPhotoId: savedElectricityPhotoId,
+                    waterPhotoId: savedWaterPhotoId,
+                });
+                toast.warning("Đã lưu offline. Khi có mạng hệ thống sẽ tự đồng bộ.");
+                moveToNextRoom();
+                return;
+            }
             toast.error(error?.details || error?.message || "Lỗi khi lưu phòng này");
             console.error(error);
         } finally {
@@ -553,6 +795,10 @@ export default function MeterReadings() {
                     description={formatPeriodRange(period)}
                     actions={
                         <div className="mt-1 flex flex-wrap items-center gap-3">
+                            <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${isOnline ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"}`}>
+                                <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`} />
+                                {syncingOffline ? "Đang đồng bộ offline" : isOnline ? "Online" : "Offline - sẽ tự đồng bộ"}
+                            </span>
                             {(pending > 0 || errors > 0) ? (
                                 <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
                                     <AlertTriangle className="h-4 w-4" />
@@ -589,7 +835,7 @@ export default function MeterReadings() {
                 <DashboardStatCard icon={CheckCircle2} label="Đã nhập" value={completed} tone="emerald" subtitle={`${total > 0 ? Math.round((completed / total) * 100) : 0}% hoàn thành`} />
                 <DashboardStatCard icon={CircleDashed} label="Chưa nhập" value={pending} tone="orange" subtitle={`${total > 0 ? Math.round((pending / total) * 100) : 0}% còn lại`} />
                 <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber" subtitle="Thay đổi đang chờ lưu" />
-                <DashboardStatCard icon={RefreshCw} label="Cập nhật" value="Vừa tải" tone="slate" subtitle="Theo dữ liệu backend" />
+                <DashboardStatCard icon={RefreshCw} label="Cập nhật" value={syncingOffline ? "Đang sync" : "Vừa tải"} tone="slate" subtitle={lastOfflineSyncAt ? `Sync offline ${lastOfflineSyncAt.toLocaleTimeString()}` : "Theo dữ liệu backend"} />
             </div>
 
             {/* Overall progress */}

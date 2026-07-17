@@ -202,6 +202,7 @@ function PrintLine({label, value}) {
 function buildPrintableHtml({form, handover, assets}) {
     const e = escapeHtml;
     const documentTitle = buildLeaseContractDocumentFilename({
+        contractCode: form.contractCode,
         roomCode: form.roomCode,
         startDate: form.startDate,
     });

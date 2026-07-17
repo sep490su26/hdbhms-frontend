@@ -65,6 +65,7 @@ export function normalizeNotificationTemplateDefinition(item = {}) {
     displayName: item.displayName ?? item.eventType ?? "",
     description: item.description ?? "",
     targetType: item.targetType ?? "",
+    targetRoles: item.targetRoles ?? item.target_roles ?? item.roles ?? [],
     allowedChannels: item.allowedChannels ?? [],
     variables: (item.variables ?? []).map(normalizeTemplateVariable),
     sampleData: item.sampleData ?? {},

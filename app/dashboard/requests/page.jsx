@@ -1243,7 +1243,6 @@ export default function ApprovalCenter() {
                     title={
                         <span className="flex items-center gap-2">
                             Quản lý yêu cầu
-                            <Info className="h-5 w-5 text-slate-400" />
                         </span>
                     }
                     description="Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê."

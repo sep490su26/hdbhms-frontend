@@ -285,6 +285,9 @@ function notificationHref(notification) {
   const eventType = String(notification?.eventType || "").toUpperCase();
   const targetType = String(notification?.targetType || "").toUpperCase();
 
+  if (eventType === "BROADCAST_ANNOUNCEMENT" || targetType === "BROADCAST") {
+    return "";
+  }
   if (eventType === "VISIT_REQUEST_CREATED" || targetType === "VISIT_REQUEST") {
     return "/dashboard/viewing-customers";
   }
@@ -703,7 +706,10 @@ function Topbar({
           loadNotifications({ silent: true });
         }
       }
-      router.push(notificationHref(notification));
+      const href = notificationHref(notification);
+      if (href) {
+        router.push(href);
+      }
     },
     [loadNotifications, router],
   );

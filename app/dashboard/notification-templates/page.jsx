@@ -12,7 +12,7 @@ import {
   BellRing,
   Check,
   CheckCircle2,
-  Eye,
+  GripVertical,
   Loader2,
   Redo2,
   RefreshCcw,
@@ -20,7 +20,6 @@ import {
   Search,
   Send,
   Undo2,
-  Users,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { fetchSimpleProperties } from "@/services/identityAccessService";
@@ -29,7 +28,6 @@ import {
   fetchNotificationTemplateDefinitions,
   fetchNotificationTemplates,
   previewNotificationBroadcastRecipients,
-  previewNotificationTemplate,
   resetNotificationTemplate,
   sendNotificationBroadcast,
   updateNotificationTemplate,
@@ -49,7 +47,73 @@ const ROLE_OPTIONS = [
   { value: "OWNER", label: "Chủ trọ" },
 ];
 
-const STAFF_ROLE_VALUES = new Set(["MANAGER", "ACCOUNTANT", "OWNER"]);
+const STAFF_ROLE_VALUES = new Set(["LEAD", "MANAGER", "ACCOUNTANT", "OWNER"]);
+const TEMPLATE_SIDEBAR_MIN_WIDTH = 280;
+const TEMPLATE_SIDEBAR_MAX_WIDTH = 520;
+const TEMPLATE_RECIPIENT_ROLES_BY_EVENT = {
+  ROOM_TRANSFER_HOLDER_NOMINATION_REQUESTED: ["TENANT"],
+  ROOM_TRANSFER_TARGET_HOLDER_APPROVAL_REQUESTED: ["TENANT"],
+  ROOM_TRANSFER_MANAGER_ACTION_REQUIRED: ["MANAGER", "OWNER"],
+  TENANT_PROFILE_ACCESS_REQUESTED: ["OWNER"],
+  TENANT_PROFILE_ACCESS_APPROVED: ["MANAGER"],
+  TENANT_PROFILE_ACCESS_REJECTED: ["MANAGER"],
+  VISIT_REQUEST_CREATED: ["MANAGER", "OWNER"],
+  DEPOSIT_CREATED: ["MANAGER", "OWNER"],
+  DEBT_DIRECT_VISIT_REQUIRED: ["MANAGER", "OWNER"],
+  PRE_CREATED_ACCOUNT_NOTIFICATION: ["TENANT"],
+  INVOICE_OVERDUE: ["TENANT"],
+  INVOICE_PAID: ["TENANT"],
+  INVOICE_PARTIALLY_PAID: ["TENANT"],
+  EXPENSE_APPROVAL_REQUESTED: ["OWNER"],
+  EXPENSE_APPROVED: ["MANAGER"],
+  EXPENSE_REJECTED: ["MANAGER"],
+  EXPENSE_PAID: ["MANAGER"],
+};
+const TEMPLATE_RECIPIENT_ROLES_BY_TARGET = {
+  INVOICE: ["TENANT"],
+  TENANT_ACCOUNT_PROVISIONING: ["TENANT"],
+  MANAGER_TASK: ["MANAGER", "OWNER"],
+  VISIT_REQUEST: ["MANAGER", "OWNER"],
+  DEPOSIT_AGREEMENT: ["MANAGER", "OWNER"],
+  EXPENSE_REQUEST: ["MANAGER", "OWNER"],
+};
+
+function clampTemplateSidebarWidth(width) {
+  return Math.min(
+    TEMPLATE_SIDEBAR_MAX_WIDTH,
+    Math.max(TEMPLATE_SIDEBAR_MIN_WIDTH, width),
+  );
+}
+
+function templateRecipientRoles(definition) {
+  if (!definition) return [];
+
+  const explicitRoles = definition.targetRoles ?? definition.roles ?? [];
+  if (Array.isArray(explicitRoles) && explicitRoles.length > 0) {
+    return explicitRoles.map((role) => String(role || "").toUpperCase());
+  }
+  const eventType = String(definition.eventType || "").toUpperCase();
+  if (TEMPLATE_RECIPIENT_ROLES_BY_EVENT[eventType]) {
+    return TEMPLATE_RECIPIENT_ROLES_BY_EVENT[eventType];
+  }
+  const targetType = String(definition.targetType || "").toUpperCase();
+  return TEMPLATE_RECIPIENT_ROLES_BY_TARGET[targetType] ?? [];
+}
+
+function templateChannelsForDefinition(definition) {
+  if (!definition) return [];
+
+  const backendChannels = (definition.allowedChannels ?? []).filter(
+    (channel) => channel !== "IN_APP",
+  );
+  const roles = templateRecipientRoles(definition);
+  if (roles.length === 0) return backendChannels;
+
+  const roleAllowedChannels = new Set(
+    allowedBroadcastChannelsForRoles(roles).map((channel) => channel.value),
+  );
+  return backendChannels.filter((channel) => roleAllowedChannels.has(channel));
+}
 
 function allowedBroadcastChannelsForRoles(roles = []) {
   const selectedRoles = roles.map((role) => String(role || "").toUpperCase());
@@ -58,17 +122,6 @@ function allowedBroadcastChannelsForRoles(roles = []) {
     if (selectedRoles.some((role) => STAFF_ROLE_VALUES.has(role)) && channel.value === "PUSH") return false;
     return true;
   });
-}
-
-function channelDisabledReason(channelValue, roles = []) {
-  const selectedRoles = roles.map((role) => String(role || "").toUpperCase());
-  if (channelValue === "WEB" && selectedRoles.includes("TENANT")) {
-    return "Khách thuê không nhận kênh Web.";
-  }
-  if (channelValue === "PUSH" && selectedRoles.some((role) => STAFF_ROLE_VALUES.has(role))) {
-    return "Nhóm staff không nhận Mobile push.";
-  }
-  return "";
 }
 
 const SCOPE_OPTIONS = [
@@ -461,6 +514,14 @@ function formatSampleValue(value) {
   return String(value);
 }
 
+function renderTemplatePreview(template, data = {}) {
+  return String(template || "").replace(TEMPLATE_TOKEN_PATTERN, (token) => {
+    const variableName = templateVariableName(token);
+    if (!Object.prototype.hasOwnProperty.call(data, variableName)) return token;
+    return formatSampleValue(data[variableName]);
+  });
+}
+
 function StatusBadge({ status }) {
   const active = status === "ACTIVE";
   return (
@@ -649,6 +710,7 @@ const TemplateTokenEditor = forwardRef(function TemplateTokenEditor(
       <div
         ref={editorRef}
         contentEditable
+        spellCheck={false}
         role="textbox"
         aria-multiline={multiline}
         suppressContentEditableWarning
@@ -756,15 +818,18 @@ export default function NotificationTemplatesPage() {
     status: "ACTIVE",
   });
   const formRef = useRef(form);
-  const [preview, setPreview] = useState(null);
+  const [sampleData, setSampleData] = useState({});
   const [loading, setLoading] = useState(true);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [templateSidebarWidth, setTemplateSidebarWidth] = useState(320);
+  const [resizingTemplateSidebar, setResizingTemplateSidebar] =
+    useState(false);
+  const templateSidebarResizeRef = useRef({ startX: 0, startWidth: 320 });
 
   const [broadcastForm, setBroadcastForm] = useState(EMPTY_BROADCAST_FORM);
   const [properties, setProperties] = useState([]);
@@ -798,9 +863,7 @@ export default function NotificationTemplatesPage() {
         setProperties(propertyData);
 
         const firstEventType = definitionData[0]?.eventType ?? "";
-        const firstAllowedChannels = (definitionData[0]?.allowedChannels ?? []).filter(
-          (channel) => channel !== "IN_APP",
-        );
+        const firstAllowedChannels = templateChannelsForDefinition(definitionData[0]);
         const firstChannel =
           firstAllowedChannels[0] ??
           templateData.find(
@@ -900,6 +963,40 @@ export default function NotificationTemplatesPage() {
     };
   }, [broadcastForm.propertyId]);
 
+  useEffect(() => {
+    if (!resizingTemplateSidebar) return undefined;
+
+    const originalCursor = document.body.style.cursor;
+    const originalUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function handlePointerMove(event) {
+      const delta = event.clientX - templateSidebarResizeRef.current.startX;
+      setTemplateSidebarWidth(
+        clampTemplateSidebarWidth(
+          templateSidebarResizeRef.current.startWidth + delta,
+        ),
+      );
+    }
+
+    function handlePointerUp() {
+      setResizingTemplateSidebar(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = originalCursor;
+      document.body.style.userSelect = originalUserSelect;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [resizingTemplateSidebar]);
+
   const localizedDefinitions = useMemo(
     () => definitions.map(localizeDefinition),
     [definitions],
@@ -939,18 +1036,33 @@ export default function NotificationTemplatesPage() {
     [templates, selectedChannel, selectedEventType],
   );
 
-  const channels = (selectedDefinition?.allowedChannels ?? []).filter(
-    (channel) => channel !== "IN_APP",
+  const channels = useMemo(
+    () => templateChannelsForDefinition(selectedDefinition),
+    [selectedDefinition],
   );
-  const variables = selectedDefinition?.variables ?? [];
-  const sampleEntries = Object.entries(selectedDefinition?.sampleData ?? {});
+  const variables = useMemo(
+    () => selectedDefinition?.variables ?? [],
+    [selectedDefinition],
+  );
+  const sampleEntries = useMemo(() => {
+    const entries = new Map(Object.entries(sampleData ?? {}));
+    variables.forEach((variable) => {
+      if (!entries.has(variable.name)) entries.set(variable.name, "");
+    });
+    return [...entries.entries()];
+  }, [sampleData, variables]);
+  const preview = useMemo(
+    () => ({
+      title: renderTemplatePreview(form.titleTemplate, sampleData),
+      body: renderTemplatePreview(form.bodyTemplate, sampleData),
+    }),
+    [form.bodyTemplate, form.titleTemplate, sampleData],
+  );
 
   useEffect(() => {
     if (!selectedDefinition) return;
 
-    const allowedChannels = (selectedDefinition.allowedChannels ?? []).filter(
-      (channel) => channel !== "IN_APP",
-    );
+    const allowedChannels = templateChannelsForDefinition(selectedDefinition);
     const validChannels = selectedChannels.filter((channel) =>
       allowedChannels.includes(channel),
     );
@@ -979,10 +1091,15 @@ export default function NotificationTemplatesPage() {
       formRef.current = nextForm;
       setForm(nextForm);
       setTemplateHistory({ past: [], future: [] });
-      setPreview(null);
       setNotice("");
     });
   }, [selectedTemplate]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setSampleData(selectedDefinition?.sampleData ?? {});
+    });
+  }, [selectedDefinition]);
 
   const filteredRooms = useMemo(() => {
     if (!broadcastForm.floorId) return rooms;
@@ -1039,6 +1156,21 @@ export default function NotificationTemplatesPage() {
     }),
     [broadcastForm, broadcastScopeIds, effectiveBroadcastRoles, sanitizedBroadcastChannels],
   );
+  const broadcastRecipientPreviewPayload = useMemo(
+    () => ({
+      scopeType: broadcastForm.scopeType,
+      scopeIds: broadcastScopeIds,
+      roles: effectiveBroadcastRoles,
+      channels: sanitizedBroadcastChannels,
+      title: "",
+      body: "",
+    }),
+    [broadcastForm.scopeType, broadcastScopeIds, effectiveBroadcastRoles, sanitizedBroadcastChannels],
+  );
+  const canPreviewBroadcastRecipients =
+    broadcastScopeReady &&
+    (broadcastForm.scopeType !== "ROLE" || effectiveBroadcastRoles.length > 0) &&
+    sanitizedBroadcastChannels.length > 0;
 
   const canSendBroadcast =
     broadcastScopeReady &&
@@ -1047,14 +1179,52 @@ export default function NotificationTemplatesPage() {
     broadcastForm.title.trim().length > 0 &&
     broadcastForm.body.trim().length > 0;
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canPreviewBroadcastRecipients) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setRecipientPreview(null);
+        setPreviewingRecipients(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = window.setTimeout(async () => {
+      setPreviewingRecipients(true);
+      setError("");
+      try {
+        const result = await previewNotificationBroadcastRecipients(
+          broadcastRecipientPreviewPayload,
+        );
+        if (!cancelled) {
+          setRecipientPreview(result);
+        }
+      } catch (previewError) {
+        if (!cancelled) {
+          setRecipientPreview(null);
+          setError(getErrorMessage(previewError));
+        }
+      } finally {
+        if (!cancelled) {
+          setPreviewingRecipients(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [broadcastRecipientPreviewPayload, canPreviewBroadcastRecipients]);
+
   function selectDefinition(definition) {
+    const allowedChannels = templateChannelsForDefinition(definition);
     setSelectedEventType(definition.eventType);
-    setSelectedChannels(
-      definition.allowedChannels?.find((channel) => channel !== "IN_APP")
-        ? [definition.allowedChannels.find((channel) => channel !== "IN_APP")]
-        : [],
-    );
-    setPreview(null);
+    setSelectedChannels(allowedChannels[0] ? [allowedChannels[0]] : []);
     setNotice("");
   }
 
@@ -1067,7 +1237,6 @@ export default function NotificationTemplatesPage() {
       }
       return [...current, channel];
     });
-    setPreview(null);
     setNotice("");
   }
 
@@ -1109,7 +1278,6 @@ export default function NotificationTemplatesPage() {
       future: [],
     }));
     setForm(nextForm);
-    setPreview(null);
   }
 
   function focusTemplateField(field, position) {
@@ -1146,7 +1314,6 @@ export default function NotificationTemplatesPage() {
       future: [edit, ...current.future].slice(0, TEMPLATE_HISTORY_LIMIT),
     }));
     setForm(previous);
-    setPreview(null);
     focusTemplateField(field, caret);
   }
 
@@ -1167,7 +1334,6 @@ export default function NotificationTemplatesPage() {
       future: current.future.slice(1),
     }));
     setForm(next);
-    setPreview(null);
     focusTemplateField(field, caret);
   }
 
@@ -1275,31 +1441,35 @@ export default function NotificationTemplatesPage() {
     }
   }
 
-  async function handlePreview() {
-    if (!selectedEventType || !selectedChannel) return;
+  function updateSampleDataValue(key, value) {
+    setSampleData((current) => ({ ...current, [key]: value }));
+  }
 
-    setPreviewing(true);
-    setError("");
-    setPreview(null);
-    try {
-      const result = await previewNotificationTemplate({
-        eventType: selectedEventType,
-        channel: selectedChannel,
-        titleTemplate: form.titleTemplate,
-        bodyTemplate: form.bodyTemplate,
-        data: selectedDefinition?.sampleData ?? {},
-      });
-      setPreview(result);
-    } catch (previewError) {
-      setError(getErrorMessage(previewError));
-    } finally {
-      setPreviewing(false);
-    }
+  function startTemplateSidebarResize(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    templateSidebarResizeRef.current = {
+      startX: event.clientX,
+      startWidth: templateSidebarWidth,
+    };
+    setResizingTemplateSidebar(true);
+  }
+
+  function nudgeTemplateSidebarWidth(delta) {
+    setTemplateSidebarWidth((current) =>
+      clampTemplateSidebarWidth(current + delta),
+    );
   }
 
   function updateBroadcastForm(patch) {
     setBroadcastForm((current) => ({ ...current, ...patch }));
-    setRecipientPreview(null);
+    if (
+      ["scopeType", "propertyId", "floorId", "roomIds", "roles", "channels"].some(
+        (key) => Object.prototype.hasOwnProperty.call(patch, key),
+      )
+    ) {
+      setRecipientPreview(null);
+    }
     setNotice("");
   }
 
@@ -1328,24 +1498,6 @@ export default function NotificationTemplatesPage() {
     }));
     setRecipientPreview(null);
     setNotice("");
-  }
-
-  async function handlePreviewRecipients() {
-    if (!broadcastScopeReady) {
-      setError("Vui lòng chọn đủ phạm vi nhận thông báo.");
-      return;
-    }
-
-    setPreviewingRecipients(true);
-    setError("");
-    setNotice("");
-    try {
-      setRecipientPreview(await previewNotificationBroadcastRecipients(broadcastPayload));
-    } catch (previewError) {
-      setError(getErrorMessage(previewError));
-    } finally {
-      setPreviewingRecipients(false);
-    }
   }
 
   async function handleSendBroadcast() {
@@ -1444,21 +1596,34 @@ export default function NotificationTemplatesPage() {
       ) : null}
 
       {activeTab === "templates" ? (
-        <div className="grid min-w-0 items-start gap-5 xl:flex">
+        <div className="grid min-w-0 items-start gap-4 xl:flex">
           <aside
-            className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:w-[320px] xl:min-w-[260px] xl:max-w-[560px] xl:resize-x xl:overflow-auto"
+            className="flex min-h-[420px] w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-slate-900 shadow-sm max-xl:max-h-[70vh] xl:h-[calc(100vh-220px)] xl:w-[var(--template-sidebar-width)] xl:shrink-0"
+            style={{ "--template-sidebar-width": `${templateSidebarWidth}px` }}
           >
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Tìm mẫu thông báo..."
-                className="h-11 w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
-              />
+            <div className="border-b border-slate-200 bg-white/90 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Thư viện mẫu
+                  </p>
+                  <p className="mt-1 truncate text-sm font-black text-slate-950">
+                    {filteredDefinitions.length} mẫu thông báo
+                  </p>
+                </div>
+              </div>
+              <div className="relative mt-3">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Tìm mẫu thông báo..."
+                  className="h-10 w-full min-w-0 truncate rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                />
+              </div>
             </div>
 
-            <div className="mt-4 grid max-h-[calc(100vh-260px)] min-h-[240px] gap-2 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3">
               {filteredDefinitions.map((definition) => {
                 const active = definition.eventType === selectedEventType;
                 return (
@@ -1466,42 +1631,19 @@ export default function NotificationTemplatesPage() {
                     key={definition.eventType}
                     type="button"
                     onClick={() => selectDefinition(definition)}
-                    className={`w-full min-w-0 overflow-hidden rounded-lg border p-3 text-left transition ${
+                    className={`block w-full min-w-0 !overflow-visible !whitespace-normal rounded-lg border px-3 py-3 text-left transition ${
                       active
-                        ? "border-[#1e40af] bg-blue-50 shadow-sm"
-                        : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                        ? "border-[#1e40af] bg-blue-50 shadow-sm ring-1 ring-blue-100"
+                        : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40"
                     }`}
                   >
-                    <div className="grid min-w-0 gap-2">
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 break-words text-sm font-black leading-5 text-slate-950">
-                          {definition.displayName}
-                        </p>
-                        <p
-                          title={definition.eventType}
-                          className="mt-1 block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-black uppercase leading-4 text-[#1e40af]"
-                        >
-                          Mã: {definition.eventType}
-                        </p>
-                      </div>
-                      <span className="w-fit max-w-full truncate rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-600">
+                    <div className="grid min-w-0 gap-1.5">
+                      <p className="min-w-0 !whitespace-normal break-words text-sm font-bold leading-5 text-slate-950">
+                        {definition.displayName}
+                      </p>
+                      <span className="w-fit max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold leading-5 text-slate-600">
                         {definition.targetLabel}
                       </span>
-                    </div>
-                    <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-slate-600">
-                      {definition.description}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {(definition.allowedChannels ?? [])
-                        .filter((channel) => channel !== "IN_APP")
-                        .map((channel) => (
-                        <span
-                          key={channel}
-                          className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600"
-                        >
-                          {optionLabel(CHANNEL_OPTIONS, channel)}
-                        </span>
-                      ))}
                     </div>
                   </button>
                 );
@@ -1509,7 +1651,39 @@ export default function NotificationTemplatesPage() {
             </div>
           </aside>
 
-          <main className="grid min-w-0 flex-1 gap-5">
+          <button
+            type="button"
+            aria-label="Kéo để đổi độ rộng thư viện mẫu"
+            title="Kéo để đổi độ rộng thư viện mẫu"
+            onPointerDown={startTemplateSidebarResize}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                nudgeTemplateSidebarWidth(-20);
+              }
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                nudgeTemplateSidebarWidth(20);
+              }
+            }}
+            className={`group -ml-1 -mr-1 hidden h-[calc(100vh-220px)] w-6 touch-none cursor-col-resize items-center justify-center rounded-md outline-none transition xl:flex ${
+              resizingTemplateSidebar
+                ? "bg-blue-50"
+                : "hover:bg-slate-100 focus-visible:bg-slate-100"
+            }`}
+          >
+            <span
+              className={`grid h-16 w-5 place-items-center rounded-md border transition ${
+                resizingTemplateSidebar
+                  ? "border-blue-200 bg-white text-[#1e40af] shadow-sm"
+                  : "border-slate-200 bg-white text-slate-400 shadow-sm group-hover:border-slate-300 group-hover:text-slate-600 group-focus-visible:border-blue-200 group-focus-visible:text-[#1e40af]"
+              }`}
+            >
+              <GripVertical className="h-4 w-4" />
+            </span>
+          </button>
+
+          <main className="grid min-w-0 gap-5 xl:flex-1">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
@@ -1661,7 +1835,7 @@ export default function NotificationTemplatesPage() {
                     {variables.length ? (
                       variables.map((variable) => {
                         const sampleValue = formatSampleValue(
-                          selectedDefinition?.sampleData?.[variable.name],
+                          sampleData?.[variable.name],
                         );
                         return (
                           <button
@@ -1715,20 +1889,6 @@ export default function NotificationTemplatesPage() {
 
                 <button
                   type="button"
-                  onClick={handlePreview}
-                  disabled={previewing || !selectedEventType || !selectedChannel}
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {previewing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                  Xem trước
-                </button>
-
-                <button
-                  type="button"
                   onClick={handleReset}
                   disabled={resetting || !selectedEventType || selectedChannels.length === 0}
                   className="inline-flex h-11 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1747,23 +1907,40 @@ export default function NotificationTemplatesPage() {
               <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="font-black">Dữ liệu mẫu</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Backend dùng dữ liệu này khi xem trước mẫu thông báo.
+                  Chỉnh giá trị ở đây để xem trước tiêu đề và nội dung ngay bên cạnh.
                 </p>
-                <div className="mt-3 overflow-hidden rounded-lg border border-slate-100">
+                <div className="mt-3 grid max-h-[440px] gap-3 overflow-y-auto pr-1">
                   {sampleEntries.length ? (
-                    sampleEntries.map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="grid grid-cols-[minmax(110px,150px)_minmax(0,1fr)] border-b border-slate-100 text-sm last:border-b-0"
-                      >
-                        <div className="break-all bg-slate-50 px-3 py-2 font-bold text-slate-600">
-                          {key}
-                        </div>
-                        <div className="break-words px-3 py-2 text-slate-800">
-                          {String(value)}
-                        </div>
-                      </div>
-                    ))
+                    sampleEntries.map(([key, value]) => {
+                      const textValue = formatSampleValue(value);
+                      const multiline =
+                        textValue.length > 80 || textValue.includes("\n");
+                      return (
+                        <label key={key} className="grid gap-1.5">
+                          <span className="break-all font-mono text-[11px] font-black uppercase text-slate-500">
+                            {key}
+                          </span>
+                          {multiline ? (
+                            <textarea
+                              value={textValue}
+                              onChange={(event) =>
+                                updateSampleDataValue(key, event.target.value)
+                              }
+                              rows={3}
+                              className="min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                            />
+                          ) : (
+                            <input
+                              value={textValue}
+                              onChange={(event) =>
+                                updateSampleDataValue(key, event.target.value)
+                              }
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                            />
+                          )}
+                        </label>
+                      );
+                    })
                   ) : (
                     <div className="px-3 py-4 text-sm text-slate-500">
                       Không có dữ liệu mẫu.
@@ -1775,32 +1952,26 @@ export default function NotificationTemplatesPage() {
               <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <h3 className="font-black">Kết quả xem trước</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Bản xem trước dùng dữ liệu mẫu từ backend.
+                  Tự cập nhật theo mẫu tiêu đề, mẫu nội dung và dữ liệu mẫu đang nhập.
                 </p>
-                {preview ? (
-                  <div className="mt-4 grid gap-3">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-                        Tiêu đề
-                      </p>
-                      <p className="mt-2 font-bold text-slate-950">
-                        {preview.title}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-                        Nội dung
-                      </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-800">
-                        {preview.body}
-                      </p>
-                    </div>
+                <div className="mt-4 grid gap-3">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Tiêu đề
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap break-words font-bold text-slate-950">
+                      {preview.title || "Chưa có tiêu đề xem trước."}
+                    </p>
                   </div>
-                ) : (
-                  <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm font-semibold text-slate-500">
-                    Bấm Xem trước để render tiêu đề và nội dung.
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                      Nội dung
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-slate-800">
+                      {preview.body || "Chưa có nội dung xem trước."}
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
             </section>
           </main>
@@ -1962,27 +2133,19 @@ export default function NotificationTemplatesPage() {
                     Kênh gửi
                   </SelectionLabel>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {CHANNEL_OPTIONS.map((channel) => {
-                      const disabledReason = channelDisabledReason(channel.value, effectiveBroadcastRoles);
-                      const disabled = Boolean(disabledReason);
-                      return (
-                        <TogglePill
-                          key={channel.value}
-                          active={sanitizedBroadcastChannels.includes(channel.value)}
-                          multi
-                          disabled={disabled}
-                          title={disabledReason || undefined}
-                          onClick={() => {
-                            if (!disabled) toggleBroadcastValue("channels", channel.value);
-                          }}
-                        >
-                          {channel.label}
-                        </TogglePill>
-                      );
-                    })}
+                    {allowedBroadcastChannels.map((channel) => (
+                      <TogglePill
+                        key={channel.value}
+                        active={sanitizedBroadcastChannels.includes(channel.value)}
+                        multi
+                        onClick={() => toggleBroadcastValue("channels", channel.value)}
+                      >
+                        {channel.label}
+                      </TogglePill>
+                    ))}
                   </div>
                   <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                    In-app đã bỏ. Khách thuê không có kênh Web; nhóm staff không có Mobile push.
+                    Chỉ hiện các kênh phù hợp với vai trò nhận. In-app đã bỏ khỏi cấu hình gửi thủ công.
                   </p>
                 </div>
               </div>
@@ -2016,20 +2179,6 @@ export default function NotificationTemplatesPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handlePreviewRecipients}
-                  disabled={previewingRecipients || !broadcastScopeReady}
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {previewingRecipients ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Users className="h-4 w-4" />
-                  )}
-                  Ước tính người nhận
-                </button>
-
                 <button
                   type="button"
                   onClick={handleSendBroadcast}
@@ -2083,7 +2232,12 @@ export default function NotificationTemplatesPage() {
               </div>
             </div>
 
-            {recipientPreview ? (
+            {previewingRecipients ? (
+              <div className="mt-5 flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-[#1e40af]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Đang tự ước tính người nhận...
+              </div>
+            ) : recipientPreview ? (
               <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
                 <p className="text-xs font-black uppercase tracking-wide text-[#1e40af]">
                   Ước tính gửi
@@ -2097,7 +2251,7 @@ export default function NotificationTemplatesPage() {
               </div>
             ) : (
               <div className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-500">
-                Bấm Ước tính người nhận để kiểm tra phạm vi trước khi gửi.
+                Chọn đủ phạm vi và kênh gửi để hệ thống tự ước tính người nhận.
               </div>
             )}
 

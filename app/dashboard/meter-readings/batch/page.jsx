@@ -486,20 +486,6 @@ export default function MeterReadings() {
 
         const numVal = val === "" ? null : Number(val);
 
-        // Validation: new reading must be >= old reading
-        if (field === "elecCurr" && numVal !== null && room.elecPrev !== null) {
-            if (numVal < room.elecPrev) {
-                toast.error("Chỉ số điện mới không được nhỏ hơn chỉ số cũ");
-                return;
-            }
-        }
-        if (field === "waterCurr" && numVal !== null && room.waterPrev !== null) {
-            if (numVal < room.waterPrev) {
-                toast.error("Chỉ số nước mới không được nhỏ hơn chỉ số cũ");
-                return;
-            }
-        }
-
         // Validation: old reading must be >= 0
         if (field === "elecPrev" && numVal !== null && numVal < 0) {
             toast.error("Chỉ số điện cũ không được âm");

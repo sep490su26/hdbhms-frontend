@@ -27,6 +27,14 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
   const roomCode = readField(room, "roomCode", "room_code");
   const syncTimeValue = readField(room, "syncTime", "sync_time");
   const syncDate = syncTimeValue ? new Date(syncTimeValue) : null;
+  const electricityPrevious = toFiniteNumber(
+    readField(room, "electricityPrevious", "electricity_previous"),
+    0,
+  );
+  const waterPrevious = toFiniteNumber(
+    readField(room, "waterPrevious", "water_previous"),
+    0,
+  );
 
   return {
     key:
@@ -38,21 +46,15 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
     id: String(roomCode ?? roomId ?? ""),
     roomId,
     roomName: readField(room, "roomName", "room_name") ?? "",
-    elecPrev: toFiniteNumber(
-      readField(room, "electricityPrevious", "electricity_previous"),
-      0,
-    ),
+    elecPrev: electricityPrevious,
     elecCurr: toFiniteNumber(
       readField(room, "electricityCurrent", "electricity_current"),
-      null,
+      electricityPrevious,
     ),
-    waterPrev: toFiniteNumber(
-      readField(room, "waterPrevious", "water_previous"),
-      0,
-    ),
+    waterPrev: waterPrevious,
     waterCurr: toFiniteNumber(
       readField(room, "waterCurrent", "water_current"),
-      null,
+      waterPrevious,
     ),
     status: readField(room, "status", "status") || "pending",
     syncTime:

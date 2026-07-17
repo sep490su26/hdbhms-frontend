@@ -48,6 +48,8 @@ import {formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime
 import {sortByNewest} from "@/lib/sortByNewest.mjs";
 import {DashboardPageHeader} from "@/components/dashboard/DashboardPageHeader";
 import {DashboardPagination} from "@/components/dashboard/DashboardPagination";
+import {useAuth} from "../_contexts/AuthContext";
+import {ROLES} from "../_lib/rbac";
 
 // ponytail: local filters cover the first 1000 contracts; move these filters into the API when the portfolio grows.
 const CONTRACT_MANAGEMENT_FETCH_SIZE = 1000;
@@ -637,6 +639,7 @@ function InfoValue({label, value}) {
 }
 
 export default function ContractTemplatePage() {
+    const {user} = useAuth();
     const searchParams = useSearchParams();
     const fileInputRef = useRef(null);
     const [contracts, setContracts] = useState([]);
@@ -1491,6 +1494,7 @@ export default function ContractTemplatePage() {
     }
 
     const isBusy = Boolean(actionLoading);
+    const canUseOwnerOnlyActions = user?.role === ROLES.OWNER;
 
     return (
         <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
@@ -2585,7 +2589,7 @@ export default function ContractTemplatePage() {
                                                 Ghi nhận / Cập nhật ý định khách
                                             </button>
                                         )}
-                                        {(details?.canLiquidate ??
+                                        {canUseOwnerOnlyActions && (details?.canLiquidate ??
                                             ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(getWorkflow(mergedSelected))) && (
                                             <button
                                                 type="button"

@@ -322,7 +322,12 @@ function expandRangeToTemplateTokens(value, start, end) {
 
 function templateTokenDeletionRange(value, range, event) {
   if (range.start !== range.end) {
-    return expandRangeToTemplateTokens(value, range.start, range.end);
+    return (
+      expandRangeToTemplateTokens(value, range.start, range.end) ?? {
+        start: range.start,
+        end: range.end,
+      }
+    );
   }
 
   const caret = range.start;
@@ -333,22 +338,33 @@ function templateTokenDeletionRange(value, range, event) {
       let start = caret;
       while (start > 0 && /\s/.test(value[start - 1])) start -= 1;
       while (start > 0 && !/\s/.test(value[start - 1])) start -= 1;
-      return expandRangeToTemplateTokens(value, start, caret);
+      if (start === caret) return null;
+      return expandRangeToTemplateTokens(value, start, caret) ?? { start, end: caret };
     }
 
     if (event.key === "Delete") {
       let end = caret;
       while (end < value.length && /\s/.test(value[end])) end += 1;
       while (end < value.length && !/\s/.test(value[end])) end += 1;
-      return expandRangeToTemplateTokens(value, caret, end);
+      if (end === caret) return null;
+      return expandRangeToTemplateTokens(value, caret, end) ?? { start: caret, end };
     }
   }
 
-  return templateTokenRanges(value).find((token) =>
+  const tokenRange = templateTokenRanges(value).find((token) =>
     event.key === "Backspace"
       ? caret > token.start && caret <= token.end
       : caret >= token.start && caret < token.end,
   );
+  if (tokenRange) return tokenRange;
+
+  if (event.key === "Backspace" && caret > 0) {
+    return { start: caret - 1, end: caret };
+  }
+  if (event.key === "Delete" && caret < value.length) {
+    return { start: caret, end: caret + 1 };
+  }
+  return null;
 }
 
 function variableLabel(name) {
@@ -399,6 +415,15 @@ function renderTemplateEditorValue(root, value) {
   if (cursor < text.length) {
     root.appendChild(document.createTextNode(text.slice(cursor)));
   }
+}
+
+function hasBrowserEditorArtifacts(root) {
+  return [...root.childNodes].some(
+    (node) =>
+      node.nodeType === Node.ELEMENT_NODE &&
+      !node.dataset?.templateToken &&
+      node.nodeName !== "BR",
+  );
 }
 
 function rawLength(node) {
@@ -621,12 +646,21 @@ const TemplateTokenEditor = forwardRef(function TemplateTokenEditor(
     if (!editor) return;
     const nextValue = serializeTemplateEditor(editor);
     const range = selectionRawRange(editor);
+    const shouldNormalizeDom = hasBrowserEditorArtifacts(editor);
     if (nextValue === lastProgrammaticValueRef.current) {
       lastProgrammaticValueRef.current = null;
+      if (shouldNormalizeDom) {
+        renderTemplateEditorValue(editor, nextValue);
+        setEditorCaretByRawOffset(editor, range.start);
+      }
       onCursorChange(field, range.start);
       return;
     }
     lastProgrammaticValueRef.current = null;
+    if (shouldNormalizeDom) {
+      renderTemplateEditorValue(editor, nextValue);
+      setEditorCaretByRawOffset(editor, range.start);
+    }
     onCursorChange(field, range.start);
     onChange(nextValue, range.start, range.start);
   }

@@ -48,6 +48,7 @@ import {formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime
 import {sortByNewest} from "@/lib/sortByNewest.mjs";
 import {DashboardPageHeader} from "@/components/dashboard/DashboardPageHeader";
 import {DashboardPagination} from "@/components/dashboard/DashboardPagination";
+import DateInput from "@/components/DateInput";
 import {useAuth} from "../_contexts/AuthContext";
 import {ROLES} from "../_lib/rbac";
 
@@ -501,6 +502,10 @@ function unwrapHandoverResponse(response) {
 
 function hasHandoverReadings(handover) {
     return Boolean(handover?.electricity && handover?.water);
+}
+
+function getSignedHandoverDocumentId(handover = {}) {
+    return handover?.signedDocumentId ?? handover?.signed_document_id ?? null;
 }
 
 function matchesStatusFilter(item, statusFilter) {
@@ -1079,6 +1084,11 @@ export default function ContractTemplatePage() {
                 const handoverData = unwrapHandoverResponse(await fetchContractHandover(item.leaseContractId, "MOVE_IN"));
                 if (!hasHandoverReadings(handoverData)) {
                     throw new Error("Missing handover data");
+                }
+                if (!getSignedHandoverDocumentId(handoverData)) {
+                    window.alert("Vui lòng upload biên bản bàn giao đã ký trước khi kích hoạt hợp đồng.");
+                    setActionLoading("");
+                    return;
                 }
             } catch (err) {
                 window.alert("Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.");
@@ -2184,8 +2194,7 @@ export default function ContractTemplatePage() {
                                                                value={getStatusLabel(mergedSelected)}/>
                                                     <label className="grid min-w-0 gap-1.5">
                                                         <span className="text-xs font-bold text-[#58667c]">Ngày bắt đầu *</span>
-                                                        <input
-                                                            type="date"
+                                                        <DateInput
                                                             value={termsForm.startDate}
                                                             onChange={(event) => updateTermsField("startDate", event.target.value)}
                                                             aria-invalid={Boolean(termsFieldErrors.startDate)}
@@ -2203,8 +2212,7 @@ export default function ContractTemplatePage() {
                                                     </label>
                                                     <label className="grid min-w-0 gap-1.5">
                                                         <span className="text-xs font-bold text-[#58667c]">Ngày kết thúc *</span>
-                                                        <input
-                                                            type="date"
+                                                        <DateInput
                                                             value={termsForm.endDate}
                                                             min={termsForm.startDate || undefined}
                                                             onChange={(event) => updateTermsField("endDate", event.target.value)}

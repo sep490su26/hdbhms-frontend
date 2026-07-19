@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -23,7 +23,7 @@ const handoverDocumentStateSource = readFileSync(
 test("activation popup renders the two-stage onboarding workflow", () => {
   assert.match(workflowSource, /Chuẩn bị hồ sơ/);
   assert.match(workflowSource, /Lưu bản đã ký/);
-  assert.match(workflowSource, /Tải tài liệu và nhập bàn giao/);
+  assert.match(workflowSource, /Tải bản in và nhập thông tin bàn giao/);
   assert.match(workflowSource, /Upload các bản PDF đã ký/);
   assert.match(workflowSource, /Đảm bảo đủ điều kiện kích hoạt/);
 });
@@ -41,9 +41,11 @@ test("signed document inputs enforce PDF and the 15 MB client limit", () => {
   assert.match(workflowSource, /replace: Boolean\(leaseSignedFileId\)/);
 });
 
-test("signed handover upload is optional for activation", () => {
-  assert.match(workflowSource, /tùy chọn, có thể tải sau khi kích hoạt/);
-  assert.doesNotMatch(pageSource, /hasSignedHandoverDocument/);
+test("signed handover upload is required for activation", () => {
+  assert.match(workflowSource, /handoverSignedFileId/);
+  assert.match(workflowSource, /handover-signed-file/);
+  assert.match(pageSource, /getSignedHandoverDocumentId/);
+  assert.doesNotMatch(workflowSource, /optional\s*fileName="Bi/);
 });
 
 test("contract list activation action opens the integrated dialog", () => {
@@ -84,11 +86,10 @@ test("active contracts show one context-aware dossier badge", () => {
   assert.doesNotMatch(pageSource, /flex flex-col items-start gap-1\.5/);
 });
 
-test("management table headers align with all ten contract columns", () => {
+test("management table headers align with all contract columns", () => {
   const header = pageSource.match(/<thead[\s\S]*?<\/thead>/)?.[0] || "";
   const labels = [
     "Mã HĐ",
-    "Loại HĐ",
     "Phòng",
     "Người ký chính",
     "Số người",

@@ -12,6 +12,7 @@ export function getContractActivationReadiness({
   depositSignedFileId = null,
   leaseSignedFileId = null,
   hasHandoverData = false,
+  handoverSignedFileId = null,
 } = {}) {
   const requirements = [
     ...(hasDeposit
@@ -32,6 +33,11 @@ export function getContractActivationReadiness({
       key: "handover-data",
       label: "Thông tin bàn giao đầy đủ",
       complete: Boolean(hasHandoverData),
+    },
+    {
+      key: "handover-signed-file",
+      label: "Bien ban ban giao da ky",
+      complete: Boolean(handoverSignedFileId),
     },
   ];
 

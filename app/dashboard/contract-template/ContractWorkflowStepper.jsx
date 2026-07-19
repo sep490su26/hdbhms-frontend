@@ -309,11 +309,15 @@ export default function ContractWorkflowStepper({
   const handoverSignedFileId = getSignedHandoverDocumentId(handoverData);
   const signedHandoverReady =
     Boolean(handoverSignedFileId) && handoverMatchesLease;
+  const signedHandoverDescription = handoverHasData
+    ? "PDF toi da 15 MB - can upload truoc khi kich hoat"
+    : "Mo sau khi hoan tat thong tin ban giao";
   const readiness = getContractActivationReadiness({
     hasDeposit,
     depositSignedFileId,
     leaseSignedFileId,
     hasHandoverData: handoverReady,
+    handoverSignedFileId: signedHandoverReady ? handoverSignedFileId : null,
   });
   const isBusy = loadingStep != null;
   const uploadLeaseDisabled = isLeaseSignedUploadDisabled({
@@ -321,10 +325,11 @@ export default function ContractWorkflowStepper({
     leaseContractId: contractDetails?.leaseContractId,
     loadingStep,
   });
-  const requiredUploadTotal = hasDeposit ? 2 : 1;
+  const requiredUploadTotal = hasDeposit ? 3 : 2;
   const requiredUploadedCount =
     Number(Boolean(leaseSignedFileId)) +
-    (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0);
+    (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0) +
+    Number(Boolean(signedHandoverReady));
   const missingCount = readiness.totalCount - readiness.completedCount;
   const electricValue = getReadingValue(handoverData?.electricity);
   const waterValue = getReadingValue(handoverData?.water);
@@ -637,13 +642,8 @@ export default function ContractWorkflowStepper({
 
         <UploadRow
           title="Biên bản bàn giao đã ký"
-          description={
-            handoverHasData
-              ? "PDF tối đa 15 MB · tùy chọn, có thể tải sau khi kích hoạt"
-              : "Tùy chọn · mở sau khi hoàn tất thông tin bàn giao"
-          }
+          description={signedHandoverDescription}
           complete={signedHandoverReady}
-          optional
           fileName="Biên bản bàn giao đã được lưu"
           loading={loadingStep === ACTION.UPLOAD_HANDOVER}
           disabled={isBusy || handoverLoading || !handoverHasData}
@@ -670,6 +670,7 @@ export default function ContractWorkflowStepper({
               deposit: "Upload đúng file PDF có đầy đủ chữ ký.",
               lease: "Upload đúng file PDF có đầy đủ chữ ký.",
               "handover-data": "Chỉ số điện, nước và thiết bị đã được chốt.",
+              "handover-signed-file": "Upload bien ban ban giao PDF co chu ky.",
             };
             return (
               <ChecklistItem

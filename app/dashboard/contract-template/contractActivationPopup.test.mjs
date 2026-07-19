@@ -41,9 +41,11 @@ test("signed document inputs enforce PDF and the 15 MB client limit", () => {
   assert.match(workflowSource, /replace: Boolean\(leaseSignedFileId\)/);
 });
 
-test("signed handover upload is required for activation", () => {
+test("signed handover upload is required only for non-renewal activation", () => {
   assert.match(workflowSource, /handoverSignedFileId/);
   assert.match(workflowSource, /handover-signed-file/);
+  assert.match(workflowSource, /requiresMoveInHandover/);
+  assert.match(pageSource, /isRenewalContract/);
   assert.match(pageSource, /getSignedHandoverDocumentId/);
   assert.doesNotMatch(workflowSource, /optional\s*fileName="Bi/);
 });

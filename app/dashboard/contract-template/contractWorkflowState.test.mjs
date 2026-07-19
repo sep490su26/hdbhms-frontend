@@ -60,3 +60,21 @@ test("direct lease activation does not require a deposit document", () => {
     ["lease", "handover-data", "handover-signed-file"],
   );
 });
+
+test("renewal activation does not require handover documents", () => {
+  const readiness = getContractActivationReadiness({
+    hasDeposit: false,
+    leaseSignedFileId: 12,
+    requiresMoveInHandover: false,
+    hasHandoverData: false,
+    handoverSignedFileId: null,
+  });
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.completedCount, 1);
+  assert.equal(readiness.totalCount, 1);
+  assert.deepEqual(
+    readiness.requirements.map((item) => item.key),
+    ["lease"],
+  );
+});

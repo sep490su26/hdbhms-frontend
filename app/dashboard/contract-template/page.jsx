@@ -462,6 +462,10 @@ function isRoomTransferManagedContract(item) {
     return Boolean(item?.transferRequestId);
 }
 
+function isRenewalContract(item) {
+    return Boolean(item?.previousContractId ?? item?.previous_contract_id);
+}
+
 function getLeaseSignedFileId(item = {}) {
     return (
         item?.signedFileId ??
@@ -1080,20 +1084,22 @@ export default function ContractTemplatePage() {
         setActionLoading(`activate-${item.leaseContractId}`);
         setError("");
         try {
-            try {
-                const handoverData = unwrapHandoverResponse(await fetchContractHandover(item.leaseContractId, "MOVE_IN"));
-                if (!hasHandoverReadings(handoverData)) {
-                    throw new Error("Missing handover data");
-                }
-                if (!getSignedHandoverDocumentId(handoverData)) {
-                    window.alert("Vui lòng upload biên bản bàn giao đã ký trước khi kích hoạt hợp đồng.");
+            if (!isRenewalContract(item)) {
+                try {
+                    const handoverData = unwrapHandoverResponse(await fetchContractHandover(item.leaseContractId, "MOVE_IN"));
+                    if (!hasHandoverReadings(handoverData)) {
+                        throw new Error("Missing handover data");
+                    }
+                    if (!getSignedHandoverDocumentId(handoverData)) {
+                        window.alert("Vui lòng upload biên bản bàn giao đã ký trước khi kích hoạt hợp đồng.");
+                        setActionLoading("");
+                        return;
+                    }
+                } catch (err) {
+                    window.alert("Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.");
                     setActionLoading("");
                     return;
                 }
-            } catch (err) {
-                window.alert("Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.");
-                setActionLoading("");
-                return;
             }
 
             const activated = await activateLeaseContract(item.leaseContractId);
@@ -2425,7 +2431,9 @@ export default function ContractTemplatePage() {
                                         </div>
                                     </DetailCard>
 
-                                    {mergedSelected.leaseContractId && !isRoomTransferManagedContract(mergedSelected) && (
+                                    {mergedSelected.leaseContractId &&
+                                        !isRoomTransferManagedContract(mergedSelected) &&
+                                        !isRenewalContract(mergedSelected) && (
                                         <ContractHandoverSection
                                             key={mergedSelected.leaseContractId}
                                             contractId={mergedSelected.leaseContractId}
@@ -2440,7 +2448,8 @@ export default function ContractTemplatePage() {
                                     )}
 
                                     {mergedSelected.leaseContractId &&
-                                        getWorkflow(mergedSelected) !== "CANCELLED" && (
+                                        getWorkflow(mergedSelected) !== "CANCELLED" &&
+                                        !isRenewalContract(mergedSelected) && (
                                             <HandoverDocumentCard
                                                 contract={mergedSelected}
                                                 refreshKey={handoverRefreshKey}

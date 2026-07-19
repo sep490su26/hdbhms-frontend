@@ -473,7 +473,7 @@ async function hydrateTransferSigningDocuments(transfer) {
     return { ...transfer, signingDocuments };
 }
 
-function RequestDetailContent({ req }) {
+function RequestDetailContent({ req, detailTransfer }) {
     const mappedType = mapRequestType(req.requestType);
     const payload = parseRequestPayload(req.requestPayload);
     const TypeDetailComponent = TYPE_DETAIL_COMPONENTS[mappedType];
@@ -508,7 +508,13 @@ function RequestDetailContent({ req }) {
             )}
 
             {/* Type-specific detail component */}
-            {TypeDetailComponent && payload && <TypeDetailComponent payload={payload} />}
+            {TypeDetailComponent && payload && (
+                <TypeDetailComponent
+                    payload={payload}
+                    transfer={mappedType === "TRANSFER" ? detailTransfer : null}
+                    request={req}
+                />
+            )}
 
             {/* Resolution info */}
             {req.status !== "PENDING" && (
@@ -1594,7 +1600,7 @@ export default function ApprovalCenter() {
                             </Button>
                         </div>
                         <div className="p-6 space-y-6">
-                            <RequestDetailContent req={detailModal} />
+                            <RequestDetailContent req={detailModal} detailTransfer={detailTransfer} />
 
                             {detailModal.requestType === "ROOM_TRANSFER" && (
                                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 space-y-4">

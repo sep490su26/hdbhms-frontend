@@ -20,8 +20,12 @@ export default function ContractActivationFlow({
   const contractId = contract?.leaseContractId || contract?.contractId;
   const leaseSignedFileId = contract?.signedFileId ?? contract?.signed_file_id ?? null;
   const creatingDraft = actionLoading === `draft-${contract?.depositAgreementId}`;
+  const isRenewalContract = Boolean(
+    contract?.previousContractId ?? contract?.previous_contract_id,
+  );
 
   const [activeView, setActiveView] = useState("workflow");
+  const effectiveActiveView = isRenewalContract ? "workflow" : activeView;
 
   // Incremented every time the signed lease file changes (re-upload).
   // The stepper uses this to invalidate handover completion state,
@@ -47,6 +51,7 @@ export default function ContractActivationFlow({
   }, [leaseSignedFileId]);
 
   function handleRequestShowHandover() {
+    if (isRenewalContract) return;
     setActiveView("handover");
   }
 
@@ -63,12 +68,12 @@ export default function ContractActivationFlow({
     document
       .getElementById("contract-detail-dialog")
       ?.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeView]);
+  }, [effectiveActiveView]);
 
   return (
     <div className="lg:col-span-2">
       {contractId ? (
-        activeView === "workflow" ? (
+        effectiveActiveView === "workflow" ? (
           <ContractWorkflowStepper
             contractDetails={contract}
             refreshKey={handoverRefreshKey}

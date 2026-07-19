@@ -250,9 +250,14 @@ export default function ContractWorkflowStepper({
     contractDetails?.depositSignedFileId ??
     contractDetails?.deposit_signed_file_id ??
     null;
+  const isRenewalContract = Boolean(
+    contractDetails?.previousContractId ?? contractDetails?.previous_contract_id,
+  );
+  const requiresMoveInHandover = !isRenewalContract;
 
   useEffect(() => {
     if (
+      requiresMoveInHandover &&
       leaseVersion > 0 &&
       leaseVersion !== prevLeaseVersionRef.current
     ) {
@@ -262,7 +267,7 @@ export default function ContractWorkflowStepper({
       );
     }
     prevLeaseVersionRef.current = leaseVersion;
-  }, [leaseVersion]);
+  }, [leaseVersion, requiresMoveInHandover]);
 
   useEffect(() => {
     let ignore = false;
@@ -270,7 +275,9 @@ export default function ContractWorkflowStepper({
     prevRefreshKeyRef.current = refreshKey;
 
     async function loadHandover() {
-      if (!contractId) {
+      if (!contractId || !requiresMoveInHandover) {
+        setHandoverData(null);
+        setConfirmedLeaseVersion(leaseVersion);
         setHandoverLoading(false);
         return;
       }
@@ -301,7 +308,7 @@ export default function ContractWorkflowStepper({
     return () => {
       ignore = true;
     };
-  }, [contractId, refreshKey, leaseSignedFileId, leaseVersion]);
+  }, [contractId, refreshKey, leaseSignedFileId, leaseVersion, requiresMoveInHandover]);
 
   const handoverHasData = hasHandoverReadings(handoverData);
   const handoverMatchesLease = confirmedLeaseVersion === leaseVersion;
@@ -316,6 +323,7 @@ export default function ContractWorkflowStepper({
     hasDeposit,
     depositSignedFileId,
     leaseSignedFileId,
+    requiresMoveInHandover,
     hasHandoverData: handoverReady,
     handoverSignedFileId: signedHandoverReady ? handoverSignedFileId : null,
   });
@@ -325,11 +333,12 @@ export default function ContractWorkflowStepper({
     leaseContractId: contractDetails?.leaseContractId,
     loadingStep,
   });
-  const requiredUploadTotal = hasDeposit ? 3 : 2;
+  const requiredUploadTotal =
+    Number(hasDeposit) + 1 + Number(requiresMoveInHandover);
   const requiredUploadedCount =
     Number(Boolean(leaseSignedFileId)) +
     (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0) +
-    Number(Boolean(signedHandoverReady));
+    (requiresMoveInHandover ? Number(Boolean(signedHandoverReady)) : 0);
   const missingCount = readiness.totalCount - readiness.completedCount;
   const electricValue = getReadingValue(handoverData?.electricity);
   const waterValue = getReadingValue(handoverData?.water);
@@ -493,7 +502,9 @@ export default function ContractWorkflowStepper({
               Chuẩn bị hồ sơ
             </p>
             <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-              Tải bản in và nhập thông tin bàn giao
+              {requiresMoveInHandover
+                ? "Tải bản in và nhập thông tin bàn giao"
+                : "Tải hợp đồng tái ký để in và ký"}
             </p>
           </div>
         </div>
@@ -515,9 +526,13 @@ export default function ContractWorkflowStepper({
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
         <PanelHeader
           kicker="Chuẩn bị hồ sơ"
-          title="Tải tài liệu và nhập bàn giao"
-          description="Tải từng tài liệu để in, ký trực tiếp tại cơ sở và chốt dữ liệu bàn giao."
-          count={hasDeposit ? 3 : 2}
+          title={requiresMoveInHandover ? "Tải tài liệu và nhập bàn giao" : "Tải hợp đồng tái ký"}
+          description={
+            requiresMoveInHandover
+              ? "Tải từng tài liệu để in, ký trực tiếp tại cơ sở và chốt dữ liệu bàn giao."
+              : "Tái ký giữ nguyên phòng hiện tại, không cần nhập bàn giao phòng."
+          }
+          count={Number(hasDeposit) + 1 + Number(requiresMoveInHandover)}
         />
 
         {hasDeposit && (
@@ -562,49 +577,53 @@ export default function ContractWorkflowStepper({
           </button>
         </DocumentRow>
 
-        <DocumentRow
-          title="Biên bản bàn giao"
-          meta={
-            handoverHasData
-              ? `Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³ · Thiết bị đã kiểm tra`
-              : "Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
-          }
-          complete={handoverReady}
-          statusLabel={handoverReady ? "Đã đủ dữ liệu" : "Cần nhập dữ liệu"}
-        >
-          <button
-            type="button"
-            onClick={onRequestShowHandover}
-            disabled={isBusy || handoverLoading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-white"
-          >
-            {handoverLoading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <ClipboardEdit className="h-3.5 w-3.5" />
-            )}
-            {handoverHasData ? "Xem bàn giao" : "Nhập bàn giao"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadHandover}
-            disabled={isBusy || !handoverHasData}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07112f] px-3 text-[11px] font-extrabold text-white hover:bg-[#10204a] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-white/10"
-          >
-            {loadingStep === ACTION.DOWNLOAD_HANDOVER ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            Tải PDF
-          </button>
-        </DocumentRow>
+        {requiresMoveInHandover && (
+          <>
+            <DocumentRow
+              title="Biên bản bàn giao"
+              meta={
+                handoverHasData
+                  ? `Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³ · Thiết bị đã kiểm tra`
+                  : "Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
+              }
+              complete={handoverReady}
+              statusLabel={handoverReady ? "Đã đủ dữ liệu" : "Cần nhập dữ liệu"}
+            >
+              <button
+                type="button"
+                onClick={onRequestShowHandover}
+                disabled={isBusy || handoverLoading}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-white"
+              >
+                {handoverLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ClipboardEdit className="h-3.5 w-3.5" />
+                )}
+                {handoverHasData ? "Xem bàn giao" : "Nhập bàn giao"}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadHandover}
+                disabled={isBusy || !handoverHasData}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#07112f] px-3 text-[11px] font-extrabold text-white hover:bg-[#10204a] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-white/10"
+              >
+                {loadingStep === ACTION.DOWNLOAD_HANDOVER ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Tải PDF
+              </button>
+            </DocumentRow>
 
-        <div className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] leading-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:mx-5">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Nút “Nhập bàn giao” chuyển sang màn con ngay trong popup hiện tại,
-          không mở thêm popup lồng nhau.
-        </div>
+            <div className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] leading-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:mx-5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Nút “Nhập bàn giao” chuyển sang màn con ngay trong popup hiện tại,
+              không mở thêm popup lồng nhau.
+            </div>
+          </>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
@@ -640,17 +659,19 @@ export default function ContractWorkflowStepper({
           onClick={() => leaseInputRef.current?.click()}
         />
 
-        <UploadRow
-          title="Biên bản bàn giao đã ký"
-          description={signedHandoverDescription}
-          complete={signedHandoverReady}
-          fileName="Biên bản bàn giao đã được lưu"
-          loading={loadingStep === ACTION.UPLOAD_HANDOVER}
-          disabled={isBusy || handoverLoading || !handoverHasData}
-          onClick={() => handoverInputRef.current?.click()}
-        />
+        {requiresMoveInHandover && (
+          <UploadRow
+            title="Biên bản bàn giao đã ký"
+            description={signedHandoverDescription}
+            complete={signedHandoverReady}
+            fileName="Biên bản bàn giao đã được lưu"
+            loading={loadingStep === ACTION.UPLOAD_HANDOVER}
+            disabled={isBusy || handoverLoading || !handoverHasData}
+            onClick={() => handoverInputRef.current?.click()}
+          />
+        )}
 
-        {!handoverHasData && (
+        {requiresMoveInHandover && !handoverHasData && (
           <div className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-4 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300 sm:mx-5">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             Cần nhập thông tin bàn giao trước khi upload biên bản đã ký.
@@ -687,7 +708,10 @@ export default function ContractWorkflowStepper({
             type="button"
             onClick={onActivate}
             disabled={
-              !readiness.ready || isActivating || handoverLoading || isBusy
+              !readiness.ready ||
+              isActivating ||
+              (requiresMoveInHandover && handoverLoading) ||
+              isBusy
             }
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-xs font-extrabold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:bg-blue-600 dark:hover:bg-blue-500 dark:disabled:bg-white/10 dark:disabled:text-slate-500"
           >
@@ -724,13 +748,15 @@ export default function ContractWorkflowStepper({
         className="hidden"
         onChange={handleUploadLease}
       />
-      <input
-        ref={handoverInputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="hidden"
-        onChange={handleUploadHandover}
-      />
+      {requiresMoveInHandover && (
+        <input
+          ref={handoverInputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={handleUploadHandover}
+        />
+      )}
     </div>
   );
 }

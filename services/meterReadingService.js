@@ -6,10 +6,11 @@ const BASE = API_BASE_URL;
  * Fetch batch status for meter readings
  * GET /api/v1/meter-readings/batch-status?period=MM-yyyy&propertyId=X
  */
-export async function fetchBatchMeterReadingsStatus(period, propertyId) {
+export async function fetchBatchMeterReadingsStatus(period, propertyId, batchId) {
     const params = new URLSearchParams();
     if (period) params.append("period", period);
     if (propertyId) params.append("propertyId", propertyId);
+    if (batchId) params.append("batchId", batchId);
 
     const queryString = params.toString();
     const url = `${BASE}/meter-readings/batch-status${queryString ? `?${queryString}` : ""}`;

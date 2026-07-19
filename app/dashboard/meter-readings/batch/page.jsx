@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
+    confirmBatch as confirmMeterReadingBatch,
     fetchBatchMeterReadingsStatus,
     saveProgressiveRoomReading,
+    startBatchReading,
     uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
 import {
@@ -49,7 +51,14 @@ import {
     Zap,
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { PhotoGallery } from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
@@ -61,6 +70,8 @@ import {
     formatVnd,
     normalizeUtilityTariff,
 } from "@/lib/meterReadingCost.mjs";
+import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
+import { fetchSimpleProperties } from "@/services/identityAccessService";
 
 const SAMPLE_PHOTOS = [
     {
@@ -179,9 +190,24 @@ function numberOrZero(value) {
     return numberOrNull(value) ?? 0;
 }
 
+function numberOrDefault(value, fallback) {
+    return numberOrNull(value) ?? fallback;
+}
+
 function normalizePropertyId(value) {
     const text = String(value || "").trim();
     return /^\d+$/.test(text) ? text : "";
+}
+
+function firstAssignedPropertyId(user) {
+    const assignedProperty = Array.isArray(user?.assignedProperties)
+        ? user.assignedProperties[0]
+        : null;
+    return normalizePropertyId(
+        assignedProperty?.id ||
+        assignedProperty?.propertyId ||
+        assignedProperty?.property_id,
+    );
 }
 
 function countEvidencePhotos(room) {
@@ -228,6 +254,36 @@ function getMeterReadingsHref(propertyId, context = {}) {
     return `/dashboard/meter-readings${query ? `?${query}` : ""}`;
 }
 
+function formatMonthYearPeriod(date = new Date()) {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${month}-${date.getFullYear()}`;
+}
+
+function meterPeriodToBillingPeriod(value) {
+    const text = String(value || "").trim();
+    const meterPeriodMatch = /^(\d{1,2})-(\d{4})$/.exec(text);
+    if (meterPeriodMatch) {
+        return `${meterPeriodMatch[2]}-${meterPeriodMatch[1].padStart(2, "0")}`;
+    }
+
+    const billingPeriodMatch = /^(\d{4})-(\d{1,2})$/.exec(text);
+    if (billingPeriodMatch) {
+        return `${billingPeriodMatch[1]}-${billingPeriodMatch[2].padStart(2, "0")}`;
+    }
+
+    return "";
+}
+
+function getBillingHref(propertyId, meterPeriod) {
+    const params = new URLSearchParams();
+    const billingPeriod = meterPeriodToBillingPeriod(meterPeriod);
+    if (billingPeriod) params.set("billingPeriod", billingPeriod);
+    if (propertyId) params.set("propertyId", propertyId);
+    params.set("from", "meter-readings");
+    const query = params.toString();
+    return `/dashboard/billing${query ? `?${query}` : ""}`;
+}
+
 function MeterPhoto({ src }) {
     return (
         <div
@@ -246,6 +302,8 @@ export default function MeterReadings() {
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+    const [confirmBatchDialogOpen, setConfirmBatchDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -256,6 +314,7 @@ export default function MeterReadings() {
     const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity, water } }
     const [tariffs, setTariffs] = useState(DEFAULT_UTILITY_TARIFFS);
     const [backendFacilityName, setBackendFacilityName] = useState("");
+    const [fallbackPropertyId, setFallbackPropertyId] = useState("");
     const [isOnline, setIsOnline] = useState(() =>
         typeof navigator === "undefined" ? true : navigator.onLine,
     );
@@ -263,10 +322,14 @@ export default function MeterReadings() {
     const [lastOfflineSyncAt, setLastOfflineSyncAt] = useState(null);
     const syncingOfflineRef = useRef(false);
 
+    const router = useRouter();
+    const { user } = useAuth();
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
-    const propertyId =
+    const queryBatchId = normalizePropertyId(searchParams.get("batchId"));
+    const queryPropertyId =
         normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
+    const propertyId = queryPropertyId || firstAssignedPropertyId(user) || fallbackPropertyId;
     const fromFacilities = searchParams.get("from") === "facilities";
     const facilityName = backendFacilityName;
     const meterReadingsHref = getMeterReadingsHref(propertyId, {
@@ -275,12 +338,32 @@ export default function MeterReadings() {
     });
     const [period, setPeriod] = useState(queryPeriod); // Default to current month backend
 
+    useEffect(() => {
+        if (queryPropertyId || firstAssignedPropertyId(user)) {
+            return undefined;
+        }
+
+        let isActive = true;
+        fetchSimpleProperties()
+            .then((properties) => {
+                if (!isActive) return;
+                setFallbackPropertyId(normalizePropertyId(properties?.[0]?.id));
+            })
+            .catch(() => {
+                if (isActive) setFallbackPropertyId("");
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [queryPropertyId, user]);
+
     const hydrateBatchResponse = useCallback(async (res) => {
         if (!res) return;
 
         setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
-        const fetchedBatchId = res.batchId || res.batch_id;
-        if (fetchedBatchId) setBatchId(fetchedBatchId);
+        const fetchedBatchId = res.batchId || res.batch_id || null;
+        setBatchId(fetchedBatchId);
         setTariffs({
             electricity: normalizeUtilityTariff(
                 readField(res, "electricityTariff", "electricity_tariff"),
@@ -296,16 +379,18 @@ export default function MeterReadings() {
                 const roomId = readField(r, "roomId", "room_id");
                 const roomCode = readField(r, "roomCode", "room_code");
                 const syncTime = readField(r, "syncTime", "sync_time");
+                const elecPrev = numberOrZero(readField(r, "electricityPrevious", "electricity_previous"));
+                const waterPrev = numberOrZero(readField(r, "waterPrevious", "water_previous"));
 
                 return {
                     id: roomCode || (roomId ? `room-${roomId}` : `room-${index}`),
                     roomId,
-                    elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
-                    elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
+                    elecPrev,
+                    elecCurr: numberOrDefault(readField(r, "electricityCurrent", "electricity_current"), elecPrev),
                     electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
                     offlineElectricityPhotoQueued: false,
-                    waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
-                    waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
+                    waterPrev,
+                    waterCurr: numberOrDefault(readField(r, "waterCurrent", "water_current"), waterPrev),
                     waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
                     offlineWaterPhotoQueued: false,
                     offlineQueuedAt: null,
@@ -326,12 +411,14 @@ export default function MeterReadings() {
         setLoading(true);
         setBackendFacilityName("");
         try {
-            const res = await fetchBatchMeterReadingsStatus(period, propertyId);
-            await cacheBatchMeterReadingsStatus(period, propertyId, res);
+            const res = await fetchBatchMeterReadingsStatus(period, propertyId, queryBatchId);
+            if (!queryBatchId) {
+                await cacheBatchMeterReadingsStatus(period, propertyId, res);
+            }
             if (res) {
                 setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
-                const fetchedBatchId = res.batchId || res.batch_id;
-                if (fetchedBatchId) setBatchId(fetchedBatchId);
+                const fetchedBatchId = res.batchId || res.batch_id || null;
+                setBatchId(fetchedBatchId);
                 setTariffs({
                     electricity: normalizeUtilityTariff(
                         readField(res, "electricityTariff", "electricity_tariff"),
@@ -347,16 +434,18 @@ export default function MeterReadings() {
                         const roomId = readField(r, "roomId", "room_id");
                         const roomCode = readField(r, "roomCode", "room_code");
                         const syncTime = readField(r, "syncTime", "sync_time");
+                        const elecPrev = numberOrZero(readField(r, "electricityPrevious", "electricity_previous"));
+                        const waterPrev = numberOrZero(readField(r, "waterPrevious", "water_previous"));
 
                         return {
                             id: roomCode || (roomId ? `room-${roomId}` : `room-${index}`),
                             roomId,
-                            elecPrev: numberOrZero(readField(r, "electricityPrevious", "electricity_previous")),
-                            elecCurr: numberOrNull(readField(r, "electricityCurrent", "electricity_current")),
+                            elecPrev,
+                            elecCurr: numberOrDefault(readField(r, "electricityCurrent", "electricity_current"), elecPrev),
                             electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
                             offlineElectricityPhotoQueued: false,
-                            waterPrev: numberOrZero(readField(r, "waterPrevious", "water_previous")),
-                            waterCurr: numberOrNull(readField(r, "waterCurrent", "water_current")),
+                            waterPrev,
+                            waterCurr: numberOrDefault(readField(r, "waterCurrent", "water_current"), waterPrev),
                             waterPhotoId: readField(r, "waterPhotoId", "water_photo_id") ?? null,
                             offlineWaterPhotoQueued: false,
                             offlineQueuedAt: null,
@@ -373,7 +462,7 @@ export default function MeterReadings() {
                 }
             }
         } catch (error) {
-            if (isOfflineSaveError(error)) {
+            if (!queryBatchId && isOfflineSaveError(error)) {
                 const cached = await getCachedBatchMeterReadingsStatus(period, propertyId);
                 if (cached) {
                     await hydrateBatchResponse(cached);
@@ -388,7 +477,7 @@ export default function MeterReadings() {
         } finally {
             setLoading(false);
         }
-    }, [hydrateBatchResponse, period, propertyId]);
+    }, [hydrateBatchResponse, period, propertyId, queryBatchId]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -479,6 +568,7 @@ export default function MeterReadings() {
     const errors = rooms.filter((r) => r.status === "error" || r.status === "warning").length;
     const total = rooms.length;
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+    const canConfirmBatch = Boolean(batchId) && total > 0 && pending === 0 && errors === 0 && unsynced === 0;
 
     const handleCurrChange = (roomId, field, val) => {
         const room = rooms.find(r => r.id === roomId);
@@ -526,6 +616,37 @@ export default function MeterReadings() {
         });
     };
 
+    const ensureBatchForSaving = useCallback(async () => {
+        if (batchId) return batchId;
+
+        let targetPropertyId = propertyId;
+        if (!targetPropertyId) {
+            const properties = await fetchSimpleProperties();
+            targetPropertyId = normalizePropertyId(properties?.[0]?.id);
+            if (targetPropertyId) setFallbackPropertyId(targetPropertyId);
+        }
+
+        if (!targetPropertyId) {
+            toast.error("Vui lòng chọn cơ sở trước khi lưu chỉ số");
+            return null;
+        }
+
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+            toast.error("Cần có mạng để tạo kỳ ghi chỉ số trước khi lưu offline");
+            return null;
+        }
+
+        const periodToStart = period || formatMonthYearPeriod();
+        const createdBatchId = await startBatchReading(periodToStart, targetPropertyId);
+        if (!createdBatchId) {
+            toast.error("Không tạo được kỳ ghi chỉ số");
+            return null;
+        }
+
+        setBatchId(createdBatchId);
+        return createdBatchId;
+    }, [batchId, period, propertyId]);
+
     const uploadEvidencePhoto = async (room, type) => {
         const photo = getCapturedPhoto(room.id, type);
         if (!photo?.file) return getExistingPhotoId(room, type) ?? null;
@@ -536,18 +657,18 @@ export default function MeterReadings() {
         return fileId;
     };
 
-    const queueRoomForOfflineSync = async (room, { electricityPhotoId = null, waterPhotoId = null } = {}) => {
+    const queueRoomForOfflineSync = async (room, { electricityPhotoId = null, waterPhotoId = null, targetBatchId = batchId } = {}) => {
         const electricityPhoto = getCapturedPhoto(room.id, "electricity");
         const waterPhoto = getCapturedPhoto(room.id, "water");
         const queuedElectricityPhotoId = electricityPhotoId ?? getExistingPhotoId(room, "electricity") ?? null;
         const queuedWaterPhotoId = waterPhotoId ?? getExistingPhotoId(room, "water") ?? null;
-        const existingQueuedItems = await getQueuedMeterReadings(batchId ? { batchId } : {});
+        const existingQueuedItems = await getQueuedMeterReadings(targetBatchId ? { batchId: targetBatchId } : {});
         const existingQueuedRoom = existingQueuedItems.find(
             (item) => String(item.roomId) === String(room.roomId),
         );
 
         await queueMeterReadingForSync({
-            batchId,
+            batchId: targetBatchId,
             roomId: room.roomId,
             roomCode: room.id,
             period,
@@ -630,10 +751,9 @@ export default function MeterReadings() {
             return;
         }
 
-        if (!batchId) {
-            toast.error("Không tìm thấy kỳ ghi chỉ số");
-            return;
-        }
+        const activeBatchId = await ensureBatchForSaving();
+
+        if (!activeBatchId) return;
 
         if (!hasEvidencePhoto(room, "electricity") || !hasEvidencePhoto(room, "water")) {
             toast.error("Vui lòng chụp đủ ảnh minh chứng cho điện và nước");
@@ -659,6 +779,7 @@ export default function MeterReadings() {
                 await queueRoomForOfflineSync(room, {
                     electricityPhotoId: savedElectricityPhotoId,
                     waterPhotoId: savedWaterPhotoId,
+                    targetBatchId: activeBatchId,
                 });
                 toast.warning("Đã lưu offline. Khi có mạng hệ thống sẽ tự đồng bộ.");
                 moveToNextRoom();
@@ -668,7 +789,7 @@ export default function MeterReadings() {
             savedElectricityPhotoId = await uploadEvidencePhoto(room, "electricity");
             savedWaterPhotoId = await uploadEvidencePhoto(room, "water");
 
-            await saveProgressiveRoomReading(batchId, room.roomId, {
+            await saveProgressiveRoomReading(activeBatchId, room.roomId, {
                 electricityValue: room.elecCurr,
                 waterValue: room.waterCurr,
                 electricityPhotoId: savedElectricityPhotoId,
@@ -690,6 +811,7 @@ export default function MeterReadings() {
                 await queueRoomForOfflineSync(room, {
                     electricityPhotoId: savedElectricityPhotoId,
                     waterPhotoId: savedWaterPhotoId,
+                    targetBatchId: activeBatchId,
                 });
                 toast.warning("Đã lưu offline. Khi có mạng hệ thống sẽ tự đồng bộ.");
                 moveToNextRoom();
@@ -699,6 +821,38 @@ export default function MeterReadings() {
             console.error(error);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const requestConfirmBatch = () => {
+        if (!batchId) {
+            toast.error("Chưa có kỳ ghi chỉ số để chốt");
+            return;
+        }
+
+        if (pending > 0 || errors > 0 || unsynced > 0) {
+            toast.error("Vui lòng hoàn tất và đồng bộ tất cả phòng trước khi chốt kỳ");
+            return;
+        }
+
+        setConfirmBatchDialogOpen(true);
+    };
+
+    const handleConfirmBatch = async () => {
+        if (confirming) return;
+
+        setConfirming(true);
+        try {
+            await confirmMeterReadingBatch(batchId);
+            toast.success("Đã chốt kỳ ghi chỉ số. Đang mở batch hóa đơn nháp.");
+            setConfirmBatchDialogOpen(false);
+            await loadData();
+            router.push(getBillingHref(propertyId, period));
+        } catch (error) {
+            toast.error(error?.details || error?.message || "Không thể chốt kỳ ghi chỉ số");
+            console.error(error);
+        } finally {
+            setConfirming(false);
         }
     };
 
@@ -809,6 +963,14 @@ export default function MeterReadings() {
                                 className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                                 <Edit3 className="h-4 w-4" />
                                 Bắt đầu nhập
+                            </Button>
+                            <Button
+                                onClick={requestConfirmBatch}
+                                disabled={!canConfirmBatch || confirming}
+                                className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {confirming ? "Đang chốt..." : "Chốt kỳ"}
                             </Button>
                         </div>
                     }
@@ -1194,6 +1356,14 @@ export default function MeterReadings() {
                             className="w-2 h-2 rounded-full bg-red-500"></span>Lỗi chỉ số</span>
                     </div>
                 </div>
+                <Button
+                    onClick={requestConfirmBatch}
+                    disabled={!canConfirmBatch || confirming}
+                    className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+                >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {confirming ? "Đang chốt..." : "Chốt kỳ"}
+                </Button>
             </div>
 
             {/* Focus Mode Modal */}
@@ -1341,6 +1511,49 @@ export default function MeterReadings() {
                             </>
                         );
                     })()}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmBatchDialogOpen} onOpenChange={(open) => !confirming && setConfirmBatchDialogOpen(open)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Xác nhận chốt kỳ điện nước</DialogTitle>
+                        <DialogDescription>
+                            Sau khi chốt, kỳ ghi chỉ số sẽ bị khóa và hệ thống sẽ mở batch hóa đơn nháp để review trước khi phát hành.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                        <div className="flex items-center justify-between gap-3">
+                            <span>Kỳ nhập</span>
+                            <span className="font-black">{formatPeriodLabel(period)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <span>Đã nhập</span>
+                            <span className="font-black">{completed} / {total} phòng</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <span>Chưa đồng bộ</span>
+                            <span className="font-black">{unsynced} phòng</span>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setConfirmBatchDialogOpen(false)}
+                            disabled={confirming}
+                        >
+                            Kiểm tra lại
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleConfirmBatch}
+                            disabled={confirming}
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                            {confirming ? "Đang chốt..." : "Xác nhận chốt kỳ"}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -44,6 +44,8 @@ import {
   fetchUtilityDashboard,
   startBatchReading,
 } from "@/services/meterReadingService";
+import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
+import { fetchSimpleProperties } from "@/services/identityAccessService";
 
 const STATUS_MAP = {
   DRAFT: {
@@ -93,8 +95,77 @@ function normalizePropertyId(value) {
   return /^\d+$/.test(text) ? text : "";
 }
 
+function firstAssignedPropertyId(user) {
+  const assignedProperty = Array.isArray(user?.assignedProperties)
+    ? user.assignedProperties[0]
+    : null;
+  return normalizePropertyId(
+    assignedProperty?.id ||
+    assignedProperty?.propertyId ||
+    assignedProperty?.property_id,
+  );
+}
+
 function periodValue(period) {
   return period?.readingPeriod || period?.reading_period || period?.period || "";
+}
+
+function normalizeCount(value, fallback = 0) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function capCompletedRooms(completedRooms, totalRooms) {
+  const completed = normalizeCount(completedRooms);
+  const total = normalizeCount(totalRooms);
+  if (total <= 0) return Math.max(0, completed);
+  return Math.min(Math.max(0, completed), total);
+}
+
+function calculateProgress(completedRooms, totalRooms) {
+  const total = normalizeCount(totalRooms);
+  if (total <= 0) return 0;
+  return Math.min(100, Math.round((capCompletedRooms(completedRooms, total) / total) * 100));
+}
+
+function normalizeHistoryItem(item) {
+  const totalRooms = normalizeCount(item.totalRooms ?? item.total_rooms);
+  return {
+    ...item,
+    batchId: item.batchId ?? item.batch_id ?? item.id,
+    isCurrent: item.isCurrent ?? item.is_current,
+    totalRooms,
+    completedRooms: capCompletedRooms(item.completedRooms ?? item.completed_rooms, totalRooms),
+    anomalyCount: normalizeCount(item.anomalyCount ?? item.anomaly_count),
+    startDate: item.startDate ?? item.start_date,
+    endDate: item.endDate ?? item.end_date,
+  };
+}
+
+function computeProgressFromBatchStatus(batchStatus) {
+  const rooms = Array.isArray(batchStatus?.rooms) ? batchStatus.rooms : [];
+  if (rooms.length === 0) return null;
+
+  const totalRooms =
+    normalizeCount(batchStatus.totalRooms ?? batchStatus.total_rooms, rooms.length) || rooms.length;
+  const completedRooms = rooms.filter((room) => {
+    const status = String(room?.status || "").toLowerCase();
+    return status === "synced";
+  }).length;
+  const anomalyCount = rooms.filter((room) => {
+    const status = String(room?.status || "").toLowerCase();
+    return status === "warning" ||
+      status === "error" ||
+      Boolean(room?.needsReview ?? room?.needs_review ?? room?.isAnomaly ?? room?.is_anomaly);
+  }).length;
+
+  return {
+    batchId: batchStatus.batchId ?? batchStatus.batch_id ?? null,
+    status: batchStatus.status ?? batchStatus.batchStatus ?? batchStatus.batch_status,
+    totalRooms,
+    completedRooms: capCompletedRooms(completedRooms, totalRooms),
+    anomalyCount,
+  };
 }
 
 function getBatchHref(period, propertyId, context = {}) {
@@ -102,6 +173,7 @@ function getBatchHref(period, propertyId, context = {}) {
   if (period) params.set("period", period);
   const normalizedPropertyId = normalizePropertyId(propertyId);
   if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+  if (context.batchId) params.set("batchId", context.batchId);
   if (context.from) params.set("from", context.from);
   if (context.facilityName) params.set("facilityName", context.facilityName);
   const query = params.toString();
@@ -176,10 +248,13 @@ export default function UtilityManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [backendFacilityName, setBackendFacilityName] = useState("");
+  const [fallbackPropertyId, setFallbackPropertyId] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const propertyId =
+  const { user } = useAuth();
+  const queryPropertyId =
     normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
+  const propertyId = queryPropertyId || firstAssignedPropertyId(user) || fallbackPropertyId;
   const fromFacilities = searchParams.get("from") === "facilities";
   const facilityName = backendFacilityName || "";
   const batchQueryContext = {
@@ -188,27 +263,42 @@ export default function UtilityManagement() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
+    if (queryPropertyId || firstAssignedPropertyId(user)) {
+      return undefined;
+    }
+
+    let isActive = true;
+    fetchSimpleProperties()
+      .then((properties) => {
+        if (!isActive) return;
+        setFallbackPropertyId(normalizePropertyId(properties?.[0]?.id));
+      })
+      .catch(() => {
+        if (isActive) setFallbackPropertyId("");
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [queryPropertyId, user]);
+
+  const loadData = useCallback(async ({ showLoading = true } = {}) => {
       try {
+        if (showLoading) setLoading(true);
         setErrorMessage("");
         setBackendFacilityName("");
         const [historyRes, dashboardRes] = await Promise.all([
           fetchBatchHistory(propertyId || null),
           fetchUtilityDashboard(propertyId || null),
         ]);
+
+        let normalizedHistory = [];
+        let normalizedDashboard = null;
+
         if (historyRes?.history) {
-          const normalizedHistory = historyRes.history.map((item) => ({
-            ...item,
-            batchId: item.batchId ?? item.batch_id ?? item.id,
-            isCurrent: item.isCurrent ?? item.is_current,
-            totalRooms: item.totalRooms ?? item.total_rooms,
-            completedRooms: item.completedRooms ?? item.completed_rooms,
-            anomalyCount: item.anomalyCount ?? item.anomaly_count,
-            startDate: item.startDate ?? item.start_date,
-            endDate: item.endDate ?? item.end_date,
-          }));
-          setHistory(dedupeBatchHistory(normalizedHistory));
+          normalizedHistory = historyRes.history.map(normalizeHistoryItem);
         }
+
         if (dashboardRes) {
           setBackendFacilityName(dashboardRes.propertyName ?? dashboardRes.property_name ?? "");
           const canCreate =
@@ -217,13 +307,13 @@ export default function UtilityManagement() {
           const nextDate =
             dashboardRes.nextAvailableDate ?? dashboardRes.next_available_date;
 
-          setDashboard({
+          normalizedDashboard = {
             ...dashboardRes,
             canCreateCurrentPeriod: canCreate,
             nextAvailableDate: nextDate,
             currentPeriod:
               dashboardRes.currentPeriod ?? dashboardRes.current_period,
-          });
+          };
           setCanStartCurrentPeriod(Boolean(canCreate));
 
           if (nextDate) {
@@ -233,38 +323,112 @@ export default function UtilityManagement() {
             setNextOpenDate(null);
           }
         }
+
+        const currentHistoryPeriod = normalizedHistory.find((item) => item.isCurrent);
+        const activePeriod =
+          periodValue(normalizedDashboard?.currentPeriod) ||
+          periodValue(currentHistoryPeriod);
+
+        if (activePeriod) {
+          try {
+            const batchStatus = await fetchBatchMeterReadingsStatus(activePeriod, propertyId || null);
+            const refreshedProgress = computeProgressFromBatchStatus(batchStatus);
+            if (batchStatus?.propertyName || batchStatus?.property_name) {
+              setBackendFacilityName(batchStatus.propertyName ?? batchStatus.property_name ?? "");
+            }
+            if (refreshedProgress) {
+              normalizedHistory = normalizedHistory.map((item) => {
+                const samePeriod = periodValue(item) === activePeriod;
+                const sameBatch = refreshedProgress.batchId &&
+                  String(item.batchId || "") === String(refreshedProgress.batchId);
+                if (!samePeriod && !sameBatch) return item;
+                return {
+                  ...item,
+                  ...refreshedProgress,
+                  status: refreshedProgress.status || item.status,
+                };
+              });
+              if (normalizedDashboard?.currentPeriod) {
+                normalizedDashboard = {
+                  ...normalizedDashboard,
+                  currentPeriod: {
+                    ...normalizedDashboard.currentPeriod,
+                    ...refreshedProgress,
+                    status: refreshedProgress.status || normalizedDashboard.currentPeriod.status,
+                  },
+                };
+              }
+            }
+          } catch (progressError) {
+            console.warn("Could not refresh current meter reading progress", progressError);
+          }
+        }
+
+        setHistory(dedupeBatchHistory(normalizedHistory));
+        if (normalizedDashboard) setDashboard(normalizedDashboard);
       } catch (error) {
         setErrorMessage("Không tải được dữ liệu ghi chỉ số điện nước.");
         console.error("Error fetching data", error);
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
+    }, [propertyId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const refreshVisiblePage = () => {
+      if (document.visibilityState === "hidden") return;
+      void loadData({ showLoading: false });
     };
-    loadData();
-  }, [propertyId]);
+
+    window.addEventListener("focus", refreshVisiblePage);
+    window.addEventListener("pageshow", refreshVisiblePage);
+    document.addEventListener("visibilitychange", refreshVisiblePage);
+
+    return () => {
+      window.removeEventListener("focus", refreshVisiblePage);
+      window.removeEventListener("pageshow", refreshVisiblePage);
+      document.removeEventListener("visibilitychange", refreshVisiblePage);
+    };
+  }, [loadData]);
 
   const displayHistory = dedupeBatchHistory(history);
   const currentPeriod = displayHistory.find((item) => item.isCurrent);
 
   const handleStartBatch = async () => {
-    if (!propertyId) {
-      toast.error("Vui lòng chọn cơ sở trước khi tạo kỳ ghi chỉ số");
-      return;
-    }
-
     try {
+      let targetPropertyId = propertyId;
+      if (!targetPropertyId) {
+        const properties = await fetchSimpleProperties();
+        targetPropertyId = normalizePropertyId(properties?.[0]?.id);
+        if (targetPropertyId) setFallbackPropertyId(targetPropertyId);
+      }
+
+      if (!targetPropertyId) {
+        toast.error("Vui lòng chọn cơ sở trước khi tạo kỳ ghi chỉ số");
+        return;
+      }
+
       const periodToStart =
         dashboard?.currentPeriod?.readingPeriod ||
         dashboard?.currentPeriod?.reading_period ||
         periodValue(currentPeriod) ||
         formatMonthYearPeriod();
-      const batchStatus = await fetchBatchMeterReadingsStatus(periodToStart, propertyId);
+      const batchStatus = await fetchBatchMeterReadingsStatus(periodToStart, targetPropertyId);
       if (!batchStatus?.rooms?.length) {
         toast.info("Không có phòng cần ghi chỉ số trong kỳ này.");
         return;
       }
-      await startBatchReading(periodToStart, propertyId || undefined);
-      router.push(getBatchHref(periodToStart, propertyId, batchQueryContext));
+      await startBatchReading(periodToStart, targetPropertyId);
+      router.push(getBatchHref(periodToStart, targetPropertyId, batchQueryContext));
     } catch (error) {
       if (error?.code === 40910) {
         toast.info("Không có phòng cần ghi chỉ số trong kỳ này.");
@@ -299,10 +463,9 @@ export default function UtilityManagement() {
   }
 
   const totalRooms = currentPeriod?.totalRooms || 0;
-  const completedRooms = currentPeriod?.completedRooms || 0;
+  const completedRooms = capCompletedRooms(currentPeriod?.completedRooms, totalRooms);
   const missingRooms = Math.max(0, totalRooms - completedRooms);
-  const progress =
-    totalRooms === 0 ? 0 : Math.round((completedRooms / totalRooms) * 100);
+  const progress = calculateProgress(completedRooms, totalRooms);
   const totalPages = Math.ceil(displayHistory.length / itemsPerPage);
   const effectiveCurrentPage = Math.min(currentPage, totalPages || 1);
   const paginatedHistory = displayHistory.slice(
@@ -317,7 +480,10 @@ export default function UtilityManagement() {
   }
 
   function openCurrentPeriod() {
-    router.push(getBatchHref(periodValue(currentPeriod), propertyId, batchQueryContext));
+    router.push(getBatchHref(periodValue(currentPeriod), propertyId, {
+      ...batchQueryContext,
+      batchId: currentPeriod?.batchId,
+    }));
   }
 
   return (
@@ -514,10 +680,8 @@ export default function UtilityManagement() {
                 </TableRow>
               ) : (
                 paginatedHistory.map((item, index) => {
-                  const prog =
-                    item.totalRooms === 0
-                      ? 0
-                      : Math.round((item.completedRooms / item.totalRooms) * 100);
+                  const itemCompletedRooms = capCompletedRooms(item.completedRooms, item.totalRooms);
+                  const prog = calculateProgress(itemCompletedRooms, item.totalRooms);
                   return (
                     <TableRow
                       key={getHistoryRowKey(item, index)}
@@ -548,7 +712,7 @@ export default function UtilityManagement() {
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-300">
-                        {item.completedRooms} / {item.totalRooms}
+                        {itemCompletedRooms} / {item.totalRooms}
                       </TableCell>
                       <TableCell className="px-4 py-3">
                         <span
@@ -562,7 +726,10 @@ export default function UtilityManagement() {
                           type="button"
                           onClick={() =>
                             router.push(
-                              getBatchHref(item.period, propertyId, batchQueryContext),
+                              getBatchHref(item.period, propertyId, {
+                                ...batchQueryContext,
+                                batchId: item.batchId,
+                              }),
                             )
                           }
                           className="inline-flex h-9 items-center rounded-lg border border-[#cbd5e1] px-3 text-xs font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
@@ -585,10 +752,8 @@ export default function UtilityManagement() {
             </div>
           ) : (
             paginatedHistory.map((item, index) => {
-              const prog =
-                item.totalRooms === 0
-                  ? 0
-                  : Math.round((item.completedRooms / item.totalRooms) * 100);
+              const itemCompletedRooms = capCompletedRooms(item.completedRooms, item.totalRooms);
+              const prog = calculateProgress(itemCompletedRooms, item.totalRooms);
               return (
                 <article
                   key={getHistoryRowKey(item, index)}
@@ -609,7 +774,7 @@ export default function UtilityManagement() {
                   <div className="mt-4">
                     <div className="mb-1 flex items-center justify-between text-sm">
                       <span className="font-semibold text-slate-500 dark:text-slate-400">
-                        Tiến độ ({item.completedRooms} / {item.totalRooms})
+                        Tiến độ ({itemCompletedRooms} / {item.totalRooms})
                       </span>
                       <span className="font-black text-slate-700 dark:text-slate-200">
                         {prog}%
@@ -632,7 +797,10 @@ export default function UtilityManagement() {
                   <button
                     type="button"
                     onClick={() =>
-                      router.push(getBatchHref(item.period, propertyId, batchQueryContext))
+                      router.push(getBatchHref(item.period, propertyId, {
+                        ...batchQueryContext,
+                        batchId: item.batchId,
+                      }))
                     }
                     className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg border border-[#cbd5e1] text-sm font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
                   >
@@ -644,19 +812,21 @@ export default function UtilityManagement() {
           )}
         </div>
 
-        <DashboardPagination
-          page={effectiveCurrentPage}
-          size={itemsPerPage}
-          totalElements={displayHistory.length}
-          totalPages={totalPages}
-          itemLabel="kỳ ghi chỉ số"
-          onPageChange={handlePageChange}
-          onSizeChange={(nextSize) => {
-            setItemsPerPage(nextSize);
-            setCurrentPage(1);
-          }}
-          className="border-t border-[#e2e8f0] dark:border-white/10"
-        />
+        {displayHistory.length > itemsPerPage ? (
+          <DashboardPagination
+            page={effectiveCurrentPage}
+            size={itemsPerPage}
+            totalElements={displayHistory.length}
+            totalPages={totalPages}
+            itemLabel="kỳ ghi chỉ số"
+            onPageChange={handlePageChange}
+            onSizeChange={(nextSize) => {
+              setItemsPerPage(nextSize);
+              setCurrentPage(1);
+            }}
+            className="border-t border-[#e2e8f0] dark:border-white/10"
+          />
+        ) : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

@@ -249,6 +249,7 @@ const TRANSFER_OUT_UTILITY_COPY = {
     unitPrice: "Đơn giá",
     amount: "Thành tiền",
     incidental: "Phát sinh",
+    serviceFee: "Phí dịch vụ",
     total: "Tổng tạm tính",
 };
 
@@ -2109,6 +2110,10 @@ export default function ApprovalCenter() {
                                                         <div className="flex items-center justify-between text-slate-600">
                                                             <span>{TRANSFER_OUT_UTILITY_COPY.incidental}</span>
                                                             <span className="font-semibold text-slate-900">{formatVnd(transferOutUtilityEstimate.incidentalAmount)}</span>
+                                                        </div>
+                                                        <div className="mt-2 flex items-center justify-between text-slate-600">
+                                                            <span>{TRANSFER_OUT_UTILITY_COPY.serviceFee}</span>
+                                                            <span className="font-semibold text-slate-900">{formatVnd(transferOutUtilityEstimate.serviceFeeAmount)}</span>
                                                         </div>
                                                         <div className="mt-3 flex items-center justify-between border-t border-emerald-100 pt-3">
                                                             <span className="font-semibold text-emerald-950">{TRANSFER_OUT_UTILITY_COPY.total}</span>

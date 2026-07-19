@@ -4,6 +4,33 @@ import { InfoField, formatMoney } from "./RequestDetailFields";
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && value !== "");
 
+const joinObjectValues = (value) => {
+    if (!value || typeof value !== "object") return "";
+    return Object.values(value).map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+};
+
+const formatRoomLabel = (code, name, id) => {
+    const codeText = String(code || "").trim();
+    const nameText = String(name || "").trim();
+    if (codeText && nameText) return `${codeText} - ${nameText}`;
+    return codeText || nameText || (id ? `#${id}` : "");
+};
+
+const formatId = (prefix, value) => value ? `${prefix} #${value}` : "";
+
+const formatPaymentBranch = (value) => {
+    const map = {
+        PAY_NOW: "Thanh toán ngay",
+        TENANT_PAY_MORE: "Thanh toán ngay",
+        ADD_TO_NEXT_INVOICE: "Cộng vào hóa đơn kỳ sau",
+        CREDIT_NEXT_CONTRACT: "Giữ/cấn sang hợp đồng mới",
+        NO_DIFFERENCE: "Không có chênh lệch",
+        UNSELECTED_POSITIVE_DIFFERENCE: "Chưa chọn phương thức",
+        UNSELECTED_NEGATIVE_DIFFERENCE: "Chưa chọn phương thức",
+    };
+    return map[String(value || "").trim().toUpperCase()] || value || "";
+};
+
 function formatVnd(value) {
     const amount = Number(value || 0);
     return `${amount.toLocaleString("vi-VN")} VNĐ`;
@@ -22,61 +49,16 @@ function formatDateTimeValue(value) {
     });
 }
 
-function parseJsonObject(value) {
-    if (!value) return null;
-    if (typeof value === "object") return value;
-    try {
-        const parsed = JSON.parse(value);
-        return parsed && typeof parsed === "object" ? parsed : null;
-    } catch {
-        return null;
-    }
-}
-
 function formatEligibilityResult(value) {
     if (value === true) return "Đủ điều kiện";
     if (value === false) return "Không đủ điều kiện";
     return "Chưa có dữ liệu";
 }
 
-function formatTransferActionLabel(action) {
-    const labels = {
-        NOMINATE_SOURCE_HOLDER: "Đề cử holder phòng cũ",
-        ACCEPT_SOURCE_HOLDER_NOMINATION: "Xác nhận holder mới phòng cũ",
-        CONFIRM_TENANT_TRANSFER: "Tenant xác nhận chuyển phòng",
-        PAY_TRANSFER_DIFFERENCE: "Thanh toán chênh lệch",
-        PAY_TRANSFER_OUT_UTILITY: "Thanh toán điện/nước phòng cũ",
-        CONFIRM_TRANSFER_CONTRACT: "Quản lý xác nhận hợp đồng",
-        SIGN_TRANSFER_CONTRACT: "Ký/upload hợp đồng",
-        EXECUTE_TRANSFER: "Start/execute transfer",
-        COMPLETE_TRANSFER: "Hoàn tất bàn giao",
-    };
-    return labels[action] || String(action || "").replaceAll("_", " ");
-}
-
-function formatSnapshotSummary(value) {
-    const snapshot = parseJsonObject(value);
-    if (!snapshot) return "";
-    const items = [];
-    for (const [key, raw] of Object.entries(snapshot)) {
-        if (raw === null || raw === undefined || raw === "") continue;
-        const label = key.replace(/([A-Z])/g, " $1").replaceAll("_", " ").trim();
-        const valueText = typeof raw === "object" ? JSON.stringify(raw) : String(raw);
-        items.push(`${label}: ${valueText}`);
-    }
-    return items.slice(0, 4).join(" · ");
-}
-
 function RoomTransferEligibilitySummary({ transfer }) {
     if (!transfer) return null;
     const debt = transfer.debtSummary || {};
     const violation = transfer.violationSummary || {};
-    const warnings = Array.isArray(transfer.eligibilityWarnings) ? transfer.eligibilityWarnings : [];
-    const allowedActions = Array.isArray(transfer.allowedActions) ? transfer.allowedActions : [];
-    const blockingReasons = Array.isArray(transfer.blockingReasons) ? transfer.blockingReasons : [];
-    const snapshotSummary = formatSnapshotSummary(transfer.eligibilitySnapshot);
-    const violationSnapshotSummary = formatSnapshotSummary(transfer.violationSnapshot);
-    const historySnapshotSummary = formatSnapshotSummary(transfer.transferHistorySnapshot);
 
     return (
         <div className="rounded-xl bg-white p-4 border border-blue-100">
@@ -84,7 +66,7 @@ function RoomTransferEligibilitySummary({ transfer }) {
                 <div>
                     <p className="text-sm font-semibold text-gray-900">Điều kiện chuyển phòng</p>
                     <p className="mt-1 text-xs text-gray-500">
-                        Snapshot lúc tạo yêu cầu và trạng thái kiểm tra hiện tại.
+                        Tóm tắt nợ, vi phạm và lịch sử chuyển phòng tại thời điểm tạo yêu cầu.
                     </p>
                 </div>
                 <Badge
@@ -129,48 +111,6 @@ function RoomTransferEligibilitySummary({ transfer }) {
                     <p className="mt-1 text-sm font-bold text-gray-900">{transfer.transferCountThisYear ?? 0}</p>
                 </div>
             </div>
-
-            {(warnings.length > 0 || blockingReasons.length > 0) && (
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {warnings.length > 0 && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <p className="text-xs font-bold text-amber-800">Cảnh báo eligibility</p>
-                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-700">
-                                {warnings.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-                            </ul>
-                        </div>
-                    )}
-                    {blockingReasons.length > 0 && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                            <p className="text-xs font-bold text-red-800">Lý do đang chặn thao tác</p>
-                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-red-700">
-                                {blockingReasons.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {allowedActions.length > 0 && (
-                <div className="mt-4">
-                    <p className="text-xs font-semibold text-gray-500">Hành động backend đang cho phép</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                        {allowedActions.map((action) => (
-                            <Badge key={action} variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                                {formatTransferActionLabel(action)}
-                            </Badge>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {(snapshotSummary || violationSnapshotSummary || historySnapshotSummary) && (
-                <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                    {snapshotSummary && <p><span className="font-bold text-gray-700">Snapshot:</span> {snapshotSummary}</p>}
-                    {violationSnapshotSummary && <p><span className="font-bold text-gray-700">Vi phạm lúc tạo:</span> {violationSnapshotSummary}</p>}
-                    {historySnapshotSummary && <p><span className="font-bold text-gray-700">Lịch sử chuyển:</span> {historySnapshotSummary}</p>}
-                </div>
-            )}
         </div>
     );
 }
@@ -291,36 +231,63 @@ const formatSettlementType = (value) => {
 };
 
 export function TransferRequestDetail({ payload, transfer }) {
-    if (!payload) return null;
+    if (!payload && !transfer) return null;
 
-    const currentRoom = firstValue(payload.currentRoom, payload.current_room, payload.fromRoom, payload.from_room);
-    const currentRoomCode = firstValue(payload.currentRoomCode, payload.current_room_code, payload.fromRoomCode, payload.from_room_code);
-    const targetRoom = firstValue(payload.targetRoom, payload.target_room, payload.desiredRoom, payload.desired_room, payload.toRoom, payload.to_room);
-    const targetRoomCode = firstValue(payload.targetRoomCode, payload.target_room_code, payload.toRoomCode, payload.to_room_code);
-    const transferDate = firstValue(payload.transferDate, payload.transfer_date, payload.requestedDate, payload.requested_date);
-    const transferType = formatTransferType(firstValue(payload.targetTransferType, payload.target_transfer_type, payload.transferType, payload.transfer_type));
-    const settlementType = formatSettlementType(firstValue(payload.positiveDifferenceSettlementType, payload.positive_difference_settlement_type, payload.settlementType, payload.settlement_type));
-    const priceDifference = firstValue(payload.priceDifferenceToPay, payload.price_difference_to_pay, payload.additionalPaymentAmount, payload.additional_payment_amount);
-    const currentHolder = firstValue(payload.currentHolderName, payload.current_holder_name, payload.currentTenantName, payload.current_tenant_name);
-    const targetHolder = firstValue(payload.targetHolderName, payload.target_holder_name, payload.targetTenantName, payload.target_tenant_name);
-    const note = firstValue(payload.note, payload.transferNote, payload.transfer_note, payload.additionalNote, payload.additional_note);
-    const reason = firstValue(payload.reason, payload.transferReason, payload.transfer_reason);
+    const transferringTenantNames = joinObjectValues(transfer?.transferringTenantNames);
+    const holderCandidateNames = joinObjectValues(transfer?.sourceHolderCandidateNames);
+    const currentRoom = firstValue(transfer?.oldRoomName, payload?.currentRoom, payload?.current_room, payload?.fromRoom, payload?.from_room);
+    const currentRoomCode = firstValue(transfer?.oldRoomCode, payload?.currentRoomCode, payload?.current_room_code, payload?.fromRoomCode, payload?.from_room_code);
+    const targetRoom = firstValue(transfer?.targetRoomName, payload?.targetRoom, payload?.target_room, payload?.desiredRoom, payload?.desired_room, payload?.toRoom, payload?.to_room);
+    const targetRoomCode = firstValue(transfer?.targetRoomCode, payload?.targetRoomCode, payload?.target_room_code, payload?.toRoomCode, payload?.to_room_code);
+    const currentRoomLabel = formatRoomLabel(currentRoomCode, currentRoom, transfer?.oldRoomId);
+    const targetRoomLabel = formatRoomLabel(targetRoomCode, targetRoom, transfer?.targetRoomId);
+    const transferDate = firstValue(transfer?.expectedTransferDate, transfer?.requestedTransferDate, payload?.transferDate, payload?.transfer_date, payload?.requestedDate, payload?.requested_date);
+    const rawTransferType = firstValue(transfer?.targetTransferType, payload?.targetTransferType, payload?.target_transfer_type, payload?.transferType, payload?.transfer_type);
+    const transferType = rawTransferType === "OTHER_CONTRACT" ? "Vào hợp đồng hiện có" : formatTransferType(rawTransferType);
+    const rawSettlementType = firstValue(transfer?.priceDifferenceSettlementType, transfer?.positiveDifferenceSettlementType, payload?.positiveDifferenceSettlementType, payload?.positive_difference_settlement_type, payload?.settlementType, payload?.settlement_type);
+    const settlementType = formatPaymentBranch(rawSettlementType) || formatSettlementType(rawSettlementType);
+    const paymentBranch = formatPaymentBranch(firstValue(transfer?.paymentBranch, rawSettlementType));
+    const priceDifference = firstValue(transfer?.priceDifferenceToPay, payload?.priceDifferenceToPay, payload?.price_difference_to_pay, payload?.additionalPaymentAmount, payload?.additional_payment_amount);
+    const currentHolder = firstValue(transferringTenantNames, payload?.currentHolderName, payload?.current_holder_name, payload?.currentTenantName, payload?.current_tenant_name);
+    const targetHolder = firstValue(holderCandidateNames, payload?.targetHolderName, payload?.target_holder_name, payload?.targetTenantName, payload?.target_tenant_name);
+    const note = firstValue(payload?.note, payload?.transferNote, payload?.transfer_note, payload?.additionalNote, payload?.additional_note);
+    const reason = firstValue(transfer?.reason, payload?.reason, payload?.transferReason, payload?.transfer_reason);
+    const contractTarget = firstValue(
+        formatId("Hợp đồng mới", transfer?.newContractId),
+        formatId("Hợp đồng đích", transfer?.targetContractId),
+    );
+    const invoiceText = [
+        formatId("Chênh lệch", transfer?.transferDifferenceInvoiceId),
+        formatId("Điện/nước phòng cũ", transfer?.oldRoomFinalInvoiceId),
+    ].filter(Boolean).join(" · ");
+    const handoverText = [
+        transfer?.transferOutHandoverRequired ? "Bàn giao phòng cũ" : "",
+        transfer?.transferInHandoverRequired ? "Nhận phòng mới" : "",
+        transfer?.roomHandoverRequired ? "Bàn giao phòng" : "",
+    ].filter(Boolean).join(" · ");
+    const reservedSlotsText = transfer?.reservedSlots ? String(transfer.reservedSlots) + " chỗ" : "";
+    const reservationExpiresAtText = transfer?.reservationExpiresAt ? formatDateTimeValue(transfer.reservationExpiresAt) : "";
 
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-                <InfoField label="Phòng hiện tại" value={currentRoom} icon={<MapPin className="w-4 h-4" />} />
-                <InfoField label="Phòng muốn chuyển" value={targetRoom} icon={<MapPin className="w-4 h-4" />} />
-                <InfoField label="Mã phòng hiện tại" value={currentRoomCode} icon={<FileText className="w-4 h-4" />} />
-                <InfoField label="Mã phòng đích" value={targetRoomCode} icon={<FileText className="w-4 h-4" />} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <InfoField label="Hợp đồng cũ" value={transfer?.oldContractCode || formatId("Hợp đồng", transfer?.oldContractId)} icon={<FileText className="w-4 h-4" />} />
+                <InfoField label="Phòng cũ" value={currentRoomLabel} icon={<MapPin className="w-4 h-4" />} />
+                <InfoField label="Phòng muốn chuyển" value={targetRoomLabel} icon={<MapPin className="w-4 h-4" />} />
+                <InfoField label="Hợp đồng sau chuyển" value={contractTarget} icon={<FileText className="w-4 h-4" />} />
                 <InfoField label="Ngày dự kiến" value={transferDate} icon={<Calendar className="w-4 h-4" />} />
                 <InfoField label="Hình thức chuyển" value={transferType} icon={<ArrowRightLeft className="w-4 h-4" />} />
-                <InfoField label="Người đang giữ phòng" value={currentHolder} icon={<User className="w-4 h-4" />} />
-                <InfoField label="Người nhận / phòng đích" value={targetHolder} icon={<User className="w-4 h-4" />} />
+                <InfoField label="Người chuyển" value={currentHolder} icon={<User className="w-4 h-4" />} />
+                <InfoField label="Holder phòng cũ được đề cử" value={targetHolder} icon={<User className="w-4 h-4" />} />
                 <InfoField label="Xử lý chênh lệch" value={settlementType} icon={<Wallet className="w-4 h-4" />} />
+                <InfoField label="Nhánh thanh toán" value={paymentBranch} icon={<Wallet className="w-4 h-4" />} />
                 {(priceDifference != null && priceDifference !== "") && (
                     <InfoField label="Số tiền chênh lệch" value={formatMoney(priceDifference)} icon={<DollarSign className="w-4 h-4" />} />
                 )}
+                <InfoField label="Hóa đơn liên quan" value={invoiceText} icon={<FileText className="w-4 h-4" />} />
+                <InfoField label="Số chỗ giữ ở phòng đích" value={reservedSlotsText} icon={<User className="w-4 h-4" />} />
+                <InfoField label="Hết hạn giữ chỗ" value={reservationExpiresAtText} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Bàn giao cần xử lý" value={handoverText} icon={<ArrowRightLeft className="w-4 h-4" />} />
             </div>
 
             {reason && (

@@ -64,6 +64,50 @@ export function normalizeInvoice(raw = {}) {
   };
 }
 
+function normalizeUtilityBillingRunItem(raw = {}) {
+  return {
+    itemId: read(raw, "itemId", "item_id"),
+    roomId: read(raw, "roomId", "room_id"),
+    roomCode: read(raw, "roomCode", "room_code") || "",
+    contractId: read(raw, "contractId", "contract_id"),
+    contractCode: read(raw, "contractCode", "contract_code") || "",
+    electricityUsage: Number(read(raw, "electricityUsage", "electricity_usage") || 0),
+    electricityAmount: Number(read(raw, "electricityAmount", "electricity_amount") || 0),
+    waterUsage: Number(read(raw, "waterUsage", "water_usage") || 0),
+    waterAmount: Number(read(raw, "waterAmount", "water_amount") || 0),
+    serviceFeeAmount: Number(read(raw, "serviceFeeAmount", "service_fee_amount") || 0),
+    subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
+    discountAmount: Number(read(raw, "discountAmount", "discount_amount") || 0),
+    totalAmount: Number(read(raw, "totalAmount", "total_amount") || 0),
+    warningMessage: read(raw, "warningMessage", "warning_message") || "",
+    adjustmentReason: read(raw, "adjustmentReason", "adjustment_reason") || "",
+    status: read(raw, "status") || "",
+    invoiceId: read(raw, "invoiceId", "invoice_id"),
+    invoiceCode: read(raw, "invoiceCode", "invoice_code") || "",
+  };
+}
+
+export function normalizeUtilityBillingRun(raw = {}) {
+  return {
+    runId: read(raw, "runId", "run_id"),
+    propertyId: read(raw, "propertyId", "property_id"),
+    propertyName: read(raw, "propertyName", "property_name") || "",
+    billingPeriod: read(raw, "billingPeriod", "billing_period") || "",
+    invoiceReason: read(raw, "invoiceReason", "invoice_reason") || "",
+    status: read(raw, "status") || "",
+    totalRooms: Number(read(raw, "totalRooms", "total_rooms") || 0),
+    readyCount: Number(read(raw, "readyCount", "ready_count") || 0),
+    warningCount: Number(read(raw, "warningCount", "warning_count") || 0),
+    skippedCount: Number(read(raw, "skippedCount", "skipped_count") || 0),
+    generatedInvoiceCount: Number(read(raw, "generatedInvoiceCount", "generated_invoice_count") || 0),
+    subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
+    discountAmount: Number(read(raw, "discountAmount", "discount_amount") || 0),
+    totalAmount: Number(read(raw, "totalAmount", "total_amount") || 0),
+    generatedAt: read(raw, "generatedAt", "generated_at") || "",
+    items: Array.isArray(read(raw, "items")) ? read(raw, "items").map(normalizeUtilityBillingRunItem) : [],
+  };
+}
+
 export async function fetchBillingInvoices(filters = {}) {
   const params = new URLSearchParams();
   if (filters.billingPeriod) params.set("billingPeriod", filters.billingPeriod);
@@ -75,6 +119,43 @@ export async function fetchBillingInvoices(filters = {}) {
   const query = params.toString();
   const data = await authenticatedFetch(`${API_BASE_URL}/admin/invoices${query ? `?${query}` : ""}`);
   return Array.isArray(data) ? data.map(normalizeInvoice) : [];
+}
+
+export async function fetchUtilityBillingRuns(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.billingPeriod) params.set("billingPeriod", filters.billingPeriod);
+  if (filters.propertyId) params.set("propertyId", filters.propertyId);
+  if (filters.status && filters.status !== "ALL") params.set("status", filters.status);
+  const query = params.toString();
+  const data = await authenticatedFetch(`${API_BASE_URL}/admin/utility-billing-runs${query ? `?${query}` : ""}`);
+  return Array.isArray(data) ? data.map(normalizeUtilityBillingRun) : [];
+}
+
+export async function fetchUtilityBillingRun(runId) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/admin/utility-billing-runs/${encodeURIComponent(runId)}`);
+  return normalizeUtilityBillingRun(data || {});
+}
+
+export async function createUtilityBillingRun({ propertyId, billingPeriod, invoiceReason = "MONTHLY" }) {
+  const params = new URLSearchParams();
+  params.set("billingPeriod", billingPeriod);
+  if (invoiceReason) params.set("invoiceReason", invoiceReason);
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/admin/utility-billing-runs/properties/${encodeURIComponent(propertyId)}?${params.toString()}`,
+    { method: "POST" },
+  );
+  return normalizeUtilityBillingRun(data || {});
+}
+
+export async function publishUtilityBillingRun(runId, { dueDays } = {}) {
+  const params = new URLSearchParams();
+  if (dueDays) params.set("dueDays", dueDays);
+  const query = params.toString();
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/admin/utility-billing-runs/${encodeURIComponent(runId)}/publish${query ? `?${query}` : ""}`,
+    { method: "POST" },
+  );
+  return normalizeUtilityBillingRun(data || {});
 }
 
 export async function applyRentOverride(payload) {

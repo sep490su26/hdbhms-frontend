@@ -43,7 +43,7 @@ import {
 } from "../../../services/depositBatchDraftStorage";
 import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
 import { previewDepositContract } from "../../../services/depositContractsService";
-import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import { fetchMyTenantProfile, fetchPrivateFile, lookupPersonProfileByPhone } from "../../../services/tenantProfilesService";
 import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
@@ -56,6 +56,11 @@ const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CO_OCCUPANT_NAME_PATTERN_MESSAGE = "Họ tên người ở cùng chỉ được chứa chữ cái và khoảng trắng.";
+const CO_OCCUPANT_PHONE_PATTERN_MESSAGE = "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng người đặt cọc chính.";
+const CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE = "Số điện thoại người ở cùng trong phòng không được trùng nhau.";
+const EXISTING_PERSON_PROFILE_HINT = "Hồ sơ với số điện thoại này đã có trong hệ thống. Khi lập hợp đồng, hệ thống sẽ dùng lại hồ sơ phù hợp.";
 
 function todayValue(offsetDays = 0) {
   const date = new Date();
@@ -134,7 +139,7 @@ function validateField(name, value, form = {}) {
   return "";
 }
 
-function TextField({ label, required, error, type, placeholder, ...props }) {
+function TextField({ label, required, error, helper, type, placeholder, ...props }) {
   const InputComponent = type === "date" ? DateInput : "input";
 
   return (
@@ -155,6 +160,7 @@ function TextField({ label, required, error, type, placeholder, ...props }) {
           }`}
       />
       {error ? <span className="text-xs font-medium text-rose-600">{error}</span> : null}
+      {!error && helper ? <span className="text-xs font-medium text-emerald-700">{helper}</span> : null}
     </label>
   );
 }
@@ -348,6 +354,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const requestedRoomKey = requestedRoomIds.join(",");
   const [rooms, setRooms] = useState(initialRooms);
   const [roomForms, setRoomForms] = useState(() => createDefaultRoomForms(initialRooms));
+  const [coOccupantProfileHints, setCoOccupantProfileHints] = useState({});
   const [roomLookup, setRoomLookup] = useState(() => ({
     key: initialRooms.length > 0 ? requestedRoomKey : "",
     error: "",
@@ -754,8 +761,73 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const paymentFinished = batchStatus?.status === "CONFIRMED";
   const terminalError = ["REFUND_REQUIRED", "EXPIRED", "CANCELLED"].includes(batchStatus?.status);
 
+  useEffect(() => {
+    const mainPhone = normalizePhone(form.phone);
+    const lookupTargets = [];
+
+    rooms.forEach((room) => {
+      const coOccupants = roomForms[room.roomId]?.coOccupants || [];
+      coOccupants.forEach((occupant, index) => {
+        const phone = normalizePhone(occupant.phone);
+        const duplicated = coOccupants.some(
+          (other, otherIndex) => otherIndex !== index && normalizePhone(other.phone) === phone,
+        );
+        if (phone && VIETNAM_PHONE_PATTERN.test(phone) && phone !== mainPhone && !duplicated) {
+          lookupTargets.push({
+            key: `room-${room.roomId}-co-${index}`,
+            phone,
+          });
+        }
+      });
+    });
+
+    let cancelled = false;
+    if (!lookupTargets.length) {
+      const clearTimerId = window.setTimeout(() => {
+        if (!cancelled) setCoOccupantProfileHints({});
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(clearTimerId);
+      };
+    }
+
+    const timerId = window.setTimeout(async () => {
+      const results = await Promise.all(lookupTargets.map(async (target) => {
+        try {
+          const lookup = await lookupPersonProfileByPhone(target.phone);
+          return { ...target, exists: Boolean(lookup?.exists) };
+        } catch {
+          return { ...target, exists: false };
+        }
+      }));
+
+      if (cancelled) return;
+      setCoOccupantProfileHints(() => results.reduce((nextHints, result) => {
+        if (result.exists) {
+          nextHints[result.key] = { phone: result.phone };
+        }
+        return nextHints;
+      }, {}));
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [form.phone, roomForms, rooms]);
+
   const updateFormField = (name, value) => {
     const nextForm = { ...form, [name]: value };
+    const nextCoOccupantPhoneErrors = name === "phone"
+      ? rooms.reduce((errors, room) => {
+        const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
+        roomForm.coOccupants.forEach((occupant, index) => {
+          errors[`room-${room.roomId}-co-${index}-phone`] = validateCoOccupantPhone(room.roomId, index, occupant.phone, value);
+        });
+        return errors;
+      }, {})
+      : {};
     setForm(nextForm);
     setFieldErrors((current) => ({
       ...current,
@@ -763,6 +835,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       ...(name === "dob" && nextForm.idIssueDate
         ? { idIssueDate: validateField("idIssueDate", nextForm.idIssueDate, nextForm) }
         : {}),
+      ...nextCoOccupantPhoneErrors,
     }));
   };
 
@@ -884,14 +957,15 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
         const occupantName = String(occupant.fullName || "").trim();
         const occupantPhone = normalizePhone(occupant.phone);
         if (!occupantName) nextErrors[nameKey] = `Vui lòng nhập họ tên người ở cùng ${index + 1}.`;
+        else if (!FULL_NAME_PATTERN.test(occupantName)) nextErrors[nameKey] = CO_OCCUPANT_NAME_PATTERN_MESSAGE;
         if (!occupantPhone) {
           nextErrors[phoneKey] = `Vui lòng nhập số điện thoại người ở cùng ${index + 1}.`;
         } else if (!VIETNAM_PHONE_PATTERN.test(occupantPhone)) {
-          nextErrors[phoneKey] = "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+          nextErrors[phoneKey] = CO_OCCUPANT_PHONE_PATTERN_MESSAGE;
         } else if (occupantPhone === mainPhone) {
-          nextErrors[phoneKey] = "Số điện thoại người ở cùng không được trùng người đặt cọc chính.";
+          nextErrors[phoneKey] = CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE;
         } else if (seenPhones.has(occupantPhone)) {
-          nextErrors[phoneKey] = "Số điện thoại người ở cùng trong phòng không được trùng nhau.";
+          nextErrors[phoneKey] = CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
         }
         seenPhones.add(occupantPhone);
       });
@@ -985,20 +1059,26 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     }));
   };
 
-  const validateCoOccupantPhone = (roomId, index, value) => {
+  function validateCoOccupantName(index, value) {
+    const fullName = String(value || "").trim();
+    if (!fullName) return `Vui lòng nhập họ tên người ở cùng ${index + 1}.`;
+    return FULL_NAME_PATTERN.test(fullName) ? "" : CO_OCCUPANT_NAME_PATTERN_MESSAGE;
+  }
+
+  function validateCoOccupantPhone(roomId, index, value, mainPhone = form.phone) {
     const phone = normalizePhone(value);
     if (!phone) return `Vui lòng nhập số điện thoại người ở cùng ${index + 1}.`;
     if (!VIETNAM_PHONE_PATTERN.test(phone)) {
-      return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+      return CO_OCCUPANT_PHONE_PATTERN_MESSAGE;
     }
-    if (phone === normalizePhone(form.phone)) {
-      return "Số điện thoại người ở cùng không được trùng người đặt cọc chính.";
+    if (phone === normalizePhone(mainPhone)) {
+      return CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE;
     }
     const duplicated = (roomForms[roomId]?.coOccupants || []).some(
       (occupant, occupantIndex) => occupantIndex !== index && normalizePhone(occupant.phone) === phone,
     );
-    return duplicated ? "Số điện thoại người ở cùng trong phòng không được trùng nhau." : "";
-  };
+    return duplicated ? CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE : "";
+  }
 
   const setOccupantCount = (room, nextCount) => {
     const count = Math.max(1, Math.min(Number(room.maxPeople || 1), nextCount));
@@ -1698,9 +1778,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                                   }));
                                   setFieldErrors((current) => ({
                                     ...current,
-                                    [`room-${room.roomId}-co-${index}-fullName`]: value.trim()
-                                      ? ""
-                                      : `Vui lòng nhập họ tên người ở cùng ${index + 1}.`,
+                                    [`room-${room.roomId}-co-${index}-fullName`]: validateCoOccupantName(index, value),
                                   }));
                                 }}
                               />
@@ -1709,6 +1787,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                                 required
                                 type="tel"
                                 error={fieldErrors[`room-${room.roomId}-co-${index}-phone`]}
+                                helper={coOccupantProfileHints[`room-${room.roomId}-co-${index}`] ? EXISTING_PERSON_PROFILE_HINT : ""}
                                 value={occupant.phone}
                                 onChange={(event) => {
                                   const value = event.target.value;

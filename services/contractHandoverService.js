@@ -91,7 +91,7 @@ export function buildHandoverDocumentFilename(item = {}) {
       item.expected_move_in_date,
   );
 
-  return `${roomCode}_BBBG_${date}.pdf`;
+  return `BBBG_${roomCode}_${date}.pdf`;
 }
 
 const DEFAULT_HANDOVER_DOCUMENT_FILENAME = buildHandoverDocumentFilename();

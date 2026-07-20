@@ -48,7 +48,7 @@ export function buildLeaseContractDocumentFilename(item = {}) {
   const date = formatDocumentFilenameDate(
     item.startDate ?? item.start_date ?? item.expectedLeaseSignDate ?? item.expected_lease_sign_date,
   );
-  return `${roomCode}_HDT_${date}.pdf`;
+  return `HDT_${roomCode}_${date}.pdf`;
 }
 
 const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME = buildLeaseContractDocumentFilename();
@@ -399,7 +399,7 @@ async function fetchPrivateFileBlob(fileId) {
 
 export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
   if (!leaseContractId) {
-    throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c há»£p Ä‘á»“ng cáº§n táº£i.");
+    throw new Error("Không xác định được hợp đồng cần tải.");
   }
 
   const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`, {
@@ -407,7 +407,7 @@ export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
   });
 
   if (!response.ok) {
-    throw new Error("KhÃ´ng thá»ƒ táº£i PDF há»£p Ä‘á»“ng.");
+    throw new Error("Không thể tải PDF hợp đồng.");
   }
 
   const contentDisposition =

@@ -63,6 +63,22 @@ export async function fetchTenantProfiles({ page = 0, size = 10 } = {}) {
   };
 }
 
+export async function lookupPersonProfileByPhone(phone) {
+  const params = new URLSearchParams({ phone: String(phone || "") });
+  const response = await fetch(`${API_BASE_URL}/person-profiles/lookup?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: authHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Không kiểm tra được hồ sơ người ở cùng."));
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  return payload?.data || payload || {};
+}
+
 export async function fetchTenantProfilesPoliceReportExportFile(columns = []) {
   const params = new URLSearchParams();
   columns.filter(Boolean).forEach((column) => params.append("columns", column));

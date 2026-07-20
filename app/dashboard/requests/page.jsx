@@ -1,12 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchChangeRequests, fetchChangeRequestStats, approveChangeRequest, rejectChangeRequest } from "@/services/changeRequestsService";
-import { completeTransfer, confirmTransferContract, estimateTransferOutUtility, executeTransfer, getRoomTransferByCode, getRoomTransferById, signTransferContract } from "@/services/roomTransferService";
+import { confirmTransferContract, getRoomTransferByCode, getRoomTransferById, signTransferContract } from "@/services/roomTransferService";
 import { downloadLeaseContractDraftPdf, fetchManagementLeaseContractDetails, uploadSignedLeaseContractFile } from "@/services/leaseContractsService";
-import { fetchContractHandover, uploadFile } from "@/services/contractHandoverService";
-import CameraFileInput from "@/components/CameraFileInput";
-import { ASSET_CONDITION_VALUES, fetchRoomAssets, normalizeAsset } from "@/services/roomAssetsService";
 import { Loader2, Eye, X, CheckCircle2, XCircle, Clock, ArrowRightLeft, LogOut, FileText, Wrench, MessageSquareWarning, Key, Search, FileCheck2, CalendarCheck, CalendarRange, AlertCircle, Plus, Info, Hourglass, Download, Upload, RotateCcw, SlidersHorizontal, Copy, CalendarDays, MoreVertical, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Input } from "@/components/ui/input";
@@ -33,6 +30,7 @@ import {
     AccessRequestDetail,
 } from "./_components/RequestTypeDetails";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import TransferExecutionModal from "../_components/TransferExecutionModal";
 
 const translateType = (type) => {
     const map = {
@@ -112,6 +110,7 @@ const translateTransferStatus = (status) => {
         WAITING_PAYMENT: "Chờ thanh toán",
         WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
         WAITING_SIGNING: "Chờ quản lý upload bản ký",
+        WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
         WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
         READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
         WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
@@ -130,6 +129,7 @@ const getTransferStatusTone = (status) => {
         case "WAITING_CONTRACT_CONFIRMATION":
             return "border-blue-200 bg-blue-50 text-blue-700";
         case "WAITING_SIGNING":
+        case "WAITING_CONTRACT_SIGNING":
             return "border-violet-200 bg-violet-50 text-violet-700";
         case "WAITING_TRANSFER_DATE":
             return "border-cyan-200 bg-cyan-50 text-cyan-700";
@@ -143,166 +143,17 @@ const getTransferStatusTone = (status) => {
     }
 };
 
-const requiresFullMoveOut = (transfer) =>
-    transfer?.sourceRoomWillBeEmptyAfterTransfer === true;
-
 const requiresFullMoveIn = (transfer) =>
     transfer?.targetTransferType === "NEW_CONTRACT";
 
-const CONDITION_OPTIONS = [
-    { value: "GOOD", label: "Hoạt động bình thường" },
-    { value: "ATTENTION", label: "Có trầy xước nhẹ" },
-    { value: "BROKEN", label: "Hỏng cần sửa" },
-    { value: "MISSING", label: "Thiếu thiết bị" },
-];
-
-const HANDOVER_ASSET_TEMPLATE = [
-    ["Điều hòa + Remote", "Thiết bị điện tử", "GOOD", ""],
-    ["Thiết bị vệ sinh + phòng tắm", "Thiết bị vệ sinh", "GOOD", "Xí, vòi xịt, vòi sen, lavabo, gương, phụ kiện"],
-    ["Bình nóng lạnh", "Thiết bị điện tử", "GOOD", ""],
-    ["Tủ quần áo 3 buồng", "Nội thất", "GOOD", ""],
-    ["Bàn học", "Nội thất", "GOOD", ""],
-    ["Giường đôi/tầng + Dát giường", "Nội thất", "GOOD", ""],
-    ["Cửa đi + cửa sổ", "Cơ sở hạ tầng", "GOOD", ""],
-    ["Modem Internet", "Thiết bị điện tử", "GOOD", ""],
-    ["Hệ thống điện: công tắc, ổ cắm, bóng điện", "Cơ sở hạ tầng", "GOOD", ""],
-].map(([assetName, assetCategory, currentCondition, description]) => ({
-    id: null,
-    assetName,
-    assetCategory,
-    quantity: 1,
-    currentCondition,
-    description,
-    imageFile: null,
-    imageUrl: "",
-    fileImageId: null,
-}));
-
-function createAssetRows() {
-    return HANDOVER_ASSET_TEMPLATE.map((asset) => ({
-        ...asset,
-        imageFile: null,
-        imageUrl: "",
-        fileImageId: null,
-    }));
-}
-
-function roomAssetsToExecuteRows(assets) {
-    if (!Array.isArray(assets) || assets.length === 0) {
-        return createAssetRows();
-    }
-    return assets.map((asset) => {
-        const normalized = normalizeAsset(asset);
-        return {
-            id: normalized.id,
-            assetName: normalized.assetName,
-            assetCategory: normalized.assetCategory,
-            quantity: normalized.quantity,
-            currentCondition: normalized.currentCondition,
-            description: normalized.description,
-            imageFile: null,
-            imageUrl: "",
-            fileImageId: normalized.fileImageId,
-        };
-    });
-}
-
-function readHandoverMeterValue(handover, meterKey) {
-    const meter = handover?.[meterKey] || {};
-    return meter.currentValue ?? meter.current_value ?? null;
-}
-
-function readHandoverDate(handover) {
-    const raw = handover?.handoverDate ?? handover?.handover_date;
-    return raw ? String(raw).slice(0, 10) : null;
-}
-
-function formatVnd(value) {
-    const amount = Number(value || 0);
-    return `${amount.toLocaleString("vi-VN")} VNĐ`;
-}
-
-function formatReading(value) {
-    if (value === null || value === undefined || value === "") return "--";
-    const number = Number(value);
-    if (Number.isNaN(number)) return String(value);
-    return number.toLocaleString("vi-VN", { maximumFractionDigits: 3 });
-}
-
-const TRANSFER_OUT_UTILITY_COPY = {
-    estimateTitle: "Ước tính tiền điện/nước phòng cũ",
-    estimateHint: "Hệ thống tự tính theo chỉ số cũ gần nhất và đơn giá utility. Hóa đơn thật sẽ được tạo khi Start Transfer.",
-    inputHint: "Nhập đủ chỉ số điện và nước để tính tạm thu.",
-    invalidReading: "Chỉ số điện/nước phải là số không âm.",
-    invalidAmount: "Số tiền phát sinh phải là số nguyên không âm.",
-    estimateError: "Không tính được chi phí tạm tính.",
-    tariffMissing: "Chưa cấu hình bảng giá điện/nước cho bất động sản này. Hãy tạo tariff điện và nước có hiệu lực trước ngày bàn giao.",
-    loading: "Đang tính...",
-    recalculating: "Đang tính lại...",
-    electricity: "Điện",
-    water: "Nước",
-    previous: "Chỉ số cũ",
-    current: "Chỉ số mới",
-    usage: "Tiêu thụ",
-    freeAllowance: "Miễn phí",
-    billableQuantity: "Tính tiền",
-    unitPrice: "Đơn giá",
-    amount: "Thành tiền",
-    incidental: "Phát sinh",
-    serviceFee: "Phí dịch vụ",
-    total: "Tổng tạm tính",
-};
-
-function MeterChargeEstimateCard({ label, estimate }) {
-    return (
-        <div className="rounded-lg border border-emerald-100 bg-white p-3">
-            <p className="text-sm font-semibold text-emerald-950">{label}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                <span>{TRANSFER_OUT_UTILITY_COPY.previous}</span>
-                <span className="text-right font-semibold text-slate-900">{formatReading(estimate?.previousValue)}</span>
-                <span>{TRANSFER_OUT_UTILITY_COPY.current}</span>
-                <span className="text-right font-semibold text-slate-900">{formatReading(estimate?.currentValue)}</span>
-                <span>{TRANSFER_OUT_UTILITY_COPY.usage}</span>
-                <span className="text-right font-semibold text-slate-900">{formatReading(estimate?.usage)}</span>
-                <span>{TRANSFER_OUT_UTILITY_COPY.freeAllowance}</span>
-                <span className="text-right font-semibold text-slate-900">{formatReading(estimate?.freeAllowance)}</span>
-                <span>{TRANSFER_OUT_UTILITY_COPY.billableQuantity}</span>
-                <span className="text-right font-semibold text-slate-900">{formatReading(estimate?.billableQuantity)}</span>
-                <span>{TRANSFER_OUT_UTILITY_COPY.unitPrice}</span>
-                <span className="text-right font-semibold text-slate-900">{formatVnd(estimate?.unitPrice)}</span>
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-emerald-100 pt-3 text-sm">
-                <span className="font-medium text-emerald-900">{TRANSFER_OUT_UTILITY_COPY.amount}</span>
-                <span className="font-bold text-emerald-950">{formatVnd(estimate?.amount)}</span>
-            </div>
-        </div>
-    );
-}
-
-function getTransferUtilityErrorMessage(error) {
-    if (error?.code === 40906 || error?.message === "Utility tariff not found") {
-        return TRANSFER_OUT_UTILITY_COPY.tariffMissing;
-    }
-    return error?.message || TRANSFER_OUT_UTILITY_COPY.estimateError;
-}
-
-async function fetchContractBaselineHandover(contractId) {
-    if (!contractId) return null;
-    const handovers = await Promise.all(
-        ["TRANSFER_IN", "MOVE_IN"].map((type) =>
-            fetchContractHandover(contractId, type).catch(() => null)
-        )
-    );
-    return handovers
-        .filter(Boolean)
-        .sort((a, b) => String(readHandoverDate(b) || "").localeCompare(String(readHandoverDate(a) || "")))[0] || null;
-}
+const isTransferSigningStatus = (status) =>
+    status === "WAITING_SIGNING" || status === "WAITING_CONTRACT_SIGNING";
 
 const getTransferTimingNote = (transfer) => {
     if (!transfer) return "";
     const moveOutNote = "Chỉ thực hiện full move-out khi sau chuyển phòng cũ trở thành phòng trống. Nếu phòng cũ vẫn còn người ở thì chỉ xử lý phần occupant rời đi, không làm room-level move-out đầy đủ.";
     const moveInNote = requiresFullMoveIn(transfer)
-        ? "Start Transfer chỉ checkout phòng cũ và tạo hóa đơn điện/nước nếu phát sinh; sau khi hóa đơn này đã thanh toán, manager mới nhập check-in phòng mới và Complete Transfer."
+        ? "Chốt phòng cũ chỉ ghi nhận người rời phòng và tạo hóa đơn điện/nước nếu phát sinh; sau khi hóa đơn này đã thanh toán, manager mới nhập check-in phòng mới và hoàn tất chuyển phòng."
         : "Ca này không cần full move-in kiểu nhận phòng trống vì tenant đi vào hợp đồng/phòng đang có người.";
     return `${moveOutNote} ${moveInNote}`;
 };
@@ -327,6 +178,7 @@ const getTransferActionMeta = (transfer) => {
                 helperText: "Đã đủ điều kiện thương mại/pháp lý. Quản lý cần xác nhận hợp đồng trước khi đi tới pha vận hành.",
             };
         case "WAITING_SIGNING":
+        case "WAITING_CONTRACT_SIGNING":
             return {
                 primaryAction: null,
                 helperText: "Đang chờ khách thuê ký hợp đồng. Chưa nên thực hiện move-out/move-in.",
@@ -334,12 +186,12 @@ const getTransferActionMeta = (transfer) => {
         case "WAITING_TRANSFER_DATE":
             return {
                 primaryAction: "execute-transfer",
-                helperText: "Hồ sơ đã sẵn sàng. Manager có thể bấm Start Transfer khi tenant và quản lý có mặt để bắt đầu phiên chuyển phòng.",
+                helperText: "Hồ sơ đã sẵn sàng. Manager có thể bấm Chốt phòng cũ khi tenant và quản lý có mặt.",
             };
         case "READY_FOR_HANDOVER":
             return {
                 primaryAction: "execute-transfer",
-                helperText: "Hồ sơ đã sẵn sàng. Manager bấm Start Transfer để mở phiên chuyển phòng và chốt checkout phòng cũ trước.",
+                helperText: "Hồ sơ đã sẵn sàng. Manager bấm Chốt phòng cũ để ghi nhận người rời phòng và chỉ số điện/nước.",
             };
         case "WAITING_EXECUTION":
             return {
@@ -579,27 +431,8 @@ export default function ApprovalCenter() {
     const [detailModal, setDetailModal] = useState(null);
     const [detailTransfer, setDetailTransfer] = useState(null);
     const [executeModal, setExecuteModal] = useState(null);
-    const [transferOutUtilityEstimate, setTransferOutUtilityEstimate] = useState(null);
-    const [transferOutUtilityEstimateLoading, setTransferOutUtilityEstimateLoading] = useState(false);
-    const [transferOutUtilityEstimateError, setTransferOutUtilityEstimateError] = useState("");
     const [selectedTransferContractId, setSelectedTransferContractId] = useState(null);
     const signedTransferContractInputRef = useRef(null);
-    const [executeForm, setExecuteForm] = useState({
-        outElectricity: "",
-        outWater: "",
-        outNote: "",
-        outElectricityImage: null,
-        outWaterImage: null,
-        outAssets: createAssetRows(),
-        inElectricity: "",
-        inWater: "",
-        inNote: "",
-        inElectricityImage: null,
-        inWaterImage: null,
-        inAssets: createAssetRows(),
-        oldRoomFinalChargeAmount: "",
-        oldRoomFinalChargeNote: "",
-    });
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -728,88 +561,12 @@ export default function ApprovalCenter() {
         setDetailTransfer(null);
     };
 
-    const openExecuteModal = async (req, preloadedTransfer = null) => {
-        setActionLoading(`load-transfer-${req.id}`);
-        try {
-            const transfer = preloadedTransfer || await loadTransferDetail(req);
-            if (!transfer?.id) {
-                window.alert("Không tải được mã transfer hợp lệ để thực hiện bước vận hành.");
-                return;
-            }
-            if (!["WAITING_TRANSFER_DATE", "READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(transfer.status)) {
-                window.alert("Yêu cầu chưa tới bước thực hiện vận hành. Hãy hoàn tất các bước trước đó.");
-                return;
-            }
-            const phase = transfer.status === "WAITING_EXECUTION" ? "COMPLETE_TRANSFER" : "MOVE_OUT";
-            const shouldLoadOldHandover = phase === "MOVE_OUT";
-            const shouldLoadNewRoomAssets = phase === "COMPLETE_TRANSFER" && requiresFullMoveIn(transfer);
-            const [oldBaselineHandover, oldRoomAssets, newRoomAssets] = await Promise.all([
-                shouldLoadOldHandover
-                    ? fetchContractBaselineHandover(transfer.oldContractId)
-                    : Promise.resolve(null),
-                shouldLoadOldHandover && transfer.oldRoomId
-                    ? fetchRoomAssets(transfer.oldRoomId).catch(() => [])
-                    : Promise.resolve([]),
-                shouldLoadNewRoomAssets && transfer.targetRoomId
-                    ? fetchRoomAssets(transfer.targetRoomId).catch(() => [])
-                    : Promise.resolve([]),
-            ]);
-            setTransferOutUtilityEstimate(null);
-            setTransferOutUtilityEstimateLoading(false);
-            setTransferOutUtilityEstimateError("");
-            setExecuteForm({
-                outElectricity: "",
-                outWater: "",
-                outNote: "",
-                outElectricityImage: null,
-                outWaterImage: null,
-                outAssets: requiresFullMoveOut(transfer) ? roomAssetsToExecuteRows(oldRoomAssets) : createAssetRows(),
-                inElectricity: "",
-                inWater: "",
-                inNote: "",
-                inElectricityImage: null,
-                inWaterImage: null,
-                inAssets: shouldLoadNewRoomAssets ? roomAssetsToExecuteRows(newRoomAssets) : createAssetRows(),
-                oldRoomFinalChargeAmount: "",
-                oldRoomFinalChargeNote: "",
-            });
-            setExecuteModal({
-                request: req,
-                transfer,
-                phase,
-                oldBaselineHandover,
-                oldRoomAssetsCount: Array.isArray(oldRoomAssets) ? oldRoomAssets.length : 0,
-                newRoomAssetsCount: Array.isArray(newRoomAssets) ? newRoomAssets.length : 0,
-            });
-        } catch (e) {
-            console.error(e);
-            window.alert(e?.message || "Không tải được chi tiết chuyển phòng.");
-        } finally {
-            setActionLoading(null);
-        }
+    const openExecuteModal = (req, preloadedTransfer = null) => {
+        setExecuteModal({request: req, transfer: preloadedTransfer});
     };
 
     const closeExecuteModal = () => {
         setExecuteModal(null);
-        setTransferOutUtilityEstimate(null);
-        setTransferOutUtilityEstimateLoading(false);
-        setTransferOutUtilityEstimateError("");
-        setExecuteForm({
-            outElectricity: "",
-            outWater: "",
-            outNote: "",
-            outElectricityImage: null,
-            outWaterImage: null,
-            outAssets: createAssetRows(),
-            inElectricity: "",
-            inWater: "",
-            inNote: "",
-            inElectricityImage: null,
-            inWaterImage: null,
-            inAssets: createAssetRows(),
-            oldRoomFinalChargeAmount: "",
-            oldRoomFinalChargeNote: "",
-        });
     };
 
     const handleConfirmTransferContract = async () => {
@@ -830,6 +587,10 @@ export default function ApprovalCenter() {
 
     const handleSignTransferContract = async () => {
         if (!detailModal || !detailTransfer) return;
+        if (!isTransferSigningStatus(detailTransfer.status)) {
+            window.alert("Hợp đồng chuyển phòng đã qua bước xác nhận ký.");
+            return;
+        }
         setActionLoading(`sign-transfer-contract-${detailModal.id}`);
         try {
             await signTransferContract(detailTransfer.id);
@@ -838,7 +599,7 @@ export default function ApprovalCenter() {
             await loadData();
         } catch (e) {
             console.error(e);
-            window.alert(e?.message || "Khong the xac nhan da ky hop dong chuyen phong.");
+            window.alert(e?.message || "Không thể xác nhận đã ký hợp đồng chuyển phòng.");
         } finally {
             setActionLoading(null);
         }
@@ -883,303 +644,6 @@ export default function ApprovalCenter() {
         }
     };
 
-    const updateAssetList = (key, index, field, value) => {
-        setExecuteForm((prev) => ({
-            ...prev,
-            [key]: prev[key].map((asset, assetIndex) =>
-                assetIndex === index ? { ...asset, [field]: value } : asset
-            ),
-        }));
-    };
-
-    const handleAssetImageChange = (key, index, payload) => {
-        setExecuteForm((prev) => ({
-            ...prev,
-            [key]: prev[key].map((asset, assetIndex) => {
-                if (assetIndex !== index) return asset;
-                if (asset.imageUrl?.startsWith("blob:")) {
-                    URL.revokeObjectURL(asset.imageUrl);
-                }
-                return {
-                    ...asset,
-                    imageFile: payload.file,
-                    imageUrl: payload.previewUrl,
-                    fileImageId: null,
-                };
-            }),
-        }));
-    };
-
-    const handleAssetImageRemove = (key, index) => {
-        setExecuteForm((prev) => ({
-            ...prev,
-            [key]: prev[key].map((asset, assetIndex) => {
-                if (assetIndex !== index) return asset;
-                if (asset.imageUrl?.startsWith("blob:")) {
-                    URL.revokeObjectURL(asset.imageUrl);
-                }
-                return {
-                    ...asset,
-                    imageFile: null,
-                    imageUrl: "",
-                    fileImageId: null,
-                };
-            }),
-        }));
-    };
-
-    const buildAssetPayloads = async (assets) => Promise.all(
-        assets.map(async (asset) => {
-            let assetImageId = asset.fileImageId ?? null;
-            if (asset.imageFile) {
-                const res = await uploadFile(asset.imageFile, "ROOM_IMAGE");
-                assetImageId = res?.id ?? null;
-            }
-            return {
-                id: asset.id ?? undefined,
-                assetName: asset.assetName.trim(),
-                assetCategory: asset.assetCategory.trim(),
-                quantity: Number(asset.quantity),
-                currentCondition: ASSET_CONDITION_VALUES[asset.currentCondition] ?? asset.currentCondition ?? "GOOD",
-                description: asset.description?.trim() ?? "",
-                fileImageId: assetImageId,
-            };
-        })
-    );
-
-    const handleExecuteTransfer = async () => {
-        if (!executeModal?.transfer) return;
-        const transfer = executeModal.transfer;
-        const handoverDate = new Date().toISOString().slice(0, 10);
-        const isMoveOutPhase = executeModal.phase === "MOVE_OUT";
-
-        let transferOutHandover = null;
-        if (isMoveOutPhase) {
-            if (!executeForm.outElectricity.trim() || !executeForm.outWater.trim()) {
-                window.alert("Vui lòng nhập chỉ số điện và nước phòng cũ.");
-                return;
-            }
-            if (!executeForm.outElectricityImage?.file || !executeForm.outWaterImage?.file) {
-                window.alert("Vui lòng chụp/tải ảnh chỉ số điện và nước phòng cũ.");
-                return;
-            }
-            if (requiresFullMoveOut(transfer) && executeForm.outAssets.some((asset) => !asset.assetName.trim() || !asset.assetCategory.trim() || Number(asset.quantity) <= 0)) {
-                window.alert("Vui lòng nhập đủ thông tin thiết bị bàn giao phòng cũ.");
-                return;
-            }
-
-            const outElectricity = Number(executeForm.outElectricity);
-            const outWater = Number(executeForm.outWater);
-            if (Number.isNaN(outElectricity) || Number.isNaN(outWater) || outElectricity < 0 || outWater < 0) {
-                window.alert("Chỉ số điện/nước phòng cũ không hợp lệ.");
-                return;
-            }
-            const finalChargeAmountText = String(executeForm.oldRoomFinalChargeAmount || "").trim();
-            const incidentalChargeAmount = finalChargeAmountText ? Number(finalChargeAmountText) : 0;
-            if (
-                Number.isNaN(incidentalChargeAmount)
-                || incidentalChargeAmount < 0
-                || !Number.isInteger(incidentalChargeAmount)
-            ) {
-                window.alert("Chi phí phát sinh bàn giao phòng cũ phải là số tiền nguyên không âm.");
-                return;
-            }
-
-            const [electricUpload, waterUpload, assetPayloads] = await Promise.all([
-                uploadFile(executeForm.outElectricityImage.file, "METER_PHOTO"),
-                uploadFile(executeForm.outWaterImage.file, "METER_PHOTO"),
-                requiresFullMoveOut(transfer) ? buildAssetPayloads(executeForm.outAssets) : Promise.resolve([]),
-            ]);
-
-            transferOutHandover = {
-                handoverDate,
-                electricity: {
-                    currentValue: outElectricity,
-                    photoFileId: electricUpload?.id || null,
-                    readingDate: handoverDate,
-                },
-                water: {
-                    currentValue: outWater,
-                    photoFileId: waterUpload?.id || null,
-                    readingDate: handoverDate,
-                },
-                note: executeForm.outNote.trim() || null,
-                assets: assetPayloads,
-                incidentalChargeAmount: incidentalChargeAmount > 0 ? incidentalChargeAmount : null,
-                incidentalChargeNote: incidentalChargeAmount > 0
-                    ? executeForm.oldRoomFinalChargeNote.trim() || null
-                    : null,
-            };
-        }
-
-        let transferInHandover = null;
-        const requiresTransferIn = !isMoveOutPhase && transfer.targetTransferType === "NEW_CONTRACT";
-        if (requiresTransferIn) {
-            if (!executeForm.inElectricity.trim() || !executeForm.inWater.trim()) {
-                window.alert("Vui lòng nhập chỉ số điện và nước phòng mới.");
-                return;
-            }
-            if (!executeForm.inElectricityImage?.file || !executeForm.inWaterImage?.file) {
-                window.alert("Vui lòng chụp/tải ảnh chỉ số điện và nước phòng mới.");
-                return;
-            }
-            if (executeForm.inAssets.some((asset) => !asset.assetName.trim() || !asset.assetCategory.trim() || Number(asset.quantity) <= 0)) {
-                window.alert("Vui lòng nhập đủ thông tin thiết bị bàn giao phòng mới.");
-                return;
-            }
-            const inElectricity = Number(executeForm.inElectricity);
-            const inWater = Number(executeForm.inWater);
-            if (Number.isNaN(inElectricity) || Number.isNaN(inWater) || inElectricity < 0 || inWater < 0) {
-                window.alert("Chỉ số điện/nước phòng mới không hợp lệ.");
-                return;
-            }
-            const [inElectricUpload, inWaterUpload, inAssetPayloads] = await Promise.all([
-                uploadFile(executeForm.inElectricityImage.file, "METER_PHOTO"),
-                uploadFile(executeForm.inWaterImage.file, "METER_PHOTO"),
-                buildAssetPayloads(executeForm.inAssets),
-            ]);
-            transferInHandover = {
-                handoverDate,
-                electricity: {
-                    currentValue: inElectricity,
-                    photoFileId: inElectricUpload?.id || null,
-                    readingDate: handoverDate,
-                },
-                water: {
-                    currentValue: inWater,
-                    photoFileId: inWaterUpload?.id || null,
-                    readingDate: handoverDate,
-                },
-                note: executeForm.inNote.trim() || null,
-                assets: inAssetPayloads,
-            };
-        }
-
-        setActionLoading(`execute-${transfer.id}`);
-        try {
-            if (isMoveOutPhase) {
-                await executeTransfer(transfer.id, {
-                    transferOutHandover,
-                    positiveDifferenceSettlementType: null,
-                });
-            } else {
-                await completeTransfer(transfer.id, {
-                    transferInHandover,
-                    positiveDifferenceSettlementType: null,
-                });
-            }
-
-            const refreshedTransfer = detailModal ? await loadTransferDetail(detailModal) : null;
-            if (refreshedTransfer) {
-                setDetailTransfer(refreshedTransfer);
-            }
-            closeExecuteModal();
-            await loadData();
-        } catch (e) {
-            console.error(e);
-            window.alert(
-                (e?.code === 40906 || e?.message === "Utility tariff not found")
-                    ? getTransferUtilityErrorMessage(e)
-                    : e?.message || (isMoveOutPhase
-                        ? "Không thể bắt đầu phiên chuyển phòng."
-                        : "Không thể hoàn tất chuyển phòng.")
-            );
-        } finally {
-            setActionLoading(null);
-        }
-    };
-
-    useEffect(() => {
-        const resetEstimateAsync = () => {
-            queueMicrotask(() => {
-                setTransferOutUtilityEstimate(null);
-                setTransferOutUtilityEstimateLoading(false);
-                setTransferOutUtilityEstimateError("");
-            });
-        };
-
-        if (!executeModal?.transfer?.id || executeModal.phase !== "MOVE_OUT") {
-            resetEstimateAsync();
-            return;
-        }
-
-        const electricityText = String(executeForm.outElectricity || "").trim();
-        const waterText = String(executeForm.outWater || "").trim();
-        if (!electricityText || !waterText) {
-            resetEstimateAsync();
-            return;
-        }
-
-        const outElectricity = Number(electricityText);
-        const outWater = Number(waterText);
-        const finalChargeAmountText = String(executeForm.oldRoomFinalChargeAmount || "").trim();
-        const incidentalChargeAmount = finalChargeAmountText ? Number(finalChargeAmountText) : 0;
-        const hasInvalidReading = Number.isNaN(outElectricity)
-            || Number.isNaN(outWater)
-            || outElectricity < 0
-            || outWater < 0;
-        const hasInvalidAmount = Number.isNaN(incidentalChargeAmount)
-            || incidentalChargeAmount < 0
-            || !Number.isInteger(incidentalChargeAmount);
-        if (hasInvalidReading || hasInvalidAmount) {
-            const errorMessage = hasInvalidReading
-                ? TRANSFER_OUT_UTILITY_COPY.invalidReading
-                : TRANSFER_OUT_UTILITY_COPY.invalidAmount;
-            queueMicrotask(() => {
-                setTransferOutUtilityEstimate(null);
-                setTransferOutUtilityEstimateLoading(false);
-                setTransferOutUtilityEstimateError(errorMessage);
-            });
-            return;
-        }
-
-        let cancelled = false;
-        const handoverDate = new Date().toISOString().slice(0, 10);
-        const timer = setTimeout(async () => {
-            setTransferOutUtilityEstimateLoading(true);
-            setTransferOutUtilityEstimateError("");
-            try {
-                const estimate = await estimateTransferOutUtility(executeModal.transfer.id, {
-                    transferOutHandover: {
-                        handoverDate,
-                        electricity: {
-                            currentValue: outElectricity,
-                            readingDate: handoverDate,
-                        },
-                        water: {
-                            currentValue: outWater,
-                            readingDate: handoverDate,
-                        },
-                        incidentalChargeAmount: incidentalChargeAmount > 0 ? incidentalChargeAmount : null,
-                    },
-                });
-                if (!cancelled) {
-                    setTransferOutUtilityEstimate(estimate);
-                }
-            } catch (e) {
-                if (!cancelled) {
-                    setTransferOutUtilityEstimate(null);
-                    setTransferOutUtilityEstimateError(getTransferUtilityErrorMessage(e));
-                }
-            } finally {
-                if (!cancelled) {
-                    setTransferOutUtilityEstimateLoading(false);
-                }
-            }
-        }, 300);
-
-        return () => {
-            cancelled = true;
-            clearTimeout(timer);
-        };
-    }, [
-        executeForm.oldRoomFinalChargeAmount,
-        executeForm.outElectricity,
-        executeForm.outWater,
-        executeModal?.phase,
-        executeModal?.transfer?.id,
-    ]);
-
     useEffect(() => {
         const t = setTimeout(loadData, 300);
         return () => clearTimeout(t);
@@ -1210,6 +674,7 @@ export default function ApprovalCenter() {
         "WAITING_TENANT_CONFIRMATION",
         "WAITING_CONTRACT_CONFIRMATION",
         "WAITING_SIGNING",
+        "WAITING_CONTRACT_SIGNING",
         "WAITING_TRANSFER_DATE",
         "READY_FOR_HANDOVER",
         "WAITING_EXECUTION",
@@ -1664,7 +1129,7 @@ export default function ApprovalCenter() {
                                                 </div>
                                             )}
 
-                                            {detailTransfer.status === "WAITING_SIGNING" && getTransferSigningDocuments(detailTransfer).length > 0 && (
+                                            {isTransferSigningStatus(detailTransfer.status) && getTransferSigningDocuments(detailTransfer).length > 0 && (
                                                 <div className="rounded-xl bg-white p-4 border border-blue-100">
                                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <p className="text-sm font-semibold text-gray-900">Tài liệu cần ký</p>
@@ -1762,7 +1227,7 @@ export default function ApprovalCenter() {
                                         {actionLoading === `confirm-contract-${detailModal.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận hợp đồng"}
                                     </Button>
                                 )}
-                                {detailModal.requestType === 'ROOM_TRANSFER' && detailTransfer?.status === 'WAITING_SIGNING' && getTransferSigningDocuments(detailTransfer).length > 0 && (
+                                {detailModal.requestType === 'ROOM_TRANSFER' && isTransferSigningStatus(detailTransfer?.status) && getTransferSigningDocuments(detailTransfer).length > 0 && (
                                     <>
                                         {getTransferSigningDocuments(detailTransfer).map((document) => (
                                             <div key={document.kind} className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
@@ -1817,7 +1282,8 @@ export default function ApprovalCenter() {
                                             className="hidden"
                                             onChange={handleUploadSignedTransferContract}
                                         />
-                                        {allowsTransferAction(detailTransfer, "SIGN_TRANSFER_CONTRACT") && (
+                                        {isTransferSigningStatus(detailTransfer.status) &&
+                                            allowsTransferAction(detailTransfer, "SIGN_TRANSFER_CONTRACT") && (
                                             <Button
                                                 onClick={handleSignTransferContract}
                                                 disabled={Boolean(actionLoading)}
@@ -1840,11 +1306,9 @@ export default function ApprovalCenter() {
                                         disabled={Boolean(actionLoading)}
                                         className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
                                     >
-                                        {actionLoading === `load-transfer-${detailModal.id}`
-                                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                                            : detailTransfer?.status === "WAITING_EXECUTION"
-                                                ? "Hoàn tất chuyển phòng"
-                                                : "Start Transfer"}
+                                        {detailTransfer?.status === "WAITING_EXECUTION"
+                                            ? "Hoàn tất chuyển phòng"
+                                            : "Chốt phòng cũ"}
                                     </Button>
                                 )}
                             </div>
@@ -1853,446 +1317,21 @@ export default function ApprovalCenter() {
                 </div>
             )}
 
-            {executeModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-2 sm:p-3 backdrop-blur-sm" onClick={closeExecuteModal}>
-                    <div className="w-full max-w-3xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="border-b border-gray-200 px-6 py-4">
-                            <h3 className="text-lg font-bold text-gray-900">Thực hiện yêu cầu chuyển phòng</h3>
-                            <p className="text-sm text-gray-500 mt-1">{executeModal.transfer?.requestCode || executeModal.request?.requestCode}</p>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="rounded-xl bg-gray-50 p-4">
-                                    <p className="text-xs font-semibold text-gray-500 mb-1">Phòng cũ</p>
-                                    <p className="text-sm font-semibold text-gray-900">{executeModal.transfer?.oldRoomName || executeModal.transfer?.oldRoomCode || "--"}</p>
-                                </div>
-                                <div className="rounded-xl bg-gray-50 p-4">
-                                    <p className="text-xs font-semibold text-gray-500 mb-1">Phòng mới</p>
-                                    <p className="text-sm font-semibold text-gray-900">{executeModal.transfer?.targetRoomName || executeModal.transfer?.targetRoomCode || "--"}</p>
-                                </div>
-                                <div className="rounded-xl bg-gray-50 p-4">
-                                    <p className="text-xs font-semibold text-gray-500 mb-1">Loại chuyển</p>
-                                    <p className="text-sm font-semibold text-gray-900">{executeModal.transfer?.targetTransferType || "--"}</p>
-                                </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-gray-200 p-5 space-y-4">
-                                <h4 className="text-sm font-bold text-gray-900">
-                                    {executeModal.phase === "MOVE_OUT" ? "Phiên chuyển phòng - Checkout phòng cũ" : "Thông tin checkout phòng cũ đã hoàn tất"}
-                                </h4>
-                                {executeModal.phase === "MOVE_OUT" ? (
-                                    <>
-                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <p className="text-sm font-semibold text-slate-900">Bàn giao cũ của phòng cũ</p>
-                                                <span className="text-xs font-semibold text-slate-500">
-                                                    {readHandoverDate(executeModal.oldBaselineHandover) || "Chưa có ngày bàn giao"}
-                                                </span>
-                                            </div>
-                                            <div className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
-                                                <div className="rounded-lg bg-white p-3">
-                                                    <p className="text-xs text-slate-500">Điện ban đầu</p>
-                                                    <p className="mt-1 font-semibold text-slate-900">
-                                                        {readHandoverMeterValue(executeModal.oldBaselineHandover, "electricity") ?? "--"}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-lg bg-white p-3">
-                                                    <p className="text-xs text-slate-500">Nước ban đầu</p>
-                                                    <p className="mt-1 font-semibold text-slate-900">
-                                                        {readHandoverMeterValue(executeModal.oldBaselineHandover, "water") ?? "--"}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-lg bg-white p-3">
-                                                    <p className="text-xs text-slate-500">Tài sản đã tải</p>
-                                                    <p className="mt-1 font-semibold text-slate-900">
-                                                        {executeModal.oldRoomAssetsCount || 0} thiết bị
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {!executeModal.oldBaselineHandover && (
-                                                <p className="mt-3 text-xs text-amber-700">
-                                                    Chưa tìm thấy biên bản TRANSFER_IN/MOVE_IN cũ, hệ thống chỉ dùng danh sách tài sản hiện tại của phòng để đối chiếu.
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Chỉ số điện</label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        value={executeForm.outElectricity}
-                                                        onChange={(e) => setExecuteForm((prev) => ({ ...prev, outElectricity: e.target.value }))}
-                                                        placeholder="Nhập chỉ số điện hiện tại"
-                                                    />
-                                                </div>
-                                                <CameraFileInput
-                                                    label="điện"
-                                                    value={executeForm.outElectricityImage}
-                                                    disabled={Boolean(actionLoading)}
-                                                    onChange={(payload) => setExecuteForm((prev) => ({ ...prev, outElectricityImage: payload }))}
-                                                    onRemove={() => setExecuteForm((prev) => ({ ...prev, outElectricityImage: null }))}
-                                                />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Chỉ số nước</label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        value={executeForm.outWater}
-                                                        onChange={(e) => setExecuteForm((prev) => ({ ...prev, outWater: e.target.value }))}
-                                                        placeholder="Nhập chỉ số nước hiện tại"
-                                                    />
-                                                </div>
-                                                <CameraFileInput
-                                                    label="nước"
-                                                    value={executeForm.outWaterImage}
-                                                    disabled={Boolean(actionLoading)}
-                                                    onChange={(payload) => setExecuteForm((prev) => ({ ...prev, outWaterImage: payload }))}
-                                                    onRemove={() => setExecuteForm((prev) => ({ ...prev, outWaterImage: null }))}
-                                                />
-                                            </div>
-                                        </div>
-                                        {requiresFullMoveOut(executeModal.transfer) && (
-                                            <div className="rounded-xl border border-gray-200 p-4 space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <h5 className="text-sm font-semibold text-gray-900">Bàn giao thiết bị phòng cũ</h5>
-                                                    <span className="text-xs text-gray-500">{executeForm.outAssets.length} thiết bị</span>
-                                                </div>
-                                                <div className="space-y-4">
-                                                    {executeForm.outAssets.map((asset, index) => (
-                                                        <div key={`out-asset-${index}`} className="rounded-xl border border-gray-200 p-4 space-y-3">
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Tên thiết bị</label>
-                                                                <Input
-                                                                    value={asset.assetName}
-                                                                    onChange={(e) => updateAssetList("outAssets", index, "assetName", e.target.value)}
-                                                                    placeholder="Tên thiết bị"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
-                                                                <Input
-                                                                    value={asset.assetCategory}
-                                                                    onChange={(e) => updateAssetList("outAssets", index, "assetCategory", e.target.value)}
-                                                                    placeholder="Danh mục thiết bị"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng</label>
-                                                                <Input
-                                                                    type="number"
-                                                                    min="1"
-                                                                    value={asset.quantity}
-                                                                    onChange={(e) => updateAssetList("outAssets", index, "quantity", e.target.value)}
-                                                                />
-                                                            </div>
-                                                            <div className="md:col-span-2">
-                                                                <label className="block text-sm font-medium text-gray-700 mb-2">Hiện trạng</label>
-                                                                <select
-                                                                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                                                    value={asset.currentCondition}
-                                                                    onChange={(e) => updateAssetList("outAssets", index, "currentCondition", e.target.value)}
-                                                                >
-                                                                    {CONDITION_OPTIONS.map((option) => (
-                                                                        <option key={option.value} value={option.value}>{option.label}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú thiết bị</label>
-                                                            <textarea
-                                                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                                rows={2}
-                                                                value={asset.description}
-                                                                onChange={(e) => updateAssetList("outAssets", index, "description", e.target.value)}
-                                                                placeholder="Mô tả hiện trạng thiết bị"
-                                                            />
-                                                        </div>
-                                                        <CameraFileInput
-                                                            label={`thiết bị ${asset.assetName || index + 1}`}
-                                                            value={asset.imageUrl ? { file: asset.imageFile, previewUrl: asset.imageUrl } : null}
-                                                            disabled={Boolean(actionLoading)}
-                                                            onChange={(payload) => handleAssetImageChange("outAssets", index, payload)}
-                                                            onRemove={() => handleAssetImageRemove("outAssets", index)}
-                                                            buttonText="Chụp ảnh thiết bị"
-                                                            previewAlt={`Ảnh ${asset.assetName || "thiết bị"}`}
-                                                        />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú</label>
-                                            <textarea
-                                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                rows={3}
-                                                value={executeForm.outNote}
-                                                onChange={(e) => setExecuteForm((prev) => ({ ...prev, outNote: e.target.value }))}
-                                                placeholder="Ghi chú bàn giao phòng cũ"
-                                            />
-                                        </div>
-                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                                            <div>
-                                                <h5 className="text-sm font-semibold text-amber-900">Chi phí phát sinh bàn giao phòng cũ</h5>
-                                                <p className="mt-1 text-xs text-amber-700">
-                                                    Khoản này sẽ tạo hóa đơn quyết toán riêng cho phòng cũ, không liên quan tới chênh lệch tiền phòng.
-                                                </p>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Số tiền phát sinh</label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="1000"
-                                                        value={executeForm.oldRoomFinalChargeAmount}
-                                                        onChange={(e) => setExecuteForm((prev) => ({ ...prev, oldRoomFinalChargeAmount: e.target.value }))}
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Nội dung thu</label>
-                                                    <Input
-                                                        value={executeForm.oldRoomFinalChargeNote}
-                                                        onChange={(e) => setExecuteForm((prev) => ({ ...prev, oldRoomFinalChargeNote: e.target.value }))}
-                                                        placeholder="VD: Bồi thường hư hỏng tài sản"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div>
-                                                    <h5 className="text-sm font-semibold text-emerald-950">{TRANSFER_OUT_UTILITY_COPY.estimateTitle}</h5>
-                                                    <p className="mt-1 text-xs text-emerald-700">{TRANSFER_OUT_UTILITY_COPY.estimateHint}</p>
-                                                </div>
-                                                {transferOutUtilityEstimateLoading && (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                                        {transferOutUtilityEstimate ? TRANSFER_OUT_UTILITY_COPY.recalculating : TRANSFER_OUT_UTILITY_COPY.loading}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {!transferOutUtilityEstimate && !transferOutUtilityEstimateLoading && !transferOutUtilityEstimateError && (
-                                                <p className="rounded-lg border border-emerald-100 bg-white px-3 py-2 text-xs text-emerald-700">
-                                                    {TRANSFER_OUT_UTILITY_COPY.inputHint}
-                                                </p>
-                                            )}
-
-                                            {transferOutUtilityEstimateError && (
-                                                <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
-                                                    {transferOutUtilityEstimateError}
-                                                </p>
-                                            )}
-
-                                            {transferOutUtilityEstimate && (
-                                                <>
-                                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                        <MeterChargeEstimateCard
-                                                            label={TRANSFER_OUT_UTILITY_COPY.electricity}
-                                                            estimate={transferOutUtilityEstimate.electricity}
-                                                        />
-                                                        <MeterChargeEstimateCard
-                                                            label={TRANSFER_OUT_UTILITY_COPY.water}
-                                                            estimate={transferOutUtilityEstimate.water}
-                                                        />
-                                                    </div>
-                                                    <div className="rounded-lg border border-emerald-100 bg-white p-3 text-sm">
-                                                        <div className="flex items-center justify-between text-slate-600">
-                                                            <span>{TRANSFER_OUT_UTILITY_COPY.incidental}</span>
-                                                            <span className="font-semibold text-slate-900">{formatVnd(transferOutUtilityEstimate.incidentalAmount)}</span>
-                                                        </div>
-                                                        <div className="mt-2 flex items-center justify-between text-slate-600">
-                                                            <span>{TRANSFER_OUT_UTILITY_COPY.serviceFee}</span>
-                                                            <span className="font-semibold text-slate-900">{formatVnd(transferOutUtilityEstimate.serviceFeeAmount)}</span>
-                                                        </div>
-                                                        <div className="mt-3 flex items-center justify-between border-t border-emerald-100 pt-3">
-                                                            <span className="font-semibold text-emerald-950">{TRANSFER_OUT_UTILITY_COPY.total}</span>
-                                                            <span className="text-lg font-bold text-emerald-950">{formatVnd(transferOutUtilityEstimate.totalAmount)}</span>
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                        <p className="text-sm font-semibold text-amber-800 mb-1">Move-out đã được chốt trước đó</p>
-                                        <p className="text-sm text-amber-700">
-                                            Bước này chỉ dùng để nhập phần move-in/phần hoàn tất cuối. Nếu cần sửa move-out thì phải quay lại luồng nghiệp vụ tương ứng ở backend.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {executeModal.phase !== "MOVE_OUT" && executeModal.transfer?.targetTransferType === "NEW_CONTRACT" && (
-                                <div className="rounded-2xl border border-gray-200 p-5 space-y-4">
-                                    <h4 className="text-sm font-bold text-gray-900">
-                                        New Room Check-in
-                                    </h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Chỉ số điện</label>
-                                                <Input
-                                                    type="number"
-                                                    min="0"
-                                                    value={executeForm.inElectricity}
-                                                    onChange={(e) => setExecuteForm((prev) => ({ ...prev, inElectricity: e.target.value }))}
-                                                    placeholder="Nhập chỉ số điện ban đầu"
-                                                />
-                                            </div>
-                                            <CameraFileInput
-                                                label="điện phòng mới"
-                                                value={executeForm.inElectricityImage}
-                                                disabled={Boolean(actionLoading)}
-                                                onChange={(payload) => setExecuteForm((prev) => ({ ...prev, inElectricityImage: payload }))}
-                                                onRemove={() => setExecuteForm((prev) => ({ ...prev, inElectricityImage: null }))}
-                                            />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Chỉ số nước</label>
-                                                <Input
-                                                    type="number"
-                                                    min="0"
-                                                    value={executeForm.inWater}
-                                                    onChange={(e) => setExecuteForm((prev) => ({ ...prev, inWater: e.target.value }))}
-                                                    placeholder="Nhập chỉ số nước ban đầu"
-                                                />
-                                            </div>
-                                            <CameraFileInput
-                                                label="nước phòng mới"
-                                                value={executeForm.inWaterImage}
-                                                disabled={Boolean(actionLoading)}
-                                                onChange={(payload) => setExecuteForm((prev) => ({ ...prev, inWaterImage: payload }))}
-                                                onRemove={() => setExecuteForm((prev) => ({ ...prev, inWaterImage: null }))}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-200 p-4 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <h5 className="text-sm font-semibold text-gray-900">Bàn giao thiết bị phòng mới</h5>
-                                            <span className="text-xs text-gray-500">{executeForm.inAssets.length} thiết bị</span>
-                                        </div>
-                                        <div className="space-y-4">
-                                            {executeForm.inAssets.map((asset, index) => (
-                                                <div key={`in-asset-${index}`} className="rounded-xl border border-gray-200 p-4 space-y-3">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Tên thiết bị</label>
-                                                            <Input
-                                                                value={asset.assetName}
-                                                                onChange={(e) => updateAssetList("inAssets", index, "assetName", e.target.value)}
-                                                                placeholder="Tên thiết bị"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
-                                                            <Input
-                                                                value={asset.assetCategory}
-                                                                onChange={(e) => updateAssetList("inAssets", index, "assetCategory", e.target.value)}
-                                                                placeholder="Danh mục thiết bị"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng</label>
-                                                            <Input
-                                                                type="number"
-                                                                min="1"
-                                                                value={asset.quantity}
-                                                                onChange={(e) => updateAssetList("inAssets", index, "quantity", e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div className="md:col-span-2">
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">Hiện trạng</label>
-                                                            <select
-                                                                className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                                                value={asset.currentCondition}
-                                                                onChange={(e) => updateAssetList("inAssets", index, "currentCondition", e.target.value)}
-                                                            >
-                                                                {CONDITION_OPTIONS.map((option) => (
-                                                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú thiết bị</label>
-                                                        <textarea
-                                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                            rows={2}
-                                                            value={asset.description}
-                                                            onChange={(e) => updateAssetList("inAssets", index, "description", e.target.value)}
-                                                            placeholder="Mô tả hiện trạng thiết bị"
-                                                        />
-                                                    </div>
-                                                    <CameraFileInput
-                                                        label={`thiết bị ${asset.assetName || index + 1}`}
-                                                        value={asset.imageUrl ? { file: asset.imageFile, previewUrl: asset.imageUrl } : null}
-                                                        disabled={Boolean(actionLoading)}
-                                                        onChange={(payload) => handleAssetImageChange("inAssets", index, payload)}
-                                                        onRemove={() => handleAssetImageRemove("inAssets", index)}
-                                                        buttonText="Chụp ảnh thiết bị"
-                                                        previewAlt={`Ảnh ${asset.assetName || "thiết bị"}`}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Ghi chú</label>
-                                        <textarea
-                                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                            rows={3}
-                                            value={executeForm.inNote}
-                                            onChange={(e) => setExecuteForm((prev) => ({ ...prev, inNote: e.target.value }))}
-                                            placeholder="Ghi chú nhận phòng mới"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {executeModal.transfer?.oldRoomFinalInvoiceId && (
-                                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-                                    <h4 className="text-sm font-bold text-blue-900">Hóa đơn điện/nước chốt khi chuyển phòng</h4>
-                                    <div className="mt-3 rounded-xl border border-blue-200 bg-white p-4 text-sm">
-                                        <p className="text-xs font-semibold text-gray-500 mb-1">Utility invoice reason TRANSFER</p>
-                                        <p className="font-semibold text-gray-900">#{executeModal.transfer.oldRoomFinalInvoiceId}</p>
-                                    </div>
-                                    <p className="mt-3 text-xs text-blue-700">
-                                        Hóa đơn này cần được thanh toán trước khi hoàn tất execute transfer.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-                            <Button variant="outline" onClick={closeExecuteModal} className="rounded-lg">
-                                Hủy
-                            </Button>
-                            <Button onClick={handleExecuteTransfer} disabled={actionLoading === `execute-${executeModal.transfer?.id}`} className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60">
-                                {actionLoading === `execute-${executeModal.transfer?.id}`
-                                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                                    : executeModal.phase === "MOVE_OUT"
-                                        ? "Start Transfer"
-                                        : "Hoàn tất chuyển phòng"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            <TransferExecutionModal
+                open={Boolean(executeModal)}
+                transferRequestId={executeModal?.transfer?.id}
+                transfer={executeModal?.transfer}
+                request={executeModal?.request}
+                onClose={closeExecuteModal}
+                onCompleted={async (refreshedTransfer) => {
+                    if (refreshedTransfer) {
+                        setDetailTransfer(refreshedTransfer);
+                    } else if (detailModal) {
+                        setDetailTransfer(await loadTransferDetail(detailModal));
+                    }
+                    await loadData();
+                }}
+            />
             {/* Reject modal */}
             {rejectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm" onClick={() => setRejectModal(null)}>

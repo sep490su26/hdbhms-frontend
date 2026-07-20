@@ -38,7 +38,7 @@ import {
   openDepositContractByPaymentPdf,
   previewDepositContract,
 } from "../../../services/depositContractsService";
-import { fetchMyTenantProfile, fetchPrivateFile } from "../../../services/tenantProfilesService";
+import { fetchMyTenantProfile, fetchPrivateFile, lookupPersonProfileByPhone } from "../../../services/tenantProfilesService";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CameraCapture from "../../../components/CameraCapture";
 import DateInput from "../../../components/DateInput";
@@ -446,6 +446,13 @@ const DEPOSIT_DRAFT_FIELDS = [
   "coOccupant2Phone",
 ];
 const DEPOSIT_DATE_FIELDS = new Set(["birthDate", "idIssueDate", "contractDate", "moveInDate"]);
+const CO_OCCUPANT_FULL_NAME_FIELDS = new Set(["coOccupant1FullName", "coOccupant2FullName"]);
+const CO_OCCUPANT_PHONE_FIELDS = new Set(["coOccupant1Phone", "coOccupant2Phone"]);
+const CO_OCCUPANT_NAME_PATTERN_MESSAGE = "Họ tên người ở cùng chỉ được chứa chữ cái và khoảng trắng.";
+const CO_OCCUPANT_PHONE_PATTERN_MESSAGE = "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng với số điện thoại người đặt cọc chính.";
+const CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng nhau.";
+const EXISTING_PERSON_PROFILE_HINT = "Hồ sơ với số điện thoại này đã có trong hệ thống. Khi lập hợp đồng, hệ thống sẽ dùng lại hồ sơ phù hợp.";
 const DepositFormErrorContext = createContext({
   errors: {},
   setError: () => { },
@@ -577,6 +584,10 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
   }
 
+  if (CO_OCCUPANT_FULL_NAME_FIELDS.has(name) && !FULL_NAME_PATTERN.test(normalizedValue)) {
+    return CO_OCCUPANT_NAME_PATTERN_MESSAGE;
+  }
+
   if (name === "phone" && !VIETNAM_PHONE_PATTERN.test(normalizedValue)) {
     return "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
   }
@@ -589,8 +600,8 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
   }
 
-  if ((name === "coOccupant1Phone" || name === "coOccupant2Phone") && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
-    return "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+  if (CO_OCCUPANT_PHONE_FIELDS.has(name) && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
+    return CO_OCCUPANT_PHONE_PATTERN_MESSAGE;
   }
 
   if (name === "email" && normalizedValue && !EMAIL_PATTERN.test(normalizedValue)) {
@@ -626,26 +637,29 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
   return "";
 };
 
-const validateOccupancyData = (data) => {
+const validateCoOccupantGroup = ({ occupantCount, coOccupants, mainPhone }) => {
   const nextErrors = {};
-  const occupantCount = Number(data.occupantCount || 0);
+  const count = Number(occupantCount || 0);
 
-  if (![1, 2, 3].includes(occupantCount)) {
+  if (![1, 2, 3].includes(count)) {
     nextErrors.occupantCount = "Số lượng người ở chỉ được chọn từ 1 đến 3.";
     return nextErrors;
   }
 
-  const mainPhone = normalizePhoneValue(data.phone);
-  const coOccupantPhones = [];
+  const normalizedMainPhone = normalizePhoneValue(mainPhone);
+  const seenPhones = new Map();
 
-  for (let displayOrder = 1; displayOrder < occupantCount; displayOrder += 1) {
+  for (let displayOrder = 1; displayOrder < count; displayOrder += 1) {
     const fullNameField = `coOccupant${displayOrder}FullName`;
     const phoneField = `coOccupant${displayOrder}Phone`;
-    const fullName = String(data[fullNameField] || "").trim();
-    const phone = normalizePhoneValue(data[phoneField]);
+    const occupant = coOccupants[displayOrder] || {};
+    const fullName = String(occupant.fullName || "").trim();
+    const phone = normalizePhoneValue(occupant.phone);
 
     if (!fullName) {
       nextErrors[fullNameField] = REQUIRED_DEPOSIT_MESSAGES[fullNameField];
+    } else if (!FULL_NAME_PATTERN.test(fullName)) {
+      nextErrors[fullNameField] = CO_OCCUPANT_NAME_PATTERN_MESSAGE;
     }
 
     if (!phone) {
@@ -654,25 +668,42 @@ const validateOccupancyData = (data) => {
     }
 
     if (!VIETNAM_PHONE_PATTERN.test(phone)) {
-      nextErrors[phoneField] = "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+      nextErrors[phoneField] = CO_OCCUPANT_PHONE_PATTERN_MESSAGE;
       continue;
     }
 
-    if (phone === mainPhone) {
-      nextErrors[phoneField] = "Số điện thoại người ở cùng không được trùng với số điện thoại người đặt cọc chính.";
+    if (phone === normalizedMainPhone) {
+      nextErrors[phoneField] = CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE;
       continue;
     }
 
-    if (coOccupantPhones.includes(phone)) {
-      nextErrors[phoneField] = "Số điện thoại người ở cùng không được trùng nhau.";
+    const duplicatedField = seenPhones.get(phone);
+    if (duplicatedField) {
+      nextErrors[phoneField] = CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
+      nextErrors[duplicatedField] = nextErrors[duplicatedField] || CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
       continue;
     }
 
-    coOccupantPhones.push(phone);
+    seenPhones.set(phone, phoneField);
   }
 
   return nextErrors;
 };
+
+const validateOccupancyData = (data) => validateCoOccupantGroup({
+  occupantCount: data.occupantCount,
+  mainPhone: data.phone,
+  coOccupants: {
+    1: {
+      fullName: data.coOccupant1FullName,
+      phone: data.coOccupant1Phone,
+    },
+    2: {
+      fullName: data.coOccupant2FullName,
+      phone: data.coOccupant2Phone,
+    },
+  },
+});
 
 const buildDepositMetadata = (room, data) => ({
   roomId: room.roomId || "",
@@ -940,6 +971,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     1: { fullName: "", phone: "" },
     2: { fullName: "", phone: "" },
   });
+  const [mainPhoneValue, setMainPhoneValue] = useState("");
+  const [coOccupantProfileHints, setCoOccupantProfileHints] = useState({});
   const isCccdScanMode = identityEntryMode === "scan";
 
   useEffect(() => {
@@ -1002,6 +1035,7 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
       if (isMounted) {
         setSavedDraft(draft);
+        setMainPhoneValue(draft.phone || "");
         setOccupantCount(["1", "2", "3"].includes(draft.occupantCount) ? draft.occupantCount : "1");
         setCoOccupants({
           1: {
@@ -1038,6 +1072,59 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     return () => window.clearTimeout(timerId);
   }, [apiFieldErrors]);
 
+  useEffect(() => {
+    const count = Number(occupantCount || 1);
+    const validationErrors = validateCoOccupantGroup({
+      occupantCount,
+      coOccupants,
+      mainPhone: mainPhoneValue,
+    });
+    const lookupTargets = [];
+
+    for (let displayOrder = 1; displayOrder < count; displayOrder += 1) {
+      const phone = normalizePhoneValue(coOccupants[displayOrder]?.phone);
+      const phoneField = `coOccupant${displayOrder}Phone`;
+      if (phone && !validationErrors[phoneField] && VIETNAM_PHONE_PATTERN.test(phone)) {
+        lookupTargets.push({ displayOrder, phone });
+      }
+    }
+
+    let cancelled = false;
+    if (!lookupTargets.length) {
+      const clearTimerId = window.setTimeout(() => {
+        if (!cancelled) setCoOccupantProfileHints({});
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(clearTimerId);
+      };
+    }
+
+    const timerId = window.setTimeout(async () => {
+      const results = await Promise.all(lookupTargets.map(async (target) => {
+        try {
+          const lookup = await lookupPersonProfileByPhone(target.phone);
+          return { ...target, exists: Boolean(lookup?.exists) };
+        } catch {
+          return { ...target, exists: false };
+        }
+      }));
+
+      if (cancelled) return;
+      setCoOccupantProfileHints(() => results.reduce((nextHints, result) => {
+        if (result.exists) {
+          nextHints[result.displayOrder] = { phone: result.phone };
+        }
+        return nextHints;
+      }, {}));
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [coOccupants, occupantCount, mainPhoneValue]);
+
   const setFieldError = (name, message) => {
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
@@ -1058,25 +1145,55 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     return !message;
   };
 
+  const getMainPhoneValue = () => formRef.current?.elements?.namedItem("phone")?.value || "";
+
+  const getCoOccupantErrors = (nextCoOccupants = coOccupants, nextCount = occupantCount, mainPhoneValue = getMainPhoneValue()) =>
+    validateCoOccupantGroup({
+      occupantCount: nextCount,
+      coOccupants: nextCoOccupants,
+      mainPhone: mainPhoneValue,
+    });
+
+  const mergeCoOccupantErrors = (currentErrors, nextErrors) => ({
+    ...currentErrors,
+    coOccupant1FullName: "",
+    coOccupant1Phone: "",
+    coOccupant2FullName: "",
+    coOccupant2Phone: "",
+    ...nextErrors,
+  });
+
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
     validateAndSetDepositField(name, value);
+    if (name === "phone") {
+      setMainPhoneValue(value);
+      const nextErrors = getCoOccupantErrors(coOccupants, occupantCount, value);
+      setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
+    }
   };
 
   const handleFieldBlur = (event) => {
     const { name, value } = event.target;
     validateAndSetDepositField(name, value);
+    if (name === "phone") {
+      setMainPhoneValue(value);
+      const nextErrors = getCoOccupantErrors(coOccupants, occupantCount, value);
+      setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
+    }
   };
 
   const handleOccupantCountChange = (event) => {
     const nextCount = event.target.value;
+    const nextCoOccupants = {
+      1: Number(nextCount) >= 2 ? coOccupants[1] : { fullName: "", phone: "" },
+      2: Number(nextCount) >= 3 ? coOccupants[2] : { fullName: "", phone: "" },
+    };
     setOccupantCount(nextCount);
-    setCoOccupants((currentCoOccupants) => ({
-      1: Number(nextCount) >= 2 ? currentCoOccupants[1] : { fullName: "", phone: "" },
-      2: Number(nextCount) >= 3 ? currentCoOccupants[2] : { fullName: "", phone: "" },
-    }));
+    setCoOccupants(nextCoOccupants);
+    const nextCoOccupantErrors = getCoOccupantErrors(nextCoOccupants, nextCount);
     setFieldErrors((currentErrors) => ({
-      ...currentErrors,
+      ...mergeCoOccupantErrors(currentErrors, nextCoOccupantErrors),
       occupantCount: validateDepositField("occupantCount", nextCount),
       ...(Number(nextCount) < 2 ? { coOccupant1FullName: "", coOccupant1Phone: "" } : {}),
       ...(Number(nextCount) < 3 ? { coOccupant2FullName: "", coOccupant2Phone: "" } : {}),
@@ -1085,15 +1202,16 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
   const handleCoOccupantChange = (displayOrder, fieldName) => (event) => {
     const value = event.target.value;
-    const formFieldName = `coOccupant${displayOrder}${fieldName === "fullName" ? "FullName" : "Phone"}`;
-    setCoOccupants((currentCoOccupants) => ({
-      ...currentCoOccupants,
+    const nextCoOccupants = {
+      ...coOccupants,
       [displayOrder]: {
-        ...currentCoOccupants[displayOrder],
+        ...coOccupants[displayOrder],
         [fieldName]: value,
       },
-    }));
-    validateAndSetDepositField(formFieldName, value);
+    };
+    setCoOccupants(nextCoOccupants);
+    const nextErrors = getCoOccupantErrors(nextCoOccupants);
+    setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
   };
 
   const handleDraftChange = (event) => {
@@ -1442,7 +1560,15 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
           <FormSection title="Thông tin liên hệ" icon={Phone}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Số điện thoại" name="phone" type="tel" placeholder="0901 234 567" defaultValue={savedDraft.phone} />
+              <Field
+                label="Số điện thoại"
+                name="phone"
+                type="tel"
+                placeholder="0901 234 567"
+                defaultValue={savedDraft.phone}
+                onChange={handleFieldChange}
+                onBlur={handleFieldBlur}
+              />
               <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
             </div>
           </FormSection>
@@ -1517,6 +1643,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                     />
                     {fieldErrors[`coOccupant${displayOrder}Phone`] && (
                       <span className="text-xs font-medium text-rose-600">{fieldErrors[`coOccupant${displayOrder}Phone`]}</span>
+                    )}
+                    {!fieldErrors[`coOccupant${displayOrder}Phone`] && coOccupantProfileHints[displayOrder] && (
+                      <span className="text-xs font-medium text-emerald-700">{EXISTING_PERSON_PROFILE_HINT}</span>
                     )}
                   </label>
                 </div>

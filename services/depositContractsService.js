@@ -135,7 +135,7 @@ export function buildDepositContractDocumentFilename(item = {}) {
       item.expectedLeaseSignDate ??
       item.expected_lease_sign_date,
   );
-  return `${roomCode}_HDC_${date}.pdf`;
+  return `HDC_${roomCode}_${date}.pdf`;
 }
 
 const DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME = buildDepositContractDocumentFilename();

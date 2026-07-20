@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
 } from "@/services/roomAssetsService";
 import {
   submitHandover,
+  fetchContractHandover,
   fetchLatestReadings,
   uploadFile,
 } from "@/services/contractHandoverService";
@@ -48,6 +50,18 @@ const CONDITION_OPTIONS = [
   { value: "BROKEN", label: "Hỏng cần sửa" },
   { value: "MISSING", label: "Thiếu thiết bị" },
 ];
+
+const CONFIRMED_STATUSES = new Set(["CONFIRMED", "CONFIRMED_BY_TENANT"]);
+
+function defaultDescription(roomCode) {
+  return `Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng ${roomCode || "chưa cập nhật"}.`;
+}
+
+function meterReadingLabel(handoverType) {
+  if (handoverType === "TRANSFER_OUT") return "Chỉ số chốt";
+  if (handoverType === "TRANSFER_IN") return "Chỉ số nhận phòng";
+  return "Chỉ số ban đầu";
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -111,6 +125,14 @@ export default function ContractHandoverSection({
   roomId,
   roomCode,
   readonly = false,
+  handoverType = "MOVE_IN",
+  title = "Bàn giao phòng",
+  description,
+  showAssets = true,
+  hideSaveButton = false,
+  confirmOnSave = true,
+  actionRef,
+  onLoaded,
   onSaved,
 }) {
   /* meter readings -------------------------------------------------- */
@@ -147,6 +169,7 @@ export default function ContractHandoverSection({
   const newAssetSequenceRef = useRef(0);
   const effectiveReadonly = readonly || isConfirmed;
   const assetEditingDisabled = effectiveReadonly || saving || loadingAssets;
+  const readingLabel = meterReadingLabel(handoverType);
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
@@ -192,11 +215,12 @@ export default function ContractHandoverSection({
   }, [roomId]);
 
   useEffect(() => {
+    if (!showAssets) return undefined;
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAssets(controller.signal);
     return () => controller.abort();
-  }, [loadAssets]);
+  }, [loadAssets, showAssets]);
 
   /* Fetch latest meter readings ------------------------------------- */
   const loadReadings = useCallback((signal) => {
@@ -209,18 +233,20 @@ export default function ContractHandoverSection({
         const elecValue = elec.suggested_value ?? elec.suggestedValue;
         const elecDate = elec.last_reading_date ?? elec.lastReadingDate;
 
-        setElectricReading(prev => prev === "" && elecValue != null ? String(elecValue) : prev);
+        setElectricReading(prev => prev === "" ? String(elecValue ?? 0) : prev);
         if (elecDate) setElectricReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? elecDate : prev);
 
         const wat = data?.water || {};
         const watValue = wat.suggested_value ?? wat.suggestedValue;
         const watDate = wat.last_reading_date ?? wat.lastReadingDate;
 
-        setWaterReading(prev => prev === "" && watValue != null ? String(watValue) : prev);
+        setWaterReading(prev => prev === "" ? String(watValue ?? 0) : prev);
         if (watDate) setWaterReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? watDate : prev);
       })
       .catch((err) => {
         if (signal?.aborted) return;
+        setElectricReading(prev => prev === "" ? "0" : prev);
+        setWaterReading(prev => prev === "" ? "0" : prev);
         console.warn(
           "Không tải được chỉ số điện nước gần nhất; vẫn có thể nhập bàn giao thủ công.",
           err?.message ?? "Unknown error",
@@ -234,42 +260,40 @@ export default function ContractHandoverSection({
 
     // If contractId is provided, fetch handover record first
     if (contractId) {
-      import('@/services/contractHandoverService').then(({ fetchContractHandover }) => {
-        fetchContractHandover(contractId, "MOVE_IN")
+      fetchContractHandover(contractId, handoverType)
           .then((data) => {
             if (controller.signal.aborted) return;
             if (data) {
               const status = data.status;
-              setIsConfirmed(status === "CONFIRMED" || status === "CONFIRMED_BY_TENANT");
+              setIsConfirmed(CONFIRMED_STATUSES.has(status));
 
               const hDate = data.handover_date || data.handoverDate;
               if (hDate) setHandoverDate(hDate.split("T")[0]);
               
               const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
-              if (elecValue != null) {
-                setElectricReading(String(elecValue));
-              }
+              setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
               const watValue = data.water?.current_value ?? data.water?.currentValue;
-              if (watValue != null) {
-                setWaterReading(String(watValue));
-              }
+              setWaterReading(prev => watValue != null ? String(watValue) : (prev === "" ? "0" : prev));
               if (data.note) setNote(data.note);
+              onLoaded?.(data);
             } else {
               setIsConfirmed(false);
+              onLoaded?.(null);
               if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
             }
           })
           .catch((err) => {
             if (controller.signal.aborted) return;
+            onLoaded?.(null);
             if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
           });
-      });
     } else {
+      onLoaded?.(null);
       if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId]);
+  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, waterReading]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -375,16 +399,19 @@ export default function ContractHandoverSection({
     waterReading !== "" &&
     Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
     Number.isFinite(Number(waterReading)) && Number(waterReading) >= 0 &&
-    assets.every((a) =>
+    (!showAssets || assets.every((a) =>
       a.assetName.trim() &&
       a.assetCategory.trim() &&
       Number.isInteger(Number(a.quantity)) &&
       Number(a.quantity) >= 0
-    );
+    ));
 
   function validateBeforeSave() {
     if (!isValid) {
-      window.alert("Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị.");
+      toast.error(showAssets
+        ? "Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị."
+        : "Vui lòng nhập đủ ngày bàn giao và chỉ số điện/nước."
+      );
       return false;
     }
     return true;
@@ -392,12 +419,17 @@ export default function ContractHandoverSection({
 
   function requestSave() {
     if (effectiveReadonly || saving || !validateBeforeSave()) return;
+    if (!confirmOnSave) {
+      void handleSave();
+      return;
+    }
     setSaveConfirmationOpen(true);
   }
 
   /* Save — single atomic call via /handover/submit ----------------- */
   async function handleSave() {
-    if (effectiveReadonly || saving || !validateBeforeSave()) return;
+    if (effectiveReadonly) return true;
+    if (saving || !validateBeforeSave()) return false;
 
     setSaveConfirmationOpen(false);
 
@@ -419,7 +451,7 @@ export default function ContractHandoverSection({
       }
 
       // 2. Upload new asset images
-      const assetPayloadGroups = await Promise.all(
+      const assetPayloadGroups = showAssets ? await Promise.all(
         assets.map(async (asset) => {
           let assetImageId = null;
           if (asset.imageFile) {
@@ -464,17 +496,17 @@ export default function ContractHandoverSection({
 
           return [primaryPayload, ...secondaryPayloads];
         }),
-      );
+      ) : [];
       const assetPayloads = assetPayloadGroups.flat();
-      const deletedAssetIds = [
+      const deletedAssetIds = showAssets ? [
         ...new Set(
           removedAssets.flatMap(({ asset }) => getPersistedAssetIds(asset)),
         ),
-      ];
+      ] : [];
 
       // 3. Single atomic submit: readings + assets + confirm
-      await submitHandover(contractId, {
-        handoverType: "MOVE_IN",
+      const response = await submitHandover(contractId, {
+        handoverType,
         handoverDate: handoverDate || new Date().toISOString().split("T")[0],
         note: note.trim(),
         electricity: {
@@ -487,7 +519,7 @@ export default function ContractHandoverSection({
           photoFileId: waterPhotoId,
           readingDate: waterReadingDate || undefined,
         },
-        assets: assetPayloads,
+        assets: showAssets ? assetPayloads : undefined,
         deletedAssetIds,
       });
 
@@ -496,13 +528,20 @@ export default function ContractHandoverSection({
       setRemovedAssets([]);
       setSaveSuccess(true);
       setIsConfirmed(true);
-      onSaved?.();
+      onSaved?.(response || {status: "CONFIRMED", handoverType});
+      return true;
     } catch (err) {
       setSaveError(err?.message ?? "Lưu thông tin thất bại.");
+      toast.error(err?.message ?? "Lưu thông tin thất bại.");
+      return false;
     } finally {
       setSaving(false);
     }
   }
+
+  useImperativeHandle(actionRef, () => ({
+    save: handleSave,
+  }));
 
   /* ----------------------------------------------------------------- */
   /*  Render                                                            */
@@ -514,11 +553,10 @@ export default function ContractHandoverSection({
         <div>
           <h3 className="inline-flex items-center gap-2 text-lg font-extrabold text-slate-900 dark:text-white xl:text-xl">
             <Gauge className="h-5 w-5" />
-            Bàn giao phòng
+            {title}
           </h3>
           <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 xl:text-sm">
-            Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng{" "}
-            {roomCode || "chưa cập nhật"}.
+            {description || defaultDescription(roomCode)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -551,7 +589,7 @@ export default function ContractHandoverSection({
           <input
             type="date"
             value={handoverDate}
-            disabled={true}
+            disabled={effectiveReadonly || saving}
             onChange={(e) => setHandoverDate(e.target.value)}
             className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
           />
@@ -565,7 +603,7 @@ export default function ContractHandoverSection({
           <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ điện</h4>
 
           <div className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (kWh) *</span>
+            <span className="text-xs font-bold text-[#58667c]">{readingLabel} (kWh) *</span>
             <input
               type="number"
               min="0"
@@ -603,7 +641,7 @@ export default function ContractHandoverSection({
           <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ nước</h4>
 
           <div className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#58667c]">Chỉ số ban đầu (m³) *</span>
+            <span className="text-xs font-bold text-[#58667c]">{readingLabel} (m³) *</span>
             <input
               type="number"
               min="0"
@@ -638,6 +676,7 @@ export default function ContractHandoverSection({
       </div>
 
       {/* Assets Table */}
+      {showAssets && (
       <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#dfe5ef] dark:border-white/10 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -862,6 +901,7 @@ export default function ContractHandoverSection({
           </table>
         </div>
       </div>
+      )}
 
       {/* Note */}
       <label className="mt-4 grid gap-1.5">
@@ -884,12 +924,12 @@ export default function ContractHandoverSection({
       )}
       {saveSuccess && (
         <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-          ✓ Đã lưu hiện trạng thiết bị thành công.
+          ✓ Đã lưu bàn giao thành công.
         </div>
       )}
 
       {/* Save button */}
-      {!effectiveReadonly && (
+      {!hideSaveButton && !effectiveReadonly && (
         <div className="mt-4 flex justify-end">
           <button
             type="button"

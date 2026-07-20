@@ -757,8 +757,15 @@ const CONTRACT_STATUS_LABELS = {
   LIQUIDATED: "Đã thanh lý",
   EXPIRED: "Hết hạn",
   RENEWED: "Đã gia hạn",
+  TRANSFERRED: "Đã chuyển phòng",
   CANCELLED: "Đã hủy",
 };
+
+const CURRENT_CONTRACT_STATUSES = new Set([
+  "ACTIVE",
+  "EXPIRING_SOON",
+  "TERMINATION_PENDING",
+]);
 
 const OCCUPANT_ROLE_LABELS = {
   PRIMARY: "Người ký chính",
@@ -812,7 +819,9 @@ function RentalHistoryPanel({ history, isLoading, error }) {
   return (
     <div className="mt-5 space-y-4">
       {contracts.map((contract, index) => {
-        const isCurrent = contract.status === "ACTIVE";
+        const isCurrent = CURRENT_CONTRACT_STATUSES.has(
+          String(contract.status || "").toUpperCase()
+        );
         return (
           <article
             key={contract.contractId || `${contract.contractCode}-${index}`}

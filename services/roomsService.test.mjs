@@ -133,7 +133,7 @@ test("fetchPublicRoomById scopes duplicate room codes by property", async () => 
         ok: true,
         json: async () => ({
           code: 0,
-          data: [{ id: 21, name: "Táº§ng 1", sortOrder: 1 }],
+          data: [{ id: 21, name: "Tầng 1", sortOrder: 1 }],
         }),
       };
     }

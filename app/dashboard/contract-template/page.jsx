@@ -4,6 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {useSearchParams} from "next/navigation";
 import {
     AlertTriangle,
+    ArrowRightLeft,
     CalendarDays,
     CheckCircle2,
     Download,
@@ -27,6 +28,7 @@ import {
     activateLeaseContract,
     buildLeaseContractDocumentFilename,
     createDraftLeaseContractFromDeposit,
+    downloadLeaseContractDraftPdf,
     downloadLeaseContractSignedFile,
     fetchLeaseContractManagementList,
     fetchManagementLeaseContractDetails,
@@ -37,12 +39,17 @@ import {
     renewLeaseContract,
     updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
+import {
+    confirmTransferContract,
+    signTransferContract,
+} from "@/services/roomTransferService";
 import {sendTenantAccountCredentials} from "@/services/identityAccessService";
 import {fetchContractHandover} from "@/services/contractHandoverService";
 import ContractActivationFlow from "./ContractActivationFlow";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
 import HandoverDocumentCard from "./HandoverDocumentCard";
+import TransferExecutionModal from "../_components/TransferExecutionModal";
 import {toast} from "sonner";
 import {formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime} from "@/lib/dateFormat";
 import {sortByNewest} from "@/lib/sortByNewest.mjs";
@@ -82,6 +89,7 @@ const CURRENT_CONTRACT_WORKFLOWS = new Set([
 const HISTORY_CONTRACT_WORKFLOWS = new Set([
     "LIQUIDATED",
     "RENEWED",
+    "TRANSFERRED",
     "CANCELLED",
     "AUTO_TERMINATED",
     "TERMINATION_PENDING",
@@ -104,6 +112,7 @@ const WORKFLOW_LABELS = {
     LIQUIDATED: "Đã thanh lý",
     EXPIRED: "Hết hạn",
     RENEWED: "Đã gia hạn",
+    TRANSFERRED: "Đã chuyển phòng",
     CANCELLED: "Đã hủy",
     AUTO_TERMINATED: "Đã tự động kết thúc",
     TERMINATION_PENDING: "Chờ thanh lý",
@@ -119,10 +128,30 @@ const STATUS_LABELS = {
     EXPIRED: "Hết hạn",
     TERMINATED: "Đã thanh lý",
     RENEWED: "Đã gia hạn",
+    TRANSFERRED: "Đã chuyển phòng",
     EXPIRING_SOON: "Sắp hết hạn",
     CANCELLED: "Đã hủy",
     AUTO_TERMINATED: "Đã tự động kết thúc",
     TERMINATION_PENDING: "Chờ thanh lý",
+};
+
+const TRANSFER_STATUS_LABELS = {
+    REQUESTED: "Mới tạo",
+    MANAGER_APPROVED: "Quản lý đã duyệt",
+    WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
+    WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
+    WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
+    WAITING_PAYMENT: "Chờ thanh toán",
+    WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
+    WAITING_SIGNING: "Chờ quản lý upload bản ký",
+    WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
+    WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
+    READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
+    WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
+    EXECUTED: "Đã chuyển phòng",
+    CANCELLED: "Đã hủy",
+    REJECTED: "Đã từ chối",
+    EXPIRED: "Đã hết hạn",
 };
 
 const ROLE_LABELS = {
@@ -369,6 +398,7 @@ function getWorkflow(item) {
         "TERMINATION_PENDING",
         "LIQUIDATED",
         "RENEWED",
+        "TRANSFERRED",
         "CANCELLED",
         "AUTO_TERMINATED",
     ].includes(contractStatus)) {
@@ -386,10 +416,7 @@ function getContractType(item = {}) {
 }
 
 function isVisibleLeaseContract(item) {
-    return (
-        !isRoomTransferManagedContract(item) &&
-        (getContractType(item) === "lease" || Boolean(item?.depositAgreementId))
-    );
+    return Boolean(item?.leaseContractId || item?.contractId || item?.depositAgreementId);
 }
 
 function getContractDateValue(item = {}) {
@@ -462,6 +489,14 @@ function isRoomTransferManagedContract(item) {
     return Boolean(item?.transferRequestId);
 }
 
+function isTransferSigningStatus(status) {
+    return status === "WAITING_SIGNING" || status === "WAITING_CONTRACT_SIGNING";
+}
+
+function getTransferStatusLabel(status) {
+    return TRANSFER_STATUS_LABELS[status] || status || "Chưa rõ";
+}
+
 function isRenewalContract(item) {
     return Boolean(item?.previousContractId ?? item?.previous_contract_id);
 }
@@ -488,16 +523,19 @@ function getTransferContractNotice(item) {
     if (!isRoomTransferManagedContract(item)) return null;
     const requestedDate = formatDate(item.transferRequestedDate);
     const code = item.transferRequestCode || `#${item.transferRequestId}`;
+    if (isTransferSigningStatus(item.transferStatus)) {
+        return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Quản lý có thể upload bản đã ký và xác nhận ngay trong màn hợp đồng này.`;
+    }
     if (item.transferStatus === "WAITING_TRANSFER_DATE") {
-        return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; bàn giao/kích hoạt vẫn phải xử lý trong chi tiết yêu cầu chuyển phòng.`;
+        return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; có thể bấm Chốt phòng cũ ngay trong màn hợp đồng khi tenant và quản lý có mặt thực tế.`;
     }
     if (["READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(item.transferStatus)) {
-        return `Đã tới bước vận hành của yêu cầu chuyển phòng ${code}. Hãy thực hiện bàn giao/kích hoạt trong chi tiết yêu cầu chuyển phòng.`;
+        return `Đã tới bước vận hành của yêu cầu chuyển phòng ${code}. Hoàn tất chốt phòng cũ/nhận phòng mới ngay tại màn hợp đồng để chuyển trạng thái.`;
     }
     if (item.transferStatus === "EXECUTED") {
         return `Hợp đồng này đã được xử lý qua yêu cầu chuyển phòng ${code}.`;
     }
-    return `Hợp đồng này thuộc yêu cầu chuyển phòng ${code}; việc ký, bàn giao và kích hoạt phải đi theo luồng chuyển phòng.`;
+    return `Hợp đồng này thuộc yêu cầu chuyển phòng ${code}; trạng thái hợp đồng sẽ đi theo tiến trình chuyển phòng.`;
 }
 
 function unwrapHandoverResponse(response) {
@@ -688,6 +726,7 @@ export default function ContractTemplatePage() {
     const [size, setSize] = useState(10);
     const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
     const [cleanupStep, setCleanupStep] = useState(1);
+    const [transferExecutionModal, setTransferExecutionModal] = useState(null);
     const selectedYear = searchParams.get("year") || "all";
 
     const loadContracts = useCallback(async () => {
@@ -941,11 +980,21 @@ export default function ContractTemplatePage() {
         setTermsError("");
         setRenewModalOpen(false);
         setIntentionModalOpen(false);
+        setTransferExecutionModal(null);
     }
 
     function openUploadDialog(item) {
         setSelected(item);
         window.setTimeout(() => fileInputRef.current?.click(), 0);
+    }
+
+    function closeTransferExecutionModal() {
+        setTransferExecutionModal(null);
+    }
+
+    function openTransferExecutionModal(item) {
+        if (!item?.transferRequestId) return;
+        setTransferExecutionModal({contract: item, transferRequestId: item.transferRequestId});
     }
 
     async function openPrintWizard(item) {
@@ -1072,7 +1121,7 @@ export default function ContractTemplatePage() {
         if (!item?.leaseContractId) return;
 
         if (isRoomTransferManagedContract(item)) {
-            window.alert("Hợp đồng này thuộc yêu cầu chuyển phòng. Vui lòng thực hiện bàn giao/kích hoạt trong chi tiết yêu cầu chuyển phòng.");
+            window.alert("Hợp đồng này thuộc yêu cầu chuyển phòng. Vui lòng xử lý trong khối chuyển phòng ngay tại chi tiết hợp đồng.");
             return;
         }
 
@@ -1157,6 +1206,114 @@ export default function ContractTemplatePage() {
         } finally {
             setActionLoading("");
         }
+    }
+
+    async function handleConfirmTransferSigned(item) {
+        if (!item?.transferRequestId) return;
+        if (!isTransferSigningStatus(item.transferStatus)) {
+            toast.info("Hợp đồng chuyển phòng đã qua bước xác nhận ký.");
+            return;
+        }
+        if (!getLeaseSignedFileId(item)) {
+            window.alert("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
+            return;
+        }
+
+        setActionLoading(`transfer-sign-${item.transferRequestId}`);
+        setError("");
+        try {
+            await signTransferContract(item.transferRequestId);
+            const refreshedContracts = await loadContracts();
+            const refreshedItem = refreshedContracts.find(
+                (contract) => String(contract.leaseContractId) === String(item.leaseContractId),
+            );
+            if (refreshedItem) {
+                setSelected((current) =>
+                    String(current?.leaseContractId) === String(item.leaseContractId)
+                        ? {...current, ...refreshedItem}
+                        : refreshedItem,
+                );
+            }
+            const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+            setDetails(refreshedDetails);
+            setTermsForm(buildTermsForm(refreshedDetails));
+            toast.success("Đã xác nhận hợp đồng chuyển phòng đã ký đủ.");
+        } catch (err) {
+            setError(err?.message || "Không xác nhận được hợp đồng chuyển phòng đã ký.");
+            toast.error(err?.message || "Không xác nhận được hợp đồng chuyển phòng đã ký.");
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    async function handleDownloadTransferDraft(item) {
+        if (!item?.leaseContractId) return;
+
+        setActionLoading(`transfer-download-${item.leaseContractId}`);
+        setError("");
+        try {
+            await downloadLeaseContractDraftPdf(
+                item.leaseContractId,
+                buildLeaseContractDocumentFilename(item),
+            );
+            toast.success("Đã tải hợp đồng chuyển phòng để in và ký.");
+        } catch (err) {
+            setError(err?.message || "Không tải được hợp đồng chuyển phòng.");
+            toast.error(err?.message || "Không tải được hợp đồng chuyển phòng.");
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    async function handleConfirmTransferContract(item) {
+        if (!item?.transferRequestId || !item?.leaseContractId) return;
+
+        setActionLoading(`transfer-confirm-${item.transferRequestId}`);
+        setError("");
+        try {
+            await confirmTransferContract(item.transferRequestId);
+            const refreshedContracts = await loadContracts();
+            const refreshedItem = refreshedContracts.find(
+                (contract) => String(contract.leaseContractId) === String(item.leaseContractId),
+            );
+            if (refreshedItem) {
+                setSelected((current) =>
+                    String(current?.leaseContractId) === String(item.leaseContractId)
+                        ? {...current, ...refreshedItem}
+                        : refreshedItem,
+                );
+            }
+            const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+            setDetails(refreshedDetails);
+            setTermsForm(buildTermsForm(refreshedDetails));
+            toast.success("Đã xác nhận hợp đồng chuyển phòng.");
+        } catch (err) {
+            setError(err?.message || "Không xác nhận được hợp đồng chuyển phòng.");
+            toast.error(err?.message || "Không xác nhận được hợp đồng chuyển phòng.");
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    async function refreshSelectedContract(contract) {
+        if (!contract?.leaseContractId) {
+            await loadContracts();
+            return;
+        }
+        const refreshedContracts = await loadContracts();
+        const refreshedItem = refreshedContracts.find(
+            (item) => String(item.leaseContractId) === String(contract.leaseContractId),
+        );
+        if (refreshedItem) {
+            setSelected((current) =>
+                String(current?.leaseContractId) === String(contract.leaseContractId)
+                    ? {...current, ...refreshedItem}
+                    : refreshedItem,
+            );
+        }
+        const refreshedDetails = await fetchManagementLeaseContractDetails(contract.leaseContractId);
+        setDetails(refreshedDetails);
+        setTermsForm(buildTermsForm(refreshedDetails));
     }
 
     async function handleRetrySendAccount(item) {
@@ -2031,6 +2188,100 @@ export default function ContractTemplatePage() {
                                     </div>
                                 </div>
                             )}
+                            {isRoomTransferManagedContract(mergedSelected) && (
+                                <DetailCard title="Xử lý hợp đồng chuyển phòng" icon={ArrowRightLeft}
+                                            className="lg:col-span-2">
+                                    <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <InfoValue
+                                                label="Yêu cầu chuyển phòng"
+                                                value={mergedSelected.transferRequestCode || `#${mergedSelected.transferRequestId}`}
+                                            />
+                                            <InfoValue
+                                                label="Trạng thái chuyển phòng"
+                                                value={getTransferStatusLabel(mergedSelected.transferStatus)}
+                                            />
+                                                <InfoValue
+                                                    label="File đã ký"
+                                                    value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa upload"}
+                                                />
+                                        </div>
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            {["WAITING_TRANSFER_DATE", "READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(mergedSelected.transferStatus) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openTransferExecutionModal(mergedSelected)}
+                                                    disabled={isBusy}
+                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-60"
+                                                >
+                                                    <ArrowRightLeft className="h-4 w-4"/>
+                                                    {mergedSelected.transferStatus === "WAITING_EXECUTION" ? "Hoàn tất chuyển phòng" : "Chốt phòng cũ"}
+                                                </button>
+                                            )}
+                                            {mergedSelected.transferStatus === "WAITING_CONTRACT_CONFIRMATION" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleConfirmTransferContract(mergedSelected)}
+                                                    disabled={isBusy}
+                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-60"
+                                                >
+                                                    {actionLoading === `transfer-confirm-${mergedSelected.transferRequestId}` ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin"/>
+                                                    ) : (
+                                                        <CheckCircle2 className="h-4 w-4"/>
+                                                    )}
+                                                    Xác nhận hợp đồng
+                                                </button>
+                                            )}
+                                            {isTransferSigningStatus(mergedSelected.transferStatus) && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDownloadTransferDraft(mergedSelected)}
+                                                        disabled={isBusy}
+                                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === `transfer-download-${mergedSelected.leaseContractId}` ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin"/>
+                                                        ) : (
+                                                            <Download className="h-4 w-4"/>
+                                                        )}
+                                                        Tải bản nháp
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openUploadDialog(mergedSelected)}
+                                                        disabled={isBusy}
+                                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
+                                                    >
+                                                        <Upload className="h-4 w-4"/>
+                                                        {getLeaseSignedFileId(mergedSelected) ? "Thay file ký" : "Upload bản ký"}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleConfirmTransferSigned(mergedSelected)}
+                                                        disabled={isBusy || !getLeaseSignedFileId(mergedSelected)}
+                                                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === `transfer-sign-${mergedSelected.transferRequestId}` ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin"/>
+                                                        ) : (
+                                                            <CheckCircle2 className="h-4 w-4"/>
+                                                        )}
+                                                        Xác nhận đã ký đủ
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {!isTransferSigningStatus(mergedSelected.transferStatus) &&
+                                        mergedSelected.transferStatus !== "WAITING_CONTRACT_CONFIRMATION" && (
+                                        <p className="mt-4 rounded-lg border border-[#dfe5ef] bg-white px-4 py-3 text-sm font-semibold text-[#607089]">
+                                            Trạng thái chuyển phòng hiện tại: {getTransferStatusLabel(mergedSelected.transferStatus)}. Tất cả thao tác xử lý đều làm ngay tại khối này.
+                                        </p>
+                                    )}
+                                </DetailCard>
+                            )}
                             {needsActivationFlow(mergedSelected) ? (
                                 <ContractActivationFlow
                                     contract={mergedSelected}
@@ -2634,6 +2885,19 @@ export default function ContractTemplatePage() {
                 </div>
             )}
 
+            <TransferExecutionModal
+                open={Boolean(transferExecutionModal)}
+                transferRequestId={transferExecutionModal?.transferRequestId}
+                contract={transferExecutionModal?.contract}
+                onClose={closeTransferExecutionModal}
+                onCompleted={async () => {
+                    if (transferExecutionModal?.contract) {
+                        await refreshSelectedContract(transferExecutionModal.contract);
+                    } else {
+                        await loadContracts();
+                    }
+                }}
+            />
             {printWizard && (
                 <ContractPrintWizard
                     contract={printWizard.contract}

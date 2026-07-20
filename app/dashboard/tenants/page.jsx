@@ -34,6 +34,11 @@ import {
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import {
+  dedupeTenantProfileEmergencyContacts,
+  dedupeTenantProfileVehicles,
+  dedupeTenantProfiles,
+} from "@/lib/tenantProfileDedupe.mjs";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
@@ -728,17 +733,20 @@ function TenantProfileModal({
 }) {
   const identity =
     valueOf(profile, "identityDocument", "identity_document") || {};
-  const vehicles = valueOf(profile, "vehicles") || [];
-  const emergencyContacts =
-    valueOf(profile, "emergencyContacts", "emergency_contacts") || [];
-  const roommates = sortByNewest(valueOf(profile, "roommates") || [], [
-    "createdAt",
-    "created_at",
-    "accountCreatedAt",
-    "account_created_at",
-    "moveInDate",
-    "move_in_date",
-  ]);
+  const vehicles = dedupeTenantProfileVehicles(valueOf(profile, "vehicles") || []);
+  const emergencyContacts = dedupeTenantProfileEmergencyContacts(
+    valueOf(profile, "emergencyContacts", "emergency_contacts") || [],
+  );
+  const roommates = dedupeTenantProfiles(
+    sortByNewest(valueOf(profile, "roommates") || [], [
+      "createdAt",
+      "created_at",
+      "accountCreatedAt",
+      "account_created_at",
+      "moveInDate",
+      "move_in_date",
+    ]),
+  );
   const maxOccupants =
     Number(valueOf(profile, "roomMaxOccupants", "room_max_occupants")) || 3;
   const occupantCount =
@@ -1595,16 +1603,20 @@ export default function TenantsPage() {
         page: 0,
         size: TENANT_PROFILE_FETCH_SIZE,
       });
-      setProfiles(sortByNewest(data.items, [
-        "createdAt",
-        "created_at",
-        "accountCreatedAt",
-        "account_created_at",
-        "contractCreatedAt",
-        "contract_created_at",
-        "signedAt",
-        "signed_at",
-      ]));
+      setProfiles(
+        dedupeTenantProfiles(
+          sortByNewest(data.items, [
+            "createdAt",
+            "created_at",
+            "accountCreatedAt",
+            "account_created_at",
+            "contractCreatedAt",
+            "contract_created_at",
+            "signedAt",
+            "signed_at",
+          ]),
+        ),
+      );
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
@@ -1621,16 +1633,20 @@ export default function TenantsPage() {
     })
       .then((data) => {
         if (!isActive) return;
-        setProfiles(sortByNewest(data.items, [
-          "createdAt",
-          "created_at",
-          "accountCreatedAt",
-          "account_created_at",
-          "contractCreatedAt",
-          "contract_created_at",
-          "signedAt",
-          "signed_at",
-        ]));
+        setProfiles(
+          dedupeTenantProfiles(
+            sortByNewest(data.items, [
+              "createdAt",
+              "created_at",
+              "accountCreatedAt",
+              "account_created_at",
+              "contractCreatedAt",
+              "contract_created_at",
+              "signedAt",
+              "signed_at",
+            ]),
+          ),
+        );
         setError("");
       })
       .catch((loadError) => {

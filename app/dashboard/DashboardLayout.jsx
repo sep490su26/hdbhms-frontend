@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Armchair,
+  ArrowRightLeft,
   Bell,
   BellRing,
   Building2,
@@ -32,6 +33,7 @@ import {
   Wrench,
   X,
   Inbox,
+  SendToBack,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -153,6 +155,12 @@ const navigation = [
     label: "Quản lý yêu cầu",
     icon: Inbox,
     permissionKey: "requests",
+  },
+  {
+    path: "/dashboard/room-transfer-history",
+    label: "Lịch sử chuyển phòng",
+    icon: SendToBack,
+    permissionKey: "roomTransferHistory",
   },
   {
     path: "/dashboard/notification-templates",

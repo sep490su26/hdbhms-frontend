@@ -1,5 +1,6 @@
 import { ApiError, getAuthToken } from "@/services/identityAccessService";
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 
 async function request(path, options = {}) {
     const token = getAuthToken();
@@ -80,9 +81,15 @@ function mapRoomTransfer(data) {
         oldRoomFinalInvoiceId: data.oldRoomFinalInvoiceId,
         depositTransferSummary: data.depositTransferSummary || null,
         approvedById: data.approvedById ?? null,
+        approvedByName: data.approvedByName ?? data.approverName ?? data.managerName ?? data.approvedBy?.fullName ?? null,
         approvedAt: data.approvedAt ?? null,
         executedAt: data.executedAt ?? null,
         completedAt: data.completedAt ?? null,
+        actualTransferDate: data.actualTransferDate ?? data.transferDate ?? data.executedAt ?? data.completedAt ?? null,
+        tenantName: data.tenantName ?? data.requesterName ?? data.customerName ?? data.primaryTenantName ?? null,
+        tenantPhone: data.tenantPhone ?? data.requesterPhone ?? data.customerPhone ?? data.primaryTenantPhone ?? null,
+        oldRoomFloorId: data.oldRoomFloorId ?? data.sourceFloorId ?? data.oldRoom?.floorId ?? data.oldRoom?.floor?.id ?? null,
+        targetRoomFloorId: data.targetRoomFloorId ?? data.targetFloorId ?? data.targetRoom?.floorId ?? data.targetRoom?.floor?.id ?? null,
         debtSummary: data.debtSummary || null,
         violationSummary: data.violationSummary || null,
         transferCountThisYear: data.transferCountThisYear ?? 0,
@@ -99,6 +106,42 @@ function mapRoomTransfer(data) {
         allowedActions: Array.isArray(data.allowedActions) ? data.allowedActions : [],
         blockingReasons: Array.isArray(data.blockingReasons) ? data.blockingReasons : [],
     };
+}
+
+async function requestRoomTransferHistory(path) {
+    const data = await request(path);
+    const items = readPageItems(data).map(mapRoomTransfer);
+    return {
+        ...normalizePageResponse(data, { items }),
+        items,
+    };
+}
+
+export async function fetchRoomTransferHistory({
+    page = 1,
+    size = 10,
+    floorId = "",
+    roomId = "",
+    fromDate = "",
+    toDate = "",
+} = {}) {
+    const params = new URLSearchParams({
+        page: String(Math.max(0, Number(page) - 1)),
+        size: String(size),
+        sort: "executedAt,desc",
+        status: "EXECUTED",
+    });
+    if (floorId) params.set("floorId", String(floorId));
+    if (roomId) params.set("roomId", String(roomId));
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
+
+    try {
+        return await requestRoomTransferHistory(`/occupant-transfer-requests/history?${params.toString()}`);
+    } catch (error) {
+        if (error?.status && error.status !== 404) throw error;
+        return requestRoomTransferHistory(`/occupant-transfer-requests?${params.toString()}`);
+    }
 }
 
 export async function getRoomTransferByCode(requestCode) {

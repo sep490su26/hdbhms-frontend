@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 function loadLeaseContractsService() {
-  const source = readFileSync(new URL("./leaseContractsService.js", import.meta.url), "utf8")
-    .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/services\/identityAccessService";\s*/m, "")
+  const source = readFileSync(
+    new URL("./leaseContractsService.js", import.meta.url),
+    "utf8",
+  )
+    .replace(
+      /import\s*{[\s\S]*?}\s*from\s*"@\/services\/identityAccessService";\s*/m,
+      "",
+    )
     .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/lib\/pageResponse";\s*/m, "")
     .replaceAll("export async function ", "async function ")
     .replaceAll("export function ", "function ");
@@ -42,7 +48,7 @@ return {
     () => "token",
     async () => {},
     (data) => data,
-    (data) => Array.isArray(data?.items) ? data.items : [],
+    (data) => (Array.isArray(data?.items) ? data.items : []),
   );
 }
 
@@ -50,14 +56,23 @@ test("buildLeaseContractDocumentFilename formats HDT filename from room and star
   const { buildLeaseContractDocumentFilename } = loadLeaseContractsService();
 
   assert.equal(
-    buildLeaseContractDocumentFilename({ roomCode: "205", startDate: "2026-06-29" }),
-    "P205_HDT_29_06_2026.pdf",
+    buildLeaseContractDocumentFilename({
+      roomCode: "205",
+      startDate: "2026-06-29",
+    }),
+    "HDT_P205_29_06_2026.pdf",
   );
   assert.equal(
-    buildLeaseContractDocumentFilename({ roomCode: "P205", startDate: "2026-07-16" }),
-    "P205_HDT_16_07_2026.pdf",
+    buildLeaseContractDocumentFilename({
+      roomCode: "P205",
+      startDate: "2026-07-16",
+    }),
+    "HDT_P205_16_07_2026.pdf",
   );
-  assert.equal(buildLeaseContractDocumentFilename({}), "Phong-X_HDT_Chua-Ro-Ngay.pdf");
+  assert.equal(
+    buildLeaseContractDocumentFilename({}),
+    "HDT_Phong-X_Chua-Ro-Ngay.pdf",
+  );
 });
 
 test("normalizeLeaseContractItem exposes the signed handover file for list badges", () => {
@@ -71,17 +86,23 @@ test("normalizeLeaseContractItem exposes the signed handover file for list badge
 });
 
 test("lease contract download fallbacks use room HDT filenames", () => {
-  const serviceSource = readFileSync(new URL("./leaseContractsService.js", import.meta.url), "utf8");
+  const serviceSource = readFileSync(
+    new URL("./leaseContractsService.js", import.meta.url),
+    "utf8",
+  );
   const pageSource = readFileSync(
     new URL("../app/dashboard/contract-template/page.jsx", import.meta.url),
     "utf8",
   );
   const wizardSource = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractPrintWizard.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractPrintWizard.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
 
-  assert.match(serviceSource, /_HDT_/);
+  assert.match(serviceSource, /HDT_/);
   assert.match(pageSource, /selectedLeaseContractFilename/);
   assert.match(
     pageSource,
@@ -102,9 +123,9 @@ test("downloadLeaseContractDraftPdf prefers backend content-disposition filename
     status: 200,
     ok: true,
     headers: {
-        get(name) {
-          return name.toLowerCase() === "content-disposition"
-          ? "attachment; filename*=UTF-8''P205_HDT_29_06_2026.pdf"
+      get(name) {
+        return name.toLowerCase() === "content-disposition"
+          ? "attachment; filename*=UTF-8''HDT_P205_29_06_2026.pdf"
           : null;
       },
     },
@@ -132,7 +153,7 @@ test("downloadLeaseContractDraftPdf prefers backend content-disposition filename
   try {
     await downloadLeaseContractDraftPdf(9);
 
-    assert.equal(clickedDownload, "P205_HDT_29_06_2026.pdf");
+    assert.equal(clickedDownload, "HDT_P205_29_06_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;
@@ -179,9 +200,9 @@ test("downloadLeaseContractDraftPdf uses caller fallback when header is unavaila
   URL.revokeObjectURL = () => {};
 
   try {
-    await downloadLeaseContractDraftPdf(9, "P201_HDT_16_07_2026.pdf");
+    await downloadLeaseContractDraftPdf(9, "HDT_P201_16_07_2026.pdf");
 
-    assert.equal(clickedDownload, "P201_HDT_16_07_2026.pdf");
+    assert.equal(clickedDownload, "HDT_P201_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;
@@ -192,7 +213,10 @@ test("downloadLeaseContractDraftPdf uses caller fallback when header is unavaila
 
 test("contract workflow lease action passes generated HDT filename fallback", () => {
   const source = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractWorkflowStepper.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -200,16 +224,25 @@ test("contract workflow lease action passes generated HDT filename fallback", ()
     source,
     /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),?\s*\);/,
   );
-  assert.doesNotMatch(source, /await downloadLeaseContractDraftPdf\(contractId\);/);
+  assert.doesNotMatch(
+    source,
+    /await downloadLeaseContractDraftPdf\(contractId\);/,
+  );
 });
 
 test("contract workflow lease signed state uses signedFileId and replace=true for re-upload", () => {
   const source = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractWorkflowStepper.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
   const activationFlowSource = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractActivationFlow.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractActivationFlow.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -225,7 +258,10 @@ test("contract workflow lease signed state uses signedFileId and replace=true fo
   );
   assert.match(source, /if \(leaseUploadInFlightRef\.current\)/);
   assert.doesNotMatch(source, /currentFileId/);
-  assert.match(activationFlowSource, /const leaseSignedFileId = contract\?\.signedFileId/);
+  assert.match(
+    activationFlowSource,
+    /const leaseSignedFileId = contract\?\.signedFileId/,
+  );
   assert.doesNotMatch(activationFlowSource, /currentFileId/);
 });
 
@@ -238,7 +274,11 @@ test("uploadSignedLeaseContractFile rejects missing leaseContractId without call
   };
 
   await assert.rejects(
-    () => uploadSignedLeaseContractFile({ depositAgreementId: 123 }, new Blob(["pdf"], { type: "application/pdf" })),
+    () =>
+      uploadSignedLeaseContractFile(
+        { depositAgreementId: 123 },
+        new Blob(["pdf"], { type: "application/pdf" }),
+      ),
     /Hợp đồng thuê chưa được tạo/,
   );
   assert.equal(fetchCalls.length, 0);
@@ -252,7 +292,10 @@ test("uploadSignedLeaseContractFile never falls back to deposit/HDC endpoint", a
     return {
       status: 200,
       ok: true,
-      json: async () => ({ code: 0, data: { leaseContractId: 9, signedFileId: 22 } }),
+      json: async () => ({
+        code: 0,
+        data: { leaseContractId: 9, signedFileId: 22 },
+      }),
     };
   };
 
@@ -264,7 +307,10 @@ test("uploadSignedLeaseContractFile never falls back to deposit/HDC endpoint", a
   assert.equal(result.leaseContractId, 9);
   assert.equal(result.signedFileId, 22);
   assert.equal(fetchCalls.length, 1);
-  assert.equal(fetchCalls[0][0], "https://api.test/api/v1/lease-contracts/9/signed-file");
+  assert.equal(
+    fetchCalls[0][0],
+    "https://api.test/api/v1/lease-contracts/9/signed-file",
+  );
   assert.ok(!fetchCalls[0][0].includes("/management/deposits/"));
 });
 
@@ -276,7 +322,10 @@ test("uploadSignedLeaseContractFile sends replace=true when signed HDT already e
     return {
       status: 200,
       ok: true,
-      json: async () => ({ code: 0, data: { leaseContractId: 9, signedFileId: 23 } }),
+      json: async () => ({
+        code: 0,
+        data: { leaseContractId: 9, signedFileId: 23 },
+      }),
     };
   };
 
@@ -287,7 +336,10 @@ test("uploadSignedLeaseContractFile sends replace=true when signed HDT already e
 
   assert.equal(result.signedFileId, 23);
   assert.equal(fetchCalls.length, 1);
-  assert.equal(fetchCalls[0][0], "https://api.test/api/v1/lease-contracts/9/signed-file?replace=true");
+  assert.equal(
+    fetchCalls[0][0],
+    "https://api.test/api/v1/lease-contracts/9/signed-file?replace=true",
+  );
 });
 
 test("fetchLeaseContractSignedFileBlob calls signed HDT download endpoint", async () => {
@@ -306,5 +358,8 @@ test("fetchLeaseContractSignedFileBlob calls signed HDT download endpoint", asyn
   const blob = await fetchLeaseContractSignedFileBlob(9);
 
   assert.equal(blob, expectedBlob);
-  assert.equal(fetchCalls[0][0], "https://api.test/api/v1/lease-contracts/9/signed-file");
+  assert.equal(
+    fetchCalls[0][0],
+    "https://api.test/api/v1/lease-contracts/9/signed-file",
+  );
 });

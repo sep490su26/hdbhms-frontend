@@ -152,6 +152,8 @@ const STATUS_CONFIG = {
 };
 
 
+const LOCKED_BATCH_STATUSES = new Set(["CONFIRMED"]);
+
 function getPeriodParts(value) {
     const text = String(value || "").trim();
     const canonical = text.match(/^(\d{4})-(\d{1,2})$/);
@@ -178,6 +180,10 @@ function formatPeriodRange(value) {
 
 function readField(source, ...keys) {
     return keys.map((key) => source?.[key]).find((value) => value !== undefined && value !== null);
+}
+
+function normalizeBatchStatus(source) {
+    return String(readField(source, "status", "batchStatus", "batch_status") || "").toUpperCase();
 }
 
 function numberOrNull(value) {
@@ -310,6 +316,7 @@ export default function MeterReadings() {
     const [editingCell, setEditingCell] = useState(null); // { roomId, field }
     const [focusRoomId, setFocusRoomId] = useState(null);
     const [batchId, setBatchId] = useState(null);
+    const [batchStatus, setBatchStatus] = useState("");
     const [cameraTarget, setCameraTarget] = useState(null);
     const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity, water } }
     const [tariffs, setTariffs] = useState(DEFAULT_UTILITY_TARIFFS);
@@ -364,6 +371,7 @@ export default function MeterReadings() {
         setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
         const fetchedBatchId = res.batchId || res.batch_id || null;
         setBatchId(fetchedBatchId);
+        setBatchStatus(normalizeBatchStatus(res));
         setTariffs({
             electricity: normalizeUtilityTariff(
                 readField(res, "electricityTariff", "electricity_tariff"),
@@ -419,6 +427,7 @@ export default function MeterReadings() {
                 setBackendFacilityName(readField(res, "propertyName", "property_name") || "");
                 const fetchedBatchId = res.batchId || res.batch_id || null;
                 setBatchId(fetchedBatchId);
+                setBatchStatus(normalizeBatchStatus(res));
                 setTariffs({
                     electricity: normalizeUtilityTariff(
                         readField(res, "electricityTariff", "electricity_tariff"),
@@ -568,9 +577,15 @@ export default function MeterReadings() {
     const errors = rooms.filter((r) => r.status === "error" || r.status === "warning").length;
     const total = rooms.length;
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-    const canConfirmBatch = Boolean(batchId) && total > 0 && pending === 0 && errors === 0 && unsynced === 0;
+    const isBatchLocked = LOCKED_BATCH_STATUSES.has(batchStatus);
+    const canConfirmBatch = !isBatchLocked && Boolean(batchId) && total > 0 && pending === 0 && errors === 0 && unsynced === 0;
 
     const handleCurrChange = (roomId, field, val) => {
+        if (isBatchLocked) {
+            toast.info("Kỳ ghi chỉ số đã chốt, không thể chỉnh sửa.");
+            return;
+        }
+
         const room = rooms.find(r => r.id === roomId);
         if (!room) return;
 
@@ -715,6 +730,7 @@ export default function MeterReadings() {
                         <button
                             type="button"
                             onClick={() => removeCapturedPhoto(room.id, type)}
+                            disabled={isBatchLocked}
                             className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                         >
                             <X className="h-4 w-4" />
@@ -724,6 +740,7 @@ export default function MeterReadings() {
                     <Button
                         variant="primary"
                         onClick={() => setCameraTarget({ roomId: room.id, type })}
+                        disabled={isBatchLocked}
                         className="flex w-full items-center justify-center gap-2"
                     >
                         <Camera className="h-4 w-4" />
@@ -736,6 +753,10 @@ export default function MeterReadings() {
 
     const handleSaveAndNext = async () => {
         if (saving) return;
+        if (isBatchLocked) {
+            toast.info("Kỳ ghi chỉ số đã chốt, không thể chỉnh sửa.");
+            return;
+        }
 
         const room = rooms.find(r => r.id === focusRoomId);
         if (!room) return;
@@ -825,6 +846,11 @@ export default function MeterReadings() {
     };
 
     const requestConfirmBatch = () => {
+        if (isBatchLocked) {
+            toast.info("Kỳ ghi chỉ số đã chốt.");
+            return;
+        }
+
         if (!batchId) {
             toast.error("Chưa có kỳ ghi chỉ số để chốt");
             return;
@@ -840,10 +866,15 @@ export default function MeterReadings() {
 
     const handleConfirmBatch = async () => {
         if (confirming) return;
+        if (isBatchLocked) {
+            setConfirmBatchDialogOpen(false);
+            return;
+        }
 
         setConfirming(true);
         try {
             await confirmMeterReadingBatch(batchId);
+            setBatchStatus("CONFIRMED");
             toast.success("Đã chốt kỳ ghi chỉ số. Đang mở batch hóa đơn nháp.");
             setConfirmBatchDialogOpen(false);
             await loadData();
@@ -928,7 +959,7 @@ export default function MeterReadings() {
                             Nhập chỉ số điện nước - {formatPeriodLabel(period)}
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
                                 <CircleDashed className="h-3.5 w-3.5" />
-                                Đang nhập
+                                {isBatchLocked ? "Đã chốt" : "Đang nhập"}
                             </span>
                         </span>
                     }
@@ -939,7 +970,12 @@ export default function MeterReadings() {
                                 <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`} />
                                 {syncingOffline ? "Đang đồng bộ offline" : isOnline ? "Online" : "Offline - sẽ tự đồng bộ"}
                             </span>
-                            {(pending > 0 || errors > 0) ? (
+                            {isBatchLocked ? (
+                                <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Kỳ đã chốt, chỉ có thể xem lại
+                                </span>
+                            ) : (pending > 0 || errors > 0) ? (
                                 <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
                                     <AlertTriangle className="h-4 w-4" />
                                     {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
@@ -959,8 +995,9 @@ export default function MeterReadings() {
                                         setFocusRoomId(filtered[0].id);
                                     }
                                 }}
+                                disabled={isBatchLocked}
                                 variant={"default"}
-                                className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                                className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                                 <Edit3 className="h-4 w-4" />
                                 Bắt đầu nhập
                             </Button>
@@ -970,7 +1007,7 @@ export default function MeterReadings() {
                                 className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <CheckCircle2 className="h-4 w-4" />
-                                {confirming ? "Đang chốt..." : "Chốt kỳ"}
+                                {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
                             </Button>
                         </div>
                     }
@@ -1105,6 +1142,7 @@ export default function MeterReadings() {
                                                                     min="0"
                                                                     className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
+                                                                    disabled={isBatchLocked}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
@@ -1126,6 +1164,7 @@ export default function MeterReadings() {
                                                                     min="0"
                                                                     className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
+                                                                    disabled={isBatchLocked}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
@@ -1175,7 +1214,8 @@ export default function MeterReadings() {
                                                             className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
                                                             <button
                                                                 onClick={() => setFocusRoomId(room.id)}
-                                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                                disabled={isBatchLocked}
+                                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
                                                                 <Edit3 size={16} />
                                                             </button>
                                                         </TableCell>
@@ -1212,7 +1252,8 @@ export default function MeterReadings() {
                                                     </div>
                                                     <button
                                                         onClick={() => setFocusRoomId(room.id)}
-                                                        className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+                                                        disabled={isBatchLocked}
+                                                        className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
                                                         <Edit3 size={18} />
                                                     </button>
                                                 </div>
@@ -1240,6 +1281,7 @@ export default function MeterReadings() {
                                                                     min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.elecCurr ?? ""}
+                                                                    disabled={isBatchLocked}
                                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
@@ -1276,6 +1318,7 @@ export default function MeterReadings() {
                                                                     min="0"
                                                                     className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
                                                                     value={room.waterCurr ?? ""}
+                                                                    disabled={isBatchLocked}
                                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                                     placeholder="—"
                                                                 />
@@ -1362,7 +1405,7 @@ export default function MeterReadings() {
                     className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
                 >
                     <CheckCircle2 className="h-4 w-4" />
-                    {confirming ? "Đang chốt..." : "Chốt kỳ"}
+                    {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
                 </Button>
             </div>
 
@@ -1423,6 +1466,7 @@ export default function MeterReadings() {
                                                     min="0"
                                                     className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.elecCurr ?? ""}
+                                                    disabled={isBatchLocked}
                                                     onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
                                                     placeholder="Nhập..."
                                                 />
@@ -1473,6 +1517,7 @@ export default function MeterReadings() {
                                                     min="0"
                                                     className="w-full bg-white dark:bg-[#0f172a] text-base border-gray-200 dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 border"
                                                     value={room.waterCurr ?? ""}
+                                                    disabled={isBatchLocked}
                                                     onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
                                                     placeholder="Nhập..."
                                                 />
@@ -1503,7 +1548,7 @@ export default function MeterReadings() {
                                         Đóng
                                     </Button>
                                     <Button onClick={handleSaveAndNext}
-                                        disabled={saving}
+                                        disabled={saving || isBatchLocked}
                                         className="w-2/3 bg-blue-600 hover:bg-blue-700">
                                         {saving ? "Đang lưu..." : "Lưu & Tiếp theo"}
                                     </Button>
@@ -1548,7 +1593,7 @@ export default function MeterReadings() {
                         <Button
                             type="button"
                             onClick={handleConfirmBatch}
-                            disabled={confirming}
+                            disabled={confirming || isBatchLocked}
                             className="bg-emerald-600 text-white hover:bg-emerald-700"
                         >
                             {confirming ? "Đang chốt..." : "Xác nhận chốt kỳ"}
@@ -1562,6 +1607,7 @@ export default function MeterReadings() {
                 title={cameraTarget?.type === "water" ? "Chụp ảnh đồng hồ nước" : "Chụp ảnh đồng hồ điện"}
                 onClose={() => setCameraTarget(null)}
                 onCapture={(photoData) => {
+                    if (isBatchLocked) return;
                     if (cameraTarget?.roomId && cameraTarget?.type) {
                         setCapturedPhotos(prev => ({
                             ...prev,

@@ -50,7 +50,9 @@ async function authenticatedDepositFetch(url, options = {}) {
 async function readEnvelope(response, fallbackMessage) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.code !== 0) {
-    const error = new Error(payload.message || payload.details || fallbackMessage);
+    const error = new Error(
+      payload.message || payload.details || fallbackMessage,
+    );
     error.status = response.status;
     error.payload = payload;
     throw error;
@@ -58,10 +60,16 @@ async function readEnvelope(response, fallbackMessage) {
   return payload.data ?? null;
 }
 
-async function readPageEnvelope(response, fallbackMessage, { page = 0, size = 10 } = {}) {
+async function readPageEnvelope(
+  response,
+  fallbackMessage,
+  { page = 0, size = 10 } = {},
+) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.code !== 0) {
-    const error = new Error(payload.message || payload.details || fallbackMessage);
+    const error = new Error(
+      payload.message || payload.details || fallbackMessage,
+    );
     error.status = response.status;
     error.payload = payload;
     throw error;
@@ -69,7 +77,11 @@ async function readPageEnvelope(response, fallbackMessage, { page = 0, size = 10
 
   const data = payload.data ?? {};
   const items = readPageItems(data);
-  const pagination = normalizePageResponse(data, { page: page + 1, size, items });
+  const pagination = normalizePageResponse(data, {
+    page: page + 1,
+    size,
+    items,
+  });
   return {
     ...data,
     ...pagination,
@@ -83,7 +95,9 @@ async function readPageEnvelope(response, fallbackMessage, { page = 0, size = 10
 function extractFilenameFromContentDisposition(headerValue) {
   if (!headerValue) return "";
 
-  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  const filenameStarMatch = headerValue.match(
+    /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i,
+  );
   if (filenameStarMatch?.[1]) {
     const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
     try {
@@ -100,7 +114,9 @@ function extractFilenameFromContentDisposition(headerValue) {
 
 function sanitizeFilenamePart(value, fallback) {
   if (value == null || String(value).trim() === "") return fallback;
-  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  const sanitized = String(value)
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "");
   return sanitized || fallback;
 }
 
@@ -123,10 +139,15 @@ function withRoomPrefix(roomCode) {
 }
 
 export function buildDepositContractDocumentFilename(item = {}) {
-  const roomCode = withRoomPrefix(sanitizeFilenamePart(
-    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
-    "Phong-X",
-  ));
+  const roomCode = withRoomPrefix(
+    sanitizeFilenamePart(
+      item.roomCode ??
+        item.room_code ??
+        item.room?.roomCode ??
+        item.room?.room_code,
+      "Phong-X",
+    ),
+  );
   const date = formatDocumentFilenameDate(
     item.expectedMoveInDate ??
       item.expected_move_in_date ??
@@ -138,7 +159,8 @@ export function buildDepositContractDocumentFilename(item = {}) {
   return `HDC_${roomCode}_${date}.pdf`;
 }
 
-const DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME = buildDepositContractDocumentFilename();
+const DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME =
+  buildDepositContractDocumentFilename();
 
 function normalizeDepositContractPreviewMetadata(metadata = {}) {
   return {
@@ -188,10 +210,20 @@ export async function previewDepositContract(metadata) {
     body: JSON.stringify(normalizeDepositContractPreviewMetadata(metadata)),
   });
 
-  return readEnvelope(response, "Không thể tạo bản xem trước hợp đồng đặt cọc.");
+  return readEnvelope(
+    response,
+    "Không thể tạo bản xem trước hợp đồng đặt cọc.",
+  );
 }
 
-export async function fetchDepositAgreements({ page = 1, size = 10, status, statuses, search, floorId } = {}) {
+export async function fetchDepositAgreements({
+  page = 1,
+  size = 10,
+  status,
+  statuses,
+  search,
+  floorId,
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
@@ -199,29 +231,43 @@ export async function fetchDepositAgreements({ page = 1, size = 10, status, stat
   });
   if (status) params.set("status", status);
   if (Array.isArray(statuses)) {
-    statuses.filter(Boolean).forEach((nextStatus) => params.append("statuses", nextStatus));
+    statuses
+      .filter(Boolean)
+      .forEach((nextStatus) => params.append("statuses", nextStatus));
   }
   if (search?.trim()) params.set("q", search.trim());
   if (floorId) params.set("floorId", String(floorId));
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements?${params.toString()}`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements?${params.toString()}`,
+    {
+      method: "GET",
+    },
+  );
 
-  return readPageEnvelope(response, "Không thể tải danh sách hợp đồng cọc.", { page, size });
+  return readPageEnvelope(response, "Không thể tải danh sách hợp đồng cọc.", {
+    page,
+    size,
+  });
 }
 
 export async function fetchDepositDashboardSummary() {
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/summary`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/summary`,
+    {
+      method: "GET",
+    },
+  );
   return readEnvelope(response, "Không thể tải thống kê hợp đồng cọc.");
 }
 
 export async function fetchDepositFilterOptions() {
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/filter-options`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/filter-options`,
+    {
+      method: "GET",
+    },
+  );
   return readEnvelope(response, "Không thể tải bộ lọc hợp đồng cọc.");
 }
 
@@ -230,9 +276,12 @@ export async function fetchDepositAgreementDetails(depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}`,
+    {
+      method: "GET",
+    },
+  );
 
   return readEnvelope(response, "Không thể tải chi tiết hợp đồng đặt cọc.");
 }
@@ -245,57 +294,75 @@ export async function updateDepositAgreementStatus(depositAgreementId, status) {
     throw new Error("Vui lòng chọn trạng thái cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/status`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
     },
-    body: JSON.stringify({ status }),
-  });
+  );
 
   return readEnvelope(response, "Không thể cập nhật trạng thái cọc.");
 }
 
-export async function updateDepositAgreementManagementInfo(depositAgreementId, payload) {
+export async function updateDepositAgreementManagementInfo(
+  depositAgreementId,
+  payload,
+) {
   if (!depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/management-info`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/management-info`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+  );
 
   return readEnvelope(response, "Không thể cập nhật thông tin hợp đồng cọc.");
 }
 
 export async function recordDepositContact(depositAgreementId, payload) {
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/contact-events`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/contact-events`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   return readEnvelope(response, "Không thể ghi nhận kết quả liên hệ khách.");
 }
 
 export async function extendDepositAgreement(depositAgreementId, payload) {
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/extensions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/extensions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   return readEnvelope(response, "Không thể gia hạn khoản cọc.");
 }
 
 export async function forfeitDepositAgreement(depositAgreementId, payload) {
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/forfeit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/forfeit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   return readEnvelope(response, "Không thể xử lý mất cọc.");
 }
 
@@ -304,9 +371,12 @@ export async function fetchDepositContractFile(depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/draft-pdf`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/draft-pdf`,
+    {
+      method: "GET",
+    },
+  );
 
   if (response.status === 401) {
     throw new Error("Vui lòng đăng nhập để xem hợp đồng đặt cọc.");
@@ -339,9 +409,12 @@ export async function fetchSignedDepositContractBlob(depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`, {
-    method: "GET",
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`,
+    {
+      method: "GET",
+    },
+  );
 
   if (response.status === 401) {
     throw new Error("Vui lòng đăng nhập để xem hợp đồng đặt cọc đã ký.");
@@ -359,7 +432,10 @@ export async function fetchSignedDepositContractBlob(depositAgreementId) {
   return response.blob();
 }
 
-export async function uploadSignedDepositContractFile(depositAgreementId, file) {
+export async function uploadSignedDepositContractFile(
+  depositAgreementId,
+  file,
+) {
   if (!depositAgreementId) {
     throw new Error("Thiếu mã hợp đồng đặt cọc.");
   }
@@ -370,15 +446,21 @@ export async function uploadSignedDepositContractFile(depositAgreementId, file) 
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await authenticatedDepositFetch(`${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`, {
-    method: "POST",
-    body: formData,
-  });
+  const response = await authenticatedDepositFetch(
+    `${API_BASE_URL}/deposit-agreements/${encodeURIComponent(depositAgreementId)}/signed-file`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
 
   return readEnvelope(response, "Không thể upload bản hợp đồng đặt cọc đã ký.");
 }
 
-export async function fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent) {
+export async function fetchDepositContractByPaymentBlob(
+  paymentIntentId,
+  paymentContent,
+) {
   if (!paymentIntentId) {
     throw new Error("Thiếu mã phiên thanh toán.");
   }
@@ -389,13 +471,16 @@ export async function fetchDepositContractByPaymentBlob(paymentIntentId, payment
   const params = new URLSearchParams({
     paymentContent: String(paymentContent),
   });
-  const response = await fetch(`${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/contract?${params.toString()}`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "X-Client-Type": "web",
+  const response = await fetch(
+    `${API_BASE_URL}/deposit/payments/${encodeURIComponent(paymentIntentId)}/contract?${params.toString()}`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "X-Client-Type": "web",
+      },
     },
-  });
+  );
 
   if (response.status === 403) {
     throw new Error("Thông tin phiên thanh toán không hợp lệ.");
@@ -411,9 +496,12 @@ export async function fetchDepositContractByPaymentBlob(paymentIntentId, payment
 }
 
 async function openBlobInNewTab(loadBlob) {
-  const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
+  const popup =
+    typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
   if (popup) {
-    popup.document.write("<!doctype html><title>Đang tải hợp đồng</title><p style=\"font-family:Arial,sans-serif;padding:24px\">Đang tải hợp đồng đặt cọc...</p>");
+    popup.document.write(
+      '<!doctype html><title>Đang tải hợp đồng</title><p style="font-family:Arial,sans-serif;padding:24px">Đang tải hợp đồng đặt cọc...</p>',
+    );
   }
 
   try {
@@ -439,15 +527,26 @@ export async function openDepositContractPdf(depositAgreementId) {
 }
 
 export async function openSignedDepositContractPdf(depositAgreementId) {
-  return openBlobInNewTab(() => fetchSignedDepositContractBlob(depositAgreementId));
+  return openBlobInNewTab(() =>
+    fetchSignedDepositContractBlob(depositAgreementId),
+  );
 }
 
-export async function openDepositContractByPaymentPdf(paymentIntentId, paymentContent) {
-  return openBlobInNewTab(() => fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent));
+export async function openDepositContractByPaymentPdf(
+  paymentIntentId,
+  paymentContent,
+) {
+  return openBlobInNewTab(() =>
+    fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent),
+  );
 }
 
-export async function downloadDepositContractPdf(depositAgreementId, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
-  const { blob, filename: serverFilename } = await fetchDepositContractFile(depositAgreementId);
+export async function downloadDepositContractPdf(
+  depositAgreementId,
+  filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME,
+) {
+  const { blob, filename: serverFilename } =
+    await fetchDepositContractFile(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -458,7 +557,10 @@ export async function downloadDepositContractPdf(depositAgreementId, filename = 
   URL.revokeObjectURL(url);
 }
 
-export async function downloadSignedDepositContractPdf(depositAgreementId, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
+export async function downloadSignedDepositContractPdf(
+  depositAgreementId,
+  filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME,
+) {
   const blob = await fetchSignedDepositContractBlob(depositAgreementId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -470,8 +572,15 @@ export async function downloadSignedDepositContractPdf(depositAgreementId, filen
   URL.revokeObjectURL(url);
 }
 
-export async function downloadDepositContractByPaymentPdf(paymentIntentId, paymentContent, filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME) {
-  const blob = await fetchDepositContractByPaymentBlob(paymentIntentId, paymentContent);
+export async function downloadDepositContractByPaymentPdf(
+  paymentIntentId,
+  paymentContent,
+  filename = DEFAULT_DEPOSIT_CONTRACT_DOCUMENT_FILENAME,
+) {
+  const blob = await fetchDepositContractByPaymentBlob(
+    paymentIntentId,
+    paymentContent,
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -481,4 +590,3 @@ export async function downloadDepositContractByPaymentPdf(paymentIntentId, payme
   link.remove();
   URL.revokeObjectURL(url);
 }
-

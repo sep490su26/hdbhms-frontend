@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 function loadContractHandoverService(overrides = {}) {
-  const source = readFileSync(new URL("./contractHandoverService.js", import.meta.url), "utf8")
-    .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/services\/identityAccessService";\s*/m, "")
+  const source = readFileSync(
+    new URL("./contractHandoverService.js", import.meta.url),
+    "utf8",
+  )
+    .replace(
+      /import\s*{[\s\S]*?}\s*from\s*"@\/services\/identityAccessService";\s*/m,
+      "",
+    )
     .replaceAll("export async function ", "async function ")
     .replaceAll("export function ", "function ")
     .replaceAll("export const ", "const ");
@@ -82,19 +88,31 @@ test("buildHandoverDocumentFilename formats BBBG filename from room and date", (
 
   assert.equal(
     buildHandoverDocumentFilename({ roomCode: "205", startDate: "2026-06-29" }),
-    "P205_BBBG_29_06_2026.pdf",
+    "BBBG_P205_29_06_2026.pdf",
   );
   assert.equal(
-    buildHandoverDocumentFilename({ roomCode: "P205", handoverDate: "2026-07-16" }),
-    "P205_BBBG_16_07_2026.pdf",
+    buildHandoverDocumentFilename({
+      roomCode: "P205",
+      handoverDate: "2026-07-16",
+    }),
+    "BBBG_P205_16_07_2026.pdf",
   );
-  assert.equal(buildHandoverDocumentFilename({}), "Phong-X_BBBG_Chua-Ro-Ngay.pdf");
+  assert.equal(
+    buildHandoverDocumentFilename({}),
+    "BBBG_Phong-X_Chua-Ro-Ngay.pdf",
+  );
 });
 
 test("handover download fallbacks do not use legacy bien-ban filenames", () => {
-  const serviceSource = readFileSync(new URL("./contractHandoverService.js", import.meta.url), "utf8");
+  const serviceSource = readFileSync(
+    new URL("./contractHandoverService.js", import.meta.url),
+    "utf8",
+  );
   const stepperSource = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractWorkflowStepper.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -104,7 +122,10 @@ test("handover download fallbacks do not use legacy bien-ban filenames", () => {
     stepperSource,
     /downloadHandoverDraftPdf\(\s*contractId,\s*"MOVE_IN",\s*buildHandoverDocumentFilename\(contractDetails\),?\s*\)/,
   );
-  assert.doesNotMatch(stepperSource, /downloadHandoverDraftPdf\(contractId, "MOVE_IN"\);/);
+  assert.doesNotMatch(
+    stepperSource,
+    /downloadHandoverDraftPdf\(contractId, "MOVE_IN"\);/,
+  );
 });
 
 test("fetchLatestReadings treats optional API errors as unavailable readings", async () => {
@@ -131,7 +152,7 @@ test("downloadHandoverDraftPdf prefers backend content-disposition filename", as
     headers: {
       get(name) {
         return name.toLowerCase() === "content-disposition"
-          ? "attachment; filename*=UTF-8''P205_BBBG_29_06_2026.pdf"
+          ? "attachment; filename*=UTF-8''BBBG_P205_29_06_2026.pdf"
           : null;
       },
     },
@@ -141,7 +162,7 @@ test("downloadHandoverDraftPdf prefers backend content-disposition filename", as
   try {
     await downloadHandoverDraftPdf(9);
 
-    assert.equal(dom.clickedDownload, "P205_BBBG_29_06_2026.pdf");
+    assert.equal(dom.clickedDownload, "BBBG_P205_29_06_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     dom.restore();
@@ -165,9 +186,9 @@ test("downloadHandoverDraftPdf uses caller fallback when header is unavailable",
   });
 
   try {
-    await downloadHandoverDraftPdf(9, "MOVE_IN", "P201_BBBG_16_07_2026.pdf");
+    await downloadHandoverDraftPdf(9, "MOVE_IN", "BBBG_P201_16_07_2026.pdf");
 
-    assert.equal(dom.clickedDownload, "P201_BBBG_16_07_2026.pdf");
+    assert.equal(dom.clickedDownload, "BBBG_P201_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     dom.restore();
@@ -185,7 +206,7 @@ test("downloadHandoverSignedPdf prefers backend content-disposition filename", a
     headers: {
       get(name) {
         return name.toLowerCase() === "content-disposition"
-          ? "attachment; filename*=UTF-8''P205_BBBG_29_06_2026.pdf"
+          ? "attachment; filename*=UTF-8''BBBG_P205_29_06_2026.pdf"
           : null;
       },
     },
@@ -195,7 +216,7 @@ test("downloadHandoverSignedPdf prefers backend content-disposition filename", a
   try {
     await downloadHandoverSignedPdf(9);
 
-    assert.equal(dom.clickedDownload, "P205_BBBG_29_06_2026.pdf");
+    assert.equal(dom.clickedDownload, "BBBG_P205_29_06_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     dom.restore();

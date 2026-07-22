@@ -328,6 +328,10 @@ function getContractDisplayName(item = {}) {
     return item.contractCode || item.displayCode || item.code || "Chưa tạo HĐ";
 }
 
+function withoutPdfExtension(value = "") {
+    return String(value).replace(/\.pdf$/i, "");
+}
+
 function buildRenewForm(item = {}) {
     const newStartDate = addDays(item.endDate, 1);
     return {
@@ -927,6 +931,10 @@ export default function ContractTemplatePage() {
         if (!mergedSelected?.leaseContractId && !mergedSelected?.contractId) return "";
         return buildLeaseContractDocumentFilename(mergedSelected);
     }, [mergedSelected]);
+    const selectedContractDisplayName = mergedSelected ? getContractDisplayName(mergedSelected) : "";
+    const selectedDetailTitle = selectedLeaseContractFilename
+        ? withoutPdfExtension(selectedLeaseContractFilename)
+        : selectedContractDisplayName;
 
     const selectedOccupants = useMemo(() => {
         const rows =
@@ -2165,8 +2173,13 @@ export default function ContractTemplatePage() {
                             <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">Chi
                                 tiết hợp đồng</p>
                             <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
-                                {getContractDisplayName(mergedSelected)}
+                                {selectedDetailTitle}
                             </h2>
+                            {selectedLeaseContractFilename && selectedContractDisplayName && selectedContractDisplayName !== selectedLeaseContractFilename && (
+                                <p className="mt-2 text-sm font-semibold text-slate-300">
+                                    Mã hợp đồng: {selectedContractDisplayName}
+                                </p>
+                            )}
                             {!mergedSelected.leaseContractId && mergedSelected.depositCode && (
                                 <p className="mt-2 text-sm font-semibold text-slate-300">
                                     Mã cọc: {mergedSelected.depositCode}

@@ -3,9 +3,18 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 function loadDepositContractsService() {
-  const source = readFileSync(new URL("./depositContractsService.js", import.meta.url), "utf8")
-    .replace(/import\s*{\s*API_BASE_URL\s*}\s*from\s*"@\/lib\/apiConfig";\s*/m, "")
-    .replace(/import\s*{\s*refreshTokenApi\s*}\s*from\s*"@\/services\/identityAccessService";\s*/m, "")
+  const source = readFileSync(
+    new URL("./depositContractsService.js", import.meta.url),
+    "utf8",
+  )
+    .replace(
+      /import\s*{\s*API_BASE_URL\s*}\s*from\s*"@\/lib\/apiConfig";\s*/m,
+      "",
+    )
+    .replace(
+      /import\s*{\s*refreshTokenApi\s*}\s*from\s*"@\/services\/identityAccessService";\s*/m,
+      "",
+    )
     .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/lib\/pageResponse";\s*/m, "")
     .replaceAll("export async function ", "async function ")
     .replaceAll("export function ", "function ");
@@ -41,17 +50,27 @@ return {
 }
 
 test("buildDepositContractDocumentFilename formats HDC filename from room and expected move-in date", () => {
-  const { buildDepositContractDocumentFilename } = loadDepositContractsService();
+  const { buildDepositContractDocumentFilename } =
+    loadDepositContractsService();
 
   assert.equal(
-    buildDepositContractDocumentFilename({ roomCode: "201", expectedMoveInDate: "2026-07-16" }),
-    "P201_HDC_16_07_2026.pdf",
+    buildDepositContractDocumentFilename({
+      roomCode: "201",
+      expectedMoveInDate: "2026-07-16",
+    }),
+    "HDC_P201_16_07_2026.pdf",
   );
   assert.equal(
-    buildDepositContractDocumentFilename({ roomCode: "P201", startDate: "2026-07-16" }),
-    "P201_HDC_16_07_2026.pdf",
+    buildDepositContractDocumentFilename({
+      roomCode: "P201",
+      startDate: "2026-07-16",
+    }),
+    "HDC_P201_16_07_2026.pdf",
   );
-  assert.equal(buildDepositContractDocumentFilename({}), "Phong-X_HDC_Chua-Ro-Ngay.pdf");
+  assert.equal(
+    buildDepositContractDocumentFilename({}),
+    "HDC_Phong-X_Chua-Ro-Ngay.pdf",
+  );
 });
 
 test("downloadDepositContractPdf prefers backend content-disposition filename", async () => {
@@ -71,7 +90,7 @@ test("downloadDepositContractPdf prefers backend content-disposition filename", 
       headers: {
         get(name) {
           return name.toLowerCase() === "content-disposition"
-            ? "attachment; filename=\"P201_HDC_16_07_2026.pdf\"; filename*=UTF-8''P201_HDC_16_07_2026.pdf"
+            ? "attachment; filename=\"HDC_P201_16_07_2026.pdf\"; filename*=UTF-8''HDC_P201_16_07_2026.pdf"
             : null;
         },
       },
@@ -98,11 +117,14 @@ test("downloadDepositContractPdf prefers backend content-disposition filename", 
   URL.revokeObjectURL = () => {};
 
   try {
-    await downloadDepositContractPdf(42, "Phong-X_HDC_Chua-Ro-Ngay.pdf");
+    await downloadDepositContractPdf(42, "HDC_Phong-X_Chua-Ro-Ngay.pdf");
 
     assert.equal(fetchCalls.length, 1);
-    assert.equal(fetchCalls[0][0], "https://api.test/api/v1/deposit-agreements/42/draft-pdf");
-    assert.equal(clickedDownload, "P201_HDC_16_07_2026.pdf");
+    assert.equal(
+      fetchCalls[0][0],
+      "https://api.test/api/v1/deposit-agreements/42/draft-pdf",
+    );
+    assert.equal(clickedDownload, "HDC_P201_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;
@@ -149,9 +171,9 @@ test("downloadDepositContractPdf uses caller fallback when header is unavailable
   URL.revokeObjectURL = () => {};
 
   try {
-    await downloadDepositContractPdf(42, "P201_HDC_16_07_2026.pdf");
+    await downloadDepositContractPdf(42, "HDC_P201_16_07_2026.pdf");
 
-    assert.equal(clickedDownload, "P201_HDC_16_07_2026.pdf");
+    assert.equal(clickedDownload, "HDC_P201_16_07_2026.pdf");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.document = originalDocument;
@@ -162,7 +184,10 @@ test("downloadDepositContractPdf uses caller fallback when header is unavailable
 
 test("contract workflow deposit action downloads instead of opening blob preview", () => {
   const source = readFileSync(
-    new URL("../app/dashboard/contract-template/ContractWorkflowStepper.jsx", import.meta.url),
+    new URL(
+      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -170,7 +195,10 @@ test("contract workflow deposit action downloads instead of opening blob preview
     source,
     /await downloadDepositContractPdf\(\s*depositAgreementId,\s*buildDepositContractDocumentFilename\(contractDetails\),?\s*\);/,
   );
-  assert.doesNotMatch(source, /await openDepositContractPdf\(depositAgreementId\);/);
+  assert.doesNotMatch(
+    source,
+    /await openDepositContractPdf\(depositAgreementId\);/,
+  );
   assert.match(source, /Đã tải hợp đồng đặt cọc để in và ký\./);
 });
 
@@ -249,9 +277,14 @@ test("forfeitDepositAgreement uses the guarded lifecycle endpoint with a reason"
 
   try {
     await forfeitDepositAgreement(42, { reason: "Khong lien lac duoc" });
-    assert.equal(request.url, "https://api.test/api/v1/deposit-agreements/42/forfeit");
+    assert.equal(
+      request.url,
+      "https://api.test/api/v1/deposit-agreements/42/forfeit",
+    );
     assert.equal(request.options.method, "POST");
-    assert.deepEqual(JSON.parse(request.options.body), { reason: "Khong lien lac duoc" });
+    assert.deepEqual(JSON.parse(request.options.body), {
+      reason: "Khong lien lac duoc",
+    });
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.window = originalWindow;

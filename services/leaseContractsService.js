@@ -18,7 +18,9 @@ function authHeaders(extraHeaders = {}) {
 
 function sanitizeFilenamePart(value, fallback) {
   if (value == null || String(value).trim() === "") return fallback;
-  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  const sanitized = String(value)
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "");
   return sanitized || fallback;
 }
 
@@ -41,22 +43,33 @@ function withRoomPrefix(roomCode) {
 }
 
 export function buildLeaseContractDocumentFilename(item = {}) {
-  const roomCode = withRoomPrefix(sanitizeFilenamePart(
-    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
-    "Phong-X",
-  ));
+  const roomCode = withRoomPrefix(
+    sanitizeFilenamePart(
+      item.roomCode ??
+        item.room_code ??
+        item.room?.roomCode ??
+        item.room?.room_code,
+      "Phong-X",
+    ),
+  );
   const date = formatDocumentFilenameDate(
-    item.startDate ?? item.start_date ?? item.expectedLeaseSignDate ?? item.expected_lease_sign_date,
+    item.startDate ??
+      item.start_date ??
+      item.expectedLeaseSignDate ??
+      item.expected_lease_sign_date,
   );
   return `HDT_${roomCode}_${date}.pdf`;
 }
 
-const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME = buildLeaseContractDocumentFilename();
+const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME =
+  buildLeaseContractDocumentFilename();
 
 function extractFilenameFromContentDisposition(headerValue) {
   if (!headerValue) return "";
 
-  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  const filenameStarMatch = headerValue.match(
+    /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i,
+  );
   if (filenameStarMatch?.[1]) {
     const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
     try {
@@ -104,11 +117,16 @@ async function parseEnvelope(response, fallbackMessage) {
 }
 
 export function normalizeLeaseContractItem(item = {}) {
-  const contractId = item.contractId ?? item.contract_id ?? item.leaseContractId ?? item.lease_contract_id ?? null;
+  const contractId =
+    item.contractId ??
+    item.contract_id ??
+    item.leaseContractId ??
+    item.lease_contract_id ??
+    null;
   const depositCode = item.depositCode ?? item.deposit_code ?? null;
   const contractCode = item.contractCode ?? item.contract_code ?? null;
   const legacyContractCode = contractId
-    ? item.displayCode ?? item.display_code ?? item.code ?? null
+    ? (item.displayCode ?? item.display_code ?? item.code ?? null)
     : null;
   const displayedContractCode = contractCode ?? legacyContractCode ?? "";
 
@@ -116,8 +134,10 @@ export function normalizeLeaseContractItem(item = {}) {
     ...item,
     sourceType: item.sourceType ?? item.source_type ?? null,
     contractId,
-    leaseContractId: item.leaseContractId ?? item.lease_contract_id ?? contractId,
-    depositAgreementId: item.depositAgreementId ?? item.deposit_agreement_id ?? null,
+    leaseContractId:
+      item.leaseContractId ?? item.lease_contract_id ?? contractId,
+    depositAgreementId:
+      item.depositAgreementId ?? item.deposit_agreement_id ?? null,
     code: displayedContractCode,
     displayCode: displayedContractCode,
     depositCode,
@@ -129,20 +149,43 @@ export function normalizeLeaseContractItem(item = {}) {
     roomId: item.roomId ?? item.room_id ?? null,
     roomCode: item.roomCode ?? item.room_code ?? null,
     roomStatus: item.roomStatus ?? item.room_status ?? null,
-    primaryTenantProfileId: item.primaryTenantProfileId ?? item.primary_tenant_profile_id ?? null,
-    customerName: item.customerName ?? item.customer_name ?? item.primaryTenantName ?? item.primary_tenant_name ?? null,
-    primaryTenantName: item.primaryTenantName ?? item.primary_tenant_name ?? item.customerName ?? item.customer_name ?? null,
-    phone: item.phone ?? item.primaryTenantPhone ?? item.primary_tenant_phone ?? null,
-    email: item.email ?? item.primaryTenantEmail ?? item.primary_tenant_email ?? null,
-    expectedLeaseSignDate: item.expectedLeaseSignDate ?? item.expected_lease_sign_date ?? null,
-    expectedMoveInDate: item.expectedMoveInDate ?? item.expected_move_in_date ?? null,
+    primaryTenantProfileId:
+      item.primaryTenantProfileId ?? item.primary_tenant_profile_id ?? null,
+    customerName:
+      item.customerName ??
+      item.customer_name ??
+      item.primaryTenantName ??
+      item.primary_tenant_name ??
+      null,
+    primaryTenantName:
+      item.primaryTenantName ??
+      item.primary_tenant_name ??
+      item.customerName ??
+      item.customer_name ??
+      null,
+    phone:
+      item.phone ??
+      item.primaryTenantPhone ??
+      item.primary_tenant_phone ??
+      null,
+    email:
+      item.email ??
+      item.primaryTenantEmail ??
+      item.primary_tenant_email ??
+      null,
+    expectedLeaseSignDate:
+      item.expectedLeaseSignDate ?? item.expected_lease_sign_date ?? null,
+    expectedMoveInDate:
+      item.expectedMoveInDate ?? item.expected_move_in_date ?? null,
     startDate: item.startDate ?? item.start_date ?? null,
     endDate: item.endDate ?? item.end_date ?? null,
     rentStartDate: item.rentStartDate ?? item.rent_start_date ?? null,
     monthlyRent: item.monthlyRent ?? item.monthly_rent ?? null,
-    paymentCycleMonths: item.paymentCycleMonths ?? item.payment_cycle_months ?? null,
+    paymentCycleMonths:
+      item.paymentCycleMonths ?? item.payment_cycle_months ?? null,
     depositAmount: item.depositAmount ?? item.deposit_amount ?? null,
-    contractStatus: item.contractStatus ?? item.contract_status ?? item.status ?? null,
+    contractStatus:
+      item.contractStatus ?? item.contract_status ?? item.status ?? null,
     status: item.status ?? item.contractStatus ?? item.contract_status ?? null,
     depositStatus: item.depositStatus ?? item.deposit_status ?? null,
     workflowStatus: item.workflowStatus ?? item.workflow_status ?? null,
@@ -204,11 +247,20 @@ export function normalizeLeaseContractItem(item = {}) {
       item.handoverSignedFileId ?? item.handover_signed_file_id ?? null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
-    accountProvisioned: item.accountProvisioned ?? item.account_provisioned ?? false,
-    emailAvailable: item.emailAvailable ?? item.email_available ?? Boolean(item.email),
-    previousContractId: item.previousContractId ?? item.previous_contract_id ?? null,
-    previousContractCode: item.previousContractCode ?? item.previous_contract_code ?? null,
-    renewedContractId: item.renewedContractId ?? item.renewed_contract_id ?? item.nextContractId ?? item.next_contract_id ?? null,
+    accountProvisioned:
+      item.accountProvisioned ?? item.account_provisioned ?? false,
+    emailAvailable:
+      item.emailAvailable ?? item.email_available ?? Boolean(item.email),
+    previousContractId:
+      item.previousContractId ?? item.previous_contract_id ?? null,
+    previousContractCode:
+      item.previousContractCode ?? item.previous_contract_code ?? null,
+    renewedContractId:
+      item.renewedContractId ??
+      item.renewed_contract_id ??
+      item.nextContractId ??
+      item.next_contract_id ??
+      null,
     renewedContractCode:
       item.renewedContractCode ??
       item.renewed_contract_code ??
@@ -216,14 +268,16 @@ export function normalizeLeaseContractItem(item = {}) {
       item.next_contract_code ??
       null,
     tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
-    expectedVacantDate: item.expectedVacantDate ?? item.expected_vacant_date ?? null,
+    expectedVacantDate:
+      item.expectedVacantDate ?? item.expected_vacant_date ?? null,
     transferRequestId: item.transferRequestId ?? null,
     transferRequestCode: item.transferRequestCode ?? null,
     transferStatus: item.transferStatus ?? null,
     transferRequestedDate: item.transferRequestedDate ?? null,
     transferContractRole: item.transferContractRole ?? null,
     transferActivationLocked: item.transferActivationLocked ?? false,
-    intentionRecordedAt: item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
+    intentionRecordedAt:
+      item.intentionRecordedAt ?? item.intention_recorded_at ?? null,
     intentionNote:
       item.intentionNote ??
       item.intention_note ??
@@ -238,17 +292,27 @@ function normalizeLeaseContractList(data) {
   return readPageItems(data).map(normalizeLeaseContractItem);
 }
 
-export async function fetchLeaseContractManagementList({ page = 0, size = 10 } = {}) {
+export async function fetchLeaseContractManagementList({
+  page = 0,
+  size = 10,
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
     sort: "createdAt,desc",
   });
-  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/management?${params.toString()}`, {
-    method: "GET",
-  });
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/management?${params.toString()}`,
+    {
+      method: "GET",
+    },
+  );
   const items = normalizeLeaseContractList(data);
-  const pagination = normalizePageResponse(data, { page: page + 1, size, items });
+  const pagination = normalizePageResponse(data, {
+    page: page + 1,
+    size,
+    items,
+  });
   return {
     ...pagination,
     data: items,
@@ -260,7 +324,9 @@ export async function fetchLeaseContractManagementList({ page = 0, size = 10 } =
 
 export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
   if (!depositAgreementId) {
-    throw new Error("Không xác định được hợp đồng đặt cọc để tạo hợp đồng thuê.");
+    throw new Error(
+      "Không xác định được hợp đồng đặt cọc để tạo hợp đồng thuê.",
+    );
   }
   const data = await authenticatedFetch(
     `${API_BASE_URL}/lease-contracts/management/deposits/${encodeURIComponent(depositAgreementId)}/draft`,
@@ -269,7 +335,11 @@ export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
   return normalizeLeaseContractItem(data);
 }
 
-export async function uploadSignedLeaseContractFile(contract, file, options = {}) {
+export async function uploadSignedLeaseContractFile(
+  contract,
+  file,
+  options = {},
+) {
   if (!contract) {
     throw new Error("Vui lòng chọn hợp đồng cần upload.");
   }
@@ -279,7 +349,9 @@ export async function uploadSignedLeaseContractFile(contract, file, options = {}
 
   const target = normalizeLeaseContractItem(contract);
   if (!target.leaseContractId) {
-    throw new Error("Hợp đồng thuê chưa được tạo. Vui lòng tạo hợp đồng thuê trước khi upload file đã ký.");
+    throw new Error(
+      "Hợp đồng thuê chưa được tạo. Vui lòng tạo hợp đồng thuê trước khi upload file đã ký.",
+    );
   }
 
   const formData = new FormData();
@@ -297,17 +369,24 @@ export async function uploadSignedLeaseContractFile(contract, file, options = {}
     body: formData,
   });
 
-  return normalizeLeaseContractItem(await parseEnvelope(response, "Không thể upload hợp đồng đã ký."));
+  return normalizeLeaseContractItem(
+    await parseEnvelope(response, "Không thể upload hợp đồng đã ký."),
+  );
 }
 
 export async function activateLeaseContract(leaseContractId) {
   if (!leaseContractId) {
-    throw new Error("Hợp đồng chưa được tạo. Vui lòng upload file hợp đồng trước.");
+    throw new Error(
+      "Hợp đồng chưa được tạo. Vui lòng upload file hợp đồng trước.",
+    );
   }
-  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activate`, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-  });
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activate`,
+    {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    },
+  );
   return normalizeLeaseContractItem(data);
 }
 
@@ -336,11 +415,14 @@ export async function liquidateLeaseContract(leaseContractId, payload = {}) {
   if (!leaseContractId) {
     throw new Error("Hợp đồng chưa được tạo, không thể thanh lý.");
   }
-  const data = await authenticatedFetch(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/liquidate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/liquidate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
   return normalizeLeaseContractItem(data);
 }
 
@@ -365,7 +447,10 @@ export async function renewLeaseContract(leaseContractId, payload) {
   );
 }
 
-export async function recordLeaseContractTenantIntention(leaseContractId, payload) {
+export async function recordLeaseContractTenantIntention(
+  leaseContractId,
+  payload,
+) {
   if (!leaseContractId) {
     throw new Error("Không xác định được hợp đồng cần ghi nhận ý định.");
   }
@@ -388,9 +473,12 @@ async function fetchPrivateFileBlob(fileId) {
   if (!fileId) {
     throw new Error("Hợp đồng chưa có file.");
   }
-  const response = await fetchWithAuth(`${API_BASE_URL}/files/private/${encodeURIComponent(fileId)}`, {
-    method: "GET",
-  });
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}/files/private/${encodeURIComponent(fileId)}`,
+    {
+      method: "GET",
+    },
+  );
   if (!response.ok) {
     throw new Error("Không thể tải file hợp đồng.");
   }
@@ -402,9 +490,12 @@ export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
     throw new Error("Không xác định được hợp đồng cần tải.");
   }
 
-  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`, {
-    method: "GET",
-  });
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`,
+    {
+      method: "GET",
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Không thể tải PDF hợp đồng.");
@@ -426,8 +517,12 @@ export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
   return file.blob;
 }
 
-export async function downloadLeaseContractDraftPdf(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
-  const { blob, filename: serverFilename } = await fetchLeaseContractDraftPdfFile(leaseContractId);
+export async function downloadLeaseContractDraftPdf(
+  leaseContractId,
+  filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME,
+) {
+  const { blob, filename: serverFilename } =
+    await fetchLeaseContractDraftPdfFile(leaseContractId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -443,9 +538,12 @@ export async function fetchLeaseContractSignedFile(leaseContractId) {
     throw new Error("Không xác định được hợp đồng thuê cần tải.");
   }
 
-  const response = await fetchWithAuth(`${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/signed-file`, {
-    method: "GET",
-  });
+  const response = await fetchWithAuth(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/signed-file`,
+    {
+      method: "GET",
+    },
+  );
 
   if (!response.ok) {
     throw new Error("Không thể tải hợp đồng thuê đã ký.");
@@ -467,8 +565,12 @@ export async function fetchLeaseContractSignedFileBlob(leaseContractId) {
   return file.blob;
 }
 
-export async function downloadLeaseContractSignedFile(leaseContractId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
-  const { blob, filename: serverFilename } = await fetchLeaseContractSignedFile(leaseContractId);
+export async function downloadLeaseContractSignedFile(
+  leaseContractId,
+  filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME,
+) {
+  const { blob, filename: serverFilename } =
+    await fetchLeaseContractSignedFile(leaseContractId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -480,9 +582,12 @@ export async function downloadLeaseContractSignedFile(leaseContractId, filename 
 }
 
 export async function openLeaseContractFile(fileId) {
-  const popup = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
+  const popup =
+    typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
   if (popup) {
-    popup.document.write("<!doctype html><title>Đang tải hợp đồng</title><p style=\"font-family:Arial,sans-serif;padding:24px\">Đang tải hợp đồng thuê...</p>");
+    popup.document.write(
+      '<!doctype html><title>Đang tải hợp đồng</title><p style="font-family:Arial,sans-serif;padding:24px">Đang tải hợp đồng thuê...</p>',
+    );
   }
 
   try {
@@ -501,7 +606,10 @@ export async function openLeaseContractFile(fileId) {
   }
 }
 
-export async function downloadLeaseContractFile(fileId, filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME) {
+export async function downloadLeaseContractFile(
+  fileId,
+  filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME,
+) {
   const blob = await fetchPrivateFileBlob(fileId);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -527,25 +635,56 @@ function normalizeLeaseContractDetails(details = {}) {
   const contractFile = rawContractFile
     ? {
         ...rawContractFile,
-        id: rawContractFile.id ?? rawContractFile.fileId ?? rawContractFile.file_id ?? null,
-        fileName: rawContractFile.fileName ?? rawContractFile.file_name ?? rawContractFile.name ?? null,
-        uploadedAt: rawContractFile.uploadedAt ?? rawContractFile.uploaded_at ?? rawContractFile.createdAt ?? rawContractFile.created_at ?? null,
+        id:
+          rawContractFile.id ??
+          rawContractFile.fileId ??
+          rawContractFile.file_id ??
+          null,
+        fileName:
+          rawContractFile.fileName ??
+          rawContractFile.file_name ??
+          rawContractFile.name ??
+          null,
+        uploadedAt:
+          rawContractFile.uploadedAt ??
+          rawContractFile.uploaded_at ??
+          rawContractFile.createdAt ??
+          rawContractFile.created_at ??
+          null,
       }
     : null;
   const rawSignedFile = details.signedFile ?? details.signed_file ?? null;
   const signedFile = rawSignedFile
     ? {
         ...rawSignedFile,
-        id: rawSignedFile.id ?? rawSignedFile.fileId ?? rawSignedFile.file_id ?? null,
-        fileName: rawSignedFile.fileName ?? rawSignedFile.file_name ?? rawSignedFile.name ?? null,
-        uploadedAt: rawSignedFile.uploadedAt ?? rawSignedFile.uploaded_at ?? rawSignedFile.createdAt ?? rawSignedFile.created_at ?? null,
+        id:
+          rawSignedFile.id ??
+          rawSignedFile.fileId ??
+          rawSignedFile.file_id ??
+          null,
+        fileName:
+          rawSignedFile.fileName ??
+          rawSignedFile.file_name ??
+          rawSignedFile.name ??
+          null,
+        uploadedAt:
+          rawSignedFile.uploadedAt ??
+          rawSignedFile.uploaded_at ??
+          rawSignedFile.createdAt ??
+          rawSignedFile.created_at ??
+          null,
       }
     : null;
-  const rawPrimaryTenant = details.primaryTenant ?? details.primary_tenant ?? {};
+  const rawPrimaryTenant =
+    details.primaryTenant ?? details.primary_tenant ?? {};
   const primaryTenant = rawPrimaryTenant
     ? {
         ...rawPrimaryTenant,
-        id: rawPrimaryTenant.id ?? rawPrimaryTenant.tenantProfileId ?? rawPrimaryTenant.tenant_profile_id ?? null,
+        id:
+          rawPrimaryTenant.id ??
+          rawPrimaryTenant.tenantProfileId ??
+          rawPrimaryTenant.tenant_profile_id ??
+          null,
         fullName: rawPrimaryTenant.fullName ?? rawPrimaryTenant.full_name ?? "",
         phone: rawPrimaryTenant.phone ?? "",
         email: rawPrimaryTenant.email ?? "",
@@ -563,7 +702,10 @@ function normalizeLeaseContractDetails(details = {}) {
           rawPrimaryTenant.birthDate ??
           rawPrimaryTenant.birth_date ??
           null,
-        permanentAddress: rawPrimaryTenant.permanentAddress ?? rawPrimaryTenant.permanent_address ?? "",
+        permanentAddress:
+          rawPrimaryTenant.permanentAddress ??
+          rawPrimaryTenant.permanent_address ??
+          "",
         citizenId:
           rawPrimaryTenant.citizenId ??
           rawPrimaryTenant.citizen_id ??
@@ -601,7 +743,8 @@ function normalizeLeaseContractDetails(details = {}) {
     endDate: details.endDate ?? details.end_date ?? null,
     rentStartDate: details.rentStartDate ?? details.rent_start_date ?? null,
     monthlyRent: details.monthlyRent ?? details.monthly_rent ?? null,
-    paymentCycleMonths: details.paymentCycleMonths ?? details.payment_cycle_months ?? null,
+    paymentCycleMonths:
+      details.paymentCycleMonths ?? details.payment_cycle_months ?? null,
     depositAmount: details.depositAmount ?? details.deposit_amount ?? null,
     occupantsCount:
       details.occupantsCount ??
@@ -611,10 +754,7 @@ function normalizeLeaseContractDetails(details = {}) {
       (Array.isArray(rawOccupants) ? rawOccupants.length : null),
     status: details.status ?? null,
     signedFileId:
-      details.signedFileId ??
-      details.signed_file_id ??
-      signedFile?.id ??
-      null,
+      details.signedFileId ?? details.signed_file_id ?? signedFile?.id ?? null,
     signedFileName:
       details.signedFileName ??
       details.signed_file_name ??
@@ -626,8 +766,10 @@ function normalizeLeaseContractDetails(details = {}) {
       signedFile?.uploadedAt ??
       null,
     signedAt: details.signedAt ?? details.signed_at ?? null,
-    previousContractId: details.previousContractId ?? details.previous_contract_id ?? null,
-    previousContractCode: details.previousContractCode ?? details.previous_contract_code ?? null,
+    previousContractId:
+      details.previousContractId ?? details.previous_contract_id ?? null,
+    previousContractCode:
+      details.previousContractCode ?? details.previous_contract_code ?? null,
     renewedContractId:
       details.renewedContractId ??
       details.renewed_contract_id ??
@@ -640,27 +782,29 @@ function normalizeLeaseContractDetails(details = {}) {
       details.nextContractCode ??
       details.next_contract_code ??
       null,
-    tenantIntention: details.tenantIntention ?? details.tenant_intention ?? null,
-    expectedVacantDate: details.expectedVacantDate ?? details.expected_vacant_date ?? null,
+    tenantIntention:
+      details.tenantIntention ?? details.tenant_intention ?? null,
+    expectedVacantDate:
+      details.expectedVacantDate ?? details.expected_vacant_date ?? null,
     transferRequestId: details.transferRequestId ?? null,
     transferRequestCode: details.transferRequestCode ?? null,
     transferStatus: details.transferStatus ?? null,
     transferRequestedDate: details.transferRequestedDate ?? null,
     transferContractRole: details.transferContractRole ?? null,
     transferActivationLocked: details.transferActivationLocked ?? false,
-    intentionRecordedAt: details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
+    intentionRecordedAt:
+      details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
     intentionNote:
       details.intentionNote ??
       details.intention_note ??
       details.tenantIntentionNote ??
       details.tenant_intention_note ??
       null,
-    intentionSource: details.intentionSource ?? details.intention_source ?? null,
+    intentionSource:
+      details.intentionSource ?? details.intention_source ?? null,
     canRenew: details.canRenew ?? details.can_renew ?? false,
     canRenewBlockedReason:
-      details.canRenewBlockedReason ??
-      details.can_renew_blocked_reason ??
-      "",
+      details.canRenewBlockedReason ?? details.can_renew_blocked_reason ?? "",
     canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
     canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
     accountProvisioningStatus:
@@ -675,7 +819,8 @@ function normalizeLeaseContractDetails(details = {}) {
     occupants: Array.isArray(rawOccupants)
       ? rawOccupants.map((occupant) => ({
           ...occupant,
-          tenantProfileId: occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
+          tenantProfileId:
+            occupant.tenantProfileId ?? occupant.tenant_profile_id ?? null,
           fullName: occupant.fullName ?? occupant.full_name ?? "",
           phone: occupant.phone ?? "",
           email: occupant.email ?? "",
@@ -693,7 +838,8 @@ function normalizeLeaseContractDetails(details = {}) {
             occupant.birthDate ??
             occupant.birth_date ??
             null,
-          permanentAddress: occupant.permanentAddress ?? occupant.permanent_address ?? "",
+          permanentAddress:
+            occupant.permanentAddress ?? occupant.permanent_address ?? "",
           citizenId:
             occupant.citizenId ??
             occupant.citizen_id ??
@@ -730,7 +876,8 @@ function normalizeLeaseContractDetails(details = {}) {
             occupant.accountStatus ??
             occupant.account_status ??
             "NOT_PROVISIONED",
-          accountSentAt: occupant.accountSentAt ?? occupant.account_sent_at ?? null,
+          accountSentAt:
+            occupant.accountSentAt ?? occupant.account_sent_at ?? null,
           lastLoginAt: occupant.lastLoginAt ?? occupant.last_login_at ?? null,
           mustChangePassword:
             occupant.mustChangePassword ??
@@ -766,7 +913,8 @@ function buildContractQueryParams(filters = {}) {
   if (filters.status) params.set("status", filters.status);
   if (filters.roomId) params.set("roomId", String(filters.roomId));
   if (filters.propertyId) params.set("propertyId", String(filters.propertyId));
-  if (filters.tenantProfileId) params.set("tenantProfileId", String(filters.tenantProfileId));
+  if (filters.tenantProfileId)
+    params.set("tenantProfileId", String(filters.tenantProfileId));
   if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
   if (filters.dateTo) params.set("dateTo", filters.dateTo);
   if (filters.keyword?.trim()) params.set("keyword", filters.keyword.trim());
@@ -809,7 +957,9 @@ export async function fetchManagementLeaseContractDetails(contractId) {
 
 export async function fetchTenantRoomRentalHistory(tenantId, roomId) {
   if (!tenantId || !roomId) {
-    throw new Error("Không xác định được tenant hoặc phòng để tải lịch sử thuê.");
+    throw new Error(
+      "Không xác định được tenant hoặc phòng để tải lịch sử thuê.",
+    );
   }
   const data = await authenticatedFetch(
     `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/rooms/${encodeURIComponent(roomId)}/rental-history`,

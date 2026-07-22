@@ -489,6 +489,7 @@ export default function ContractWorkflowStepper({
 
   const depositDocumentFilename = buildDepositContractDocumentFilename(contractDetails);
   const leaseDocumentFilename = buildLeaseContractDocumentFilename(contractDetails);
+  const handoverDocumentFilename = buildHandoverDocumentFilename(contractDetails);
 
   return (
     <div className="space-y-4 bg-[#f7f8fb] p-4 dark:bg-[#081225] sm:p-6">
@@ -537,8 +538,8 @@ export default function ContractWorkflowStepper({
 
         {hasDeposit && (
           <DocumentRow
-            title="Hợp đồng đặt cọc"
-            meta={`PDF · ${depositDocumentFilename} · 2 bản`}
+            title={depositDocumentFilename}
+            meta="Hợp đồng đặt cọc · PDF · 2 bản"
             statusLabel="Sẵn sàng tải"
           >
             <button
@@ -558,8 +559,8 @@ export default function ContractWorkflowStepper({
         )}
 
         <DocumentRow
-          title="Hợp đồng thuê"
-          meta={`PDF · ${leaseDocumentFilename} · 2 bản`}
+          title={leaseDocumentFilename}
+          meta="Hợp đồng thuê · PDF · 2 bản"
           statusLabel="Sẵn sàng tải"
         >
           <button
@@ -580,11 +581,11 @@ export default function ContractWorkflowStepper({
         {requiresMoveInHandover && (
           <>
             <DocumentRow
-              title="Biên bản bàn giao"
+              title={handoverDocumentFilename}
               meta={
                 handoverHasData
-                  ? `Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³ · Thiết bị đã kiểm tra`
-                  : "Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
+                  ? `Biên bản bàn giao · Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³`
+                  : "Biên bản bàn giao · Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
               }
               complete={handoverReady}
               statusLabel={handoverReady ? "Đã đủ dữ liệu" : "Cần nhập dữ liệu"}
@@ -636,12 +637,12 @@ export default function ContractWorkflowStepper({
 
         {hasDeposit && (
           <UploadRow
-            title="Hợp đồng đặt cọc đã ký"
+            title={depositDocumentFilename}
             description="PDF tối đa 15 MB · cần đủ chữ ký các bên"
             complete={Boolean(depositSignedFileId)}
             fileName={
               contractDetails?.depositSignedFileName ||
-              "Hợp đồng đặt cọc đã được lưu"
+              depositDocumentFilename
             }
             loading={loadingStep === ACTION.UPLOAD_DEPOSIT}
             disabled={isBusy}
@@ -650,10 +651,10 @@ export default function ContractWorkflowStepper({
         )}
 
         <UploadRow
-          title="Hợp đồng thuê đã ký"
+          title={leaseDocumentFilename}
           description="PDF tối đa 15 MB · cần đủ chữ ký các bên"
           complete={Boolean(leaseSignedFileId)}
-          fileName={contractDetails?.signedFileName}
+          fileName={contractDetails?.signedFileName || leaseDocumentFilename}
           loading={loadingStep === ACTION.UPLOAD_LEASE}
           disabled={uploadLeaseDisabled}
           onClick={() => leaseInputRef.current?.click()}
@@ -661,10 +662,10 @@ export default function ContractWorkflowStepper({
 
         {requiresMoveInHandover && (
           <UploadRow
-            title="Biên bản bàn giao đã ký"
+            title={handoverDocumentFilename}
             description={signedHandoverDescription}
             complete={signedHandoverReady}
-            fileName="Biên bản bàn giao đã được lưu"
+            fileName={handoverDocumentFilename}
             loading={loadingStep === ACTION.UPLOAD_HANDOVER}
             disabled={isBusy || handoverLoading || !handoverHasData}
             onClick={() => handoverInputRef.current?.click()}

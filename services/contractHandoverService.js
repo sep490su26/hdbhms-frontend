@@ -1,4 +1,10 @@
-import { API_BASE_URL, ApiError, authenticatedFetch, getAuthToken, refreshTokenApi } from "@/services/identityAccessService";
+import {
+  API_BASE_URL,
+  ApiError,
+  authenticatedFetch,
+  getAuthToken,
+  refreshTokenApi,
+} from "@/services/identityAccessService";
 
 const BASE = API_BASE_URL;
 
@@ -38,7 +44,9 @@ async function readErrorMessage(response, fallbackMessage) {
 function extractFilenameFromContentDisposition(headerValue) {
   if (!headerValue) return "";
 
-  const filenameStarMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  const filenameStarMatch = headerValue.match(
+    /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i,
+  );
   if (filenameStarMatch?.[1]) {
     const encoded = filenameStarMatch[1].trim().replace(/^"|"$/g, "");
     try {
@@ -67,7 +75,9 @@ function formatBbbgFilenameDate(value) {
 
 function sanitizeFilenamePart(value, fallback) {
   if (value == null || String(value).trim() === "") return fallback;
-  const sanitized = String(value).trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  const sanitized = String(value)
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "");
   return sanitized || fallback;
 }
 
@@ -78,10 +88,15 @@ function withRoomPrefix(roomCode) {
 }
 
 export function buildHandoverDocumentFilename(item = {}) {
-  const roomCode = withRoomPrefix(sanitizeFilenamePart(
-    item.roomCode ?? item.room_code ?? item.room?.roomCode ?? item.room?.room_code,
-    "Phong-X",
-  ));
+  const roomCode = withRoomPrefix(
+    sanitizeFilenamePart(
+      item.roomCode ??
+        item.room_code ??
+        item.room?.roomCode ??
+        item.room?.room_code,
+      "Phong-X",
+    ),
+  );
   const date = formatBbbgFilenameDate(
     item.handoverDate ??
       item.handover_date ??
@@ -131,7 +146,11 @@ export async function fetchLatestReadings(roomId) {
  * Create handover readings
  * POST /api/v1/lease-contracts/{contractId}/handover/meter-readings
  */
-export async function createHandoverReadings(contractId, payload, handoverType = "MOVE_IN") {
+export async function createHandoverReadings(
+  contractId,
+  payload,
+  handoverType = "MOVE_IN",
+) {
   const data = await authenticatedFetch(
     `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover/meter-readings?type=${encodeURIComponent(handoverType)}`,
     {
@@ -143,10 +162,13 @@ export async function createHandoverReadings(contractId, payload, handoverType =
   return data;
 }
 
-export async function fetchContractHandover(contractId, handoverType = "MOVE_IN") {
+export async function fetchContractHandover(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
   return authenticatedFetch(
     `${API_BASE_URL}/lease-contracts/${encodeURIComponent(contractId)}/handover?type=${encodeURIComponent(handoverType)}`,
-    { method: "GET" }
+    { method: "GET" },
   );
 }
 
@@ -167,7 +189,11 @@ export async function submitHandover(contractId, payload) {
   );
 }
 
-export async function uploadHandoverDocument(contractId, file, handoverType = "MOVE_IN") {
+export async function uploadHandoverDocument(
+  contractId,
+  file,
+  handoverType = "MOVE_IN",
+) {
   if (!contractId) throw new Error("Missing contractId");
   if (!file) throw new Error("Missing handover document file");
 
@@ -185,7 +211,10 @@ export async function uploadHandoverDocument(contractId, file, handoverType = "M
 
 export const uploadHandoverSignedDocument = uploadHandoverDocument;
 
-export async function fetchHandoverDraftPdfFile(contractId, handoverType = "MOVE_IN") {
+export async function fetchHandoverDraftPdfFile(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
   if (!contractId) throw new Error("Missing contractId");
 
   const response = await fetchWithAuth(
@@ -194,7 +223,12 @@ export async function fetchHandoverDraftPdfFile(contractId, handoverType = "MOVE
   );
 
   if (!response.ok) {
-    throw new Error(await readErrorMessage(response, "Unable to download handover draft PDF."));
+    throw new Error(
+      await readErrorMessage(
+        response,
+        "Unable to download handover draft PDF.",
+      ),
+    );
   }
 
   const contentDisposition =
@@ -208,7 +242,10 @@ export async function fetchHandoverDraftPdfFile(contractId, handoverType = "MOVE
   };
 }
 
-export async function fetchHandoverDraftPdfBlob(contractId, handoverType = "MOVE_IN") {
+export async function fetchHandoverDraftPdfBlob(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
   const file = await fetchHandoverDraftPdfFile(contractId, handoverType);
   return file.blob;
 }
@@ -218,7 +255,10 @@ export async function downloadHandoverDraftPdf(
   handoverType = "MOVE_IN",
   filename = DEFAULT_HANDOVER_DOCUMENT_FILENAME,
 ) {
-  const { blob, filename: serverFilename } = await fetchHandoverDraftPdfFile(contractId, handoverType);
+  const { blob, filename: serverFilename } = await fetchHandoverDraftPdfFile(
+    contractId,
+    handoverType,
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -229,7 +269,10 @@ export async function downloadHandoverDraftPdf(
   URL.revokeObjectURL(url);
 }
 
-export async function fetchHandoverSignedPdfFile(contractId, handoverType = "MOVE_IN") {
+export async function fetchHandoverSignedPdfFile(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
   if (!contractId) throw new Error("Missing contractId");
 
   const response = await fetchWithAuth(
@@ -238,7 +281,12 @@ export async function fetchHandoverSignedPdfFile(contractId, handoverType = "MOV
   );
 
   if (!response.ok) {
-    throw new Error(await readErrorMessage(response, "Unable to download signed handover PDF."));
+    throw new Error(
+      await readErrorMessage(
+        response,
+        "Unable to download signed handover PDF.",
+      ),
+    );
   }
 
   const contentDisposition =
@@ -252,7 +300,10 @@ export async function fetchHandoverSignedPdfFile(contractId, handoverType = "MOV
   };
 }
 
-export async function fetchHandoverSignedPdfBlob(contractId, handoverType = "MOVE_IN") {
+export async function fetchHandoverSignedPdfBlob(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
   const file = await fetchHandoverSignedPdfFile(contractId, handoverType);
   return file.blob;
 }
@@ -262,7 +313,10 @@ export async function downloadHandoverSignedPdf(
   handoverType = "MOVE_IN",
   filename = DEFAULT_HANDOVER_DOCUMENT_FILENAME,
 ) {
-  const { blob, filename: serverFilename } = await fetchHandoverSignedPdfFile(contractId, handoverType);
+  const { blob, filename: serverFilename } = await fetchHandoverSignedPdfFile(
+    contractId,
+    handoverType,
+  );
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -273,12 +327,14 @@ export async function downloadHandoverSignedPdf(
   URL.revokeObjectURL(url);
 }
 
-
 export async function confirmHandover(contractId, body) {
   if (!contractId) throw new Error("Missing contractId");
-  return authenticatedFetch(`${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/confirm`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return authenticatedFetch(
+    `${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/confirm`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 }

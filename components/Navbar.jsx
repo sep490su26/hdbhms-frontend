@@ -63,8 +63,8 @@ export function Navbar() {
 
     router.push("/login");
   };
-  const primaryActionLabel = staffRole ? "Quản lý trọ" : "Đăng nhập";
-  const PrimaryActionIcon = staffRole ? LayoutDashboard : LogIn;
+  const primaryActionLabel = "Quản lý trọ";
+  const PrimaryActionIcon = LayoutDashboard;
 
   return (
     <nav

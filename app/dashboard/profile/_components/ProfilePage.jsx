@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import { useState } from "react";
 import Image from "next/image";
 import {
   AlertCircle,
@@ -14,8 +14,8 @@ import {
   Save,
   X,
 } from "lucide-react";
-import {useProfile} from "../_hooks/useProfile";
-import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
+import { useProfile } from "../_hooks/useProfile";
+import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 function getInitials(name) {
@@ -41,7 +41,7 @@ function CompletionBadge() {
   );
 }
 
-function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
+function ProfileAvatar({ src, name, isUploading, onSelect, error, missing }) {
   const [failedSrc, setFailedSrc] = useState(null);
   const imageFailed = Boolean(src && failedSrc === src);
 
@@ -63,12 +63,18 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
             {getInitials(name)}
           </span>
         )}
-        <span className={`absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 text-white transition-opacity ${
-          isUploading
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-        }`}>
-          {isUploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
+        <span
+          className={`absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 text-white transition-opacity ${
+            isUploading
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+        >
+          {isUploading ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <Camera className="h-6 w-6" />
+          )}
           <span className="text-[11px] font-bold">
             {isUploading ? "Đang tải..." : "Tải ảnh lên"}
           </span>
@@ -85,14 +91,28 @@ function ProfileAvatar({src, name, isUploading, onSelect, error, missing}) {
           }}
         />
       </label>
-      <p className="text-center text-xs text-slate-500 dark:text-slate-400">JPG, PNG hoặc WebP. Tối đa 2MB.</p>
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+        JPG, PNG hoặc WebP. Tối đa 2MB.
+      </p>
       {missing && <CompletionBadge />}
-      {error && <p className="text-center text-xs font-bold text-rose-700 dark:text-rose-300">{error}</p>}
+      {error && (
+        <p className="text-center text-xs font-bold text-rose-700 dark:text-rose-300">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
-function Field({label, value, missing, editable, error, type = "text", onChange}) {
+function Field({
+  label,
+  value,
+  missing,
+  editable,
+  error,
+  type = "text",
+  onChange,
+}) {
   return (
     <label className="grid gap-2">
       <span className="flex min-h-5 items-center justify-between gap-2 text-xs font-bold uppercase tracking-[0.05em] text-slate-600 dark:text-slate-300">
@@ -111,19 +131,27 @@ function Field({label, value, missing, editable, error, type = "text", onChange}
             : "cursor-default border-[#e0e3e5] dark:border-white/10 bg-[#f2f4f6] dark:bg-white/5 text-slate-600 dark:text-slate-300"
         } ${error ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100" : ""}`}
       />
-      {error && <span className="text-xs font-bold text-rose-700 dark:text-rose-300">{error}</span>}
+      {error && (
+        <span className="text-xs font-bold text-rose-700 dark:text-rose-300">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
 
-function WorkItem({icon: Icon, label, value, tone}) {
+function WorkItem({ icon: Icon, label, value, tone }) {
   return (
     <div className="flex gap-4 rounded-lg bg-[#f7f9fb] dark:bg-white/5 p-3">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}
+      >
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
         <p className="mt-1 break-words text-sm font-bold leading-6 text-slate-900 dark:text-white">
           {value || "Chưa cập nhật"}
         </p>
@@ -132,7 +160,7 @@ function WorkItem({icon: Icon, label, value, tone}) {
   );
 }
 
-function Toast({toast, onDismiss}) {
+function Toast({ toast, onDismiss }) {
   if (!toast) return null;
   const isError = toast.tone === "error";
   const Icon = isError ? AlertCircle : CheckCircle2;
@@ -206,7 +234,9 @@ export function ProfilePage() {
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,0.9fr)]">
         <article className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Thông tin cá nhân</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              Thông tin cá nhân
+            </h2>
             {!state.isEditing ? (
               <button
                 type="button"
@@ -232,9 +262,11 @@ export function ProfilePage() {
                   disabled={state.isSaving}
                   className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
                 >
-                  {state.isSaving
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <Save className="h-4 w-4" />}
+                  {state.isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
                   Lưu thay đổi
                 </button>
               </div>
@@ -251,7 +283,11 @@ export function ProfilePage() {
               missing={isMissing("avatarUrl")}
             />
             <div className="grid content-start gap-5 sm:grid-cols-2">
-              <Field label="Họ tên" value={profile.fullName} missing={isMissing("fullName")} />
+              <Field
+                label="Họ tên"
+                value={profile.fullName}
+                missing={isMissing("fullName")}
+              />
               <Field
                 label="Số điện thoại"
                 value={state.isEditing ? state.draft.phone : profile.phone}
@@ -259,7 +295,9 @@ export function ProfilePage() {
                 editable={state.isEditing}
                 error={state.fieldErrors.phone}
                 type="tel"
-                onChange={(event) => state.updateDraft("phone", event.target.value)}
+                onChange={(event) =>
+                  state.updateDraft("phone", event.target.value)
+                }
               />
               <div className="sm:col-span-2">
                 <Field
@@ -269,18 +307,23 @@ export function ProfilePage() {
                   editable={state.isEditing}
                   error={state.fieldErrors.email}
                   type="email"
-                  onChange={(event) => state.updateDraft("email", event.target.value)}
+                  onChange={(event) =>
+                    state.updateDraft("email", event.target.value)
+                  }
                 />
               </div>
               <p className="sm:col-span-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Họ tên được đồng bộ từ hồ sơ nhân sự. Bạn có thể cập nhật SĐT, email và ảnh đại diện.
+                Họ tên được đồng bộ từ hồ sơ nhân sự. Bạn có thể cập nhật SĐT,
+                email và ảnh đại diện.
               </p>
             </div>
           </div>
         </article>
 
         <aside className="rounded-xl border border-[#c5c6cd] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:p-8">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Thông tin công việc</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Thông tin công việc
+          </h2>
           <div className="mt-7 grid gap-4">
             <WorkItem
               icon={Building2}
@@ -302,8 +345,9 @@ export function ProfilePage() {
             />
           </div>
           <div className="mt-7 rounded-lg border border-dashed border-[#c5c6cd] dark:border-white/10 bg-[#f2f4f6] dark:bg-white/5 p-4 text-xs leading-5 text-slate-600 dark:text-slate-300">
-            <strong>Lưu ý:</strong> Thông tin công việc được thiết lập bởi bộ phận Nhân sự.
-            Nếu có sai sót, vui lòng liên hệ Admin hệ thống để cập nhật.
+            <strong>Lưu ý:</strong> Thông tin công việc được thiết lập bởi bộ
+            phận Nhân sự. Nếu có sai sót, vui lòng liên hệ Admin hệ thống để cập
+            nhật.
           </div>
         </aside>
       </section>

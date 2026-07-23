@@ -30,6 +30,7 @@ import {
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { compareByNewest } from "@/lib/sortByNewest.mjs";
 import { fetchAllExpenseRequests } from "@/services/expenseReportService";
+import { formatThousandVND } from "../_lib/formatters";
 
 const money = new Intl.NumberFormat("vi-VN");
 const PERIOD_COUNT = 6;
@@ -249,8 +250,8 @@ function signedPercent(value) {
   return `${value >= 0 ? "+" : ""}${value}%`;
 }
 
-function signedMoney(value) {
-  return `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value))}`;
+function signedThousandVND(value) {
+  return `${value >= 0 ? "+" : "-"}${formatThousandVND(Math.abs(value))}`;
 }
 
 function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note, badge }) {
@@ -264,7 +265,7 @@ function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note, ba
         {badge && <span className="inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />{badge}</span>}
       </div>
       <p className={`mt-3 text-[10px] font-bold uppercase ${dark ? "text-slate-400" : "text-[#5f6b7c]"}`}>{label}</p>
-      <p className="mt-1 text-lg font-black">{formatCurrency(value)}</p>
+      <p className="mt-1 truncate text-lg font-black">{formatThousandVND(value)}</p>
       {note && <p className={`mt-3 text-[10px] ${dark ? "text-slate-400" : "text-[#64748b]"}`}>{note}</p>}
     </article>
   );
@@ -402,11 +403,16 @@ export default function OperatingExpensesPage() {
           </div>
         }
       />
-      <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-        <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-        <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
-        <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+          <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
+          <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
+        </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
+      </div>
 
       {errorMessage && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
@@ -421,7 +427,7 @@ export default function OperatingExpensesPage() {
       )}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" badge={signedPercent(expenseGrowth)} note={`So với kỳ trước: ${signedMoney(currentExpense - previousExpense)}`} />
+        <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" badge={signedPercent(expenseGrowth)} note={`So với kỳ trước: ${signedThousandVND(currentExpense - previousExpense)}`} />
         {cardCategories.map((item) => (
           <ExpenseCard
             key={item.key}

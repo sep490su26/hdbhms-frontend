@@ -354,6 +354,9 @@ export async function fetchViewingRooms(propertyId) {
         return propertiesArray.map((room) => ({
             id: room.id,
             propertyId: room.propertyId ?? room.property_id ?? room.property?.id ?? propertyId,
+            floorId: room.floorId ?? room.floor_id ?? room.floor?.id,
+            floorName: room.floorName ?? room.floor_name ?? room.floor?.name,
+            floorCode: room.floorCode ?? room.floor_code ?? room.floor?.floorCode ?? room.floor?.floor_code,
             roomCode: room.roomCode ?? room.room_code,
             name: room.name || `Phòng ${room.roomCode ?? room.room_code}`,
             status: room.currentStatus ?? room.current_status,

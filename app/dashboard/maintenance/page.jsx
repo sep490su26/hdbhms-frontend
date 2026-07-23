@@ -46,9 +46,18 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_META = {
-  PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
-  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
-  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
+  PENDING: [
+    "Chờ tiếp nhận",
+    "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
+  ],
+  ACCEPTED: [
+    "Đã tiếp nhận",
+    "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20",
+  ],
+  IN_PROGRESS: [
+    "Đang xử lý",
+    "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20",
+  ],
   WAITING_CONFIRMATION: [
     "Chờ xác nhận",
     "bg-violet-50 text-violet-800 ring-violet-200",
@@ -57,7 +66,10 @@ const STATUS_META = {
     "Hoàn tất xử lý",
     "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
   ],
-  REJECTED: ["Từ chối", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
+  REJECTED: [
+    "Từ chối",
+    "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20",
+  ],
   CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
@@ -67,7 +79,10 @@ const BILLING_META = {
     "Chưa tạo hóa đơn",
     "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
   ],
-  DRAFT: ["Chờ phát hành", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  DRAFT: [
+    "Chờ phát hành",
+    "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20",
+  ],
   PENDING_PAYMENT: [
     "Chờ thanh toán",
     "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20",
@@ -76,8 +91,14 @@ const BILLING_META = {
     "Thanh toán một phần",
     "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20",
   ],
-  PAID: ["Đã thanh toán", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
-  OVERDUE: ["Quá hạn", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
+  PAID: [
+    "Đã thanh toán",
+    "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
+  ],
+  OVERDUE: [
+    "Quá hạn",
+    "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20",
+  ],
   VOIDED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
@@ -199,6 +220,33 @@ function selectClassName() {
   return "h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
 
+function deriveRoomFloor(room) {
+  const roomCode = String(
+    room?.roomCode || room?.room_code || room?.name || "",
+  );
+  const fallbackFloor = roomCode.match(/\d/)?.[0] || "";
+  const id = String(
+    room?.floorId ||
+      room?.floor_id ||
+      room?.floor?.id ||
+      room?.floorCode ||
+      room?.floor_code ||
+      fallbackFloor,
+  );
+  const label =
+    room?.floorName ||
+    room?.floor_name ||
+    room?.floor?.name ||
+    room?.floorCode ||
+    room?.floor_code ||
+    (fallbackFloor ? `Tang ${fallbackFloor}` : "");
+
+  return {
+    id,
+    label: String(label || id),
+  };
+}
+
 function inputClassName() {
   return "h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
 }
@@ -227,7 +275,9 @@ function Metric({ label, value, icon: Icon, tone }) {
   return (
     <article className="min-h-28 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}
         >
@@ -264,12 +314,14 @@ export default function MaintenancePage() {
   const [filters, setFilters] = useState({
     keyword: "",
     propertyId: "",
+    floor: "all",
     status: "all",
     category: "all",
     severity: "all",
     scope: "all",
     roomId: "",
   });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
@@ -295,14 +347,45 @@ export default function MaintenancePage() {
   const roomOptions = useMemo(() => {
     return rooms
       .filter((room) => room?.id)
-      .map((room) => ({
-        id: String(room.id),
-        label: room.roomCode || room.name || `Phòng ${room.id}`,
-        status: String(
-          room.status || room.currentStatus || room.current_status || "",
-        ).toUpperCase(),
-      }));
+      .map((room) => {
+        const floor = deriveRoomFloor(room);
+        return {
+          id: String(room.id),
+          label: room.roomCode || room.name || `Phong ${room.id}`,
+          floorId: floor.id,
+          floorLabel: floor.label,
+          status: String(
+            room.status || room.currentStatus || room.current_status || "",
+          ).toUpperCase(),
+        };
+      });
   }, [rooms]);
+
+  const floorOptions = useMemo(() => {
+    const floors = new Map();
+    roomOptions.forEach((room) => {
+      if (!room.floorId) return;
+      floors.set(room.floorId, {
+        id: room.floorId,
+        label: room.floorLabel || `Tang ${room.floorId}`,
+      });
+    });
+    return [...floors.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, "vi", { numeric: true }),
+    );
+  }, [roomOptions]);
+
+  const filteredRoomOptions = useMemo(() => {
+    if (!filters.floor || filters.floor === "all") return [];
+    return roomOptions.filter((room) => room.floorId === filters.floor);
+  }, [filters.floor, roomOptions]);
+  const selectedViolationPropertyId = String(
+    violationForm.propertyId ||
+      filters.propertyId ||
+      propertyOptions[0]?.id ||
+      "",
+  );
+
   const metrics = useMemo(() => {
     const count = (statuses) =>
       tickets.filter((ticket) => statuses.includes(ticket.status)).length;
@@ -367,7 +450,14 @@ export default function MaintenancePage() {
         page: page - 1,
         size,
       });
-      setTickets(sortByNewest(result.tickets, ["createdAt", "created_at", "updatedAt", "updated_at"]));
+      setTickets(
+        sortByNewest(result.tickets, [
+          "createdAt",
+          "created_at",
+          "updatedAt",
+          "updated_at",
+        ]),
+      );
       setTotalElements(result.total);
       setTotalPages(result.totalPages);
     } catch (loadError) {
@@ -429,11 +519,20 @@ export default function MaintenancePage() {
 
   function updateFilter(name, value) {
     setPage(1);
-    setFilters((current) => ({
-      ...current,
-      [name]: value,
-      ...(name === "propertyId" ? { roomId: "" } : {}),
-    }));
+    setFilters((current) => {
+      const nextFilters = { ...current, [name]: value };
+      // Nếu đổi Cơ sở -> Reset Tầng và Phòng
+      if (name === "propertyId") {
+        nextFilters.floor = "all";
+        nextFilters.roomId = "";
+      }
+      // Nếu đổi Tầng -> Reset Phòng
+      if (name === "floor") {
+        nextFilters.roomId = "";
+      }
+      return nextFilters;
+    });
+
     if (name === "propertyId") {
       setInternalForm((current) => ({
         ...current,
@@ -560,40 +659,40 @@ export default function MaintenancePage() {
         description="Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất."
         actions={
           <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={loadTickets}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-            />
-            Làm mới
-          </button>
-          {canManage && (
             <button
               type="button"
-              onClick={() => {
-                setInternalForm((current) => ({
-                  ...current,
-                  propertyId:
-                    current.propertyId ||
-                    filters.propertyId ||
-                    propertyOptions[0]?.id ||
-                    "",
-                }));
-                setIsInternalOpen((value) => !value);
-              }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
+              onClick={loadTickets}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
             >
-              {isInternalOpen ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <Wrench className="h-4 w-4" />
-              )}
-              {isInternalOpen ? "Đóng phiếu nội bộ" : "Tạo phiếu nội bộ"}
+              <RefreshCcw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
+              Làm mới
             </button>
-          )}
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInternalForm((current) => ({
+                    ...current,
+                    propertyId:
+                      current.propertyId ||
+                      filters.propertyId ||
+                      propertyOptions[0]?.id ||
+                      "",
+                  }));
+                  setIsInternalOpen((value) => !value);
+                }}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
+              >
+                {isInternalOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <Wrench className="h-4 w-4" />
+                )}
+                {isInternalOpen ? "Đóng phiếu nội bộ" : "Tạo phiếu nội bộ"}
+              </button>
+            )}
           </div>
         }
       />
@@ -603,11 +702,6 @@ export default function MaintenancePage() {
           <Metric key={item.label} {...item} />
         ))}
       </div>
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-        Chi phí ghi nhận là tổng chi phí/phạt đã ghi nhận, không đồng nghĩa đã
-        thanh toán. Xem badge thanh toán trên từng phiếu để biết trạng thái thu
-        tiền.
-      </p>
 
       {internalSuccess && <InlineNotice>{internalSuccess}</InlineNotice>}
 
@@ -806,20 +900,9 @@ export default function MaintenancePage() {
       )}
 
       <div className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        <div className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
-          <SlidersHorizontal className="h-4 w-4" />
-          Bộ lọc
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <label className="relative xl:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-            <input
-              value={filters.keyword}
-              onChange={(event) => updateFilter("keyword", event.target.value)}
-              className={`${inputClassName()} w-full pl-9`}
-              placeholder="Tìm theo mã phiếu"
-            />
-          </label>
+        {/* NHÓM LỌC CHÍNH */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 items-center">
+          {/* 1. Lọc Cơ sở */}
           <select
             value={filters.propertyId}
             onChange={(event) => updateFilter("propertyId", event.target.value)}
@@ -833,6 +916,8 @@ export default function MaintenancePage() {
               </option>
             ))}
           </select>
+
+          {/* 2. Lọc Trạng thái */}
           <select
             value={filters.status}
             onChange={(event) => updateFilter("status", event.target.value)}
@@ -844,55 +929,99 @@ export default function MaintenancePage() {
               </option>
             ))}
           </select>
+
+          {/* 3. Lọc Tầng */}
           <select
-            value={filters.category}
-            onChange={(event) => updateFilter("category", event.target.value)}
+            value={filters.floor}
+            onChange={(event) => updateFilter("floor", event.target.value)}
+            disabled={!filters.propertyId || floorOptions.length === 0}
             className={selectClassName()}
           >
-            {CATEGORY_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            <option value="all">
+              {floorOptions.length > 0 ? "Tất cả tầng" : "Tất cả tầng"}
+            </option>
+            {floorOptions.map((floor) => (
+              <option key={floor.id} value={floor.id}>
+                {floor.label}
               </option>
             ))}
           </select>
-          <select
-            value={filters.severity}
-            onChange={(event) => updateFilter("severity", event.target.value)}
-            className={selectClassName()}
-          >
-            {PRIORITY_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.scope}
-            onChange={(event) => updateFilter("scope", event.target.value)}
-            className={selectClassName()}
-          >
-            {SCOPE_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {filters.propertyId && (
+
+          {/* 4. Lọc Phòng */}
           <select
             value={filters.roomId}
             onChange={(event) => updateFilter("roomId", event.target.value)}
-            className={`${selectClassName()} max-w-xs`}
+            disabled={
+              !filters.propertyId ||
+              filters.floor === "all" ||
+              filteredRoomOptions.length === 0
+            }
+            className={selectClassName()}
           >
             <option value="">
-              {roomOptions.length > 0 ? "Tất cả phòng" : "Chưa có phòng"}
+              {filters.floor === "all"
+                ? "Chọn tầng trước"
+                : filteredRoomOptions.length > 0
+                  ? "Tất cả phòng"
+                  : "Chưa có phòng"}
             </option>
-            {roomOptions.map((room) => (
+            {filteredRoomOptions.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.label}
               </option>
             ))}
           </select>
+
+          {/* 5. Nút Toggle Bộ Lọc Nâng Cao */}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {showAdvancedFilters ? "Thu gọn" : "Lọc thêm"}
+          </button>
+        </div>
+
+        {/* NHÓM LỌC NÂNG CAO (Chỉ hiện khi toggle) */}
+        {showAdvancedFilters && (
+          <div className="grid gap-3 pt-4 border-t border-slate-200 dark:border-white/10 md:grid-cols-2 lg:grid-cols-4">
+            <select
+              value={filters.category}
+              onChange={(event) => updateFilter("category", event.target.value)}
+              className={selectClassName()}
+            >
+              {CATEGORY_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.severity}
+              onChange={(event) => updateFilter("severity", event.target.value)}
+              className={selectClassName()}
+            >
+              {PRIORITY_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.scope}
+              onChange={(event) => updateFilter("scope", event.target.value)}
+              className={selectClassName()}
+            >
+              {SCOPE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
@@ -904,7 +1033,7 @@ export default function MaintenancePage() {
             <thead className="bg-[#f2f4f6] dark:bg-white/5">
               <tr className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">
                 <th className="px-5 py-4">Phiếu</th>
-                <th className="px-5 py-4">Vị trí</th>
+                <th className="px-5 py-4">Phòng</th>
                 <th className="px-5 py-4">Hạng mục</th>
                 <th className="px-5 py-4">Mức độ</th>
                 <th className="px-5 py-4">Trạng thái</th>
@@ -954,9 +1083,6 @@ export default function MaintenancePage() {
                           ticket.roomName ||
                           SCOPE_LABELS[ticket.ticketScope] ||
                           ticket.ticketScope}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {ticket.propertyName || "Chưa có cơ sở"}
                       </p>
                     </td>
                     <td

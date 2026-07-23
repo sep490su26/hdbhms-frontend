@@ -15,6 +15,7 @@ import {
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { fetchPaidExpenseRequests } from "@/services/expenseReportService";
 import { fetchRevenueReport } from "@/services/revenueReportService";
+import { formatThousandVND } from "../_lib/formatters";
 
 const money = new Intl.NumberFormat("vi-VN");
 const PERIOD_COUNT = 6;
@@ -204,8 +205,8 @@ function signedPercent(value) {
   return `${value >= 0 ? "+" : ""}${value}%`;
 }
 
-function signedMoney(value) {
-  return `${value >= 0 ? "+" : "-"}${formatCurrency(Math.abs(value))}`;
+function signedThousandVND(value) {
+  return `${value >= 0 ? "+" : "-"}${formatThousandVND(Math.abs(value))}`;
 }
 
 function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inverse = false }) {
@@ -241,7 +242,7 @@ function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inve
         </span>
       </div>
       <p className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b]"}`}>{label}</p>
-      <p className="mt-1 text-xl font-black">{formatCurrency(value)}</p>
+      <p className="mt-1 truncate text-xl font-black">{formatThousandVND(value)}</p>
       <p className={`mt-4 border-t border-current/10 pt-3 text-[10px] italic ${theme.note}`}>{note}</p>
     </article>
   );
@@ -366,11 +367,16 @@ export default function IncomeExpenseReportPage() {
           </div>
         }
       />
-      <nav className="flex items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-        <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-        <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
-        <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
-      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+          <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
+          <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
+        </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
+      </div>
 
       {errorMessage && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
@@ -390,14 +396,14 @@ export default function IncomeExpenseReportPage() {
           label="Tổng doanh thu"
           value={current.income}
           badge={signedPercent(incomeGrowth)}
-          note={`So với kỳ trước: ${signedMoney(current.income - previous.income)}`}
+          note={`So với kỳ trước: ${signedThousandVND(current.income - previous.income)}`}
         />
         <MetricCard
           icon={ReceiptText}
           label="Tổng chi phí"
           value={current.expense}
           badge={signedPercent(expenseGrowth)}
-          note={`So với kỳ trước: ${signedMoney(current.expense - previous.expense)}`}
+          note={`So với kỳ trước: ${signedThousandVND(current.expense - previous.expense)}`}
           tone="red"
           inverse={expenseGrowth < 0}
         />

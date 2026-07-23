@@ -5,6 +5,8 @@ import {
   AlertCircle,
   Bike,
   BriefcaseBusiness,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   Contact,
   Eye,
@@ -23,6 +25,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   fetchTenantProfilePermissionGrants,
   fetchPrivateFileObjectUrl,
@@ -32,7 +35,10 @@ import {
   revokeTenantProfilePermissionGrant,
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
-import { formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime } from "@/lib/dateFormat";
+import {
+  formatDate as formatDisplayDate,
+  formatDateTime as formatDisplayDateTime,
+} from "@/lib/dateFormat";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import {
   dedupeTenantProfileEmergencyContacts,
@@ -43,8 +49,8 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
-// ponytail: local filters cover the first 1000 tenant profiles; move filters into the API when this grows.
 const TENANT_PROFILE_FETCH_SIZE = 1000;
+
 const POLICE_REPORT_EXPORT_COLUMNS = [
   { key: "fullName", label: "Họ tên" },
   { key: "cccdNumber", label: "CCCD" },
@@ -101,20 +107,6 @@ const formatMoney = (value) => {
     : "Chưa cập nhật";
 };
 
-const initialsOf = (name) => {
-  const words = String(name || "KH")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  return (
-    words
-      .slice(-2)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase() || "KH"
-  );
-};
-
 const roleLabel = (role) =>
   String(role).toUpperCase() === "PRIMARY" ? "Người ký chính" : "Người ở cùng";
 
@@ -122,33 +114,6 @@ const roleClass = (role) =>
   String(role).toUpperCase() === "PRIMARY"
     ? "border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300"
     : "border-slate-200 bg-slate-50 text-slate-700";
-
-const profileStatusLabel = (status, fallback) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "COMPLETED") return "Hồ sơ đủ";
-  if (value === "MISSING_CCCD") return "Thiếu CCCD";
-  if (value === "MISSING_PORTRAIT") return "Thiếu ảnh chân dung";
-  if (value === "MISSING_EMERGENCY_CONTACT") return "Thiếu liên hệ khẩn cấp";
-  return fallback || "Chưa rõ";
-};
-
-const profileStatusClass = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "COMPLETED")
-    return "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
-  if (
-    value === "MISSING_CCCD" ||
-    value === "MISSING_PORTRAIT" ||
-    value === "MISSING_EMERGENCY_CONTACT"
-  ) {
-    return "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
-  }
-  if (value === "ACCESS_REJECTED")
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  if (value.startsWith("ACCESS_"))
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-700";
-};
 
 const profileAccessStatus = (profile) =>
   String(
@@ -193,7 +158,9 @@ const permissionGrantDurationLabel = (durationCode) => {
 };
 
 const isActivePermissionGrant = (grant) =>
-  ["ACTIVE", "APPROVED"].includes(String(valueOf(grant, "status")).toUpperCase());
+  ["ACTIVE", "APPROVED"].includes(
+    String(valueOf(grant, "status")).toUpperCase(),
+  );
 
 const accountStatusLabel = (status) => {
   const value = String(status || "").toUpperCase();
@@ -252,7 +219,8 @@ const contractStatusClass = (status) => {
     return "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   if (value === "EXPIRING_SOON")
     return "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300";
-  if (value === "EXPIRED") return "border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300";
+  if (value === "EXPIRED")
+    return "border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300";
   if (
     [
       "PENDING_SIGNATURE",
@@ -406,7 +374,9 @@ function ChecklistRow({ label, done, doneText, missingText }) {
     <div className="flex items-center justify-between rounded-xl bg-[#f1f5ff] dark:bg-white/5 px-4 py-3">
       <div className="flex items-center gap-3">
         <FileText className="h-5 w-5 text-[#1e40af] dark:text-[#93c5fd]" />
-        <span className="font-bold text-slate-700 dark:text-slate-200">{label}</span>
+        <span className="font-bold text-slate-700 dark:text-slate-200">
+          {label}
+        </span>
       </div>
       <span
         className={`flex items-center gap-1 text-xs font-black uppercase ${done ? "text-emerald-600 dark:text-emerald-300" : "text-amber-700 dark:text-yellow-300"}`}
@@ -733,7 +703,9 @@ function TenantProfileModal({
 }) {
   const identity =
     valueOf(profile, "identityDocument", "identity_document") || {};
-  const vehicles = dedupeTenantProfileVehicles(valueOf(profile, "vehicles") || []);
+  const vehicles = dedupeTenantProfileVehicles(
+    valueOf(profile, "vehicles") || [],
+  );
   const emergencyContacts = dedupeTenantProfileEmergencyContacts(
     valueOf(profile, "emergencyContacts", "emergency_contacts") || [],
   );
@@ -1123,16 +1095,6 @@ function TenantProfileModal({
             </DetailSection>
           </aside>
         </div>
-
-        <footer className="flex justify-end border-t border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-11 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-8 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-          >
-            Đóng
-          </button>
-        </footer>
       </div>
     </div>
   );
@@ -1150,7 +1112,12 @@ function PermissionGrantModal({
 }) {
   if (!profile) return null;
 
-  const sortedGrants = sortByNewest(grants, ["grantedAt", "granted_at", "createdAt", "created_at"]);
+  const sortedGrants = sortByNewest(grants, [
+    "grantedAt",
+    "granted_at",
+    "createdAt",
+    "created_at",
+  ]);
 
   const profileName = valueOf(profile, "fullName", "full_name") || "Khách thuê";
   const roomCode = valueOf(profile, "roomCode", "room_code");
@@ -1172,7 +1139,8 @@ function PermissionGrantModal({
               {profileName}
             </h2>
             <p className="mt-1 text-sm font-semibold text-[#64748b]">
-              {roomCode ? `Phòng ${roomCode} · ` : ""}{activeCount} quyền đang hiệu lực
+              {roomCode ? `Phòng ${roomCode} · ` : ""}
+              {activeCount} quyền đang hiệu lực
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1242,31 +1210,56 @@ function PermissionGrantModal({
                       valueOf(grant, "granteeEmail", "grantee_email");
 
                     return (
-                      <tr key={grantId || `${managerName}-${valueOf(grant, "grantedAt", "granted_at")}`}>
+                      <tr
+                        key={
+                          grantId ||
+                          `${managerName}-${valueOf(grant, "grantedAt", "granted_at")}`
+                        }
+                      >
                         <td className="px-4 py-4">
-                          <p className="font-black text-[#091426]">{managerName}</p>
+                          <p className="font-black text-[#091426]">
+                            {managerName}
+                          </p>
                           <p className="mt-1 text-xs font-semibold text-[#64748b]">
                             {managerContact || "Chưa có liên hệ"}
                           </p>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge className={permissionGrantStatusClass(valueOf(grant, "status"))}>
-                            {permissionGrantStatusLabel(valueOf(grant, "status"))}
+                          <Badge
+                            className={permissionGrantStatusClass(
+                              valueOf(grant, "status"),
+                            )}
+                          >
+                            {permissionGrantStatusLabel(
+                              valueOf(grant, "status"),
+                            )}
                           </Badge>
                         </td>
                         <td className="px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p>{permissionGrantDurationLabel(valueOf(grant, "durationCode", "duration_code"))}</p>
+                          <p>
+                            {permissionGrantDurationLabel(
+                              valueOf(grant, "durationCode", "duration_code"),
+                            )}
+                          </p>
                           <p className="mt-1 text-xs text-[#64748b]">
-                            Đến {formatDateTime(valueOf(grant, "expiresAt", "expires_at"))}
+                            Đến{" "}
+                            {formatDateTime(
+                              valueOf(grant, "expiresAt", "expires_at"),
+                            )}
                           </p>
                           {valueOf(grant, "revokedAt", "revoked_at") && (
                             <p className="mt-1 text-xs text-rose-600">
-                              Thu hồi {formatDateTime(valueOf(grant, "revokedAt", "revoked_at"))}
+                              Thu hồi{" "}
+                              {formatDateTime(
+                                valueOf(grant, "revokedAt", "revoked_at"),
+                              )}
                             </p>
                           )}
                         </td>
                         <td className="max-w-[220px] px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p className="line-clamp-2">{valueOf(grant, "reason") || "Không ghi lý do"}</p>
+                          <p className="line-clamp-2">
+                            {valueOf(grant, "reason") || "Không ghi lý do"}
+                          </p>
                           {valueOf(grant, "revokeReason", "revoke_reason") && (
                             <p className="mt-2 line-clamp-2 text-xs text-rose-600">
                               {valueOf(grant, "revokeReason", "revoke_reason")}
@@ -1282,10 +1275,14 @@ function PermissionGrantModal({
                               className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               <KeyRound className="h-4 w-4" />
-                              {String(actionId) === String(grantId) ? "Đang thu hồi..." : "Thu hồi"}
+                              {String(actionId) === String(grantId)
+                                ? "Đang thu hồi..."
+                                : "Thu hồi"}
                             </button>
                           ) : (
-                            <span className="text-xs font-bold text-[#94a3b8]">Không khả dụng</span>
+                            <span className="text-xs font-bold text-[#94a3b8]">
+                              Không khả dụng
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -1439,6 +1436,7 @@ export default function TenantsPage() {
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [profileStatusFilter, setProfileStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [expandedRoomKeys, setExpandedRoomKeys] = useState([]);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -1448,6 +1446,14 @@ export default function TenantsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const isOwner = String(activeRole).toLowerCase() === "owner";
+
+  const toggleRoomExpanded = (roomKey) => {
+    setExpandedRoomKeys((current) =>
+      current.includes(roomKey)
+        ? current.filter((key) => key !== roomKey)
+        : [...current, roomKey],
+    );
+  };
 
   const openExportDialog = () => {
     setExportError("");
@@ -1479,7 +1485,9 @@ export default function TenantsPage() {
       await downloadTenantProfilesPoliceReportExport(selectedExportColumns);
       setExportDialogOpen(false);
     } catch (downloadError) {
-      setExportError(downloadError?.message || "Xuất file Excel thất bại, vui lòng thử lại.");
+      setExportError(
+        downloadError?.message || "Xuất file Excel thất bại, vui lòng thử lại.",
+      );
     } finally {
       setIsExporting(false);
     }
@@ -1525,8 +1533,12 @@ export default function TenantsPage() {
     const profileId = valueOf(profile, "id", "profileId", "profile_id");
     if (!profileId) return;
 
-    const defaultReason = `Cần xem hồ sơ khách thuê phòng ${valueOf(profile, "roomCode", "room_code") || ""}`.trim();
-    const reason = window.prompt("Lý do cần xem hồ sơ khách thuê?", defaultReason);
+    const defaultReason =
+      `Cần xem hồ sơ khách thuê phòng ${valueOf(profile, "roomCode", "room_code") || ""}`.trim();
+    const reason = window.prompt(
+      "Lý do cần xem hồ sơ khách thuê?",
+      defaultReason,
+    );
     if (reason === null) return;
 
     try {
@@ -1552,9 +1564,18 @@ export default function TenantsPage() {
     setGrantsError("");
     try {
       const grants = await fetchTenantProfilePermissionGrants(profileId);
-      setPermissionGrants(sortByNewest(grants, ["grantedAt", "granted_at", "createdAt", "created_at"]));
+      setPermissionGrants(
+        sortByNewest(grants, [
+          "grantedAt",
+          "granted_at",
+          "createdAt",
+          "created_at",
+        ]),
+      );
     } catch (loadError) {
-      setGrantsError(loadError?.message || "Không tải được danh sách quyền xem hồ sơ.");
+      setGrantsError(
+        loadError?.message || "Không tải được danh sách quyền xem hồ sơ.",
+      );
       setPermissionGrants([]);
     } finally {
       setGrantsLoading(false);
@@ -1589,7 +1610,9 @@ export default function TenantsPage() {
       }
       await loadProfiles();
     } catch (revokeError) {
-      setGrantsError(revokeError?.message || "Không thu hồi được quyền xem hồ sơ.");
+      setGrantsError(
+        revokeError?.message || "Không thu hồi được quyền xem hồ sơ.",
+      );
     } finally {
       setGrantActionId("");
     }
@@ -1776,14 +1799,6 @@ export default function TenantsPage() {
                 Xuất Excel
               </button>
             )}
-            <button
-              type="button"
-              onClick={loadProfiles}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Làm mới
-            </button>
           </div>
         }
       />
@@ -1874,7 +1889,9 @@ export default function TenantsPage() {
       {!isLoading && error && (
         <section className="rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-10 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-rose-600 dark:text-rose-300" />
-          <p className="mt-3 text-sm font-bold text-rose-700 dark:text-rose-300">{error}</p>
+          <p className="mt-3 text-sm font-bold text-rose-700 dark:text-rose-300">
+            {error}
+          </p>
           <button
             type="button"
             onClick={loadProfiles}
@@ -1898,6 +1915,8 @@ export default function TenantsPage() {
         <section className="grid gap-5">
           {groupedByRoom.map((roomProfiles) => {
             const roomProfile = roomProfiles[0];
+            const roomKey = `${valueOf(roomProfile, "propertyId", "property_id")}-${valueOf(roomProfile, "roomCode", "room_code")}`;
+            const isExpanded = expandedRoomKeys.includes(roomKey);
             const maxOccupants =
               Number(
                 valueOf(roomProfile, "roomMaxOccupants", "room_max_occupants"),
@@ -1913,10 +1932,16 @@ export default function TenantsPage() {
 
             return (
               <div
-                key={`${valueOf(roomProfile, "propertyId", "property_id")}-${valueOf(roomProfile, "roomCode", "room_code")}`}
+                key={roomKey}
                 className="overflow-hidden rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
               >
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => toggleRoomExpanded(roomKey)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`room-tenants-${roomKey}`}
+                  className="flex w-full flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-4 text-left"
+                >
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
                       <h2 className="text-lg font-black text-slate-900 dark:text-white">
@@ -1945,187 +1970,214 @@ export default function TenantsPage() {
                         "chưa cập nhật"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white ring-1 ring-[#d8dee8]">
-                    <Users className="h-4 w-4 text-[#1e40af] dark:text-[#93c5fd]" />
-                    {roomOccupancyText(roomProfile)} người
-                  </div>
-                </div>
+                  <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-2 rounded-lg bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white ring-1 ring-[#d8dee8]">
+                      <Users className="h-4 w-4 text-[#1e40af] dark:text-[#93c5fd]" />
+                      {roomOccupancyText(roomProfile)} người
+                    </span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-[#d8dee8] dark:bg-[#0f172a] dark:text-slate-300 dark:ring-white/10">
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5" />
+                      )}
+                    </span>
+                  </span>
+                </button>
 
-                <div className="dashboard-table">
-                  <table className="w-full text-left">
-                    <thead className="bg-white dark:bg-[#0f172a] text-xs font-black uppercase tracking-[0.05em] text-slate-500 dark:text-slate-400">
-                      <tr>
-                        <th className="px-6 py-4">Họ tên</th>
-                        <th className="px-6 py-4">SĐT</th>
-                        <th className="px-6 py-4">Email</th>
-                        <th className="px-6 py-4">Số phòng</th>
-                        <th className="px-6 py-4">Số người</th>
-                        <th className="px-6 py-4">Vai trò</th>
-                        <th className="px-6 py-4">Hồ sơ</th>
-                        <th className="px-6 py-4">Tài khoản app</th>
-                        <th className="px-6 py-4 text-right">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#e2e8f0]">
-                      {roomProfiles.map((profile, index) => (
-                        <tr
-                          key={profileRowKey(profile, index)}
-                          className="hover:bg-[#f8fafc] dark:hover:bg-white/5"
-                        >
-                          <td data-label="Họ tên" className="px-6 py-5">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dbeafe] text-sm font-black text-[#1d4ed8]">
-                                {initialsOf(
-                                  valueOf(profile, "fullName", "full_name"),
-                                )}
-                              </span>
-                              <span>
-                                <span className="block font-black text-slate-900 dark:text-white">
-                                  {valueOf(profile, "fullName", "full_name")}
-                                </span>
-                                <span className="mt-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                  ID hồ sơ: #{valueOf(profile, "id")}
-                                </span>
-                              </span>
-                            </div>
-                          </td>
-                          <td
-                            data-label="SĐT"
-                            className="px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
-                          >
-                            {valueOf(profile, "phone") || "Chưa cập nhật"}
-                          </td>
-                          <td
-                            data-label="Email"
-                            className="break-words px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
-                          >
-                            {valueOf(profile, "email") || "Chưa cập nhật"}
-                          </td>
-                          <td
-                            data-label="Số phòng"
-                            className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white"
-                          >
-                            Phòng {valueOf(profile, "roomCode", "room_code")}
-                          </td>
-                          <td
-                            data-label="Số người"
-                            className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white"
-                          >
-                            {roomOccupancyText(profile)}
-                          </td>
-                          <td data-label="Vai trò" className="px-6 py-5">
-                            <Badge
-                              className={roleClass(
-                                valueOf(profile, "roomRole", "room_role"),
-                              )}
-                            >
-                              {roleLabel(
-                                valueOf(profile, "roomRole", "room_role"),
-                              )}
-                            </Badge>
-                          </td>
-                          <td data-label="Hồ sơ" className="px-6 py-5">
-                            <Badge
-                              className={profileStatusClass(
-                                valueOf(
-                                  profile,
-                                  "profileStatus",
-                                  "profile_status",
-                                ),
-                              )}
-                            >
-                              {profileStatusLabel(
-                                valueOf(
-                                  profile,
-                                  "profileStatus",
-                                  "profile_status",
-                                ),
-                                valueOf(
-                                  profile,
-                                  "profileStatusLabel",
-                                  "profile_status_label",
-                                ),
-                              )}
-                            </Badge>
-                          </td>
-                          <td data-label="Tài khoản app" className="px-6 py-5">
-                            <Badge
-                              className={accountStatusClass(
-                                valueOf(profile, "appStatus", "app_status"),
-                              )}
-                            >
-                              {accountStatusLabel(
-                                valueOf(profile, "appStatus", "app_status"),
-                              )}
-                            </Badge>
-                          </td>
-                          <td
-                            data-label="Thao tác"
-                            className="px-6 py-5 text-right"
-                          >
-                            {(() => {
-                              const profileId = valueOf(
-                                profile,
-                                "id",
-                                "profileId",
-                                "profile_id",
-                              );
-                              const accessStatus = profileAccessStatus(profile);
-                              const isRequesting =
-                                String(accessRequestingId) === String(profileId);
-                              if (canViewProfile(profile)) {
-                                return (
-                                  <div className="flex flex-col items-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedProfile(profile)}
-                                      className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                      Xem hồ sơ
-                                    </button>
-                                    {String(activeRole).toLowerCase() === "owner" && (
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      id={`room-tenants-${roomKey}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="dashboard-table overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead className="bg-white dark:bg-[#0f172a] text-xs font-black uppercase tracking-[0.05em] text-slate-500 dark:text-slate-400">
+                            <tr className="hover:bg-[#f8fafc] dark:hover:bg-white/5">
+                              <th className="px-6 py-4">Họ tên</th>
+                              <th className="px-6 py-4 text-center">SĐT</th>
+                              <th className="px-6 py-4 text-center">Email</th>
+                              <th className="px-6 py-4">Số người</th>
+                              <th className="px-6 py-4 text-center">Vai trò</th>
+                              <th className="px-6 py-4">Tài khoản app</th>
+                              <th className="px-6 py-4 text-center">
+                                Thao tác
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#e2e8f0]">
+                            {roomProfiles.map((profile, index) => (
+                              <tr
+                                key={profileRowKey(profile, index)}
+                                className="hover:bg-[#f8fafc] dark:hover:bg-white/5"
+                              >
+                                <td data-label="Họ tên" className="px-6 py-5">
+                                  <div className="flex items-center gap-3">
+                                    <span>
+                                      <span className="block font-black text-slate-900 dark:text-white">
+                                        {valueOf(
+                                          profile,
+                                          "fullName",
+                                          "full_name",
+                                        )}
+                                      </span>
+                                    </span>
+                                  </div>
+                                </td>
+                                <td
+                                  data-label="SĐT"
+                                  className="px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                                >
+                                  {valueOf(profile, "phone") || "Chưa cập nhật"}
+                                </td>
+                                <td
+                                  data-label="Email"
+                                  className="break-words px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                                >
+                                  {valueOf(profile, "email") || "Chưa cập nhật"}
+                                </td>
+
+                                <td
+                                  data-label="Số người"
+                                  className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white text-center"
+                                >
+                                  {roomOccupancyText(profile)}
+                                </td>
+                                <td
+                                  data-label="Vai trò"
+                                  className="px-6 py-5 text-center"
+                                >
+                                  <Badge
+                                    className={roleClass(
+                                      valueOf(profile, "roomRole", "room_role"),
+                                    )}
+                                  >
+                                    {roleLabel(
+                                      valueOf(profile, "roomRole", "room_role"),
+                                    )}
+                                  </Badge>
+                                </td>
+
+                                <td
+                                  data-label="Tài khoản app"
+                                  className="px-6 py-5"
+                                >
+                                  <Badge
+                                    className={accountStatusClass(
+                                      valueOf(
+                                        profile,
+                                        "appStatus",
+                                        "app_status",
+                                      ),
+                                    )}
+                                  >
+                                    {accountStatusLabel(
+                                      valueOf(
+                                        profile,
+                                        "appStatus",
+                                        "app_status",
+                                      ),
+                                    )}
+                                  </Badge>
+                                </td>
+                                <td
+                                  data-label="Thao tác"
+                                  className="px-6 py-5 text-left"
+                                >
+                                  {(() => {
+                                    const profileId = valueOf(
+                                      profile,
+                                      "id",
+                                      "profileId",
+                                      "profile_id",
+                                    );
+                                    const accessStatus =
+                                      profileAccessStatus(profile);
+                                    const isRequesting =
+                                      String(accessRequestingId) ===
+                                      String(profileId);
+                                    if (canViewProfile(profile)) {
+                                      return (
+                                        <div className="flex flex-col items-start gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedProfile(profile)
+                                            }
+                                            className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                            Xem hồ sơ
+                                          </button>
+                                          {String(activeRole).toLowerCase() ===
+                                            "owner" && (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openManageProfileAccess(profile)
+                                              }
+                                              className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                                            >
+                                              <KeyRound className="h-4 w-4" />
+                                              Quản lý quyền
+                                            </button>
+                                          )}
+                                          {valueOf(
+                                            profile,
+                                            "profileAccessExpiresAt",
+                                            "profile_access_expires_at",
+                                          ) && (
+                                            <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
+                                              Hiệu lực đến{" "}
+                                              {formatDate(
+                                                valueOf(
+                                                  profile,
+                                                  "profileAccessExpiresAt",
+                                                  "profile_access_expires_at",
+                                                ),
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return (
                                       <button
                                         type="button"
-                                        onClick={() => openManageProfileAccess(profile)}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                                        disabled={
+                                          accessStatus === "PENDING" ||
+                                          isRequesting
+                                        }
+                                        onClick={() =>
+                                          handleRequestProfileAccess(profile)
+                                        }
+                                        className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:border-[#e2e8f0] disabled:bg-[#f8fafc] disabled:text-[#94a3b8] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
                                       >
                                         <KeyRound className="h-4 w-4" />
-                                        Quản lý quyền
+                                        {isRequesting
+                                          ? "Đang gửi..."
+                                          : accessStatus === "PENDING"
+                                            ? "Chờ duyệt"
+                                            : accessStatus === "REJECTED"
+                                              ? "Gửi lại yêu cầu"
+                                              : "Yêu cầu xem"}
                                       </button>
-                                    )}
-                                    {valueOf(profile, "profileAccessExpiresAt", "profile_access_expires_at") && (
-                                      <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
-                                        Hiệu lực đến {formatDate(valueOf(profile, "profileAccessExpiresAt", "profile_access_expires_at"))}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-                              return (
-                                <button
-                                  type="button"
-                                  disabled={accessStatus === "PENDING" || isRequesting}
-                                  onClick={() => handleRequestProfileAccess(profile)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:border-[#e2e8f0] disabled:bg-[#f8fafc] disabled:text-[#94a3b8] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
-                                >
-                                  <KeyRound className="h-4 w-4" />
-                                  {isRequesting
-                                    ? "Đang gửi..."
-                                    : accessStatus === "PENDING"
-                                      ? "Chờ duyệt"
-                                      : accessStatus === "REJECTED"
-                                        ? "Gửi lại yêu cầu"
-                                        : "Yêu cầu xem"}
-                                </button>
-                              );
-                            })()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}

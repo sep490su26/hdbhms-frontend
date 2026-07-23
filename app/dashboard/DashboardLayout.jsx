@@ -34,6 +34,7 @@ import {
   X,
   Inbox,
   SendToBack,
+  WalletMinimal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,7 +49,12 @@ import { SidebarProvider, useSidebar } from "./_contexts/SidebarContext";
 import { ThemeProvider, useTheme } from "./_contexts/ThemeContext";
 import { PermissionGuard } from "./_components/PermissionGuard";
 import { ProtectedRoute } from "./_components/ProtectedRoute";
-import { ROLE_LABELS, ROLES, SECTION_PERMISSIONS, canAccessRole } from "./_lib/rbac";
+import {
+  ROLE_LABELS,
+  ROLES,
+  SECTION_PERMISSIONS,
+  canAccessRole,
+} from "./_lib/rbac";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -134,7 +140,7 @@ const navigation = [
   {
     path: "/dashboard/debt",
     label: "Quản lý công nợ",
-    icon: WalletCards,
+    icon: WalletMinimal,
     permissionKey: "debt",
   },
   {
@@ -306,7 +312,10 @@ function notificationHref(notification) {
   if (eventType === "VISIT_REQUEST_CREATED" || targetType === "VISIT_REQUEST") {
     return "/dashboard/viewing-customers";
   }
-  if (eventType === "TENANT_PROFILE_ACCESS_REQUESTED" || targetType === "CHANGE_REQUEST") {
+  if (
+    eventType === "TENANT_PROFILE_ACCESS_REQUESTED" ||
+    targetType === "CHANGE_REQUEST"
+  ) {
     return "/dashboard/requests";
   }
   if (
@@ -543,7 +552,8 @@ function Sidebar({ isOpen, onClose, role }) {
             <ul className="flex flex-col gap-4">
               {visibleNavigation.map((item) => {
                 const Icon = item.icon;
-                const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                const hasChildren =
+                  Array.isArray(item.children) && item.children.length > 0;
                 const isActive =
                   isNavigationPathActive(pathname, item.path) ||
                   item.children?.some((child) =>
@@ -622,7 +632,9 @@ function Sidebar({ isOpen, onClose, role }) {
                                 <Link
                                   href={child.path}
                                   onClick={onClose}
-                                  aria-current={childActive ? "page" : undefined}
+                                  aria-current={
+                                    childActive ? "page" : undefined
+                                  }
                                   className={`block rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                                     childActive
                                       ? "bg-[#ecf3ff] text-[#465fff] dark:bg-[#465fff]/[0.12] dark:text-[#9cb9ff]"
@@ -832,7 +844,8 @@ function Topbar({
                   open={isNotificationOpen}
                   onOpenChange={(open) => {
                     setNotificationOpen(open);
-                    if (open) loadNotifications({ silent: notifications.length > 0 });
+                    if (open)
+                      loadNotifications({ silent: notifications.length > 0 });
                   }}
                 >
                   <DropdownMenuTrigger asChild>
@@ -860,7 +873,9 @@ function Topbar({
                           Thông báo
                         </p>
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          {unreadCount > 0 ? `${unreadCount} chưa đọc` : "Không có thông báo mới"}
+                          {unreadCount > 0
+                            ? `${unreadCount} chưa đọc`
+                            : "Không có thông báo mới"}
                         </p>
                       </div>
                       <button
@@ -895,12 +910,16 @@ function Topbar({
                         notifications.map((notification) => (
                           <DropdownMenuItem
                             key={notification.id}
-                            onClick={() => handleNotificationClick(notification)}
+                            onClick={() =>
+                              handleNotificationClick(notification)
+                            }
                             className="cursor-pointer items-start gap-3 rounded-lg px-3 py-3 focus:bg-gray-50 dark:focus:bg-white/5"
                           >
                             <span
                               className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                                notification.isRead ? "bg-gray-300 dark:bg-gray-600" : "bg-orange-500"
+                                notification.isRead
+                                  ? "bg-gray-300 dark:bg-gray-600"
+                                  : "bg-orange-500"
                               }`}
                             />
                             <span className="min-w-0 flex-1">
@@ -908,11 +927,14 @@ function Topbar({
                                 {notification.title || "Thông báo"}
                               </span>
                               <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-500 dark:text-gray-400">
-                                {notification.body || "Có cập nhật mới cần xem."}
+                                {notification.body ||
+                                  "Có cập nhật mới cần xem."}
                               </span>
                               {notification.createdAt && (
                                 <span className="mt-2 block text-[11px] font-semibold text-gray-400">
-                                  {formatNotificationTime(notification.createdAt)}
+                                  {formatNotificationTime(
+                                    notification.createdAt,
+                                  )}
                                 </span>
                               )}
                             </span>
@@ -1013,7 +1035,13 @@ function DashboardLayoutShell({ children }) {
       router.replace(`/login${redirect}`);
       return;
     }
-    if (isOwnerFacilityScopedRouteWithoutProperty(effectiveRole, pathname, routePropertyId)) {
+    if (
+      isOwnerFacilityScopedRouteWithoutProperty(
+        effectiveRole,
+        pathname,
+        routePropertyId,
+      )
+    ) {
       router.replace("/dashboard/facilities");
       return;
     }

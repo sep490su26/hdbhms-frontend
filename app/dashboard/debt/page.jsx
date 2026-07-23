@@ -138,19 +138,6 @@ export default function DebtDashboardPage() {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={loadDebts}
-              disabled={loading}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white disabled:opacity-60"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Làm mới
-            </button>
           </div>
         }
       />
@@ -256,13 +243,17 @@ export default function DebtDashboardPage() {
 
               <div className="mt-5 grid gap-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-bold text-slate-500 dark:text-slate-400">Tiền phòng</p>
+                  <p className="font-bold text-slate-500 dark:text-slate-400">
+                    Tiền phòng
+                  </p>
                   <p className="font-black">
                     {formatMoney(debt.rentDebtAmount)}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-bold text-slate-500 dark:text-slate-400">Điện nước</p>
+                  <p className="font-bold text-slate-500 dark:text-slate-400">
+                    Điện nước
+                  </p>
                   <p className="font-black">
                     {formatMoney(debt.utilityDebtAmount)}
                   </p>

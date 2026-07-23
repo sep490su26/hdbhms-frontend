@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { fetchRevenueReport } from "@/services/revenueReportService";
+import { formatThousandVND } from "./_lib/formatters";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -84,7 +85,7 @@ function SummaryCard({ label, value, note, color, trend }) {
     <article className="relative min-h-[112px] overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm">
       <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color }} />
       <p className="max-w-[120px] text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">{label}</p>
-      <p className="mt-2 text-2xl font-black text-[#0f1d33]">{formatCurrency(value)}</p>
+      <p className="mt-2 truncate text-2xl font-black text-[#0f1d33]">{formatThousandVND(value)}</p>
       <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${trend ? "text-emerald-600" : "text-[#5f6b7c]"}`}>
         {trend && <TrendingUp className="h-3 w-3" />}
         {note}
@@ -233,7 +234,8 @@ export default function FinancePage() {
         }
       />
 
-      <nav className="flex items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
             <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Doanh thu</span>
             <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">
               Thu chi tổng hợp
@@ -241,7 +243,11 @@ export default function FinancePage() {
             <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">
               Chi phí vận hành
             </Link>
-      </nav>
+        </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
+      </div>
 
       {errorMessage && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">

@@ -46,6 +46,7 @@ const translateType = (type) => {
         MOVEOUT: "Trả phòng",
         RENEWAL: "Gia hạn HĐ",
         TERMINATION: "Thanh lý HĐ",
+        CONTRACT_LIQUIDATION: "Thanh lý HĐ",
         MAINTENANCE: "Bảo trì",
         COMPLAINT: "Khiếu nại",
         ACCESS: "Yêu cầu thẻ"
@@ -60,6 +61,7 @@ const mapRequestType = (type) => {
         MOVE_OUT: "MOVEOUT",
         CONTRACT_RENEWAL: "RENEWAL",
         CONTRACT_TERMINATION: "TERMINATION",
+        CONTRACT_LIQUIDATION: "TERMINATION",
         PERMISSION_ACCESS: "PERMISSION_ACCESS",
         TENANT_PROFILE_ACCESS: "TENANT_PROFILE_ACCESS",
         METER_READING_CORRECTION: "METER_READING_CORRECTION",
@@ -84,11 +86,20 @@ const translateStatus = (status) => {
     return map[status] || status;
 };
 
+const statusBadgeClass = (status) => {
+    if (status === "PENDING") return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    if (status === "APPROVED" || status === "COMPLETED") return "text-green-600 bg-green-50 border-green-200";
+    if (status === "PROCESSING") return "text-blue-600 bg-blue-50 border-blue-200";
+    if (status === "REJECTED" || status === "CANCELLED") return "text-red-600 bg-red-50 border-red-200";
+    return "text-gray-600 bg-gray-50 border-gray-200";
+};
+
 const TYPE_CONFIG = {
     TRANSFER: { color: "bg-violet-50", icon: <ArrowRightLeft className="w-5 h-5 text-violet-500" />, accent: "violet" },
     MOVEOUT: { color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500" />, accent: "green" },
     RENEWAL: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
     TERMINATION: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" />, accent: "red" },
+    CONTRACT_LIQUIDATION: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" />, accent: "red" },
     MAINTENANCE: { color: "bg-emerald-50", icon: <Wrench className="w-5 h-5 text-emerald-500" />, accent: "emerald" },
     COMPLAINT: { color: "bg-blue-50", icon: <MessageSquareWarning className="w-5 h-5 text-blue-500" />, accent: "blue" },
     ACCESS: { color: "bg-orange-50", icon: <Key className="w-5 h-5 text-orange-500" />, accent: "orange" },
@@ -330,6 +341,9 @@ function RequestDetailContent({ req, detailTransfer }) {
     const mappedType = mapRequestType(req.requestType);
     const payload = parseRequestPayload(req.requestPayload);
     const TypeDetailComponent = TYPE_DETAIL_COMPONENTS[mappedType];
+    const resolvedTone = statusBadgeClass(req.status);
+    const isPositiveStatus = req.status === "APPROVED" || req.status === "COMPLETED";
+    const isProcessingStatus = req.status === "PROCESSING";
 
     return (
         <div className="space-y-6">
@@ -342,7 +356,7 @@ function RequestDetailContent({ req, detailTransfer }) {
                     <h3 className="text-lg font-bold text-gray-900">{req.title || translateType(mappedType)}</h3>
                     <p className="text-sm text-gray-500 mt-0.5 font-mono">{req.requestCode || `#${req.id}`}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <Badge variant="outline" className={`bg-white capitalize ${req.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50 border-yellow-200' : req.status === 'APPROVED' ? 'text-green-600 bg-green-50 border-green-200' : req.status === 'REJECTED' ? 'text-red-600 bg-red-50 border-red-200' : 'text-gray-600 bg-gray-50'}`}>
+                        <Badge variant="outline" className={`capitalize ${resolvedTone}`}>
                             {translateStatus(req.status)}
                         </Badge>
                         <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
@@ -371,24 +385,26 @@ function RequestDetailContent({ req, detailTransfer }) {
 
             {/* Resolution info */}
             {req.status !== "PENDING" && (
-                <div className={`rounded-xl p-4 ${req.status === "APPROVED" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                <div className={`rounded-xl p-4 border ${resolvedTone}`}>
                     <div className="flex items-center gap-2 mb-2">
-                        {req.status === "APPROVED" ? (
+                        {isProcessingStatus ? (
+                            <Hourglass className="w-4 h-4 text-blue-600" />
+                        ) : isPositiveStatus ? (
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
                         ) : (
                             <XCircle className="w-4 h-4 text-red-600" />
                         )}
-                        <p className={`text-sm font-semibold ${req.status === "APPROVED" ? "text-green-700" : "text-red-700"}`}>
-                            {req.status === "APPROVED" ? "Đã duyệt" : "Đã từ chối"}
+                        <p className="text-sm font-semibold">
+                            {translateStatus(req.status)}
                         </p>
                     </div>
                     {req.resolutionNote && (
-                        <p className={`text-sm whitespace-pre-wrap ${req.status === "APPROVED" ? "text-green-600" : "text-red-600"}`}>
+                        <p className="text-sm whitespace-pre-wrap">
                             {req.resolutionNote}
                         </p>
                     )}
                     {req.resolvedAt && (
-                        <p className={`text-xs mt-2 ${req.status === "APPROVED" ? "text-green-500" : "text-red-500"}`}>
+                        <p className="text-xs mt-2">
                             {new Date(req.resolvedAt).toLocaleString('vi-VN')}
                         </p>
                     )}
@@ -887,7 +903,7 @@ export default function ApprovalCenter() {
                                                     <p className="mt-2 text-slate-400">{req.createdAt ? new Date(req.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--"}</p>
                                                 </TableCell>
                                                 <TableCell className="px-3 py-3 align-top">
-                                                    <Badge variant="outline" className={`rounded-full border-0 capitalize ${req.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : req.status === 'REJECTED' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
+                                                    <Badge variant="outline" className={`rounded-full capitalize ${statusBadgeClass(req.status)}`}>
                                                         {translateStatus(req.status)}
                                                     </Badge>
                                                 </TableCell>
@@ -942,7 +958,7 @@ export default function ApprovalCenter() {
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <Badge variant="outline" className={`bg-white border-gray-200 capitalize ${req.status === 'PENDING' ? 'text-yellow-600 bg-yellow-50' : req.status === 'APPROVED' ? 'text-green-600 bg-green-50' : req.status === 'REJECTED' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50'}`}>
+                                                <Badge variant="outline" className={`capitalize ${statusBadgeClass(req.status)}`}>
                                                     {translateStatus(req.status)}
                                                 </Badge>
                                                 <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">

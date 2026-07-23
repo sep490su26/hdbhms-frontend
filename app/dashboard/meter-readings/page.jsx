@@ -46,6 +46,7 @@ import {
 } from "@/services/meterReadingService";
 import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
 import { fetchSimpleProperties } from "@/services/identityAccessService";
+import { UtilityBillingRunsPanel } from "./_components/UtilityBillingRunsPanel";
 
 const STATUS_MAP = {
   DRAFT: {
@@ -466,6 +467,8 @@ export default function UtilityManagement() {
   const completedRooms = capCompletedRooms(currentPeriod?.completedRooms, totalRooms);
   const missingRooms = Math.max(0, totalRooms - completedRooms);
   const progress = calculateProgress(completedRooms, totalRooms);
+  const utilityBillingReady =
+    String(currentPeriod?.status || "").toUpperCase() === "CONFIRMED";
   const totalPages = Math.ceil(displayHistory.length / itemsPerPage);
   const effectiveCurrentPage = Math.min(currentPage, totalPages || 1);
   const paginatedHistory = displayHistory.slice(
@@ -627,6 +630,14 @@ export default function UtilityManagement() {
           </div>
         )}
       </section>
+
+      {utilityBillingReady ? (
+        <UtilityBillingRunsPanel
+          key={`${propertyId || "all"}-${periodValue(currentPeriod) || formatMonthYearPeriod()}`}
+          propertyId={propertyId}
+          defaultPeriod={periodValue(currentPeriod) || formatMonthYearPeriod()}
+        />
+      ) : null}
 
       <section className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="flex items-center gap-2 border-b border-[#e2e8f0] px-4 py-4 dark:border-white/10">

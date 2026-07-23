@@ -198,6 +198,11 @@ const specialRoutePermissions = [
     permissionKey: "maintenance",
     navigationPath: "/dashboard/maintenance",
   },
+  {
+    prefix: "/dashboard/rules",
+    permissionKey: "facilities",
+    navigationPath: "/dashboard/facilities",
+  },
 ];
 
 function getAllowedRoles(item) {
@@ -220,7 +225,9 @@ function isOwnerFacilityScopedRouteWithoutProperty(role, pathname, propertyId) {
     (pathname === "/dashboard/rooms" ||
       pathname?.startsWith("/dashboard/rooms/") ||
       pathname === "/dashboard/meter-readings" ||
-      pathname?.startsWith("/dashboard/meter-readings/"))
+      pathname?.startsWith("/dashboard/meter-readings/") ||
+      pathname === "/dashboard/rules" ||
+      pathname?.startsWith("/dashboard/rules/"))
   );
 }
 

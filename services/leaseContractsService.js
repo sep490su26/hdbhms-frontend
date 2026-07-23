@@ -270,6 +270,33 @@ export function normalizeLeaseContractItem(item = {}) {
     tenantIntention: item.tenantIntention ?? item.tenant_intention ?? null,
     expectedVacantDate:
       item.expectedVacantDate ?? item.expected_vacant_date ?? null,
+    liquidationId: item.liquidationId ?? item.liquidation_id ?? null,
+    liquidationDate:
+      item.liquidationDate ?? item.liquidation_date ?? null,
+    liquidationReason:
+      item.liquidationReason ?? item.liquidation_reason ?? null,
+    liquidationDepositAmount:
+      item.liquidationDepositAmount ?? item.liquidation_deposit_amount ?? null,
+    liquidationDepositDeductionAmount:
+      item.liquidationDepositDeductionAmount ??
+      item.liquidation_deposit_deduction_amount ??
+      null,
+    liquidationDepositDeductionReason:
+      item.liquidationDepositDeductionReason ??
+      item.liquidation_deposit_deduction_reason ??
+      null,
+    liquidationDepositRefundAmount:
+      item.liquidationDepositRefundAmount ??
+      item.liquidation_deposit_refund_amount ??
+      null,
+    liquidationFinalInvoiceId:
+      item.liquidationFinalInvoiceId ?? item.liquidation_final_invoice_id ?? null,
+    liquidationSignedFileId:
+      item.liquidationSignedFileId ?? item.liquidation_signed_file_id ?? null,
+    liquidationStatus:
+      item.liquidationStatus ?? item.liquidation_status ?? null,
+    liquidationCreatedAt:
+      item.liquidationCreatedAt ?? item.liquidation_created_at ?? null,
     transferRequestId: item.transferRequestId ?? null,
     transferRequestCode: item.transferRequestCode ?? null,
     transferStatus: item.transferStatus ?? null,
@@ -421,6 +448,26 @@ export async function liquidateLeaseContract(leaseContractId, payload = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+    },
+  );
+  return normalizeLeaseContractItem(data);
+}
+
+export async function updateLeaseContractLiquidationDraft(leaseContractId, payload = {}) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng cần cập nhật hồ sơ thanh lý.");
+  }
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/liquidation`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        liquidationDate: payload.liquidationDate,
+        reason: payload.reason,
+        depositDeductionAmount: payload.depositDeductionAmount,
+        depositDeductionReason: payload.depositDeductionReason,
+      }),
     },
   );
   return normalizeLeaseContractItem(data);
@@ -786,6 +833,39 @@ function normalizeLeaseContractDetails(details = {}) {
       details.tenantIntention ?? details.tenant_intention ?? null,
     expectedVacantDate:
       details.expectedVacantDate ?? details.expected_vacant_date ?? null,
+    liquidationId: details.liquidationId ?? details.liquidation_id ?? null,
+    liquidationDate:
+      details.liquidationDate ?? details.liquidation_date ?? null,
+    liquidationReason:
+      details.liquidationReason ?? details.liquidation_reason ?? null,
+    liquidationDepositAmount:
+      details.liquidationDepositAmount ??
+      details.liquidation_deposit_amount ??
+      null,
+    liquidationDepositDeductionAmount:
+      details.liquidationDepositDeductionAmount ??
+      details.liquidation_deposit_deduction_amount ??
+      null,
+    liquidationDepositDeductionReason:
+      details.liquidationDepositDeductionReason ??
+      details.liquidation_deposit_deduction_reason ??
+      null,
+    liquidationDepositRefundAmount:
+      details.liquidationDepositRefundAmount ??
+      details.liquidation_deposit_refund_amount ??
+      null,
+    liquidationFinalInvoiceId:
+      details.liquidationFinalInvoiceId ??
+      details.liquidation_final_invoice_id ??
+      null,
+    liquidationSignedFileId:
+      details.liquidationSignedFileId ??
+      details.liquidation_signed_file_id ??
+      null,
+    liquidationStatus:
+      details.liquidationStatus ?? details.liquidation_status ?? null,
+    liquidationCreatedAt:
+      details.liquidationCreatedAt ?? details.liquidation_created_at ?? null,
     transferRequestId: details.transferRequestId ?? null,
     transferRequestCode: details.transferRequestCode ?? null,
     transferStatus: details.transferStatus ?? null,

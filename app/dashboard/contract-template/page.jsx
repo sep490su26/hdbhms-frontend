@@ -37,6 +37,7 @@ import {
     liquidateLeaseContract,
     recordLeaseContractTenantIntention,
     renewLeaseContract,
+    updateLeaseContractLiquidationDraft,
     updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
 import {
@@ -284,6 +285,23 @@ function buildTermsForm(item = {}) {
         paymentCycleMonths: String(item.paymentCycleMonths || 1),
         monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
         depositAmount: item.depositAmount == null ? "0" : String(item.depositAmount),
+    };
+}
+
+function todayInputValue() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function buildLiquidationForm(item = {}) {
+    return {
+        liquidationDate: toDateInputValue(item.liquidationDate || item.expectedVacantDate) || todayInputValue(),
+        reason: item.liquidationReason || item.intentionNote || "",
+        depositDeductionAmount:
+            item.liquidationDepositDeductionAmount == null
+                ? "0"
+                : String(item.liquidationDepositDeductionAmount),
+        depositDeductionReason: item.liquidationDepositDeductionReason || "",
     };
 }
 
@@ -712,6 +730,9 @@ export default function ContractTemplatePage() {
     const [termsForm, setTermsForm] = useState(buildTermsForm());
     const [termsError, setTermsError] = useState("");
     const [termsFieldErrors, setTermsFieldErrors] = useState({});
+    const [isEditingLiquidation, setIsEditingLiquidation] = useState(false);
+    const [liquidationForm, setLiquidationForm] = useState(buildLiquidationForm());
+    const [liquidationError, setLiquidationError] = useState("");
     const [renewModalOpen, setRenewModalOpen] = useState(false);
     const [renewForm, setRenewForm] = useState(buildRenewForm());
     const [renewError, setRenewError] = useState("");
@@ -775,6 +796,7 @@ export default function ContractTemplatePage() {
                 if (!ignore) {
                     setDetails(data);
                     setTermsForm(buildTermsForm(data));
+                    setLiquidationForm(buildLiquidationForm(data));
                 }
             } catch {
                 if (!ignore) setDetails(null);
@@ -986,6 +1008,9 @@ export default function ContractTemplatePage() {
         setIsEditingTerms(false);
         setTermsFieldErrors({});
         setTermsError("");
+        setLiquidationForm(buildLiquidationForm(item));
+        setIsEditingLiquidation(false);
+        setLiquidationError("");
         setRenewModalOpen(false);
         setIntentionModalOpen(false);
         setTransferExecutionModal(null);
@@ -1322,6 +1347,7 @@ export default function ContractTemplatePage() {
         const refreshedDetails = await fetchManagementLeaseContractDetails(contract.leaseContractId);
         setDetails(refreshedDetails);
         setTermsForm(buildTermsForm(refreshedDetails));
+        setLiquidationForm(buildLiquidationForm(refreshedDetails));
     }
 
     async function handleRetrySendAccount(item) {
@@ -1455,18 +1481,76 @@ export default function ContractTemplatePage() {
 
     async function handleLiquidate(item) {
         if (!item?.leaseContractId) return;
-        const confirmed = window.confirm("Bạn chắc chắn muốn thanh lý hợp đồng này?");
+        const deductionAmount = Number(liquidationForm.depositDeductionAmount || 0);
+        if (!Number.isFinite(deductionAmount) || deductionAmount < 0) {
+            setLiquidationError("Số tiền khấu trừ không hợp lệ.");
+            return;
+        }
+        if (deductionAmount > Number(item.depositAmount || 0)) {
+            setLiquidationError("Số tiền khấu trừ không được lớn hơn tiền cọc.");
+            return;
+        }
+        const confirmed = window.confirm("Bạn chắc chắn muốn hoàn tất thanh lý hợp đồng này?");
         if (!confirmed) return;
         setActionLoading(`liquidate-${item.leaseContractId}`);
         setError("");
+        setLiquidationError("");
         try {
-            const updated = await liquidateLeaseContract(item.leaseContractId, {reason: "Thanh lý từ màn quản lý hợp đồng"});
-            await loadContracts();
-            const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
-            setDetails(refreshedDetails);
-            setSelected((current) => current ? {...current, ...updated} : current);
+            const updated = await liquidateLeaseContract(item.leaseContractId, {
+                liquidationDate: liquidationForm.liquidationDate,
+                reason: liquidationForm.reason,
+                depositDeductionAmount: deductionAmount,
+                depositDeductionReason: liquidationForm.depositDeductionReason,
+            });
+            await refreshSelectedContract(updated);
+            setIsEditingLiquidation(false);
+            toast.success("Đã hoàn tất thanh lý hợp đồng.");
         } catch (err) {
             setError(err?.message || "Không thanh lý được hợp đồng.");
+            setLiquidationError(err?.details || err?.message || "Không thanh lý được hợp đồng.");
+            toast.error(err?.message || "Không thanh lý được hợp đồng.");
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    function updateLiquidationField(field, value) {
+        setLiquidationForm((current) => ({...current, [field]: value}));
+        if (liquidationError) setLiquidationError("");
+    }
+
+    async function handleSaveLiquidationDraft(item) {
+        if (!item?.leaseContractId) return;
+        const deductionAmount = Number(liquidationForm.depositDeductionAmount || 0);
+        if (!liquidationForm.liquidationDate) {
+            setLiquidationError("Vui lòng chọn ngày thanh lý.");
+            return;
+        }
+        if (!Number.isFinite(deductionAmount) || deductionAmount < 0) {
+            setLiquidationError("Số tiền khấu trừ không hợp lệ.");
+            return;
+        }
+        if (deductionAmount > Number(item.depositAmount || 0)) {
+            setLiquidationError("Số tiền khấu trừ không được lớn hơn tiền cọc.");
+            return;
+        }
+
+        setActionLoading(`liquidation-draft-${item.leaseContractId}`);
+        setLiquidationError("");
+        setError("");
+        try {
+            const updated = await updateLeaseContractLiquidationDraft(item.leaseContractId, {
+                liquidationDate: liquidationForm.liquidationDate,
+                reason: liquidationForm.reason,
+                depositDeductionAmount: deductionAmount,
+                depositDeductionReason: liquidationForm.depositDeductionReason,
+            });
+            await refreshSelectedContract(updated);
+            setIsEditingLiquidation(false);
+            toast.success("Đã lưu hồ sơ thanh lý.");
+        } catch (err) {
+            setLiquidationError(err?.details || err?.message || "Không lưu được hồ sơ thanh lý.");
+            toast.error(err?.message || "Không lưu được hồ sơ thanh lý.");
         } finally {
             setActionLoading("");
         }
@@ -1675,7 +1759,7 @@ export default function ContractTemplatePage() {
     }
 
     const isBusy = Boolean(actionLoading);
-    const canUseOwnerOnlyActions = user?.role === ROLES.OWNER;
+    const canUseLiquidationActions = user?.role === ROLES.OWNER || user?.role === ROLES.MANAGER;
 
     return (
         <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
@@ -2620,6 +2704,127 @@ export default function ContractTemplatePage() {
                                         )}
                                     </DetailCard>
 
+                                    {(mergedSelected.liquidationId || getWorkflow(mergedSelected) === "TERMINATION_PENDING") && (
+                                        <DetailCard
+                                            title="Hồ sơ thanh lý"
+                                            icon={FileWarning}
+                                            className="lg:col-span-2"
+                                            action={
+                                                canUseLiquidationActions && mergedSelected.liquidationStatus !== "CONFIRMED" ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (isEditingLiquidation) {
+                                                                setLiquidationForm(buildLiquidationForm(mergedSelected));
+                                                                setLiquidationError("");
+                                                                setIsEditingLiquidation(false);
+                                                            } else {
+                                                                setLiquidationForm(buildLiquidationForm(mergedSelected));
+                                                                setLiquidationError("");
+                                                                setIsEditingLiquidation(true);
+                                                            }
+                                                        }}
+                                                        disabled={isBusy}
+                                                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
+                                                    >
+                                                        {isEditingLiquidation ? <X className="h-3.5 w-3.5"/> : <Pencil className="h-3.5 w-3.5"/>}
+                                                        {isEditingLiquidation ? "Hủy" : "Cập nhật"}
+                                                    </button>
+                                                ) : null
+                                            }
+                                        >
+                                            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
+                                                {isEditingLiquidation ? (
+                                                    <>
+                                                        <label className="grid min-w-0 gap-1.5">
+                                                            <span className="text-xs font-bold text-[#58667c]">Ngày thanh lý *</span>
+                                                            <DateInput
+                                                                value={liquidationForm.liquidationDate}
+                                                                onChange={(event) => updateLiquidationField("liquidationDate", event.target.value)}
+                                                                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                                                            />
+                                                        </label>
+                                                        <label className="grid min-w-0 gap-1.5">
+                                                            <span className="text-xs font-bold text-[#58667c]">Khấu trừ cọc</span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1000"
+                                                                value={liquidationForm.depositDeductionAmount}
+                                                                onChange={(event) => updateLiquidationField("depositDeductionAmount", event.target.value)}
+                                                                className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                                                            />
+                                                        </label>
+                                                        <label className="grid min-w-0 gap-1.5 sm:col-span-2">
+                                                            <span className="text-xs font-bold text-[#58667c]">Lý do thanh lý</span>
+                                                            <textarea
+                                                                rows={3}
+                                                                value={liquidationForm.reason}
+                                                                onChange={(event) => updateLiquidationField("reason", event.target.value)}
+                                                                className="min-h-24 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
+                                                            />
+                                                        </label>
+                                                        <label className="grid min-w-0 gap-1.5 sm:col-span-2">
+                                                            <span className="text-xs font-bold text-[#58667c]">Lý do khấu trừ</span>
+                                                            <textarea
+                                                                rows={2}
+                                                                value={liquidationForm.depositDeductionReason}
+                                                                onChange={(event) => updateLiquidationField("depositDeductionReason", event.target.value)}
+                                                                className="min-h-20 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
+                                                            />
+                                                        </label>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <InfoValue label="Trạng thái hồ sơ" value={mergedSelected.liquidationStatus === "CONFIRMED" ? "Đã xác nhận" : "Bản nháp"}/>
+                                                        <InfoValue label="Ngày thanh lý" value={formatDate(mergedSelected.liquidationDate || mergedSelected.expectedVacantDate)}/>
+                                                        <InfoValue label="Tiền cọc" value={formatOptionalMoney(mergedSelected.liquidationDepositAmount ?? mergedSelected.depositAmount)}/>
+                                                        <InfoValue label="Khấu trừ cọc" value={formatOptionalMoney(mergedSelected.liquidationDepositDeductionAmount ?? 0)}/>
+                                                        <InfoValue label="Hoàn cọc dự kiến" value={formatOptionalMoney(mergedSelected.liquidationDepositRefundAmount ?? Math.max(0, Number(mergedSelected.depositAmount || 0) - Number(mergedSelected.liquidationDepositDeductionAmount || 0)))}/>
+                                                        <InfoValue label="Hóa đơn chốt" value={mergedSelected.liquidationFinalInvoiceId ? `#${mergedSelected.liquidationFinalInvoiceId}` : "Chưa có"}/>
+                                                        <InfoValue label="Lý do thanh lý" value={mergedSelected.liquidationReason}/>
+                                                        <InfoValue label="Lý do khấu trừ" value={mergedSelected.liquidationDepositDeductionReason}/>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {liquidationError && (
+                                                <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                                                    {liquidationError}
+                                                </p>
+                                            )}
+                                            {canUseLiquidationActions && mergedSelected.liquidationStatus !== "CONFIRMED" && (
+                                                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveLiquidationDraft(mergedSelected)}
+                                                        disabled={isBusy}
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === `liquidation-draft-${mergedSelected.leaseContractId}` ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin"/>
+                                                        ) : (
+                                                            <Save className="h-4 w-4"/>
+                                                        )}
+                                                        Lưu hồ sơ
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleLiquidate(mergedSelected)}
+                                                        disabled={isBusy}
+                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === `liquidate-${mergedSelected.leaseContractId}` ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin"/>
+                                                        ) : (
+                                                            <CheckCircle2 className="h-4 w-4"/>
+                                                        )}
+                                                        Hoàn tất thanh lý
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </DetailCard>
+                                    )}
+
                                     <DetailCard title="Người ở trong hợp đồng" icon={Users} className="lg:col-span-2">
                                         <div
                                             className="dashboard-table custom-scrollbar mt-5 rounded-lg border border-[#dfe5ef] bg-white">
@@ -2870,8 +3075,9 @@ export default function ContractTemplatePage() {
                                                 Ghi nhận / Cập nhật ý định khách
                                             </button>
                                         )}
-                                        {canUseOwnerOnlyActions && (details?.canLiquidate ??
-                                            ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(getWorkflow(mergedSelected))) && (
+                                        {canUseLiquidationActions && (details?.canLiquidate ??
+                                            ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) &&
+                                            getWorkflow(mergedSelected) !== "TERMINATION_PENDING" && (
                                             <button
                                                 type="button"
                                                 onClick={() => handleLiquidate(mergedSelected)}

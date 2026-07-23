@@ -346,17 +346,24 @@ export function RenewalRequestDetail({ payload }) {
 
 export function TerminationRequestDetail({ payload }) {
     if (!payload) return null;
+    const effectiveDate = payload.liquidationDate
+        || payload.liquidation_date
+        || payload.terminationDate
+        || payload.termination_date
+        || payload.effectiveDate
+        || payload.effective_date;
+    const reason = payload.reason || payload.terminationReason || payload.termination_reason;
 
     return (
         <div className="grid grid-cols-2 gap-4">
             <InfoField label="Phòng" value={payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
-            {(payload.terminationDate || payload.termination_date || payload.effectiveDate || payload.effective_date) && (
-                <InfoField label="Ngày thanh lý" value={payload.terminationDate || payload.termination_date || payload.effectiveDate || payload.effective_date} icon={<Calendar className="w-4 h-4" />} />
+            {effectiveDate && (
+                <InfoField label="Ngày thanh lý" value={effectiveDate} icon={<Calendar className="w-4 h-4" />} />
             )}
-            {(payload.reason || payload.terminationReason || payload.termination_reason) && (
+            {reason && (
                 <div className="col-span-2 rounded-xl bg-red-50 p-4">
                     <p className="text-sm font-semibold text-red-700 mb-1">Lý do thanh lý</p>
-                    <p className="text-sm text-red-600 whitespace-pre-wrap">{payload.reason || payload.terminationReason || payload.termination_reason}</p>
+                    <p className="text-sm text-red-600 whitespace-pre-wrap">{reason}</p>
                 </div>
             )}
         </div>

@@ -15,7 +15,15 @@ import {
   Layers3,
   MapPin,
   Pencil,
+  MoreVertical,
+  FileText,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   FACILITY_STATUS,
   facilityStatusOptions,
@@ -64,6 +72,78 @@ function StatusBadge({ status }) {
       <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
       {meta.label}
     </span>
+  );
+}
+
+const facilityActionItemClass =
+  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-300";
+
+function FacilityActionsMenu({
+  facility,
+  showMeterReadingsAction,
+  onEdit,
+  onUtilitySettings,
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#cbd3df] text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+          aria-label={`Tùy chọn ${facility.name}`}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-72 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <Link href={getFacilityRoomsHref(facility)} className={facilityActionItemClass}>
+            <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Xem chi tiết
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <button type="button" onClick={() => onEdit(facility)} className={facilityActionItemClass}>
+            <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Chỉnh sửa
+          </button>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <Link
+            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
+            className={facilityActionItemClass}
+          >
+            <LayoutGrid className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Sơ đồ tầng
+          </Link>
+        </DropdownMenuItem>
+        {showMeterReadingsAction ? (
+          <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+            <Link href={getFacilityMeterReadingsHref(facility)} className={facilityActionItemClass}>
+              <Gauge className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              Điện nước
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <Link href={`/dashboard/rules?propertyId=${encodeURIComponent(String(facility.id))}`} className={facilityActionItemClass}>
+            <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Quản lý nội quy
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <button type="button" onClick={() => onUtilitySettings(facility)} className={facilityActionItemClass}>
+            <CircleDollarSign className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Giá điện nước
+          </button>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -203,61 +283,25 @@ function MobileFacilityCard({
             </div>
           ))}
         </div>
-        <div className="mt-4 grid gap-2">
-          <Link
-            href={getFacilityRoomsHref(facility)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
+        <div className="mt-4 flex items-center gap-2">
+          <FacilityActionsMenu
+            facility={facility}
+            showMeterReadingsAction={showMeterReadingsAction}
+            onEdit={onEdit}
+            onUtilitySettings={onUtilitySettings}
+          />
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] text-xs font-bold text-white"
           >
-            <Eye className="h-3.5 w-3.5" />
-            Xem chi tiết
-          </Link>
-         
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(facility)}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Chỉnh sửa
-            </button>
-            <Link
-              href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Sơ đồ
-            </Link>
-            {showMeterReadingsAction && (
-              <Link
-                href={getFacilityMeterReadingsHref(facility)}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
-              >
-                <Gauge className="h-3.5 w-3.5" />
-                Điện nước
-              </Link>
+            {expanded ? "Thu gọn" : "Xem tầng"}
+            {expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
             )}
-            <button
-              type="button"
-              onClick={() => onUtilitySettings(facility)}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[#cbd3df] dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-200"
-            >
-              <CircleDollarSign className="h-3.5 w-3.5" />
-              Giá điện nước
-            </button>
-            <button
-              type="button"
-              onClick={onToggle}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] text-xs font-bold text-white"
-            >
-              {expanded ? "Thu gọn" : "Xem tầng"}
-              {expanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </button>
-          </div>
+          </button>
         </div>
       </div>
       {expanded && (
@@ -402,51 +446,13 @@ export function FacilityList({
                         <StatusBadge status={facility.status} />
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                         
-                          <button
-                            type="button"
-                            onClick={() => onEdit(facility)}
-                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            aria-label={`Chỉnh sửa ${facility.name}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <Link
-                            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
-                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            title="Chỉnh sửa sơ đồ tầng"
-                            aria-label={`Chỉnh sửa sơ đồ tầng ${facility.name}`}
-                          >
-                            <LayoutGrid className="h-4 w-4" />
-                          </Link>
-                          <Link
-                            href={getFacilityRoomsHref(facility)}
-                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            title="Xem chi tiết tầng/phòng"
-                            aria-label={`Xem chi tiết ${facility.name}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                          {showMeterReadingsAction && (
-                            <Link
-                              href={getFacilityMeterReadingsHref(facility)}
-                              className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                              title="Quản lý điện nước"
-                              aria-label={`Quản lý điện nước ${facility.name}`}
-                            >
-                              <Gauge className="h-4 w-4" />
-                            </Link>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => onUtilitySettings(facility)}
-                            className="rounded-lg border border-[#cbd3df] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 transition hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                            title="Giá điện nước"
-                            aria-label={`Giá điện nước ${facility.name}`}
-                          >
-                            <CircleDollarSign className="h-4 w-4" />
-                          </button>
+                        <div className="flex items-center justify-end">
+                          <FacilityActionsMenu
+                            facility={facility}
+                            showMeterReadingsAction={showMeterReadingsAction}
+                            onEdit={onEdit}
+                            onUtilitySettings={onUtilitySettings}
+                          />
                         </div>
                       </td>
                     </tr>

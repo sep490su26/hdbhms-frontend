@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Banknote,
-  CalendarDays,
   CheckCircle2,
   History,
   Loader2,
@@ -23,11 +22,7 @@ import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import {
   applyRentOverride,
   confirmManualPayment,
-  createUtilityBillingRun,
   fetchBillingInvoices,
-  fetchUtilityBillingRun,
-  fetchUtilityBillingRuns,
-  publishUtilityBillingRun,
   sendOverdueInvoiceWarning,
 } from "@/services/billingService";
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
@@ -52,21 +47,6 @@ const TYPE_LABELS = {
   OTHER: "Phát sinh",
   DEPOSIT: "Đặt cọc",
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
-};
-
-const BILLING_BATCH_STATUS_LABELS = {
-  DRAFT: "Nháp",
-  PREVIEWED: "Đang review",
-  CONFIRMED: "Đã duyệt",
-  INVOICES_CREATED: "Đã phát hành",
-  CANCELLED: "Đã hủy",
-};
-
-const BILLING_BATCH_ITEM_STATUS_LABELS = {
-  READY: "Sẵn sàng",
-  WARNING: "Cần kiểm tra",
-  SKIPPED: "Bỏ qua",
-  INVOICED: "Đã phát hành",
 };
 
 function currentMonth() {
@@ -171,40 +151,6 @@ function invoiceStatusClasses(status) {
   return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
 }
 
-function billingBatchStatusLabel(value) {
-  return BILLING_BATCH_STATUS_LABELS[value] || value || "Chưa rõ";
-}
-
-function billingBatchItemStatusLabel(value) {
-  return BILLING_BATCH_ITEM_STATUS_LABELS[value] || value || "Chưa rõ";
-}
-
-function billingBatchStatusClasses(status) {
-  if (status === "INVOICES_CREATED") {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
-  }
-  if (status === "PREVIEWED" || status === "CONFIRMED") {
-    return "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20";
-  }
-  if (status === "CANCELLED") {
-    return "bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-400 dark:ring-white/10";
-  }
-  return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
-}
-
-function billingBatchItemStatusClasses(status) {
-  if (status === "READY") {
-    return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
-  }
-  if (status === "WARNING") {
-    return "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
-  }
-  if (status === "INVOICED") {
-    return "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20";
-  }
-  return "bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10";
-}
-
 function isPendingInvoice(invoice) {
   return invoice?.status === "ISSUED";
 }
@@ -254,9 +200,6 @@ export default function BillingPage() {
   );
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [billingRuns, setBillingRuns] = useState([]);
-  const [selectedRunId, setSelectedRunId] = useState("");
-  const [selectedRunDetail, setSelectedRunDetail] = useState(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [overrideForm, setOverrideForm] = useState({
     propertyId: "",
@@ -273,7 +216,6 @@ export default function BillingPage() {
     note: "",
   });
   const [loading, setLoading] = useState(true);
-  const [loadingRuns, setLoadingRuns] = useState(true);
   const [saving, setSaving] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -354,21 +296,6 @@ export default function BillingPage() {
     [paymentForm.propertyId, paymentForm.roomId, visibleInvoices],
   );
 
-  const selectedRun = useMemo(
-    () =>
-      billingRuns.find((run) => String(run.runId) === String(selectedRunId)) ||
-      null,
-    [billingRuns, selectedRunId],
-  );
-
-  const activeRunDetail = selectedRunDetail || selectedRun;
-  const runItems = activeRunDetail?.items || [];
-  const warningRunItems = runItems.filter((item) => item.status === "WARNING");
-  const publishBlocked =
-    !activeRunDetail ||
-    activeRunDetail.status === "INVOICES_CREATED" ||
-    activeRunDetail.warningCount > 0;
-
   const totalElements = invoices.length;
   const totalPages = Math.ceil(totalElements / size);
   const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
@@ -397,27 +324,6 @@ export default function BillingPage() {
     }
   }, [filters]);
 
-  const loadBillingRuns = useCallback(async () => {
-    setLoadingRuns(true);
-    setError("");
-    try {
-      const data = await fetchUtilityBillingRuns({
-        billingPeriod: filters.billingPeriod,
-        propertyId: filters.propertyId,
-      });
-      setBillingRuns(data);
-      setSelectedRunId((current) =>
-        current && data.some((run) => String(run.runId) === String(current))
-          ? current
-          : data[0]?.runId || "",
-      );
-    } catch (loadError) {
-      setError(loadError?.message || "Không tải được danh sách kỳ hóa đơn.");
-    } finally {
-      setLoadingRuns(false);
-    }
-  }, [filters.billingPeriod, filters.propertyId]);
-
   useEffect(() => {
     fetchManagementRoomCatalog()
       .then(setRooms)
@@ -437,8 +343,6 @@ export default function BillingPage() {
       if (queryBillingPeriod) {
         setBillingPeriodText(billingPeriodToVietnameseDate(queryBillingPeriod));
       }
-      setSelectedRunId("");
-      setSelectedRunDetail(null);
       setPage(1);
     }, 0);
 
@@ -449,29 +353,6 @@ export default function BillingPage() {
     const timeoutId = window.setTimeout(loadInvoices, 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadInvoices]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(loadBillingRuns, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [loadBillingRuns]);
-
-  useEffect(() => {
-    if (!selectedRunId) {
-      const timeoutId = window.setTimeout(() => setSelectedRunDetail(null), 0);
-      return () => window.clearTimeout(timeoutId);
-    }
-    let ignore = false;
-    fetchUtilityBillingRun(selectedRunId)
-      .then((data) => {
-        if (!ignore) setSelectedRunDetail(data);
-      })
-      .catch(() => {
-        if (!ignore) setSelectedRunDetail(null);
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [selectedRunId]);
 
   useEffect(() => {
     if (!selectedInvoice) return;
@@ -577,52 +458,6 @@ export default function BillingPage() {
       );
     } catch (warningError) {
       setError(warningError?.message || "Không gửi được cảnh báo thanh toán quá hạn.");
-    } finally {
-      setSaving("");
-    }
-  }
-
-  async function generateBillingBatch() {
-    if (!filters.propertyId) {
-      setError("Vui lòng chọn cơ sở trước khi tạo kỳ hóa đơn điện nước.");
-      return;
-    }
-    if (!filters.billingPeriod) {
-      setError("Vui lòng chọn tháng trước khi tạo kỳ hóa đơn điện nước.");
-      return;
-    }
-    setSaving("generate-batch");
-    setError("");
-    setMessage("");
-    try {
-      const run = await createUtilityBillingRun({
-        propertyId: filters.propertyId,
-        billingPeriod: filters.billingPeriod,
-      });
-      setMessage("Đã tạo bản nháp kỳ hóa đơn điện nước để quản lý review.");
-      setSelectedRunId(run.runId || "");
-      setSelectedRunDetail(run);
-      await loadBillingRuns();
-    } catch (saveError) {
-      setError(saveError?.message || "Không tạo được kỳ hóa đơn điện nước.");
-    } finally {
-      setSaving("");
-    }
-  }
-
-  async function publishBillingBatch() {
-    if (!activeRunDetail?.runId) return;
-    setSaving(`publish-batch-${activeRunDetail.runId}`);
-    setError("");
-    setMessage("");
-    try {
-      const run = await publishUtilityBillingRun(activeRunDetail.runId);
-      setMessage("Đã phát hành kỳ hóa đơn và gửi thông báo cho khách thuê.");
-      setSelectedRunDetail(run);
-      await loadBillingRuns();
-      await loadInvoices();
-    } catch (saveError) {
-      setError(saveError?.message || "Không phát hành được kỳ hóa đơn.");
     } finally {
       setSaving("");
     }
@@ -766,214 +601,6 @@ export default function BillingPage() {
           tone="rose"
           subtitle="Khoản cần tiếp tục thu"
         />
-      </section>
-
-      <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-4 py-3 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
-              <CalendarDays className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                Kỳ hóa đơn điện nước
-              </h2>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Tạo bản nháp theo kỳ, review phòng bất thường rồi phát hành một lần cho toàn batch.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={loadBillingRuns}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Tải kỳ hóa đơn
-            </button>
-            <button
-              type="button"
-              onClick={generateBillingBatch}
-              disabled={saving === "generate-batch"}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-            >
-              {saving === "generate-batch" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Tạo/Recalculate batch
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-0 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="border-b border-[#e2e8f0] dark:border-white/10 lg:border-b-0 lg:border-r">
-            {loadingRuns ? (
-              <div className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                Đang tải kỳ hóa đơn...
-              </div>
-            ) : billingRuns.length === 0 ? (
-              <div className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Chưa có batch cho bộ lọc hiện tại.
-              </div>
-            ) : (
-              <div className="max-h-[360px] overflow-y-auto">
-                {billingRuns.map((run) => (
-                  <button
-                    key={run.runId}
-                    type="button"
-                    onClick={() => setSelectedRunId(run.runId || "")}
-                    className={`flex w-full flex-col gap-2 border-b border-[#e2e8f0] px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5 ${
-                      String(selectedRunId) === String(run.runId)
-                        ? "bg-blue-50/70 dark:bg-blue-500/10"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-black text-slate-900 dark:text-white">
-                        {formatBillingPeriod(run.billingPeriod)}
-                      </span>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${billingBatchStatusClasses(run.status)}`}
-                      >
-                        {billingBatchStatusLabel(run.status)}
-                      </span>
-                    </div>
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {run.propertyName || "Chưa rõ cơ sở"}
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                      <span>{run.totalRooms} phòng</span>
-                      <span>{formatMoney(run.totalAmount)}</span>
-                      <span>{run.warningCount} cần kiểm tra</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="min-w-0 p-4">
-            {!activeRunDetail ? (
-              <div className="rounded-lg border border-dashed border-[#cbd5e1] p-6 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
-                Chọn một batch để xem chi tiết review.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-black text-slate-900 dark:text-white">
-                        Batch {formatBillingPeriod(activeRunDetail.billingPeriod)} - {activeRunDetail.propertyName || "Cơ sở"}
-                      </h3>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchStatusClasses(activeRunDetail.status)}`}
-                      >
-                        {billingBatchStatusLabel(activeRunDetail.status)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                      {activeRunDetail.totalRooms} phòng, tổng dự kiến {formatMoney(activeRunDetail.totalAmount)}.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={publishBillingBatch}
-                    disabled={publishBlocked || saving === `publish-batch-${activeRunDetail.runId}`}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {saving === `publish-batch-${activeRunDetail.runId}` ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-                    Phát hành batch
-                  </button>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Sẵn sàng</p>
-                    <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeRunDetail.readyCount}</p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-500/10">
-                    <p className="text-xs font-bold text-amber-700 dark:text-amber-300">Cần kiểm tra</p>
-                    <p className="mt-1 text-xl font-black text-amber-800 dark:text-amber-200">{activeRunDetail.warningCount}</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Bỏ qua</p>
-                    <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeRunDetail.skippedCount}</p>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-500/10">
-                    <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Đã phát hành</p>
-                    <p className="mt-1 text-xl font-black text-emerald-800 dark:text-emerald-200">{activeRunDetail.generatedInvoiceCount}</p>
-                  </div>
-                </div>
-
-                {warningRunItems.length > 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                    Batch còn {warningRunItems.length} phòng cần kiểm tra. Hãy sửa chỉ số hoặc regenerate trước khi phát hành.
-                  </div>
-                )}
-
-                <div className="overflow-x-auto rounded-lg border border-[#e2e8f0] dark:border-white/10">
-                  <table className="w-full min-w-[860px] text-left text-sm">
-                    <thead className="bg-[#f2f4f6] text-xs uppercase text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                      <tr>
-                        <th className="px-4 py-3">Phòng</th>
-                        <th className="px-4 py-3 text-right">Điện</th>
-                        <th className="px-4 py-3 text-right">Nước</th>
-                        <th className="px-4 py-3 text-right">Dịch vụ</th>
-                        <th className="px-4 py-3">Trạng thái</th>
-                        <th className="px-4 py-3 text-right">Tổng</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {runItems.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
-                            Chưa có item trong batch.
-                          </td>
-                        </tr>
-                      ) : (
-                        runItems.map((item) => (
-                          <tr key={item.itemId} className="border-t border-[#e2e8f0] dark:border-white/10">
-                            <td className="px-4 py-3">
-                              <p className="font-black">{displayRoomCode(item.roomCode)}</p>
-                              {item.warningMessage && (
-                                <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                                  {item.warningMessage}
-                                </p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <p className="font-bold">{item.electricityUsage}</p>
-                              <p className="text-xs text-slate-500">{formatMoney(item.electricityAmount)}</p>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <p className="font-bold">{item.waterUsage}</p>
-                              <p className="text-xs text-slate-500">{formatMoney(item.waterAmount)}</p>
-                            </td>
-                            <td className="px-4 py-3 text-right font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(item.status)}`}>
-                                {billingBatchItemStatusLabel(item.status)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right font-black">{formatMoney(item.totalAmount)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
       </section>
 
       <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">

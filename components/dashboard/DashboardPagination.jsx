@@ -44,6 +44,7 @@ export function DashboardPagination({
     lastItem,
   } = getPaginationState({ page, size, totalElements, totalPages });
   const hasData = safeTotalElements > 0;
+  const hasPageNavigation = hasData && safeTotalPages > 1;
   const pageItems = hasData ? buildPageItems(safePage, safeTotalPages) : [];
 
   useEffect(() => {
@@ -109,70 +110,72 @@ export function DashboardPagination({
         </label>
       </div>
 
-      <Pagination className="mx-0 w-full justify-start lg:w-auto lg:justify-end">
-        <PaginationContent className="flex-wrap gap-1.5">
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              text="Trước"
-              aria-disabled={isPreviousDisabled}
-              onClick={(event) => {
-                event.preventDefault();
-                if (isPreviousDisabled) return;
-                goToPage(safePage - 1);
-              }}
-              className={`${navButtonClass} ${
-                isPreviousDisabled ? disabledNavClass : enabledNavClass
-              }`}
-            />
-          </PaginationItem>
+      {hasPageNavigation && (
+        <Pagination className="mx-0 w-full justify-start lg:w-auto lg:justify-end">
+          <PaginationContent className="flex-wrap gap-1.5">
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                text="Trước"
+                aria-disabled={isPreviousDisabled}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (isPreviousDisabled) return;
+                  goToPage(safePage - 1);
+                }}
+                className={`${navButtonClass} ${
+                  isPreviousDisabled ? disabledNavClass : enabledNavClass
+                }`}
+              />
+            </PaginationItem>
 
-          {pageItems.map((pageNumber, index) => {
-            const previous = pageItems[index - 1];
+            {pageItems.map((pageNumber, index) => {
+              const previous = pageItems[index - 1];
 
-            return (
-              <FragmentWithGap
-                key={pageNumber}
-                showGap={previous && pageNumber - previous > 1}
-              >
-                <PaginationItem>
-                  <PaginationLink
-                    href="#"
-                    isActive={pageNumber === safePage}
-                    className={
-                      pageNumber === safePage
-                        ? activePageClass
-                        : normalPageClass
-                    }
-                    onClick={(event) => {
-                      event.preventDefault();
-                      goToPage(pageNumber);
-                    }}
-                  >
-                    {pageNumber}
-                  </PaginationLink>
-                </PaginationItem>
-              </FragmentWithGap>
-            );
-          })}
+              return (
+                <FragmentWithGap
+                  key={pageNumber}
+                  showGap={previous && pageNumber - previous > 1}
+                >
+                  <PaginationItem>
+                    <PaginationLink
+                      href="#"
+                      isActive={pageNumber === safePage}
+                      className={
+                        pageNumber === safePage
+                          ? activePageClass
+                          : normalPageClass
+                      }
+                      onClick={(event) => {
+                        event.preventDefault();
+                        goToPage(pageNumber);
+                      }}
+                    >
+                      {pageNumber}
+                    </PaginationLink>
+                  </PaginationItem>
+                </FragmentWithGap>
+              );
+            })}
 
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              text="Sau"
-              aria-disabled={isNextDisabled}
-              onClick={(event) => {
-                event.preventDefault();
-                if (isNextDisabled) return;
-                goToPage(safePage + 1);
-              }}
-              className={`${navButtonClass} ${
-                isNextDisabled ? disabledNavClass : enabledNavClass
-              }`}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                text="Sau"
+                aria-disabled={isNextDisabled}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (isNextDisabled) return;
+                  goToPage(safePage + 1);
+                }}
+                className={`${navButtonClass} ${
+                  isNextDisabled ? disabledNavClass : enabledNavClass
+                }`}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

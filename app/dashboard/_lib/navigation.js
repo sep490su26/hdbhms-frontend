@@ -1,5 +1,4 @@
 import {
-  ArrowRightLeft,
   BellRing,
   Building2,
   FileCheck2,
@@ -8,7 +7,6 @@ import {
   Inbox,
   LayoutDashboard,
   ReceiptText,
-  SendToBack,
   Settings,
   UserRoundCog,
   UsersRound,
@@ -41,11 +39,6 @@ export const navigation = [
     icon: FileText,
   },
   { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
-  {
-    path: "/dashboard/room-transfer-history",
-    label: "Lịch sử chuyển phòng",
-    icon: SendToBack,
-  },
   {
     path: "/dashboard/notification-templates",
     label: "Template thông báo",

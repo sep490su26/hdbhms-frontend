@@ -33,7 +33,6 @@ import {
   Wrench,
   X,
   Inbox,
-  SendToBack,
   WalletMinimal,
 } from "lucide-react";
 import {
@@ -163,12 +162,6 @@ const navigation = [
     permissionKey: "requests",
   },
   {
-    path: "/dashboard/room-transfer-history",
-    label: "Lịch sử chuyển phòng",
-    icon: SendToBack,
-    permissionKey: "roomTransferHistory",
-  },
-  {
     path: "/dashboard/notification-templates",
     label: "Quản lý thông báo",
     icon: BellRing,
@@ -208,6 +201,11 @@ const specialRoutePermissions = [
     prefix: "/dashboard/rules",
     permissionKey: "facilities",
     navigationPath: "/dashboard/facilities",
+  },
+  {
+    prefix: "/dashboard/room-transfer-history",
+    permissionKey: "roomTransferHistory",
+    navigationPath: "/dashboard/requests",
   },
 ];
 

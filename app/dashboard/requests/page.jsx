@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import {useState, useEffect, useCallback, useRef} from "react";
+import {useRouter} from "next/navigation";
 import {
     fetchChangeRequests,
     fetchChangeRequestStats,
@@ -44,7 +45,6 @@ import {
     CalendarCheck,
     CalendarRange,
     AlertCircle,
-    Plus,
     Info,
     Hourglass,
     Download,
@@ -134,13 +134,26 @@ const mapRequestType = (type) => {
 const translateStatus = (status) => {
     const map = {
         PENDING: "Đang chờ",
+        UNDER_REVIEW: "Đang xem xét",
         APPROVED: "Đã duyệt",
         REJECTED: "Đã từ chối",
         PROCESSING: "Đang xử lý",
-        COMPLETED: "Hoàn thành"
+        COMPLETED: "Hoàn thành",
+        CANCELLED: "Đã hủy"
     };
     return map[status] || status;
 };
+
+const STATUS_FILTERS = [
+    {value: "PENDING", label: "Đang chờ"},
+    {value: "UNDER_REVIEW", label: "Đang xem xét"},
+    {value: "APPROVED", label: "Đã duyệt"},
+    {value: "PROCESSING", label: "Đang xử lý"},
+    {value: "COMPLETED", label: "Hoàn thành"},
+    {value: "REJECTED", label: "Đã từ chối"},
+    {value: "CANCELLED", label: "Đã hủy"},
+    {value: "ALL", label: "Tất cả"},
+];
 
 const statusBadgeClass = (status) => {
     if (status === "PENDING") return "text-yellow-600 bg-yellow-50 border-yellow-200";
@@ -543,10 +556,11 @@ function RequestDetailContent({req, detailTransfer}) {
 }
 
 export default function ApprovalCenter() {
+    const router = useRouter();
     const {user} = useAuth();
     const isOwner = user?.role === ROLES.OWNER;
     const [typeFilter, setTypeFilter] = useState("All Types");
-    const [statusFilter, setStatusFilter] = useState("Pending");
+    const [statusFilter, setStatusFilter] = useState("PENDING");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
     const [size, setSize] = useState(10);
@@ -581,7 +595,7 @@ export default function ApprovalCenter() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const apiStatus = statusFilter === "All" ? undefined : statusFilter;
+            const apiStatus = statusFilter === "ALL" ? undefined : statusFilter;
             const [dataRes, statsRes] = await Promise.all([
                 fetchChangeRequests({
                     page: page - 1,
@@ -989,9 +1003,12 @@ export default function ApprovalCenter() {
                     }
                     description="Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê."
                     actions={
-                        <Button className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800">
-                            <Plus className="mr-2 h-4 w-4"/>
-                            Tạo yêu cầu mới
+                        <Button
+                            onClick={() => router.push("/dashboard/room-transfer-history")}
+                            className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800"
+                        >
+                            <ArrowRightLeft className="mr-2 h-4 w-4"/>
+                            Lịch sử chuyển phòng
                         </Button>
                     }
                 />
@@ -1057,12 +1074,16 @@ export default function ApprovalCenter() {
                                         <select
                                             className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
                                             value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            onChange={(e) => {
+                                                setStatusFilter(e.target.value);
+                                                setPage(1);
+                                            }}
                                         >
-                                            <option value="Pending">Đang chờ</option>
-                                            <option value="Approved">Đã duyệt</option>
-                                            <option value="Rejected">Đã từ chối</option>
-                                            <option value="All">Tất cả</option>
+                                            {STATUS_FILTERS.map((item) => (
+                                                <option key={item.value} value={item.value}>
+                                                    {item.label}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
 
@@ -1082,8 +1103,9 @@ export default function ApprovalCenter() {
                                         className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted sm:min-w-[140px]"
                                         onClick={() => {
                                             setTypeFilter("All Types");
-                                            setStatusFilter("Pending");
+                                            setStatusFilter("PENDING");
                                             setSearch("");
+                                            setPage(1);
                                         }}
                                     >
                                         <RotateCcw className="mr-2 h-4 w-4 shrink-0"/>

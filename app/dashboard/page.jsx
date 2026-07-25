@@ -266,9 +266,6 @@ function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading }) {
             <p className="text-3xl font-extrabold text-[#102039]">
               {loading ? "..." : `${occupiedRate}%`}
             </p>
-            <p className="mt-1 text-xs font-semibold text-[#64748b]">
-              Theo backend
-            </p>
           </div>
         </div>
       </div>

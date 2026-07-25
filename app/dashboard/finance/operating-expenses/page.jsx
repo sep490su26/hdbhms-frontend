@@ -51,12 +51,54 @@ const expenseTypeOrder = [
 ];
 
 const expenseTypeMeta = {
-  REPAIR: { label: "Sửa chữa", color: "#3f5db5", bg: "bg-amber-50", text: "text-amber-700", icon: Wrench, note: "Bảo trì, sửa chữa" },
-  COMMON_UTILITY: { label: "Điện nước", color: "#9abcf5", bg: "bg-blue-50", text: "text-blue-700", icon: Zap, note: "Chi phí dùng chung" },
-  SUPPLIES: { label: "Vật tư", color: "#0f1d33", bg: "bg-cyan-50", text: "text-cyan-700", icon: Package, note: "Mua sắm vật tư" },
-  REPLACEMENT: { label: "Thay thế", color: "#f5c8bd", bg: "bg-violet-50", text: "text-violet-700", icon: Gavel, note: "Thay mới thiết bị" },
-  CLEANING: { label: "Vệ sinh", color: "#19a9c7", bg: "bg-emerald-50", text: "text-emerald-700", icon: Sparkles, note: "Vệ sinh khu chung" },
-  OTHER: { label: "Khác", color: "#ef627f", bg: "bg-rose-50", text: "text-rose-700", icon: Droplets, note: "Chi phí khác" },
+  REPAIR: {
+    label: "Sửa chữa",
+    color: "#3f5db5",
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    icon: Wrench,
+    note: "Bảo trì, sửa chữa",
+  },
+  COMMON_UTILITY: {
+    label: "Điện nước",
+    color: "#9abcf5",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    icon: Zap,
+    note: "Chi phí dùng chung",
+  },
+  SUPPLIES: {
+    label: "Vật tư",
+    color: "#0f1d33",
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    icon: Package,
+    note: "Mua sắm vật tư",
+  },
+  REPLACEMENT: {
+    label: "Thay thế",
+    color: "#f5c8bd",
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    icon: Gavel,
+    note: "Thay mới thiết bị",
+  },
+  CLEANING: {
+    label: "Vệ sinh",
+    color: "#19a9c7",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    icon: Sparkles,
+    note: "Vệ sinh khu chung",
+  },
+  OTHER: {
+    label: "Khác",
+    color: "#ef627f",
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    icon: Droplets,
+    note: "Chi phí khác",
+  },
 };
 
 const statusLabels = {
@@ -108,9 +150,11 @@ function monthEndDate(year, month) {
 
 function displayPeriod(key, periodType) {
   const monthMatch = /^(\d{4})-(\d{2})$/.exec(key);
-  if (periodType === "month" && monthMatch) return `Tháng ${monthMatch[2]}/${monthMatch[1]}`;
+  if (periodType === "month" && monthMatch)
+    return `Tháng ${monthMatch[2]}/${monthMatch[1]}`;
   const quarterMatch = /^(\d{4})-Q([1-4])$/.exec(key);
-  if (periodType === "quarter" && quarterMatch) return `Quý ${quarterMatch[2]}/${quarterMatch[1]}`;
+  if (periodType === "quarter" && quarterMatch)
+    return `Quý ${quarterMatch[2]}/${quarterMatch[1]}`;
   return key;
 }
 
@@ -167,12 +211,19 @@ function periodKeyFromDate(value, periodType) {
   const year = Number(match[1]);
   const month = Number(match[2]);
   if (periodType === "year") return String(year);
-  if (periodType === "quarter") return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
+  if (periodType === "quarter")
+    return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
   return `${year}-${pad2(month)}`;
 }
 
 function expenseReportDate(item = {}) {
-  return item.expenseDate || item.paymentDate || item.expectedPaymentDate || item.createdAt?.slice(0, 10) || "";
+  return (
+    item.expenseDate ||
+    item.paymentDate ||
+    item.expectedPaymentDate ||
+    item.createdAt?.slice(0, 10) ||
+    ""
+  );
 }
 
 function formatDisplayDate(value) {
@@ -186,8 +237,10 @@ function csvCell(value) {
 }
 
 function statusTone(status) {
-  if (status === "PAID" || status === "APPROVED") return "bg-emerald-50 text-emerald-600";
-  if (status === "REJECTED" || status === "CANCELLED") return "bg-rose-50 text-rose-600";
+  if (status === "PAID" || status === "APPROVED")
+    return "bg-emerald-50 text-emerald-600";
+  if (status === "REJECTED" || status === "CANCELLED")
+    return "bg-rose-50 text-rose-600";
   return "bg-amber-50 text-amber-600";
 }
 
@@ -198,7 +251,9 @@ function statusMark(status) {
 }
 
 function normalizeExpenseRow(item = {}) {
-  const categoryKey = expenseTypeMeta[item.expenseType] ? item.expenseType : "OTHER";
+  const categoryKey = expenseTypeMeta[item.expenseType]
+    ? item.expenseType
+    : "OTHER";
   const meta = expenseTypeMeta[categoryKey];
   const dateValue = expenseReportDate(item);
   return {
@@ -219,7 +274,8 @@ function buildTrendData(expenses, windows, periodType) {
   const buckets = new Map(windows.map((window) => [window.key, 0]));
   expenses.forEach((item) => {
     const key = periodKeyFromDate(expenseReportDate(item), periodType);
-    if (buckets.has(key)) buckets.set(key, buckets.get(key) + (Number(item.amount) || 0));
+    if (buckets.has(key))
+      buckets.set(key, buckets.get(key) + (Number(item.amount) || 0));
   });
   return windows.map((window) => ({
     ...window,
@@ -228,10 +284,22 @@ function buildTrendData(expenses, windows, periodType) {
 }
 
 function buildCategories(rows) {
-  const byType = new Map(expenseTypeOrder.map((key) => {
-    const meta = expenseTypeMeta[key];
-    return [key, { key, name: meta.label, value: 0, color: meta.color, icon: meta.icon, note: meta.note }];
-  }));
+  const byType = new Map(
+    expenseTypeOrder.map((key) => {
+      const meta = expenseTypeMeta[key];
+      return [
+        key,
+        {
+          key,
+          name: meta.label,
+          value: 0,
+          color: meta.color,
+          icon: meta.icon,
+          note: meta.note,
+        },
+      ];
+    }),
+  );
 
   rows.forEach((row) => {
     const current = byType.get(row.categoryKey) || byType.get("OTHER");
@@ -254,22 +322,49 @@ function signedThousandVND(value) {
   return `${value >= 0 ? "+" : "-"}${formatThousandVND(Math.abs(value))}`;
 }
 
-function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note, badge }) {
+function ExpenseCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+  tone = "light",
+  note,
+  badge,
+}) {
   const dark = tone === "dark";
   return (
-    <article className={`relative min-h-[132px] rounded-lg border p-4 shadow-sm ${dark ? "border-[#14243d] bg-[#0d1b31] text-white" : "border-[#dce2ec] bg-white text-[#0f1d33]"}`}>
-      <span className={`absolute right-4 top-4 rounded-full border px-2.5 py-1 text-[10px] font-black ${dark ? "border-white/10 bg-white/5 text-slate-300" : "border-[#dce2ec] bg-[#f8fafc] text-[#5f6b7c]"}`}>
-        nghìn đồng
-      </span>
+    <article
+      className={`min-h-[132px] rounded-lg border p-4 shadow-sm ${dark ? "border-[#14243d] bg-[#0d1b31] text-white" : "border-[#dce2ec] bg-white text-[#0f1d33]"}`}
+    >
       <div className="flex items-start justify-between gap-2">
-        <span className={`grid h-9 w-9 place-items-center rounded ${dark ? "bg-[#172b4b] text-[#8ca8ff]" : "bg-[#eef3ff]"}`} style={!dark ? { color } : undefined}>
+        <span
+          className={`grid h-9 w-9 place-items-center rounded ${dark ? "bg-[#172b4b] text-[#8ca8ff]" : "bg-[#eef3ff]"}`}
+          style={!dark ? { color } : undefined}
+        >
           <Icon className="h-4 w-4" />
         </span>
-        {badge && <span className="mt-7 inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />{badge}</span>}
+        {badge && (
+          <span className="inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300">
+            <TrendingUp className="h-3 w-3" />
+            {badge}
+          </span>
+        )}
       </div>
-      <p className={`mt-3 text-[10px] font-bold uppercase ${dark ? "text-slate-400" : "text-[#5f6b7c]"}`}>{label}</p>
-      <p className="mt-1 truncate text-lg font-black">{formatThousandVND(value)}</p>
-      {note && <p className={`mt-3 text-[10px] ${dark ? "text-slate-400" : "text-[#64748b]"}`}>{note}</p>}
+      <p
+        className={`mt-3 text-[10px] font-bold uppercase ${dark ? "text-slate-400" : "text-[#5f6b7c]"}`}
+      >
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-black">
+        {formatThousandVND(value)}
+      </p>
+      {note && (
+        <p
+          className={`mt-3 text-[10px] ${dark ? "text-slate-400" : "text-[#64748b]"}`}
+        >
+          {note}
+        </p>
+      )}
     </article>
   );
 }
@@ -279,7 +374,9 @@ function ExpenseTooltip({ active, payload, label }) {
   return (
     <div className="rounded-lg border border-[#dce2ec] bg-white px-3 py-2 text-xs shadow-lg">
       <p className="font-bold">{label}</p>
-      <p className="mt-1 text-[#3f5db5]">Chi phí: <strong>{formatCurrency(payload[0].value)}</strong></p>
+      <p className="mt-1 text-[#3f5db5]">
+        Chi phí: <strong>{formatCurrency(payload[0].value)}</strong>
+      </p>
     </div>
   );
 }
@@ -294,7 +391,10 @@ export default function OperatingExpensesPage() {
   const [category, setCategory] = useState("all");
   const [descending, setDescending] = useState(true);
 
-  const windows = useMemo(() => buildPeriodWindows(periodType, selectedMonth), [periodType, selectedMonth]);
+  const windows = useMemo(
+    () => buildPeriodWindows(periodType, selectedMonth),
+    [periodType, selectedMonth],
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -326,13 +426,20 @@ export default function OperatingExpensesPage() {
   const rows = useMemo(() => expenses.map(normalizeExpenseRow), [expenses]);
   const currentWindowKey = windows.at(-1)?.key || "";
   const currentRows = useMemo(
-    () => rows.filter((row) => periodKeyFromDate(row.rawDate, periodType) === currentWindowKey),
+    () =>
+      rows.filter(
+        (row) =>
+          periodKeyFromDate(row.rawDate, periodType) === currentWindowKey,
+      ),
     [currentWindowKey, periodType, rows],
   );
   const categories = useMemo(() => buildCategories(currentRows), [currentRows]);
   const filterCategories = useMemo(() => buildCategories(rows), [rows]);
   const totalExpense = categories.reduce((sum, item) => sum + item.value, 0);
-  const chartData = useMemo(() => buildTrendData(expenses, windows, periodType), [expenses, periodType, windows]);
+  const chartData = useMemo(
+    () => buildTrendData(expenses, windows, periodType),
+    [expenses, periodType, windows],
+  );
   const currentExpense = chartData.at(-1)?.value || 0;
   const previousExpense = chartData.at(-2)?.value || 0;
   const expenseGrowth = growthPercent(currentExpense, previousExpense);
@@ -340,13 +447,20 @@ export default function OperatingExpensesPage() {
   const pieCategories = visibleCategories.length
     ? visibleCategories
     : [{ key: "empty", name: "Chưa có dữ liệu", value: 1, color: "#e8edf7" }];
-  const cardCategories = (visibleCategories.length ? visibleCategories : categories).slice(0, 4);
+  const cardCategories = (
+    visibleCategories.length ? visibleCategories : categories
+  ).slice(0, 4);
   const visibleRows = useMemo(() => {
-    const filtered = category === "all" ? rows : rows.filter((item) => item.categoryKey === category);
+    const filtered =
+      category === "all"
+        ? rows
+        : rows.filter((item) => item.categoryKey === category);
     return [...filtered].sort((left, right) => {
       const dateDiff = compareByNewest(left, right, ["rawDate"], ["rawId"]);
       if (dateDiff !== 0) return dateDiff;
-      return descending ? right.amount - left.amount : left.amount - right.amount;
+      return descending
+        ? right.amount - left.amount
+        : left.amount - right.amount;
     });
   }, [category, descending, rows]);
 
@@ -368,16 +482,30 @@ export default function OperatingExpensesPage() {
   };
 
   const exportReport = () => {
-    const header = ["Thời gian", "Hạng mục", "Nội dung chi tiết", "Mã chứng từ", "Số tiền", "Trạng thái"];
-    const exportRows = visibleRows.map((item) => [
-      item.date,
-      item.category,
-      item.detail,
-      item.id,
-      item.amount,
-      item.statusLabel,
-    ].map(csvCell).join(","));
-    const blob = new Blob([`\uFEFF${[header.join(","), ...exportRows].join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const header = [
+      "Thời gian",
+      "Hạng mục",
+      "Nội dung chi tiết",
+      "Mã chứng từ",
+      "Số tiền",
+      "Trạng thái",
+    ];
+    const exportRows = visibleRows.map((item) =>
+      [
+        item.date,
+        item.category,
+        item.detail,
+        item.id,
+        item.amount,
+        item.statusLabel,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+    const blob = new Blob(
+      [`\uFEFF${[header.join(","), ...exportRows].join("\n")}`],
+      { type: "text/csv;charset=utf-8" },
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -395,23 +523,60 @@ export default function OperatingExpensesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
               {Object.entries(periodOptions).map(([key, item]) => (
-                <button key={key} type="button" onClick={() => handlePeriodTypeChange(key)} className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}>{item.label}</button>
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handlePeriodTypeChange(key)}
+                  className={`min-w-14 rounded-md px-3 text-xs font-bold ${periodType === key ? "bg-white text-[#0f1d33] shadow-sm" : "text-[#5f6b7c]"}`}
+                >
+                  {item.label}
+                </button>
               ))}
             </div>
             <label className="relative">
               <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
-              <input type="month" value={selectedMonth} onChange={(event) => handleSelectedMonthChange(event.target.value)} className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(event) =>
+                  handleSelectedMonthChange(event.target.value)
+                }
+                className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]"
+              />
             </label>
-            <button type="button" onClick={exportReport} disabled={isLoading} className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a] disabled:cursor-not-allowed disabled:bg-[#64748b]"><Download className="h-4 w-4" />Xuất báo cáo</button>
+            <button
+              type="button"
+              onClick={exportReport}
+              disabled={isLoading}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-xs font-bold text-white hover:bg-[#17233a] disabled:cursor-not-allowed disabled:bg-[#64748b]"
+            >
+              <Download className="h-4 w-4" />
+              Xuất báo cáo
+            </button>
           </div>
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-          <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-          <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
-          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
+          <Link
+            href="/dashboard/finance"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Doanh thu
+          </Link>
+          <Link
+            href="/dashboard/finance/income-expense"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Thu chi tổng hợp
+          </Link>
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">
+            Chi phí vận hành
+          </span>
         </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
       </div>
 
       {errorMessage && (
@@ -427,7 +592,14 @@ export default function OperatingExpensesPage() {
       )}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <ExpenseCard icon={TrendingUp} label="Tổng chi phí vận hành" value={totalExpense} tone="dark" badge={signedPercent(expenseGrowth)} note={`So với kỳ trước: ${signedThousandVND(currentExpense - previousExpense)}`} />
+        <ExpenseCard
+          icon={TrendingUp}
+          label="Tổng chi phí vận hành"
+          value={totalExpense}
+          tone="dark"
+          badge={signedPercent(expenseGrowth)}
+          note={`So với kỳ trước: ${signedThousandVND(currentExpense - previousExpense)}`}
+        />
         {cardCategories.map((item) => (
           <ExpenseCard
             key={item.key}
@@ -442,16 +614,42 @@ export default function OperatingExpensesPage() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div className="min-h-[310px] rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between"><h2 className="text-sm font-black">Xu hướng chi phí (6 kỳ)</h2><span className="text-lg font-black text-[#64748b]">...</span></div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-black">Xu hướng chi phí (6 kỳ)</h2>
+            <span className="text-lg font-black text-[#64748b]">...</span>
+          </div>
           <div className="mt-5 h-[235px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 5, left: -24, bottom: 0 }}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 8, right: 5, left: -24, bottom: 0 }}
+              >
                 <CartesianGrid vertical={false} stroke="#edf1f6" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }} />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }}
+                />
                 <YAxis hide />
-                <Tooltip content={<ExpenseTooltip />} cursor={{ fill: "#f8faff" }} />
-                <Bar dataKey="value" fill="#dbe7fb" radius={[3, 3, 0, 0]} maxBarSize={34}>
-                  {chartData.map((item, index) => <Cell key={item.key} fill={index === chartData.length - 1 ? "#3f5db5" : "#dbe7fb"} />)}
+                <Tooltip
+                  content={<ExpenseTooltip />}
+                  cursor={{ fill: "#f8faff" }}
+                />
+                <Bar
+                  dataKey="value"
+                  fill="#dbe7fb"
+                  radius={[3, 3, 0, 0]}
+                  maxBarSize={34}
+                >
+                  {chartData.map((item, index) => (
+                    <Cell
+                      key={item.key}
+                      fill={
+                        index === chartData.length - 1 ? "#3f5db5" : "#dbe7fb"
+                      }
+                    />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -464,17 +662,56 @@ export default function OperatingExpensesPage() {
             <div className="relative mx-auto h-48 w-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieCategories} dataKey="value" nameKey="name" innerRadius={58} outerRadius={78} paddingAngle={1} stroke="none">
-                    {pieCategories.map((item) => <Cell key={item.key} fill={item.color} />)}
+                  <Pie
+                    data={pieCategories}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={58}
+                    outerRadius={78}
+                    paddingAngle={1}
+                    stroke="none"
+                  >
+                    {pieCategories.map((item) => (
+                      <Cell key={item.key} fill={item.color} />
+                    ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [formatCurrency(value), name]} />
+                  <Tooltip
+                    formatter={(value, name) => [formatCurrency(value), name]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 grid place-items-center text-center"><div><p className="text-[10px] font-semibold text-[#64748b]">Hạng mục</p><p className="text-sm font-black">{windows.at(-1)?.period}</p></div></div>
+              <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+                <div>
+                  <p className="text-[10px] font-semibold text-[#64748b]">
+                    Hạng mục
+                  </p>
+                  <p className="text-sm font-black">{windows.at(-1)?.period}</p>
+                </div>
+              </div>
             </div>
             <div className="grid gap-3">
-              {(visibleCategories.length ? visibleCategories : categories.slice(0, 4)).map((item) => (
-                <div key={item.key} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-[#64748b]"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span><strong>{totalExpense > 0 ? Math.round((item.value / totalExpense) * 100) : 0}%</strong></div>
+              {(visibleCategories.length
+                ? visibleCategories
+                : categories.slice(0, 4)
+              ).map((item) => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <span className="flex items-center gap-2 text-[#64748b]">
+                    <i
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    {item.name}
+                  </span>
+                  <strong>
+                    {totalExpense > 0
+                      ? Math.round((item.value / totalExpense) * 100)
+                      : 0}
+                    %
+                  </strong>
+                </div>
               ))}
             </div>
           </div>
@@ -485,45 +722,112 @@ export default function OperatingExpensesPage() {
         <header className="flex items-center justify-between border-b border-[#dce2ec] px-5 py-4">
           <h2 className="text-sm font-black">Chi tiết các khoản chi</h2>
           <div className="flex gap-2">
-            <button type="button" onClick={() => setShowFilters((value) => !value)} className={`grid h-9 w-9 place-items-center rounded border ${showFilters ? "border-[#3f5db5] bg-[#eef3ff] text-[#3f5db5]" : "border-[#cbd5e1] text-[#64748b]"}`} aria-label="Lọc khoản chi"><Filter className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setDescending((value) => !value)} className="grid h-9 w-9 place-items-center rounded border border-[#cbd5e1] text-[#64748b]" aria-label="Đổi thứ tự sắp xếp"><ListFilter className={`h-4 w-4 transition ${descending ? "" : "rotate-180"}`} /></button>
+            <button
+              type="button"
+              onClick={() => setShowFilters((value) => !value)}
+              className={`grid h-9 w-9 place-items-center rounded border ${showFilters ? "border-[#3f5db5] bg-[#eef3ff] text-[#3f5db5]" : "border-[#cbd5e1] text-[#64748b]"}`}
+              aria-label="Lọc khoản chi"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDescending((value) => !value)}
+              className="grid h-9 w-9 place-items-center rounded border border-[#cbd5e1] text-[#64748b]"
+              aria-label="Đổi thứ tự sắp xếp"
+            >
+              <ListFilter
+                className={`h-4 w-4 transition ${descending ? "" : "rotate-180"}`}
+              />
+            </button>
           </div>
         </header>
         {showFilters && (
           <div className="border-b border-[#dce2ec] bg-[#f8faff] px-5 py-3">
-            <label className="flex max-w-xs items-center gap-3 text-xs font-bold">Hạng mục
-              <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-9 flex-1 rounded border border-[#cbd5e1] bg-white px-3 outline-none">
+            <label className="flex max-w-xs items-center gap-3 text-xs font-bold">
+              Hạng mục
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                className="h-9 flex-1 rounded border border-[#cbd5e1] bg-white px-3 outline-none"
+              >
                 <option value="all">Tất cả</option>
-                {filterCategories.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
+                {filterCategories.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
         )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-[#eef3fb] text-[10px] font-black uppercase text-[#5f6b7c]"><tr><th className="px-5 py-3.5">Thời gian</th><th className="px-5 py-3.5">Hạng mục</th><th className="px-5 py-3.5">Nội dung chi tiết</th><th className="px-5 py-3.5">Số tiền</th><th className="px-5 py-3.5 text-right">Trạng thái</th></tr></thead>
+            <thead className="bg-[#eef3fb] text-[10px] font-black uppercase text-[#5f6b7c]">
+              <tr>
+                <th className="px-5 py-3.5">Thời gian</th>
+                <th className="px-5 py-3.5">Hạng mục</th>
+                <th className="px-5 py-3.5">Nội dung chi tiết</th>
+                <th className="px-5 py-3.5">Số tiền</th>
+                <th className="px-5 py-3.5 text-right">Trạng thái</th>
+              </tr>
+            </thead>
             <tbody>
               {visibleRows.map((item) => {
-                const meta = expenseTypeMeta[item.categoryKey] || expenseTypeMeta.OTHER;
+                const meta =
+                  expenseTypeMeta[item.categoryKey] || expenseTypeMeta.OTHER;
                 return (
-                  <tr key={`${item.id}-${item.rawId || item.rawDate}`} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
-                    <td className="px-5 py-4 font-semibold">{item.date || "-"}</td>
-                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.bg} ${meta.text}`}>{item.category}</span></td>
-                    <td className="px-5 py-4 text-[#334155]">{item.detail} <span className="ml-2 rounded bg-[#e8edf5] px-1.5 py-0.5 text-[9px] text-[#64748b]">#{item.id}</span></td>
-                    <td className="px-5 py-4 font-black">{formatCurrency(item.amount)}</td>
-                    <td className="px-5 py-4 text-right"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${statusTone(item.status)}`} title={item.statusLabel}>{statusMark(item.status)}</span></td>
+                  <tr
+                    key={`${item.id}-${item.rawId || item.rawDate}`}
+                    className="border-t border-[#e7ebf2] hover:bg-[#f8faff]"
+                  >
+                    <td className="px-5 py-4 font-semibold">
+                      {item.date || "-"}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.bg} ${meta.text}`}
+                      >
+                        {item.category}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-[#334155]">
+                      {item.detail}{" "}
+                      <span className="ml-2 rounded bg-[#e8edf5] px-1.5 py-0.5 text-[9px] text-[#64748b]">
+                        #{item.id}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-black">
+                      {formatCurrency(item.amount)}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <span
+                        className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${statusTone(item.status)}`}
+                        title={item.statusLabel}
+                      >
+                        {statusMark(item.status)}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
               {!visibleRows.length && (
                 <tr className="border-t border-[#e7ebf2]">
-                  <td colSpan={5} className="px-5 py-8 text-center text-xs font-semibold text-[#64748b]">Không có khoản chi trong kỳ này</td>
+                  <td
+                    colSpan={5}
+                    className="px-5 py-8 text-center text-xs font-semibold text-[#64748b]"
+                  >
+                    Không có khoản chi trong kỳ này
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <footer className="border-t border-[#dce2ec] bg-[#eef3fb] px-5 py-3 text-[10px] text-[#64748b]">Hiển thị {visibleRows.length} trong tổng số {rows.length} bản ghi chi phí</footer>
+        <footer className="border-t border-[#dce2ec] bg-[#eef3fb] px-5 py-3 text-[10px] text-[#64748b]">
+          Hiển thị {visibleRows.length} trong tổng số {rows.length} bản ghi chi
+          phí
+        </footer>
       </section>
     </div>
   );

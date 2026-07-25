@@ -83,13 +83,19 @@ function displayPeriod(item, periodType) {
 function SummaryCard({ label, value, note, color, trend }) {
   return (
     <article className="relative min-h-[112px] overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm">
-      <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color }} />
-      <span className="absolute right-4 top-4 rounded-full border border-[#dce2ec] bg-[#f8fafc] px-2.5 py-1 text-[10px] font-black text-[#5f6b7c]">
-        nghìn đồng
-      </span>
-      <p className="max-w-[120px] pr-16 text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">{label}</p>
-      <p className="mt-2 truncate text-2xl font-black text-[#0f1d33]">{formatThousandVND(value)}</p>
-      <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${trend ? "text-emerald-600" : "text-[#5f6b7c]"}`}>
+      <span
+        className="absolute inset-x-0 top-0 h-0.5"
+        style={{ backgroundColor: color }}
+      />
+      <p className="max-w-[120px] text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">
+        {label}
+      </p>
+      <p className="mt-2 truncate text-2xl font-black text-[#0f1d33]">
+        {formatThousandVND(value)}
+      </p>
+      <p
+        className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${trend ? "text-emerald-600" : "text-[#5f6b7c]"}`}
+      >
         {trend && <TrendingUp className="h-3 w-3" />}
         {note}
       </p>
@@ -104,7 +110,10 @@ function RevenueTooltip({ active, payload, label }) {
       <p className="font-bold text-[#0f1d33]">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="mt-1 text-[#5f6b7c]">
-          {item.name}: <strong className="text-[#0f1d33]">{formatCompact(item.value)}</strong>
+          {item.name}:{" "}
+          <strong className="text-[#0f1d33]">
+            {formatCompact(item.value)}
+          </strong>
         </p>
       ))}
     </div>
@@ -132,7 +141,8 @@ export default function FinancePage() {
         if (!ignore && data) setReport(data);
       })
       .catch((error) => {
-        if (!ignore) setErrorMessage(error?.message || "Không tải được báo cáo doanh thu");
+        if (!ignore)
+          setErrorMessage(error?.message || "Không tải được báo cáo doanh thu");
       })
       .finally(() => {
         if (!ignore) setIsLoading(false);
@@ -145,7 +155,12 @@ export default function FinancePage() {
 
   const reports = report?.periods ?? [];
   const selectedReport = reports.at(-1) ?? emptyPeriod;
-  const totalRevenue = selectedReport.total || selectedReport.room + selectedReport.utilities + selectedReport.service + selectedReport.extra;
+  const totalRevenue =
+    selectedReport.total ||
+    selectedReport.room +
+      selectedReport.utilities +
+      selectedReport.service +
+      selectedReport.extra;
   const growth = report?.revenueGrowthPercent ?? 0;
   const chartData = reports.map((item) => ({
     ...item,
@@ -153,41 +168,64 @@ export default function FinancePage() {
     previous: item.previous,
     current: item.total,
   }));
-  const sources = (report?.sources?.length
-    ? report.sources
-    : Object.keys(sourceLabels).map((key) => ({
-        key,
-        amount: selectedReport[key] ?? 0,
-        percent: percentOf(selectedReport[key], totalRevenue),
-      }))
+  const sources = (
+    report?.sources?.length
+      ? report.sources
+      : Object.keys(sourceLabels).map((key) => ({
+          key,
+          amount: selectedReport[key] ?? 0,
+          percent: percentOf(selectedReport[key], totalRevenue),
+        }))
   ).map((source) => ({
     ...source,
     label: sourceLabels[source.key] || source.key,
     value: source.amount,
     percent: source.percent ?? percentOf(source.amount, totalRevenue),
   }));
-  const sourceByKey = Object.fromEntries(sources.map((source) => [source.key, source]));
+  const sourceByKey = Object.fromEntries(
+    sources.map((source) => [source.key, source]),
+  );
   const donutStops = useMemo(() => {
     if (totalRevenue <= 0) {
       return { parts: ["#e8edf7 0% 100%"], end: 100 };
     }
-    return sources.reduce((result, source, index) => {
-      const previous = index === 0 ? 0 : result.end;
-      const end = previous + (source.value / totalRevenue) * 100;
-      result.parts.push(`${sourceColors[source.key]} ${previous}% ${end}%`);
-      result.end = end;
-      return result;
-    }, { parts: [], end: 0 });
+    return sources.reduce(
+      (result, source, index) => {
+        const previous = index === 0 ? 0 : result.end;
+        const end = previous + (source.value / totalRevenue) * 100;
+        result.parts.push(`${sourceColors[source.key]} ${previous}% ${end}%`);
+        result.end = end;
+        return result;
+      },
+      { parts: [], end: 0 },
+    );
   }, [sources, totalRevenue]);
 
   const exportReport = () => {
     if (!reports.length) return;
-    const header = ["Kỳ báo cáo", "Doanh thu phòng", "Tiền điện nước", "Phí dịch vụ", "Phát sinh", "Tổng cộng"];
+    const header = [
+      "Kỳ báo cáo",
+      "Doanh thu phòng",
+      "Tiền điện nước",
+      "Phí dịch vụ",
+      "Phát sinh",
+      "Tổng cộng",
+    ];
     const rows = reports.map((item) => {
-      const total = item.total || item.room + item.utilities + item.service + item.extra;
-      return [displayPeriod(item, periodType), item.room, item.utilities, item.service, item.extra, total].join(",");
+      const total =
+        item.total || item.room + item.utilities + item.service + item.extra;
+      return [
+        displayPeriod(item, periodType),
+        item.room,
+        item.utilities,
+        item.service,
+        item.extra,
+        total,
+      ].join(",");
     });
-    const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], {
+      type: "text/csv;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -239,14 +277,25 @@ export default function FinancePage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-            <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Doanh thu</span>
-            <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">
-              Thu chi tổng hợp
-            </Link>
-            <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">
-              Chi phí vận hành
-            </Link>
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">
+            Doanh thu
+          </span>
+          <Link
+            href="/dashboard/finance/income-expense"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Thu chi tổng hợp
+          </Link>
+          <Link
+            href="/dashboard/finance/operating-expenses"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Chi phí vận hành
+          </Link>
         </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
       </div>
 
       {errorMessage && (
@@ -262,11 +311,37 @@ export default function FinancePage() {
       )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <SummaryCard label="Tổng doanh thu" value={totalRevenue} note={`${growth >= 0 ? "+" : ""}${growth}%`} color="#3f5db5" trend={growth >= 0} />
-        <SummaryCard label="Tiền phòng" value={sourceByKey.room?.value ?? 0} note={`${sourceByKey.room?.percent ?? 0}% tổng thu`} color="#82b4ff" />
-        <SummaryCard label="Tiền điện nước" value={sourceByKey.utilities?.value ?? 0} note={`${sourceByKey.utilities?.percent ?? 0}% tổng thu`} color="#f8b91f" />
-        <SummaryCard label="Phí dịch vụ" value={sourceByKey.service?.value ?? 0} note={`${sourceByKey.service?.percent ?? 0}% tổng thu`} color="#a865ef" />
-        <SummaryCard label="Phát sinh" value={sourceByKey.extra?.value ?? 0} note={`${sourceByKey.extra?.percent ?? 0}% tổng thu`} color="#ef627f" />
+        <SummaryCard
+          label="Tổng doanh thu"
+          value={totalRevenue}
+          note={`${growth >= 0 ? "+" : ""}${growth}%`}
+          color="#3f5db5"
+          trend={growth >= 0}
+        />
+        <SummaryCard
+          label="Tiền phòng"
+          value={sourceByKey.room?.value ?? 0}
+          note={`${sourceByKey.room?.percent ?? 0}% tổng thu`}
+          color="#82b4ff"
+        />
+        <SummaryCard
+          label="Tiền điện nước"
+          value={sourceByKey.utilities?.value ?? 0}
+          note={`${sourceByKey.utilities?.percent ?? 0}% tổng thu`}
+          color="#f8b91f"
+        />
+        <SummaryCard
+          label="Phí dịch vụ"
+          value={sourceByKey.service?.value ?? 0}
+          note={`${sourceByKey.service?.percent ?? 0}% tổng thu`}
+          color="#a865ef"
+        />
+        <SummaryCard
+          label="Phát sinh"
+          value={sourceByKey.extra?.value ?? 0}
+          note={`${sourceByKey.extra?.percent ?? 0}% tổng thu`}
+          color="#ef627f"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(250px,0.95fr)]">
@@ -274,19 +349,47 @@ export default function FinancePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-black">Xu hướng doanh thu</h2>
             <div className="flex items-center gap-4 text-[10px] font-semibold text-[#5f6b7c]">
-              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />Năm nay</span>
-              <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#e8edf7]" />Năm ngoái</span>
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />
+                Năm nay
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-full bg-[#e8edf7]" />
+                Năm ngoái
+              </span>
             </div>
           </div>
           <div className="mt-5 h-[255px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barGap={0} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
+              <BarChart
+                data={chartData}
+                barGap={0}
+                margin={{ top: 8, right: 4, left: -24, bottom: 0 }}
+              >
                 <CartesianGrid vertical={false} stroke="#edf1f6" />
-                <XAxis dataKey="short" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#5f6b7c", fontWeight: 700 }} />
+                <XAxis
+                  dataKey="short"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "#5f6b7c", fontWeight: 700 }}
+                />
                 <YAxis hide />
-                <Tooltip content={<RevenueTooltip />} cursor={{ fill: "#f7f9fc" }} />
-                <Bar dataKey="previous" name="Năm ngoái" fill="#e8edf7" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="current" name="Năm nay" fill="#3f5db5" radius={[4, 4, 0, 0]} />
+                <Tooltip
+                  content={<RevenueTooltip />}
+                  cursor={{ fill: "#f7f9fc" }}
+                />
+                <Bar
+                  dataKey="previous"
+                  name="Năm ngoái"
+                  fill="#e8edf7"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="current"
+                  name="Năm nay"
+                  fill="#3f5db5"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -294,19 +397,32 @@ export default function FinancePage() {
 
         <div className="rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm">
           <h2 className="text-base font-black">Phân bổ nguồn thu</h2>
-          <div className="mx-auto mt-5 grid h-44 w-44 place-items-center rounded-[24px]" style={{ background: `conic-gradient(${donutStops.parts.join(",")})` }}>
+          <div
+            className="mx-auto mt-5 grid h-44 w-44 place-items-center rounded-[24px]"
+            style={{
+              background: `conic-gradient(${donutStops.parts.join(",")})`,
+            }}
+          >
             <div className="grid h-28 w-28 place-items-center bg-white text-center">
               <div>
                 <p className="text-2xl font-black">100%</p>
-                <p className="text-[10px] font-semibold text-[#5f6b7c]">Tổng thu</p>
+                <p className="text-[10px] font-semibold text-[#5f6b7c]">
+                  Tổng thu
+                </p>
               </div>
             </div>
           </div>
           <div className="mt-5 grid gap-3">
             {sources.map((source) => (
-              <div key={source.key} className="flex items-center justify-between text-xs">
+              <div
+                key={source.key}
+                className="flex items-center justify-between text-xs"
+              >
                 <span className="flex items-center gap-2 font-semibold text-[#5f6b7c]">
-                  <i className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: sourceColors[source.key] }} />
+                  <i
+                    className="h-2.5 w-2.5 rounded-sm"
+                    style={{ backgroundColor: sourceColors[source.key] }}
+                  />
                   {source.label}
                 </span>
                 <strong>{source.percent}%</strong>
@@ -319,7 +435,10 @@ export default function FinancePage() {
       <section className="overflow-hidden rounded-lg border border-[#dce2ec] bg-white shadow-sm">
         <header className="flex items-center justify-between border-b border-[#dce2ec] px-5 py-4">
           <h2 className="text-base font-black">Chi tiết theo thời gian</h2>
-          <button type="button" className="inline-flex items-center gap-1 text-xs font-bold text-[#3156b6]">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs font-bold text-[#3156b6]"
+          >
             Xem tất cả <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </header>
@@ -336,19 +455,38 @@ export default function FinancePage() {
               </tr>
             </thead>
             <tbody>
-              {[...reports].reverse().slice(0, 5).map((item) => {
-                const total = item.room + item.utilities + item.service + item.extra;
-                return (
-                  <tr key={item.period} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
-                    <td className="px-5 py-4 font-bold">{displayPeriod(item, periodType)}</td>
-                    <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.room)}</td>
-                    <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.utilities)}</td>
-                    <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.service)}</td>
-                    <td className="px-5 py-4 text-[#4b5563]">{formatCurrency(item.extra)}</td>
-                    <td className="px-5 py-4 text-right font-black">{formatCurrency(item.total || total)}</td>
-                  </tr>
-                );
-              })}
+              {[...reports]
+                .reverse()
+                .slice(0, 5)
+                .map((item) => {
+                  const total =
+                    item.room + item.utilities + item.service + item.extra;
+                  return (
+                    <tr
+                      key={item.period}
+                      className="border-t border-[#e7ebf2] hover:bg-[#f8faff]"
+                    >
+                      <td className="px-5 py-4 font-bold">
+                        {displayPeriod(item, periodType)}
+                      </td>
+                      <td className="px-5 py-4 text-[#4b5563]">
+                        {formatCurrency(item.room)}
+                      </td>
+                      <td className="px-5 py-4 text-[#4b5563]">
+                        {formatCurrency(item.utilities)}
+                      </td>
+                      <td className="px-5 py-4 text-[#4b5563]">
+                        {formatCurrency(item.service)}
+                      </td>
+                      <td className="px-5 py-4 text-[#4b5563]">
+                        {formatCurrency(item.extra)}
+                      </td>
+                      <td className="px-5 py-4 text-right font-black">
+                        {formatCurrency(item.total || total)}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>

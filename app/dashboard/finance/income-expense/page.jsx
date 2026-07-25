@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Download, ReceiptText, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import {
+  CalendarDays,
+  Download,
+  ReceiptText,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -149,12 +156,19 @@ function periodKeyFromDate(value, periodType) {
   const year = Number(match[1]);
   const month = Number(match[2]);
   if (periodType === "year") return String(year);
-  if (periodType === "quarter") return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
+  if (periodType === "quarter")
+    return `${year}-Q${Math.floor((month - 1) / 3) + 1}`;
   return `${year}-${pad2(month)}`;
 }
 
 function expenseReportDate(item = {}) {
-  return item.expenseDate || item.paymentDate || item.expectedPaymentDate || item.createdAt?.slice(0, 10) || "";
+  return (
+    item.expenseDate ||
+    item.paymentDate ||
+    item.expectedPaymentDate ||
+    item.createdAt?.slice(0, 10) ||
+    ""
+  );
 }
 
 function buildExpenseBuckets(expenses, periodType) {
@@ -167,17 +181,23 @@ function buildExpenseBuckets(expenses, periodType) {
 }
 
 function periodIncome(item = {}) {
-  return numberValue(item.total) || (
+  return (
+    numberValue(item.total) ||
     numberValue(item.room) +
-    numberValue(item.utilities) +
-    numberValue(item.service) +
-    numberValue(item.extra)
+      numberValue(item.utilities) +
+      numberValue(item.service) +
+      numberValue(item.extra)
   );
 }
 
 function buildReports(revenueReport, expenses, periodType, endPeriod) {
-  const windows = buildPeriodWindows(periodType, revenueReport?.endPeriod || endPeriod);
-  const revenueByKey = new Map((revenueReport?.periods || []).map((item) => [item.period, item]));
+  const windows = buildPeriodWindows(
+    periodType,
+    revenueReport?.endPeriod || endPeriod,
+  );
+  const revenueByKey = new Map(
+    (revenueReport?.periods || []).map((item) => [item.period, item]),
+  );
   const expenseByKey = buildExpenseBuckets(expenses, periodType);
 
   return windows.map((window) => {
@@ -209,7 +229,15 @@ function signedThousandVND(value) {
   return `${value >= 0 ? "+" : "-"}${formatThousandVND(Math.abs(value))}`;
 }
 
-function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inverse = false }) {
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  badge,
+  note,
+  tone = "blue",
+  inverse = false,
+}) {
   const themes = {
     blue: {
       card: "border-[#dfe5ef] bg-white text-[#0f1d33]",
@@ -233,20 +261,39 @@ function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inve
   const theme = themes[tone];
 
   return (
-    <article className={`relative min-h-[150px] rounded-lg border p-5 shadow-sm ${theme.card}`}>
-      <span className={`absolute right-5 top-5 rounded-full border px-2.5 py-1 text-[10px] font-black ${tone === "dark" ? "border-white/10 bg-white/5 text-slate-300" : "border-[#dfe5ef] bg-[#f8fafc] text-[#64748b]"}`}>
-        nghìn đồng
-      </span>
+    <article
+      className={`min-h-[150px] rounded-lg border p-5 shadow-sm ${theme.card}`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <span className={`grid h-9 w-9 place-items-center rounded ${theme.icon}`}><Icon className="h-4 w-4" /></span>
-        <span className={`mt-7 inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold ${theme.badge}`}>
-          {inverse ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+        <span
+          className={`grid h-9 w-9 place-items-center rounded ${theme.icon}`}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <span
+          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold ${theme.badge}`}
+        >
+          {inverse ? (
+            <TrendingDown className="h-3 w-3" />
+          ) : (
+            <TrendingUp className="h-3 w-3" />
+          )}
           {badge}
         </span>
       </div>
-      <p className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b]"}`}>{label}</p>
-      <p className="mt-1 truncate text-xl font-black">{formatThousandVND(value)}</p>
-      <p className={`mt-4 border-t border-current/10 pt-3 text-[10px] italic ${theme.note}`}>{note}</p>
+      <p
+        className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b]"}`}
+      >
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xl font-black">
+        {formatThousandVND(value)}
+      </p>
+      <p
+        className={`mt-4 border-t border-current/10 pt-3 text-[10px] italic ${theme.note}`}
+      >
+        {note}
+      </p>
     </article>
   );
 }
@@ -268,7 +315,9 @@ function ChartTooltip({ active, payload, label }) {
 export default function IncomeExpenseReportPage() {
   const [periodType, setPeriodType] = useState("month");
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
-  const [reports, setReports] = useState(() => buildReports(null, [], "month", currentYearMonth()));
+  const [reports, setReports] = useState(() =>
+    buildReports(null, [], "month", currentYearMonth()),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -286,7 +335,10 @@ export default function IncomeExpenseReportPage() {
       }),
     ])
       .then(([revenueReport, expenses]) => {
-        if (!ignore) setReports(buildReports(revenueReport, expenses, periodType, selectedMonth));
+        if (!ignore)
+          setReports(
+            buildReports(revenueReport, expenses, periodType, selectedMonth),
+          );
       })
       .catch((error) => {
         if (!ignore) {
@@ -308,7 +360,10 @@ export default function IncomeExpenseReportPage() {
   const incomeGrowth = growthPercent(current.income, previous.income);
   const expenseGrowth = growthPercent(current.expense, previous.expense);
   const profitGrowth = growthPercent(current.profit, previous.profit);
-  const profitMargin = current.income > 0 ? Math.round((current.profit / current.income) * 1000) / 10 : 0;
+  const profitMargin =
+    current.income > 0
+      ? Math.round((current.profit / current.income) * 1000) / 10
+      : 0;
 
   const beginReload = () => {
     setIsLoading(true);
@@ -328,9 +383,25 @@ export default function IncomeExpenseReportPage() {
   };
 
   const exportReport = () => {
-    const header = ["Thời gian", "Doanh thu", "Chi phí", "Lợi nhuận", "Trạng thái"];
-    const rows = reports.map((item) => [item.period, item.income, item.expense, item.profit, item.reconciled ? "Đã chốt" : "Chưa chốt"].join(","));
-    const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const header = [
+      "Thời gian",
+      "Doanh thu",
+      "Chi phí",
+      "Lợi nhuận",
+      "Trạng thái",
+    ];
+    const rows = reports.map((item) =>
+      [
+        item.period,
+        item.income,
+        item.expense,
+        item.profit,
+        item.reconciled ? "Đã chốt" : "Chưa chốt",
+      ].join(","),
+    );
+    const blob = new Blob([`\uFEFF${[header.join(","), ...rows].join("\n")}`], {
+      type: "text/csv;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -363,7 +434,9 @@ export default function IncomeExpenseReportPage() {
               <input
                 type="month"
                 value={selectedMonth}
-                onChange={(event) => handleSelectedMonthChange(event.target.value)}
+                onChange={(event) =>
+                  handleSelectedMonthChange(event.target.value)
+                }
                 className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]"
               />
             </label>
@@ -372,10 +445,25 @@ export default function IncomeExpenseReportPage() {
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
-          <Link href="/dashboard/finance" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Doanh thu</Link>
-          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
-          <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
+          <Link
+            href="/dashboard/finance"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Doanh thu
+          </Link>
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">
+            Thu chi tổng hợp
+          </span>
+          <Link
+            href="/dashboard/finance/operating-expenses"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+          >
+            Chi phí vận hành
+          </Link>
         </nav>
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+          Đơn vị: Nghìn VND
+        </p>
       </div>
 
       {errorMessage && (
@@ -421,22 +509,60 @@ export default function IncomeExpenseReportPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-black">Biểu đồ so sánh Thu - Chi</h2>
-            <p className="mt-1 text-xs text-[#64748b]">Thống kê 6 kỳ gần nhất</p>
+            <p className="mt-1 text-xs text-[#64748b]">
+              Thống kê 6 kỳ gần nhất
+            </p>
           </div>
           <div className="flex items-center gap-4 text-[10px] font-semibold text-[#64748b]">
-            <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />Doanh thu</span>
-            <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-[#e89ca2]" />Chi phí</span>
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />
+              Doanh thu
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-full bg-[#e89ca2]" />
+              Chi phí
+            </span>
           </div>
         </div>
         <div className="mt-5 h-[275px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={reports} barGap={4} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              data={reports}
+              barGap={4}
+              margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
+            >
               <CartesianGrid vertical={false} stroke="#edf1f6" />
-              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }} />
-              <YAxis axisLine={false} tickLine={false} width={42} tick={{ fontSize: 9, fill: "#94a3b8" }} tickFormatter={formatChartTick} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f8faff" }} />
-              <Bar dataKey="income" name="Doanh thu" fill="#3f5db5" radius={[3, 3, 0, 0]} maxBarSize={28} />
-              <Bar dataKey="expense" name="Chi phí" fill="#e89ca2" radius={[3, 3, 0, 0]} maxBarSize={28} />
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                width={42}
+                tick={{ fontSize: 9, fill: "#94a3b8" }}
+                tickFormatter={formatChartTick}
+              />
+              <Tooltip
+                content={<ChartTooltip />}
+                cursor={{ fill: "#f8faff" }}
+              />
+              <Bar
+                dataKey="income"
+                name="Doanh thu"
+                fill="#3f5db5"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={28}
+              />
+              <Bar
+                dataKey="expense"
+                name="Chi phí"
+                fill="#e89ca2"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={28}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -445,7 +571,11 @@ export default function IncomeExpenseReportPage() {
       <section className="overflow-hidden rounded-lg border border-[#dce2ec] bg-white shadow-sm">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dce2ec] px-5 py-4">
           <h2 className="text-sm font-black">Chi tiết theo thời gian</h2>
-          <button type="button" onClick={exportReport} className="inline-flex items-center gap-2 text-xs font-bold text-[#3156b6] hover:text-[#233f91]">
+          <button
+            type="button"
+            onClick={exportReport}
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#3156b6] hover:text-[#233f91]"
+          >
             <Download className="h-3.5 w-3.5" />
             Xuất báo cáo (CSV)
           </button>
@@ -463,14 +593,28 @@ export default function IncomeExpenseReportPage() {
             </thead>
             <tbody>
               {[...reports].reverse().map((item, index) => (
-                <tr key={item.periodKey} className="border-t border-[#e7ebf2] hover:bg-[#f8faff]">
-                  <td className={`px-5 py-4 ${index < 3 ? "font-black" : "font-semibold"}`}>{item.period}</td>
-                  <td className="px-5 py-4 font-semibold text-[#3156b6]">{formatCurrency(item.income)}</td>
-                  <td className="px-5 py-4 font-semibold text-rose-600">{formatCurrency(item.expense)}</td>
-                  <td className="px-5 py-4 font-black">{formatCurrency(item.profit)}</td>
+                <tr
+                  key={item.periodKey}
+                  className="border-t border-[#e7ebf2] hover:bg-[#f8faff]"
+                >
+                  <td
+                    className={`px-5 py-4 ${index < 3 ? "font-black" : "font-semibold"}`}
+                  >
+                    {item.period}
+                  </td>
+                  <td className="px-5 py-4 font-semibold text-[#3156b6]">
+                    {formatCurrency(item.income)}
+                  </td>
+                  <td className="px-5 py-4 font-semibold text-rose-600">
+                    {formatCurrency(item.expense)}
+                  </td>
+                  <td className="px-5 py-4 font-black">
+                    {formatCurrency(item.profit)}
+                  </td>
                   <td className="px-5 py-4 text-right">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
-                      <i className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Đã chốt
+                      <i className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Đã chốt
                     </span>
                   </td>
                 </tr>

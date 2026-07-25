@@ -49,9 +49,12 @@ const emptyForm = {
 
 function StatusSelect({ status, onChange }) {
   const styles = {
-    NOT_VIEWED: "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
-    VIEWED: "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    DISMISSED: "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#020817] text-slate-600 dark:text-slate-300",
+    NOT_VIEWED:
+      "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
+    VIEWED:
+      "border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    DISMISSED:
+      "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#020817] text-slate-600 dark:text-slate-300",
   };
 
   return (
@@ -66,23 +69,6 @@ function StatusSelect({ status, onChange }) {
         </option>
       ))}
     </select>
-  );
-}
-
-function CustomerAvatar({ name }) {
-  const parts = name.trim().split(/\s+/);
-  const initials =
-    parts.length > 1
-      ? `${parts[0][0]}${parts[parts.length - 1][0]}`
-      : name.slice(0, 2);
-  const dark = name.includes("Phạm");
-
-  return (
-    <span
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${dark ? "bg-black text-white" : "bg-[#d7e6ff] text-[#39557a]"}`}
-    >
-      {initials.toUpperCase()}
-    </span>
   );
 }
 
@@ -248,10 +234,14 @@ function ViewingModal({
 function Field({ label, error, children }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-sm font-bold text-slate-900 dark:text-white">{label}</span>
+      <span className="text-sm font-bold text-slate-900 dark:text-white">
+        {label}
+      </span>
       {children}
       {error && (
-        <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">{error}</span>
+        <span className="text-xs font-semibold text-rose-600 dark:text-rose-300">
+          {error}
+        </span>
       )}
     </label>
   );
@@ -275,7 +265,9 @@ function TrashModal({
     >
       <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-lg bg-white dark:bg-[#0f172a] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Thùng rác</h2>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            Thùng rác
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -318,7 +310,10 @@ function TrashModal({
                   >
                     {customer.phone}
                   </td>
-                  <td data-label="Cơ sở" className="px-5 py-4 text-slate-700 dark:text-slate-200">
+                  <td
+                    data-label="Cơ sở"
+                    className="px-5 py-4 text-slate-700 dark:text-slate-200"
+                  >
                     {customer.propertyName}
                   </td>
                   <td
@@ -557,7 +552,14 @@ export default function ViewingCustomersClient() {
           page: nextPage,
           size: trashPageSize,
         });
-        setTrashRows(sortByNewest(data.items, ["deletedAt", "deleted_at", "createdAt", "created_at"]));
+        setTrashRows(
+          sortByNewest(data.items, [
+            "deletedAt",
+            "deleted_at",
+            "createdAt",
+            "created_at",
+          ]),
+        );
         setTrashPagination(data);
         setErrorMessage("");
       } catch (error) {
@@ -836,7 +838,9 @@ export default function ViewingCustomersClient() {
                   </option>
                 ))}
               </select>
-              <span className="font-semibold text-slate-900 dark:text-white">Thời gian:</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
+                Thời gian:
+              </span>
               <input
                 type="date"
                 value={filters.fromDate}
@@ -885,13 +889,10 @@ export default function ViewingCustomersClient() {
                       className="border-t border-[#d9dde5] dark:border-white/10 text-sm"
                     >
                       <td data-label="Tên khách" className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <CustomerAvatar name={customer.fullName} />
-                          <div className="min-w-0">
-                            <span className="block max-w-[180px] truncate font-bold leading-5 text-slate-900 dark:text-white">
-                              {customer.fullName}
-                            </span>
-                          </div>
+                        <div className="min-w-0">
+                          <span className="block max-w-[180px] truncate font-bold leading-5 text-slate-900 dark:text-white">
+                            {customer.fullName}
+                          </span>
                         </div>
                       </td>
                       <td

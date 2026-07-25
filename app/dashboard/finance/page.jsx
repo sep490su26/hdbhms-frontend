@@ -84,7 +84,10 @@ function SummaryCard({ label, value, note, color, trend }) {
   return (
     <article className="relative min-h-[112px] overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm">
       <span className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: color }} />
-      <p className="max-w-[120px] text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">{label}</p>
+      <span className="absolute right-4 top-4 rounded-full border border-[#dce2ec] bg-[#f8fafc] px-2.5 py-1 text-[10px] font-black text-[#5f6b7c]">
+        nghìn đồng
+      </span>
+      <p className="max-w-[120px] pr-16 text-[10px] font-bold uppercase leading-4 text-[#5f6b7c]">{label}</p>
       <p className="mt-2 truncate text-2xl font-black text-[#0f1d33]">{formatThousandVND(value)}</p>
       <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${trend ? "text-emerald-600" : "text-[#5f6b7c]"}`}>
         {trend && <TrendingUp className="h-3 w-3" />}
@@ -244,9 +247,6 @@ export default function FinancePage() {
               Chi phí vận hành
             </Link>
         </nav>
-        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
-          Đơn vị: Nghìn VND
-        </p>
       </div>
 
       {errorMessage && (

@@ -77,6 +77,9 @@ function apiAssetToRow(raw) {
     currentCondition: a.currentCondition,   // keep as enum value
     description: a.description,
     fileImageId: a.fileImageId,
+    compensationAmount: a.compensationAmount ?? 0,
+    damageNote: a.damageNote ?? "",
+    evidenceFileId: a.evidenceFileId ?? null,
     imageFile: null,
     imageUrl:
       raw.fileImageUrl ?? raw.file_image_url ?? raw.imageUrl ?? raw.image_url ?? "",
@@ -129,6 +132,7 @@ export default function ContractHandoverSection({
   title = "Bàn giao phòng",
   description,
   showAssets = true,
+  showCompensation = false,
   hideSaveButton = false,
   confirmOnSave = true,
   actionRef,
@@ -275,6 +279,26 @@ export default function ContractHandoverSection({
               const watValue = data.water?.current_value ?? data.water?.currentValue;
               setWaterReading(prev => watValue != null ? String(watValue) : (prev === "" ? "0" : prev));
               if (data.note) setNote(data.note);
+              if (showCompensation && Array.isArray(data.items) && data.items.length > 0) {
+                setAssets(
+                  withAssetRowKeys(
+                    data.items.map((item) => ({
+                      id: item.id,
+                      assetName: item.assetName ?? "",
+                      assetCategory: "Thiết bị",
+                      quantity: item.quantity ?? 1,
+                      currentCondition: item.conditionStatus ?? "GOOD",
+                      description: item.note ?? "",
+                      compensationAmount: item.compensationAmount ?? 0,
+                      damageNote: item.note ?? "",
+                      evidenceFileId: item.evidenceFileId ?? null,
+                      imageUrl: item.evidenceFileUrl ?? "",
+                    })),
+                    `handover-${contractId}-${handoverType}`,
+                  ),
+                );
+                setFromApi(true);
+              }
               onLoaded?.(data);
             } else {
               setIsConfirmed(false);
@@ -293,7 +317,7 @@ export default function ContractHandoverSection({
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, waterReading]);
+  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, waterReading, showCompensation]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -403,7 +427,10 @@ export default function ContractHandoverSection({
       a.assetName.trim() &&
       a.assetCategory.trim() &&
       Number.isInteger(Number(a.quantity)) &&
-      Number(a.quantity) >= 0
+      Number(a.quantity) >= 0 &&
+      (!showCompensation ||
+        (Number.isFinite(Number(a.compensationAmount ?? 0)) &&
+          Number(a.compensationAmount ?? 0) >= 0))
     ));
 
   function validateBeforeSave() {
@@ -473,6 +500,9 @@ export default function ContractHandoverSection({
             currentCondition,
             description: asset.description?.trim() ?? "",
             fileImageId: assetImageId,
+            compensationAmount: showCompensation ? Number(asset.compensationAmount || 0) : undefined,
+            damageNote: showCompensation ? asset.damageNote?.trim() ?? "" : undefined,
+            evidenceFileId: showCompensation ? asset.evidenceFileId ?? undefined : undefined,
           };
 
           // A canonical UI row can represent legacy split records such as
@@ -492,6 +522,7 @@ export default function ContractHandoverSection({
               currentCondition,
               description: source.description?.trim() ?? "",
               fileImageId: source.fileImageId ?? undefined,
+              compensationAmount: 0,
             }));
 
           return [primaryPayload, ...secondaryPayloads];
@@ -747,7 +778,7 @@ export default function ContractHandoverSection({
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-xs xl:text-sm">
+          <table className={`w-full ${showCompensation ? "min-w-[1260px]" : "min-w-[980px]"} text-left text-xs xl:text-sm`}>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="w-10 px-3 py-3">STT</th>
@@ -757,6 +788,12 @@ export default function ContractHandoverSection({
                 <th className="min-w-44 px-3 py-3">Tình trạng</th>
                 <th className="min-w-44 px-3 py-3">Mô tả</th>
                 <th className="w-32 px-3 py-3">Ảnh</th>
+                {showCompensation && (
+                  <>
+                    <th className="w-40 px-3 py-3">Bồi thường</th>
+                    <th className="min-w-56 px-3 py-3">Thiệt hại</th>
+                  </>
+                )}
                 {!effectiveReadonly && (
                   <th className="w-20 px-3 py-3 text-center">Thao tác</th>
                 )}
@@ -853,6 +890,33 @@ export default function ContractHandoverSection({
                       />
                     )}
                   </td>
+                  {showCompensation && (
+                    <>
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1000"
+                          inputMode="numeric"
+                          value={asset.compensationAmount ?? 0}
+                          disabled={assetEditingDisabled}
+                          onChange={(e) => updateAsset(index, "compensationAmount", e.target.value)}
+                          aria-label={`Bồi thường thiết bị dòng ${index + 1}`}
+                          className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <input
+                          value={asset.damageNote ?? ""}
+                          disabled={assetEditingDisabled}
+                          onChange={(e) => updateAsset(index, "damageNote", e.target.value)}
+                          placeholder="Ghi chú thiệt hại"
+                          aria-label={`Ghi chú thiệt hại dòng ${index + 1}`}
+                          className="h-9 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 px-2.5 outline-none focus:border-[#1e40af] disabled:bg-slate-100"
+                        />
+                      </td>
+                    </>
+                  )}
                   {!effectiveReadonly && (
                     <td className="px-3 py-2.5 text-center">
                       <button
@@ -874,7 +938,7 @@ export default function ContractHandoverSection({
               {assets.length === 0 && (
                 <tr>
                   <td
-                    colSpan={effectiveReadonly ? 7 : 8}
+                    colSpan={(effectiveReadonly ? 7 : 8) + (showCompensation ? 2 : 0)}
                     className="px-4 py-10 text-center"
                   >
                     <p className="font-bold text-slate-700 dark:text-slate-200">
@@ -967,9 +1031,6 @@ export default function ContractHandoverSection({
                   <DialogTitle className="text-lg font-extrabold text-slate-900 dark:text-white">
                     Xác nhận lưu bàn giao
                   </DialogTitle>
-                  <DialogDescription className="mt-2 leading-6 text-slate-600 dark:text-slate-300">
-                    Bạn đã kiểm tra và hoàn tất toàn bộ thông tin bàn giao chưa?
-                  </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
@@ -978,9 +1039,6 @@ export default function ContractHandoverSection({
           <div className="px-6 pb-6">
             <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold leading-6 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
               Sau khi xác nhận lưu, dữ liệu bàn giao sẽ được chốt và không thể chỉnh sửa.
-            </p>
-            <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Hãy kiểm tra lại ngày bàn giao, chỉ số điện nước và hiện trạng thiết bị trước khi tiếp tục.
             </p>
 
             <DialogFooter className="mt-6">

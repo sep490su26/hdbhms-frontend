@@ -116,6 +116,17 @@ async function parseEnvelope(response, fallbackMessage) {
   return payload.data ?? null;
 }
 
+function normalizeInvoiceLine(line = {}) {
+  return {
+    id: line.id ?? line.invoiceLineId ?? line.invoice_line_id ?? null,
+    lineType: line.lineType ?? line.line_type ?? null,
+    description: line.description ?? "",
+    quantity: line.quantity ?? null,
+    unitPrice: line.unitPrice ?? line.unit_price ?? null,
+    amount: line.amount ?? null,
+  };
+}
+
 export function normalizeLeaseContractItem(item = {}) {
   const contractId =
     item.contractId ??
@@ -291,12 +302,75 @@ export function normalizeLeaseContractItem(item = {}) {
       null,
     liquidationFinalInvoiceId:
       item.liquidationFinalInvoiceId ?? item.liquidation_final_invoice_id ?? null,
+    liquidationFinalInvoiceCode:
+      item.liquidationFinalInvoiceCode ??
+      item.liquidation_final_invoice_code ??
+      null,
+    liquidationFinalInvoiceStatus:
+      item.liquidationFinalInvoiceStatus ??
+      item.liquidation_final_invoice_status ??
+      null,
+    liquidationFinalInvoiceSubtotalAmount:
+      item.liquidationFinalInvoiceSubtotalAmount ??
+      item.liquidation_final_invoice_subtotal_amount ??
+      null,
+    liquidationFinalInvoiceDiscountAmount:
+      item.liquidationFinalInvoiceDiscountAmount ??
+      item.liquidation_final_invoice_discount_amount ??
+      null,
+    liquidationFinalInvoiceTotalAmount:
+      item.liquidationFinalInvoiceTotalAmount ??
+      item.liquidation_final_invoice_total_amount ??
+      null,
+    liquidationFinalInvoiceRemainingAmount:
+      item.liquidationFinalInvoiceRemainingAmount ??
+      item.liquidation_final_invoice_remaining_amount ??
+      null,
+    liquidationFinalInvoiceLines: Array.isArray(
+      item.liquidationFinalInvoiceLines ?? item.liquidation_final_invoice_lines,
+    )
+      ? (item.liquidationFinalInvoiceLines ?? item.liquidation_final_invoice_lines).map(
+          normalizeInvoiceLine,
+        )
+      : [],
     liquidationSignedFileId:
       item.liquidationSignedFileId ?? item.liquidation_signed_file_id ?? null,
     liquidationStatus:
       item.liquidationStatus ?? item.liquidation_status ?? null,
     liquidationCreatedAt:
       item.liquidationCreatedAt ?? item.liquidation_created_at ?? null,
+    liquidationDepositRefundRequestId:
+      item.liquidationDepositRefundRequestId ??
+      item.liquidation_deposit_refund_request_id ??
+      null,
+    liquidationDepositRefundExpenseId:
+      item.liquidationDepositRefundExpenseId ??
+      item.liquidation_deposit_refund_expense_id ??
+      null,
+    liquidationDepositRefundExpenseRequestId:
+      item.liquidationDepositRefundExpenseRequestId ??
+      item.liquidation_deposit_refund_expense_request_id ??
+      null,
+    liquidationDepositRefundStatus:
+      item.liquidationDepositRefundStatus ??
+      item.liquidation_deposit_refund_status ??
+      null,
+    liquidationDepositRefundProofFileId:
+      item.liquidationDepositRefundProofFileId ??
+      item.liquidation_deposit_refund_proof_file_id ??
+      null,
+    liquidationDepositRefundedAmount:
+      item.liquidationDepositRefundedAmount ??
+      item.liquidation_deposit_refunded_amount ??
+      null,
+    liquidationDepositRefundedAt:
+      item.liquidationDepositRefundedAt ??
+      item.liquidation_deposit_refunded_at ??
+      null,
+    liquidationDepositRefundTransactionRef:
+      item.liquidationDepositRefundTransactionRef ??
+      item.liquidation_deposit_refund_transaction_ref ??
+      null,
     transferRequestId: item.transferRequestId ?? null,
     transferRequestCode: item.transferRequestCode ?? null,
     transferStatus: item.transferStatus ?? null,
@@ -467,6 +541,7 @@ export async function updateLeaseContractLiquidationDraft(leaseContractId, paylo
         reason: payload.reason,
         depositDeductionAmount: payload.depositDeductionAmount,
         depositDeductionReason: payload.depositDeductionReason,
+        charges: payload.charges,
       }),
     },
   );
@@ -475,7 +550,7 @@ export async function updateLeaseContractLiquidationDraft(leaseContractId, paylo
 
 export async function renewLeaseContract(leaseContractId, payload) {
   if (!leaseContractId) {
-    throw new Error("Không xác định được hợp đồng cần tái ký.");
+    throw new Error("Không xác định được hợp đồng cần gia hạn.");
   }
   return authenticatedFetch(
     `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/renew`,
@@ -815,6 +890,38 @@ function normalizeLeaseContractDetails(details = {}) {
     signedAt: details.signedAt ?? details.signed_at ?? null,
     previousContractId:
       details.previousContractId ?? details.previous_contract_id ?? null,
+    liquidationDepositRefundRequestId:
+      details.liquidationDepositRefundRequestId ??
+      details.liquidation_deposit_refund_request_id ??
+      null,
+    liquidationDepositRefundExpenseId:
+      details.liquidationDepositRefundExpenseId ??
+      details.liquidation_deposit_refund_expense_id ??
+      null,
+    liquidationDepositRefundExpenseRequestId:
+      details.liquidationDepositRefundExpenseRequestId ??
+      details.liquidation_deposit_refund_expense_request_id ??
+      null,
+    liquidationDepositRefundStatus:
+      details.liquidationDepositRefundStatus ??
+      details.liquidation_deposit_refund_status ??
+      null,
+    liquidationDepositRefundProofFileId:
+      details.liquidationDepositRefundProofFileId ??
+      details.liquidation_deposit_refund_proof_file_id ??
+      null,
+    liquidationDepositRefundedAmount:
+      details.liquidationDepositRefundedAmount ??
+      details.liquidation_deposit_refunded_amount ??
+      null,
+    liquidationDepositRefundedAt:
+      details.liquidationDepositRefundedAt ??
+      details.liquidation_deposit_refunded_at ??
+      null,
+    liquidationDepositRefundTransactionRef:
+      details.liquidationDepositRefundTransactionRef ??
+      details.liquidation_deposit_refund_transaction_ref ??
+      null,
     previousContractCode:
       details.previousContractCode ?? details.previous_contract_code ?? null,
     renewedContractId:
@@ -858,6 +965,39 @@ function normalizeLeaseContractDetails(details = {}) {
       details.liquidationFinalInvoiceId ??
       details.liquidation_final_invoice_id ??
       null,
+    liquidationFinalInvoiceCode:
+      details.liquidationFinalInvoiceCode ??
+      details.liquidation_final_invoice_code ??
+      null,
+    liquidationFinalInvoiceStatus:
+      details.liquidationFinalInvoiceStatus ??
+      details.liquidation_final_invoice_status ??
+      null,
+    liquidationFinalInvoiceSubtotalAmount:
+      details.liquidationFinalInvoiceSubtotalAmount ??
+      details.liquidation_final_invoice_subtotal_amount ??
+      null,
+    liquidationFinalInvoiceDiscountAmount:
+      details.liquidationFinalInvoiceDiscountAmount ??
+      details.liquidation_final_invoice_discount_amount ??
+      null,
+    liquidationFinalInvoiceTotalAmount:
+      details.liquidationFinalInvoiceTotalAmount ??
+      details.liquidation_final_invoice_total_amount ??
+      null,
+    liquidationFinalInvoiceRemainingAmount:
+      details.liquidationFinalInvoiceRemainingAmount ??
+      details.liquidation_final_invoice_remaining_amount ??
+      null,
+    liquidationFinalInvoiceLines: Array.isArray(
+      details.liquidationFinalInvoiceLines ??
+        details.liquidation_final_invoice_lines,
+    )
+      ? (
+          details.liquidationFinalInvoiceLines ??
+          details.liquidation_final_invoice_lines
+        ).map(normalizeInvoiceLine)
+      : [],
     liquidationSignedFileId:
       details.liquidationSignedFileId ??
       details.liquidation_signed_file_id ??

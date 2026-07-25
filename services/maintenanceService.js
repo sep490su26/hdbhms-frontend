@@ -125,6 +125,7 @@ export function normalizeTicket(raw = {}) {
     category: readField(raw, "category") || "OTHER",
     title: maintenanceDisplayText(readField(raw, "title") || "Phiếu sự cố"),
     description: maintenanceDisplayText(readField(raw, "description") || ""),
+    repairRequested: readField(raw, "repairRequested", "repair_requested") !== false,
     status: normalizeStatus(readField(raw, "status")),
     ticketStatus: normalizeStatus(readField(raw, "ticketStatus", "ticket_status", "status")),
     ticketStatusLabel: readField(raw, "ticketStatusLabel", "ticket_status_label") || "",

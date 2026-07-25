@@ -73,35 +73,6 @@ const STATUS_META = {
   CANCELLED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
 };
 
-const BILLING_META = {
-  NO_CHARGE: ["Không thu khách", "bg-slate-100 text-slate-700 ring-slate-200"],
-  NOT_INVOICED: [
-    "Chưa tạo hóa đơn",
-    "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
-  ],
-  DRAFT: [
-    "Chờ phát hành",
-    "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20",
-  ],
-  PENDING_PAYMENT: [
-    "Chờ thanh toán",
-    "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20",
-  ],
-  PARTIALLY_PAID: [
-    "Thanh toán một phần",
-    "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20",
-  ],
-  PAID: [
-    "Đã thanh toán",
-    "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
-  ],
-  OVERDUE: [
-    "Quá hạn",
-    "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20",
-  ],
-  VOIDED: ["Đã hủy", "bg-slate-100 text-slate-700 ring-slate-200"],
-};
-
 const CATEGORY_OPTIONS = [
   ["all", "Tất cả hạng mục"],
   ["RULE_VIOLATION", "Vi phạm nội quy"],
@@ -158,6 +129,13 @@ function formatMoney(value) {
   return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} VNĐ`;
 }
 
+function formatThousandMoney(value) {
+  const amount = Number(value || 0);
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
+    (Number.isFinite(amount) ? amount : 0) / 1000,
+  );
+}
+
 function statusMeta(status) {
   return (
     STATUS_META[status] || [
@@ -176,33 +154,6 @@ function StatusBadge({ status }) {
       {label}
     </span>
   );
-}
-
-function BillingBadge({ status, label }) {
-  const [fallbackLabel, className] =
-    BILLING_META[status] || BILLING_META.NO_CHARGE;
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${className}`}
-    >
-      {label || fallbackLabel}
-    </span>
-  );
-}
-
-function shouldShowBillingStatus(ticket) {
-  if (ticket?.ticketScope === "PROPERTY_OPERATION") return true;
-  const ticketStatus = String(
-    ticket?.ticketStatus || ticket?.status || "",
-  ).toUpperCase();
-  if (
-    ticketStatus === "PENDING" ||
-    ticketStatus === "PENDING_ACCEPTANCE" ||
-    ticketStatus === "ACCEPTED"
-  ) {
-    return false;
-  }
-  return Boolean(ticket?.billingStatus);
 }
 
 function Field({ label, children, className = "" }) {
@@ -271,11 +222,16 @@ function InlineNotice({ type = "info", children }) {
   );
 }
 
-function Metric({ label, value, icon: Icon, tone }) {
+function Metric({ label, value, icon: Icon, tone, unitBadge }) {
   return (
-    <article className="min-h-28 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+    <article className="relative min-h-28 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+      {unitBadge ? (
+        <span className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+          {unitBadge}
+        </span>
+      ) : null}
       <div className="flex items-start justify-between gap-4">
-        <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+        <p className={`text-xs font-black uppercase text-slate-500 dark:text-slate-400 ${unitBadge ? "pr-20" : ""}`}>
           {label}
         </p>
         <span
@@ -379,12 +335,6 @@ export default function MaintenancePage() {
     if (!filters.floor || filters.floor === "all") return [];
     return roomOptions.filter((room) => room.floorId === filters.floor);
   }, [filters.floor, roomOptions]);
-  const selectedViolationPropertyId = String(
-    violationForm.propertyId ||
-      filters.propertyId ||
-      propertyOptions[0]?.id ||
-      "",
-  );
 
   const metrics = useMemo(() => {
     const count = (statuses) =>
@@ -419,13 +369,15 @@ export default function MaintenancePage() {
       },
       {
         label: "Chi phí ghi nhận",
-        value: formatMoney(totalCost),
+        value: formatThousandMoney(totalCost),
+        unitBadge: "nghìn đồng",
         icon: Check,
         tone: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
       },
       {
         label: "Chi phí chủ trọ chịu",
-        value: formatMoney(landlordCost),
+        value: formatThousandMoney(landlordCost),
+        unitBadge: "nghìn đồng",
         icon: Wrench,
         tone: "bg-slate-100 text-slate-700",
       },
@@ -1110,9 +1062,20 @@ export default function MaintenancePage() {
                           </span>
                         </span>
                       ) : (
-                        CATEGORY_LABELS[ticket.category] ||
-                        ticket.category ||
-                        "Khác"
+                        <span className="inline-flex flex-col gap-1">
+                          <span>
+                            {CATEGORY_LABELS[ticket.category] ||
+                              ticket.category ||
+                              "Khác"}
+                          </span>
+                          <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${
+                            ticket.repairRequested === false
+                              ? "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"
+                              : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+                          }`}>
+                            {ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"}
+                          </span>
+                        </span>
                       )}
                     </td>
                     <td
@@ -1124,32 +1087,9 @@ export default function MaintenancePage() {
                         "Trung bình"}
                     </td>
                     <td data-label="Trạng thái" className="px-5 py-4">
-                      <div className="flex flex-col items-start gap-1.5">
-                        <StatusBadge
-                          status={ticket.ticketStatus || ticket.status}
-                        />
-                        {shouldShowBillingStatus(ticket) && (
-                          <BillingBadge
-                            status={ticket.billingStatus}
-                            label={ticket.billingStatusLabel}
-                          />
-                        )}
-                        {ticket.ticketScope === "PROPERTY_OPERATION" && (
-                          <>
-                            <span className="text-xs font-black text-teal-700">
-                              Chi phí nội bộ · Chủ trọ chịu
-                            </span>
-                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                              {formatMoney(ticket.costAmount)}
-                            </span>
-                          </>
-                        )}
-                        {ticket.invoiceCode && (
-                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                            {ticket.invoiceCode}
-                          </span>
-                        )}
-                      </div>
+                      <StatusBadge
+                        status={ticket.ticketStatus || ticket.status}
+                      />
                     </td>
                     <td
                       data-label="Cập nhật"

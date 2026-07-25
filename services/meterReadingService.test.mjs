@@ -27,6 +27,23 @@ test("new meter reading periods use the MM-yyyy format", () => {
   assert.match(source, /dashboard\?\.currentPeriod\?\.readingPeriod/);
 });
 
+test("meter reading period history has a dedicated dashboard route", () => {
+  const pageSource = readFileSync(
+    new URL("../app/dashboard/meter-readings/page.jsx", import.meta.url),
+    "utf8",
+  );
+  const historySource = readFileSync(
+    new URL("../app/dashboard/meter-readings/history/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(pageSource, /\/dashboard\/meter-readings\/history/);
+  assert.match(pageSource, /Lịch sử kỳ ghi số/);
+  assert.match(historySource, /title="Lịch sử các kỳ ghi chỉ số"/);
+  assert.match(historySource, /fetchBatchHistory/);
+  assert.match(historySource, /DashboardPagination/);
+});
+
 test("confirmed meter reading batches lock entry actions", () => {
   const source = readFileSync(
     new URL("../app/dashboard/meter-readings/batch/page.jsx", import.meta.url),

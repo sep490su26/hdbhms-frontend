@@ -21,15 +21,21 @@ export function DashboardStatCard({
   tone = "slate",
   suffix = "",
   subtitle,
+  unitBadge,
 }) {
   const iconTone = toneClasses[tone] || toneClasses.slate;
 
   return (
-    <article className="flex min-h-20 items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] sm:p-4">
+    <article className="relative flex min-h-20 items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] sm:p-4">
+      {unitBadge ? (
+        <span className="absolute right-3 top-3 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+          {unitBadge}
+        </span>
+      ) : null}
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconTone}`}>
         <Icon className="h-5 w-5" />
       </span>
-      <div className="min-w-0">
+      <div className={`min-w-0 ${unitBadge ? "pr-20" : ""}`}>
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
         <p className="mt-1 text-xl font-black leading-none text-slate-900 dark:text-white sm:text-2xl">
           {value}

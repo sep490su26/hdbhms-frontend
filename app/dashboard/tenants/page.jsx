@@ -584,7 +584,7 @@ function LeaseContractDetailModal({ contract, onClose }) {
                   }
                 />
                 <ContractDetailInfo
-                  label="Hợp đồng tái ký"
+                  label="Hợp đồng gia hạn"
                   value={
                     valueOf(
                       contract,

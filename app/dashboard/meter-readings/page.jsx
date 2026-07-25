@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -26,18 +26,9 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
-import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
-import { dedupeBatchHistory, getHistoryRowKey } from "@/lib/meterReadingHistory.mjs";
+import { dedupeBatchHistory } from "@/lib/meterReadingHistory.mjs";
 import {
   fetchBatchHistory,
   fetchBatchMeterReadingsStatus,
@@ -181,6 +172,16 @@ function getBatchHref(period, propertyId, context = {}) {
   return `/dashboard/meter-readings/batch${query ? `?${query}` : ""}`;
 }
 
+function getHistoryHref(propertyId, context = {}) {
+  const params = new URLSearchParams();
+  const normalizedPropertyId = normalizePropertyId(propertyId);
+  if (normalizedPropertyId) params.set("propertyId", normalizedPropertyId);
+  if (context.from) params.set("from", context.from);
+  if (context.facilityName) params.set("facilityName", context.facilityName);
+  const query = params.toString();
+  return `/dashboard/meter-readings/history${query ? `?${query}` : ""}`;
+}
+
 function MeterReadingsBreadcrumb({ facilityName }) {
   return (
     <Breadcrumb className="-mb-2">
@@ -246,8 +247,6 @@ export default function UtilityManagement() {
   const [nextOpenDate, setNextOpenDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [backendFacilityName, setBackendFacilityName] = useState("");
   const [fallbackPropertyId, setFallbackPropertyId] = useState("");
   const router = useRouter();
@@ -255,16 +254,19 @@ export default function UtilityManagement() {
   const { user } = useAuth();
   const queryPropertyId =
     normalizePropertyId(searchParams.get("propertyId") || searchParams.get("facilityId"));
-  const propertyId = queryPropertyId || firstAssignedPropertyId(user) || fallbackPropertyId;
+  const assignedPropertyId = firstAssignedPropertyId(user);
+  const propertyId = queryPropertyId || assignedPropertyId || fallbackPropertyId;
+  const selectedPropertyId = propertyId || "";
   const fromFacilities = searchParams.get("from") === "facilities";
   const facilityName = backendFacilityName || "";
   const batchQueryContext = {
     from: fromFacilities ? "facilities" : "",
     facilityName,
   };
+  const historyHref = getHistoryHref(propertyId, batchQueryContext);
 
   useEffect(() => {
-    if (queryPropertyId || firstAssignedPropertyId(user)) {
+    if (queryPropertyId || assignedPropertyId) {
       return undefined;
     }
 
@@ -281,17 +283,24 @@ export default function UtilityManagement() {
     return () => {
       isActive = false;
     };
-  }, [queryPropertyId, user]);
+  }, [assignedPropertyId, queryPropertyId]);
 
-  const loadData = useCallback(async ({ showLoading = true } = {}) => {
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    let cancelled = false;
+
+    const loadData = async ({ showLoading = true } = {}) => {
       try {
         if (showLoading) setLoading(true);
         setErrorMessage("");
         setBackendFacilityName("");
         const [historyRes, dashboardRes] = await Promise.all([
-          fetchBatchHistory(propertyId || null),
-          fetchUtilityDashboard(propertyId || null),
+          fetchBatchHistory(selectedPropertyId || null),
+          fetchUtilityDashboard(selectedPropertyId || null),
         ]);
+
+        if (cancelled) return;
 
         let normalizedHistory = [];
         let normalizedDashboard = null;
@@ -332,7 +341,7 @@ export default function UtilityManagement() {
 
         if (activePeriod) {
           try {
-            const batchStatus = await fetchBatchMeterReadingsStatus(activePeriod, propertyId || null);
+            const batchStatus = await fetchBatchMeterReadingsStatus(activePeriod, selectedPropertyId || null);
             const refreshedProgress = computeProgressFromBatchStatus(batchStatus);
             if (batchStatus?.propertyName || batchStatus?.property_name) {
               setBackendFacilityName(batchStatus.propertyName ?? batchStatus.property_name ?? "");
@@ -365,25 +374,22 @@ export default function UtilityManagement() {
           }
         }
 
+        if (cancelled) return;
         setHistory(dedupeBatchHistory(normalizedHistory));
         if (normalizedDashboard) setDashboard(normalizedDashboard);
       } catch (error) {
-        setErrorMessage("Không tải được dữ liệu ghi chỉ số điện nước.");
-        console.error("Error fetching data", error);
+        if (!cancelled) {
+          setErrorMessage("Không tải được dữ liệu ghi chỉ số điện nước.");
+          console.error("Error fetching data", error);
+        }
       } finally {
-        if (showLoading) setLoading(false);
+        if (!cancelled && showLoading) setLoading(false);
       }
-    }, [propertyId]);
+    };
 
-  useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadData();
     }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadData]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
 
     const refreshVisiblePage = () => {
       if (document.visibilityState === "hidden") return;
@@ -395,11 +401,13 @@ export default function UtilityManagement() {
     document.addEventListener("visibilitychange", refreshVisiblePage);
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
       window.removeEventListener("focus", refreshVisiblePage);
       window.removeEventListener("pageshow", refreshVisiblePage);
       document.removeEventListener("visibilitychange", refreshVisiblePage);
     };
-  }, [loadData]);
+  }, [selectedPropertyId]);
 
   const displayHistory = dedupeBatchHistory(history);
   const currentPeriod = displayHistory.find((item) => item.isCurrent);
@@ -467,20 +475,10 @@ export default function UtilityManagement() {
   const completedRooms = capCompletedRooms(currentPeriod?.completedRooms, totalRooms);
   const missingRooms = Math.max(0, totalRooms - completedRooms);
   const progress = calculateProgress(completedRooms, totalRooms);
-  const utilityBillingReady =
-    String(currentPeriod?.status || "").toUpperCase() === "CONFIRMED";
-  const totalPages = Math.ceil(displayHistory.length / itemsPerPage);
-  const effectiveCurrentPage = Math.min(currentPage, totalPages || 1);
-  const paginatedHistory = displayHistory.slice(
-    (effectiveCurrentPage - 1) * itemsPerPage,
-    effectiveCurrentPage * itemsPerPage,
-  );
-
-  function handlePageChange(page) {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  }
+  const utilityBillingPeriod =
+    String(currentPeriod?.status || "").toUpperCase() === "CONFIRMED"
+      ? currentPeriod
+      : displayHistory.find((item) => String(item.status || "").toUpperCase() === "CONFIRMED");
 
   function openCurrentPeriod() {
     router.push(getBatchHref(periodValue(currentPeriod), propertyId, {
@@ -500,6 +498,13 @@ export default function UtilityManagement() {
         description="Quản lý kỳ ghi chỉ số, tiến độ nhập liệu và lịch sử chốt điện nước."
         actions={
           <>
+            <Link
+              href={historyHref}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] px-4 text-sm font-bold text-slate-700 dark:border-white/10 dark:text-slate-200"
+            >
+              <History className="h-4 w-4 dark:text-slate-300" />
+              Lịch sử kỳ ghi số
+            </Link>
             {!currentPeriod && canStartCurrentPeriod ? (
               <button
                 type="button"
@@ -631,214 +636,13 @@ export default function UtilityManagement() {
         )}
       </section>
 
-      {utilityBillingReady ? (
+      {utilityBillingPeriod ? (
         <UtilityBillingRunsPanel
-          key={`${propertyId || "all"}-${periodValue(currentPeriod) || formatMonthYearPeriod()}`}
+          key={`${propertyId || "all"}-${periodValue(utilityBillingPeriod) || formatMonthYearPeriod()}`}
           propertyId={propertyId}
-          defaultPeriod={periodValue(currentPeriod) || formatMonthYearPeriod()}
+          defaultPeriod={periodValue(utilityBillingPeriod) || formatMonthYearPeriod()}
         />
       ) : null}
-
-      <section className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="flex items-center gap-2 border-b border-[#e2e8f0] px-4 py-4 dark:border-white/10">
-          <History className="h-4 w-4 text-[#3156b6] dark:text-blue-300" />
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Lịch sử các kỳ ghi chỉ số
-            </h2>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Xem lại trạng thái, tiến độ và cảnh báo theo từng kỳ.
-            </p>
-          </div>
-        </div>
-
-        <div className="hidden overflow-x-auto md:block">
-          <Table className="min-w-[820px]">
-            <TableHeader>
-              <TableRow className="border-b border-[#e2e8f0] bg-[#f8fafc] hover:bg-[#f8fafc] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/5">
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Kỳ ghi chỉ số
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Thời gian
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Trạng thái
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Tiến độ
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Phòng đã nhập
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Cảnh báo
-                </TableHead>
-                <TableHead className="px-4 py-3 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                  Thao tác
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedHistory.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
-                  >
-                    Chưa có kỳ ghi chỉ số.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedHistory.map((item, index) => {
-                  const itemCompletedRooms = capCompletedRooms(item.completedRooms, item.totalRooms);
-                  const prog = calculateProgress(itemCompletedRooms, item.totalRooms);
-                  return (
-                    <TableRow
-                      key={getHistoryRowKey(item, index)}
-                      className="border-t border-[#e2e8f0] transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
-                    >
-                      <TableCell className="px-4 py-3">
-                        <p className="font-black text-slate-900 dark:text-white">
-                          {item.period}
-                        </p>
-                        {item.isCurrent ? (
-                          <p className="text-xs font-semibold text-[#3156b6] dark:text-blue-300">
-                            Hiện tại
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                        {formatTime(item.startDate, item.endDate)}
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <PeriodBadge status={item.status} />
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-10 text-sm font-black text-slate-700 dark:text-slate-200">
-                            {prog}%
-                          </span>
-                          <ProgressBar value={prog} className="w-24" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-300">
-                        {itemCompletedRooms} / {item.totalRooms}
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span
-                          className={`text-sm font-black ${item.anomalyCount > 0 ? "text-orange-600 dark:text-orange-300" : "text-slate-400 dark:text-slate-500"}`}
-                        >
-                          {item.anomalyCount}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            router.push(
-                              getBatchHref(item.period, propertyId, {
-                                ...batchQueryContext,
-                                batchId: item.batchId,
-                              }),
-                            )
-                          }
-                          className="inline-flex h-9 items-center rounded-lg border border-[#cbd5e1] px-3 text-xs font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
-                        >
-                          Xem chi tiết
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="grid gap-3 p-3 md:hidden">
-          {paginatedHistory.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[#cbd5e1] p-5 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
-              Chưa có kỳ ghi chỉ số.
-            </div>
-          ) : (
-            paginatedHistory.map((item, index) => {
-              const itemCompletedRooms = capCompletedRooms(item.completedRooms, item.totalRooms);
-              const prog = calculateProgress(itemCompletedRooms, item.totalRooms);
-              return (
-                <article
-                  key={getHistoryRowKey(item, index)}
-                  className="rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                        {item.period}
-                      </h3>
-                      <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {formatTime(item.startDate, item.endDate)}
-                      </p>
-                    </div>
-                    <PeriodBadge status={item.status} />
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="font-semibold text-slate-500 dark:text-slate-400">
-                        Tiến độ ({itemCompletedRooms} / {item.totalRooms})
-                      </span>
-                      <span className="font-black text-slate-700 dark:text-slate-200">
-                        {prog}%
-                      </span>
-                    </div>
-                    <ProgressBar value={prog} />
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-slate-500 dark:text-slate-400">
-                      Cảnh báo
-                    </span>
-                    <span
-                      className={`font-black ${item.anomalyCount > 0 ? "text-orange-600 dark:text-orange-300" : "text-slate-700 dark:text-slate-200"}`}
-                    >
-                      {item.anomalyCount}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(getBatchHref(item.period, propertyId, {
-                        ...batchQueryContext,
-                        batchId: item.batchId,
-                      }))
-                    }
-                    className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg border border-[#cbd5e1] text-sm font-black text-[#3156b6] transition hover:bg-blue-50 dark:border-white/10 dark:text-blue-300 dark:hover:bg-blue-500/10"
-                  >
-                    Xem chi tiết
-                  </button>
-                </article>
-              );
-            })
-          )}
-        </div>
-
-        {displayHistory.length > itemsPerPage ? (
-          <DashboardPagination
-            page={effectiveCurrentPage}
-            size={itemsPerPage}
-            totalElements={displayHistory.length}
-            totalPages={totalPages}
-            itemLabel="kỳ ghi chỉ số"
-            onPageChange={handlePageChange}
-            onSizeChange={(nextSize) => {
-              setItemsPerPage(nextSize);
-              setCurrentPage(1);
-            }}
-            className="border-t border-[#e2e8f0] dark:border-white/10"
-          />
-        ) : null}
-      </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">

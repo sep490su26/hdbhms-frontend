@@ -46,6 +46,12 @@ function formatMoney(value) {
   return formatNumber(value);
 }
 
+function formatThousandMoney(value) {
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
+    Number(value || 0) / 1000,
+  );
+}
+
 function formatUsage(value, unit) {
   const parsed = Number(value || 0);
   const formatted = new Intl.NumberFormat("vi-VN", {
@@ -68,6 +74,7 @@ function StatCard({
   badge,
   badgeTone = "green",
   accent = "blue",
+  unitBadge,
 }) {
   const accentClasses = {
     blue: "bg-[#eef3ff] text-[#4360b6]",
@@ -81,14 +88,26 @@ function StatCard({
   };
 
   return (
-    <article className="rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm">
+    <article className="relative rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm">
+      {unitBadge ? (
+        <span className="absolute right-4 top-4 rounded-full border border-[#dfe5f0] bg-[#f8fafc] px-2.5 py-1 text-[10px] font-black text-[#526070]">
+          {unitBadge}
+        </span>
+      ) : null}
+      {unitBadge && badge ? (
+        <span
+          className={`absolute right-4 top-12 rounded px-2.5 py-1 text-xs font-bold ${badgeClasses[badgeTone]}`}
+        >
+          {badge}
+        </span>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${accentClasses[accent]}`}
         >
           <Icon className="h-4.5 w-4.5" />
         </span>
-        {badge ? (
+        {badge && !unitBadge ? (
           <span
             className={`rounded px-2.5 py-1 text-xs font-bold ${badgeClasses[badgeTone]}`}
           >
@@ -96,7 +115,7 @@ function StatCard({
           </span>
         ) : null}
       </div>
-      <p className="mt-5 text-xs font-bold uppercase text-[#526070]">{label}</p>
+      <p className={`mt-5 text-xs font-bold uppercase text-[#526070] ${unitBadge ? "pr-28" : ""}`}>{label}</p>
       <div className="mt-2 flex items-baseline gap-1.5 text-[#102039]">
         <span className="text-2xl font-extrabold leading-none">{value}</span>
         {suffix ? <span className="text-sm font-semibold">{suffix}</span> : null}
@@ -466,8 +485,8 @@ export default function DashboardPage() {
         <StatCard
           icon={HandCoins}
           label="Doanh thu tháng"
-          value={loading ? "..." : formatMoney(overview?.currentMonthRevenue)}
-          suffix="VNĐ"
+          value={loading ? "..." : formatThousandMoney(overview?.currentMonthRevenue)}
+          unitBadge="nghìn đồng"
           badge={`${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth}%`}
         />
         <StatCard
@@ -489,8 +508,8 @@ export default function DashboardPage() {
         <StatCard
           icon={AlertTriangle}
           label="Tổng công nợ"
-          value={loading ? "..." : formatNumber(overview?.totalDebtAmount)}
-          suffix="VNĐ"
+          value={loading ? "..." : formatThousandMoney(overview?.totalDebtAmount)}
+          unitBadge="nghìn đồng"
           note={
             debtWarningRoomCount
               ? `${formatNumber(debtWarningRoomCount)} phòng vượt ngưỡng`

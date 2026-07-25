@@ -15,6 +15,7 @@ import {
     Loader2,
     Mail,
     Pencil,
+    Plus,
     Printer,
     RefreshCw,
     Save,
@@ -36,16 +37,15 @@ import {
     uploadSignedLeaseContractFile,
     liquidateLeaseContract,
     recordLeaseContractTenantIntention,
-    renewLeaseContract,
     updateLeaseContractLiquidationDraft,
     updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
 import {
     confirmTransferContract,
-    signTransferContract,
+    signTransferContractDocument,
 } from "@/services/roomTransferService";
 import {sendTenantAccountCredentials} from "@/services/identityAccessService";
-import {fetchContractHandover} from "@/services/contractHandoverService";
+import {fetchContractHandover, fetchLatestReadings} from "@/services/contractHandoverService";
 import ContractActivationFlow from "./ContractActivationFlow";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
@@ -96,6 +96,25 @@ const HISTORY_CONTRACT_WORKFLOWS = new Set([
     "TERMINATION_PENDING",
     "ENDED",
 ]);
+
+const LIQUIDATION_CHARGE_TYPES = [
+    {value: "ELECTRICITY", label: "Tiền điện"},
+    {value: "WATER", label: "Tiền nước"},
+    {value: "SERVICE_FEE", label: "Phí dịch vụ"},
+    {value: "ROOM_RENT", label: "Tiền phòng"},
+    {value: "MAINTENANCE_COMPENSATION", label: "Sửa chữa/bồi thường"},
+    {value: "VIOLATION_FINE", label: "Phạt vi phạm"},
+    {value: "OTHER", label: "Chi phí phát sinh"},
+];
+
+const DEFAULT_LIQUIDATION_CHARGES = [
+    ["ELECTRICITY", "Tiền điện chốt phòng"],
+    ["WATER", "Tiền nước chốt phòng"],
+    ["SERVICE_FEE", "Phí dịch vụ chốt phòng"],
+    ["ROOM_RENT", "Tiền phòng còn thiếu"],
+    ["MAINTENANCE_COMPENSATION", "Sửa chữa/bồi thường"],
+    ["OTHER", "Chi phí phát sinh"],
+];
 
 const ACTIVATION_FLOW_WORKFLOWS = new Set([
     "DRAFT",
@@ -161,9 +180,9 @@ const ROLE_LABELS = {
 };
 
 const TENANT_INTENTION_OPTIONS = [
-    {value: "RENEW", label: "Muốn tái ký / gia hạn"},
+    {value: "RENEW", label: "Muốn gia hạn"},
     {value: "TRANSFER", label: "Muốn chuyển phòng"},
-    {value: "MOVE_OUT", label: "Sẽ chuyển đi / Không tái ký"},
+    {value: "MOVE_OUT", label: "Sẽ chuyển đi / Không gia hạn"},
     {value: "UNDECIDED", label: "Chưa có ý định"},
 ];
 
@@ -255,6 +274,33 @@ function formatOptionalMoney(value) {
     return formatMoney(value);
 }
 
+function getDepositRefundStatusLabel(value) {
+    const map = {
+        PENDING: "Chờ xử lý",
+        WAITING_OWNER_APPROVAL: "Chờ chủ trọ duyệt",
+        APPROVED_WAITING_REFUND: "Đã duyệt, chờ hoàn tiền",
+        RECORDED_BY_MANAGER: "Đã hoàn tiền, chờ khách xác nhận",
+        TENANT_CONFIRMED: "Khách đã xác nhận nhận tiền",
+        DISPUTED: "Khách phản hồi chưa nhận/sai tiền",
+        OWNER_REJECTED: "Chủ trọ từ chối",
+        NOT_REQUIRED: "Không cần hoàn cọc",
+        CANCELLED: "Đã hủy",
+    };
+    return map[value] || value || "Chưa tạo yêu cầu";
+}
+
+function getLiquidationChargeTypeLabel(value) {
+    return LIQUIDATION_CHARGE_TYPES.find((type) => type.value === value)?.label || "Chi phí phát sinh";
+}
+
+function getInvoiceLineAmount(line = {}) {
+    const amount = Number(line.amount);
+    if (Number.isFinite(amount)) return amount;
+    const quantity = Number(line.quantity || 0);
+    const unitPrice = Number(line.unitPrice || 0);
+    return Number.isFinite(quantity) && Number.isFinite(unitPrice) ? quantity * unitPrice : 0;
+}
+
 function getAmountPerPeriod(item) {
     if (
         item?.monthlyRent === null ||
@@ -278,6 +324,20 @@ function toDateInputValue(value) {
     return String(value).slice(0, 10);
 }
 
+function shouldForfeitDepositOnLiquidation(item = {}, liquidationDateValue) {
+    const liquidationDate = toDateInputValue(liquidationDateValue || item.liquidationDate || item.expectedVacantDate);
+    const endDate = toDateInputValue(item.endDate);
+    if (!liquidationDate || !endDate) return false;
+    const liquidation = new Date(`${liquidationDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    if (Number.isNaN(liquidation.getTime()) || Number.isNaN(end.getTime()) || liquidation >= end) {
+        return false;
+    }
+    const refundableFrom = new Date(end);
+    refundableFrom.setMonth(refundableFrom.getMonth() - 1);
+    return liquidation < refundableFrom;
+}
+
 function buildTermsForm(item = {}) {
     return {
         startDate: toDateInputValue(item.startDate),
@@ -293,16 +353,150 @@ function todayInputValue() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 }
 
+function isMeterLiquidationCharge(lineType) {
+    return lineType === "ELECTRICITY" || lineType === "WATER";
+}
+
+function getLiquidationChargeDefaultDescription(lineType) {
+    return DEFAULT_LIQUIDATION_CHARGES.find(([type]) => type === lineType)?.[1] || "Chi phí phát sinh";
+}
+
+function getMeterUsage(charge = {}) {
+    if (!isMeterLiquidationCharge(charge.lineType)) {
+        return Number(charge.quantity || 0);
+    }
+    const previousValue = Number(charge.previousValue || 0);
+    const currentValue = Number(charge.currentValue || 0);
+    if (!Number.isFinite(previousValue) || !Number.isFinite(currentValue)) {
+        return 0;
+    }
+    return Math.max(0, Math.ceil(currentValue - previousValue));
+}
+
+function calculateLiquidationRoomRent(item = {}, liquidationDateValue) {
+    const liquidationDate = toDateInputValue(liquidationDateValue || item.liquidationDate || item.expectedVacantDate);
+    const monthlyRent = Number(item.monthlyRent || 0);
+    if (!liquidationDate || !Number.isFinite(monthlyRent) || monthlyRent <= 0) {
+        return 0;
+    }
+    const liquidation = new Date(`${liquidationDate}T00:00:00`);
+    if (Number.isNaN(liquidation.getTime())) {
+        return 0;
+    }
+    const periodStart = new Date(liquidation.getFullYear(), liquidation.getMonth(), 1);
+    const rentStartValue = toDateInputValue(item.rentStartDate || item.startDate);
+    const rentStart = rentStartValue ? new Date(`${rentStartValue}T00:00:00`) : periodStart;
+    const chargeStart = rentStart > periodStart ? rentStart : periodStart;
+    const endDateValue = toDateInputValue(item.endDate);
+    const endDate = endDateValue ? new Date(`${endDateValue}T00:00:00`) : liquidation;
+    const chargeEnd = endDate < liquidation ? endDate : liquidation;
+    if (chargeEnd < chargeStart) {
+        return 0;
+    }
+    const daysInMonth = new Date(liquidation.getFullYear(), liquidation.getMonth() + 1, 0).getDate();
+    const chargeableDays = chargeEnd.getDate() - chargeStart.getDate() + 1;
+    return Math.ceil((monthlyRent * chargeableDays) / daysInMonth);
+}
+
+function getLiquidationRoomRentDescription(liquidationDateValue) {
+    const liquidationDate = toDateInputValue(liquidationDateValue);
+    if (!liquidationDate) return "Tiền phòng tháng thanh lý";
+    return `Tiền phòng tháng ${liquidationDate.slice(0, 7)} đến ngày ${liquidationDate}`;
+}
+
+function applyAutoLiquidationRoomRent(charges = [], item = {}, liquidationDateValue) {
+    const amount = calculateLiquidationRoomRent(item, liquidationDateValue);
+    const description = getLiquidationRoomRentDescription(liquidationDateValue);
+    return charges.map((charge) =>
+        charge.lineType === "ROOM_RENT"
+            ? {
+                ...charge,
+                description: charge.description || description,
+                quantity: "1",
+                unitPrice: String(amount),
+            }
+            : charge,
+    );
+}
+
+function createLiquidationCharge(lineType = "OTHER", description = "") {
+    const meterCharge = isMeterLiquidationCharge(lineType);
+    return {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        lineType,
+        description: description || getLiquidationChargeDefaultDescription(lineType),
+        previousValue: "0",
+        currentValue: "0",
+        quantity: meterCharge ? "0" : "1",
+        unitPrice: "0",
+    };
+}
+
+function buildLiquidationCharges(item = {}) {
+    const lines = Array.isArray(item.liquidationFinalInvoiceLines)
+        ? item.liquidationFinalInvoiceLines
+        : [];
+    if (lines.length > 0) {
+        return lines.map((line) => ({
+            id: `${line.id || Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            lineType: line.lineType || "OTHER",
+            description: line.description || "",
+            previousValue: "0",
+            currentValue: "0",
+            quantity: line.quantity == null ? "1" : String(line.quantity),
+            unitPrice: line.unitPrice == null ? "0" : String(line.unitPrice),
+        }));
+    }
+    return applyAutoLiquidationRoomRent(
+        DEFAULT_LIQUIDATION_CHARGES.map(([lineType, description]) =>
+            createLiquidationCharge(lineType, description),
+        ),
+        item,
+        item.liquidationDate || item.expectedVacantDate || todayInputValue(),
+    );
+}
+
 function buildLiquidationForm(item = {}) {
+    const subtotal = Number(item.liquidationFinalInvoiceSubtotalAmount ?? 0);
+    const depositAmount = Number(item.liquidationDepositAmount ?? item.depositAmount ?? 0);
+    const safeDepositAmount = Number.isFinite(depositAmount) ? depositAmount : 0;
+    const safeSubtotal = Number.isFinite(subtotal) ? subtotal : 0;
+    const forfeitDeposit = shouldForfeitDepositOnLiquidation(item);
     return {
         liquidationDate: toDateInputValue(item.liquidationDate || item.expectedVacantDate) || todayInputValue(),
         reason: item.liquidationReason || item.intentionNote || "",
-        depositDeductionAmount:
-            item.liquidationDepositDeductionAmount == null
-                ? "0"
-                : String(item.liquidationDepositDeductionAmount),
+        depositDeductionAmount: String(forfeitDeposit ? safeDepositAmount : Math.min(safeDepositAmount, safeSubtotal)),
         depositDeductionReason: item.liquidationDepositDeductionReason || "",
+        charges: buildLiquidationCharges(item),
     };
+}
+
+function normalizeLiquidationCharges(charges = []) {
+    return charges
+        .map((charge) => {
+            const rawQuantity = isMeterLiquidationCharge(charge.lineType)
+                ? getMeterUsage(charge)
+                : Number(charge.quantity || 0);
+            const unitPrice = Number(charge.unitPrice || 0);
+            const quantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : 0;
+            const description = String(charge.description || getLiquidationChargeDefaultDescription(charge.lineType)).trim();
+            return {
+                lineType: charge.lineType || "OTHER",
+                description: isMeterLiquidationCharge(charge.lineType)
+                    ? `${description}: ${charge.previousValue || 0} -> ${charge.currentValue || 0}`
+                    : description,
+                quantity,
+                unitPrice: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0,
+            };
+        })
+        .filter((charge) => charge.quantity > 0 && charge.unitPrice > 0);
+}
+
+function getLiquidationChargeSubtotal(charges = []) {
+    return normalizeLiquidationCharges(charges).reduce(
+        (total, charge) => total + charge.quantity * charge.unitPrice,
+        0,
+    );
 }
 
 function addDays(value, days) {
@@ -322,26 +516,6 @@ function addYearsMinusOneDay(value, years) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function getNextRenewalContractCode(item = {}) {
-    let rootContractCode = String(item.contractCode || item.displayCode || "").trim();
-    const renewalSuffixes = [];
-
-    while (/-R(\d+)$/.test(rootContractCode)) {
-        renewalSuffixes.unshift(Number(rootContractCode.match(/-R(\d+)$/)?.[1]));
-        rootContractCode = rootContractCode.replace(/-R\d+$/, "");
-    }
-
-    const lastSuffix = renewalSuffixes.at(-1);
-    let renewalNumber = 1;
-    if (renewalSuffixes.length === 1 && lastSuffix < 1900) {
-        renewalNumber = lastSuffix + 1;
-    } else if (renewalSuffixes.length > 0) {
-        renewalNumber = renewalSuffixes.length + 1;
-    }
-
-    return rootContractCode ? `${rootContractCode}-R${renewalNumber}` : "";
-}
-
 function getContractDisplayName(item = {}) {
     return item.contractCode || item.displayCode || item.code || "Chưa tạo HĐ";
 }
@@ -351,15 +525,14 @@ function withoutPdfExtension(value = "") {
 }
 
 function buildRenewForm(item = {}) {
-    const newStartDate = addDays(item.endDate, 1);
+    const currentEndDate = toDateInputValue(item.endDate);
     return {
-        newContractCode: getNextRenewalContractCode(item),
-        newStartDate,
-        newEndDate: addYearsMinusOneDay(newStartDate, 1),
+        startDate: toDateInputValue(item.startDate),
+        currentEndDate,
+        endDate: addYearsMinusOneDay(addDays(currentEndDate, 1), 1) || currentEndDate,
         monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
         paymentCycleMonths: String(item.paymentCycleMonths || 1),
         depositAmount: item.depositAmount == null ? "0" : String(item.depositAmount),
-        note: "",
     };
 }
 
@@ -413,6 +586,10 @@ function getOccupantsCount(item, details) {
 
 function getWorkflow(item) {
     const contractStatus = item?.status || item?.contractStatus;
+    const renewalContract = isRenewalContract(item);
+    if (renewalContract && ["DRAFT", "PENDING_SIGNATURE"].includes(contractStatus)) {
+        return contractStatus;
+    }
     if ([
         "ACTIVE",
         "EXPIRING_SOON",
@@ -423,10 +600,15 @@ function getWorkflow(item) {
         "TRANSFERRED",
         "CANCELLED",
         "AUTO_TERMINATED",
+        "DRAFT",
+        "PENDING_SIGNATURE",
     ].includes(contractStatus)) {
         return contractStatus;
     }
     const status = item?.workflowStatus || item?.depositStatus;
+    if (renewalContract && ["MISSING_FILE", "PENDING_ACTIVATION"].includes(status)) {
+        return "PENDING_SIGNATURE";
+    }
     if (status === "ACTIVE") return "ACTIVE";
     if (item?.leaseContractId && getLeaseSignedFileId(item)) return "PENDING_ACTIVATION";
     if (item?.leaseContractId && !getLeaseSignedFileId(item)) return "MISSING_FILE";
@@ -519,6 +701,17 @@ function getTransferStatusLabel(status) {
     return TRANSFER_STATUS_LABELS[status] || status || "Chưa rõ";
 }
 
+function getTransferContractStatusLabel(item = {}) {
+    const status = item?.transferStatus;
+    if (isTransferSigningStatus(status) && item?.status === "SIGNED") {
+        return "Đã xác nhận ký, chờ đủ bộ";
+    }
+    if (isTransferSigningStatus(status) && getLeaseSignedFileId(item)) {
+        return "Đã upload bản ký, chờ xác nhận đủ bộ";
+    }
+    return getTransferStatusLabel(status);
+}
+
 function isRenewalContract(item) {
     return Boolean(item?.previousContractId ?? item?.previous_contract_id);
 }
@@ -536,6 +729,7 @@ function getLeaseSignedFileId(item = {}) {
 function needsActivationFlow(item) {
     if (!item) return false;
     if (isRoomTransferManagedContract(item)) return false;
+    if (isRenewalContract(item)) return false;
     if (!item.leaseContractId && item.depositAgreementId) return true;
     if (!item.leaseContractId) return false;
     return ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item));
@@ -546,7 +740,10 @@ function getTransferContractNotice(item) {
     const requestedDate = formatDate(item.transferRequestedDate);
     const code = item.transferRequestCode || `#${item.transferRequestId}`;
     if (isTransferSigningStatus(item.transferStatus)) {
-        return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Quản lý có thể upload bản đã ký và xác nhận ngay trong màn hợp đồng này.`;
+        if (getLeaseSignedFileId(item)) {
+            return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Bản đã ký của hợp đồng này đã được upload; bước xác nhận đủ bộ thực hiện ở chi tiết yêu cầu chuyển phòng.`;
+        }
+        return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Quản lý có thể upload bản đã ký của riêng hợp đồng này tại đây.`;
     }
     if (item.transferStatus === "WAITING_TRANSFER_DATE") {
         return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; có thể bấm Chốt phòng cũ ngay trong màn hợp đồng khi tenant và quản lý có mặt thực tế.`;
@@ -595,39 +792,6 @@ function getStatusLabel(item) {
     return WORKFLOW_LABELS[workflow] || STATUS_LABELS[item?.status] || "Chờ xử lý";
 }
 
-function FileBadge({item}) {
-    const workflow = getWorkflow(item);
-    const leaseUploaded = Boolean(getLeaseSignedFileId(item));
-    const requiresMoveInHandover =
-        !item?.previousContractId && !item?.transferRequestId;
-    const activeDossierComplete =
-        workflow === "ACTIVE" &&
-        (!requiresMoveInHandover || Boolean(item?.handoverSignedFileId));
-    const complete = workflow === "ACTIVE" ? activeDossierComplete : leaseUploaded;
-    const label =
-        workflow === "ACTIVE"
-            ? activeDossierComplete
-                ? "Đủ hồ sơ"
-                : "Chưa có biên bản ký"
-            : leaseUploaded
-                ? "Đã upload"
-                : "Chưa upload";
-    const Icon = complete ? FileCheck2 : FileWarning;
-
-    return (
-        <span
-            className={`inline-flex max-w-full items-center justify-center gap-1 rounded-full border px-2 py-1.5 text-center text-[11px] font-bold leading-tight xl:px-3 xl:py-2 xl:text-xs ${
-                complete
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
-                    : "border-amber-200 bg-amber-50 text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300"
-            }`}
-        >
-      <Icon className="h-3.5 w-3.5 shrink-0"/>
-            {label}
-    </span>
-    );
-}
-
 function StatusBadge({item}) {
     const workflow = getWorkflow(item);
     const label = getStatusLabel(item);
@@ -658,7 +822,7 @@ function StatusBadge({item}) {
             }`}
         >
       <Icon className="h-3.5 w-3.5 shrink-0"/>
-            {label}
+            <span className="whitespace-nowrap">{label}</span>
     </span>
     );
 }
@@ -703,6 +867,239 @@ function InfoValue({label, value}) {
         <div>
             <p className="text-xs font-semibold text-[#6b7280] xl:text-sm">{label}</p>
             <p className="mt-1 break-words text-sm font-bold text-[#091426] xl:text-base">{value || "Chưa có"}</p>
+        </div>
+    );
+}
+
+function LiquidationInvoiceLines({lines = []}) {
+    if (!lines.length) {
+        return (
+            <p className="rounded-lg border border-dashed border-[#dfe5ef] bg-white px-4 py-3 text-sm font-semibold text-[#607089]">
+                Chưa có khoản thanh lý nào.
+            </p>
+        );
+    }
+
+    const electricityLines = lines.filter((line) => line.lineType === "ELECTRICITY");
+    const waterLines = lines.filter((line) => line.lineType === "WATER");
+    const otherLines = lines.filter((line) => !isMeterLiquidationCharge(line.lineType));
+    const renderLines = (items) => (
+        <table className="w-full table-auto text-left">
+            <thead className="bg-[#f7f9fe] text-[11px] font-bold uppercase tracking-[0.04em] text-[#6b7280] xl:text-xs">
+            <tr>
+                <th className="px-4 py-3">Loại phí</th>
+                <th className="px-4 py-3">Diễn giải</th>
+                <th className="px-4 py-3 text-right">SL</th>
+                <th className="px-4 py-3 text-right">Đơn giá</th>
+                <th className="px-4 py-3 text-right">Thành tiền</th>
+            </tr>
+            </thead>
+            <tbody>
+            {items.map((line) => (
+                <tr key={line.id || `${line.lineType}-${line.description}`} className="border-t border-[#edf1f6]">
+                    <td className="px-4 py-3 text-sm font-bold text-[#091426]">{getLiquidationChargeTypeLabel(line.lineType)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-[#091426]">{line.description || "Chưa có"}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{line.quantity ?? 1}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{formatOptionalMoney(line.unitPrice)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-extrabold text-[#091426]">{formatMoney(getInvoiceLineAmount(line))}</td>
+                </tr>
+            ))}
+            </tbody>
+        </table>
+    );
+
+    return (
+        <div className="grid gap-3">
+            {electricityLines.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-[#dfe5ef] bg-white">
+                    <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
+                        Chốt điện
+                    </p>
+                    {renderLines(electricityLines)}
+                </div>
+            )}
+            {waterLines.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-[#dfe5ef] bg-white">
+                    <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
+                        Chốt nước
+                    </p>
+                    {renderLines(waterLines)}
+                </div>
+            )}
+            {otherLines.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-[#dfe5ef] bg-white">
+                    <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
+                        Chi phí khác
+                    </p>
+                    {renderLines(otherLines)}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function LiquidationChargeRows({charges = [], onAdd, onChange, onRemove}) {
+    const electricityCharges = charges
+        .map((charge, index) => ({charge, index}))
+        .filter(({charge}) => charge.lineType === "ELECTRICITY");
+    const waterCharges = charges
+        .map((charge, index) => ({charge, index}))
+        .filter(({charge}) => charge.lineType === "WATER");
+    const otherCharges = charges
+        .map((charge, index) => ({charge, index}))
+        .filter(({charge}) => !isMeterLiquidationCharge(charge.lineType));
+    const renderChargeRow = (charge, index) => (
+        <div
+            key={charge.id || index}
+            className={`grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 ${
+                isMeterLiquidationCharge(charge.lineType)
+                    ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.4fr)_110px_110px_90px_140px_auto]"
+                    : "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.4fr)_120px_140px_auto]"
+            }`}
+        >
+            <label className="grid min-w-0 gap-1.5">
+                <span className="text-[11px] font-bold text-[#58667c]">Loại phí</span>
+                <select
+                    value={charge.lineType}
+                    onChange={(event) => onChange(index, "lineType", event.target.value)}
+                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                >
+                    {LIQUIDATION_CHARGE_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                </select>
+            </label>
+            <label className="grid min-w-0 gap-1.5">
+                <span className="text-[11px] font-bold text-[#58667c]">Diễn giải</span>
+                <input
+                    value={charge.description}
+                    onChange={(event) => onChange(index, "description", event.target.value)}
+                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                />
+            </label>
+            {isMeterLiquidationCharge(charge.lineType) ? (
+                <>
+                    <label className="grid min-w-0 gap-1.5">
+                        <span className="text-[11px] font-bold text-[#58667c]">Chỉ số cũ</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={charge.previousValue}
+                            onChange={(event) => onChange(index, "previousValue", event.target.value)}
+                            className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                        />
+                    </label>
+                    <label className="grid min-w-0 gap-1.5">
+                        <span className="text-[11px] font-bold text-[#58667c]">Chỉ số mới</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={charge.currentValue}
+                            onChange={(event) => onChange(index, "currentValue", event.target.value)}
+                            className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+                        />
+                    </label>
+                    <div className="grid min-w-0 gap-1.5">
+                        <span className="text-[11px] font-bold text-[#58667c]">Sản lượng</span>
+                        <div
+                            className="h-10 rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#091426]">
+                            {getMeterUsage(charge)}
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <label className="grid min-w-0 gap-1.5">
+                    <span className="text-[11px] font-bold text-[#58667c]">Số lượng</span>
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={charge.quantity}
+                        disabled={charge.lineType === "ROOM_RENT"}
+                        onChange={(event) => onChange(index, "quantity", event.target.value)}
+                        className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
+                    />
+                </label>
+            )}
+            <label className="grid min-w-0 gap-1.5">
+                <span className="text-[11px] font-bold text-[#58667c]">Đơn giá</span>
+                <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={charge.unitPrice}
+                    disabled={charge.lineType === "ROOM_RENT"}
+                    onChange={(event) => onChange(index, "unitPrice", event.target.value)}
+                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
+                />
+            </label>
+            <div className="flex items-end justify-end">
+                <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-red-600 hover:bg-red-50"
+                >
+                    <X className="h-3.5 w-3.5"/>
+                    Xóa
+                </button>
+            </div>
+        </div>
+    );
+
+    if (!charges.length) {
+        return (
+            <div className="grid gap-3 rounded-lg border border-dashed border-[#dfe5ef] bg-white p-3 sm:col-span-2">
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chi phí khác</p>
+                    <button
+                        type="button"
+                        onClick={onAdd}
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc]"
+                    >
+                        <Plus className="h-3.5 w-3.5"/>
+                        Thêm dòng
+                    </button>
+                </div>
+                <p className="text-sm font-semibold text-[#607089]">Chưa có khoản thanh lý nào.</p>
+            </div>
+        );
+    }
+    return (
+        <div className="grid gap-3 sm:col-span-2">
+            {electricityCharges.length > 0 && (
+                <div className="grid gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chốt điện</p>
+                    {electricityCharges.map(({charge, index}) => renderChargeRow(charge, index))}
+                </div>
+            )}
+            {waterCharges.length > 0 && (
+                <div className="grid gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chốt nước</p>
+                    {waterCharges.map(({charge, index}) => renderChargeRow(charge, index))}
+                </div>
+            )}
+            <div className="grid gap-3">
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chi phí khác</p>
+                    <button
+                        type="button"
+                        onClick={onAdd}
+                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc]"
+                    >
+                        <Plus className="h-3.5 w-3.5"/>
+                        Thêm dòng
+                    </button>
+                </div>
+                {otherCharges.length > 0 ? (
+                    otherCharges.map(({charge, index}) => renderChargeRow(charge, index))
+                ) : (
+                    <p className="rounded-lg border border-dashed border-[#dfe5ef] bg-white px-4 py-3 text-sm font-semibold text-[#607089]">
+                        Chưa có chi phí khác.
+                    </p>
+                )}
+            </div>
         </div>
     );
 }
@@ -921,9 +1318,9 @@ export default function ContractTemplatePage() {
             contractFileId: details.contractFile?.id || selected.contractFileId,
             contractFileName: details.contractFile?.fileName || selected.contractFileName,
             contractFileUploadedAt: details.contractFile?.uploadedAt || selected.contractFileUploadedAt,
-            signedFileId: details.signedFile?.id || details.signedFileId || selected.signedFileId,
-            signedFileName: details.signedFile?.fileName || details.signedFileName || selected.signedFileName,
-            signedFileUploadedAt: details.signedFile?.uploadedAt || details.signedFileUploadedAt || selected.signedFileUploadedAt,
+            signedFileId: details.signedFile?.id ?? details.signedFileId ?? selected.signedFileId,
+            signedFileName: details.signedFile?.fileName ?? details.signedFileName ?? selected.signedFileName,
+            signedFileUploadedAt: details.signedFile?.uploadedAt ?? details.signedFileUploadedAt ?? selected.signedFileUploadedAt,
             propertyName: details.property?.name || selected.propertyName,
             tenantId: details.tenantId || selected.tenantId || null,
             roomCode: details.room?.roomCode || selected.roomCode,
@@ -949,10 +1346,37 @@ export default function ContractTemplatePage() {
         };
     }, [details, selected]);
 
+    const liquidationDraftCharges = useMemo(
+        () => liquidationForm.charges || [],
+        [liquidationForm.charges],
+    );
+    const liquidationDraftSubtotal = useMemo(
+        () => getLiquidationChargeSubtotal(liquidationDraftCharges),
+        [liquidationDraftCharges],
+    );
+    const liquidationDraftDeposit = Number(
+        mergedSelected?.liquidationDepositAmount ?? mergedSelected?.depositAmount ?? 0,
+    );
+    const safeLiquidationDraftDeposit = Number.isFinite(liquidationDraftDeposit) ? liquidationDraftDeposit : 0;
+    const liquidationDraftDepositForfeited = shouldForfeitDepositOnLiquidation(
+        mergedSelected || {},
+        liquidationForm.liquidationDate,
+    );
+    const liquidationDraftDeduction = Math.min(
+        safeLiquidationDraftDeposit,
+        liquidationDraftDepositForfeited ? safeLiquidationDraftDeposit : liquidationDraftSubtotal,
+    );
+    const liquidationDraftRemainingDeposit = Math.max(0, liquidationDraftDeposit - liquidationDraftDeduction);
+    const liquidationDraftRemainingPayable = Math.max(0, liquidationDraftSubtotal - liquidationDraftDeduction);
+
     const selectedLeaseContractFilename = useMemo(() => {
         if (!mergedSelected?.leaseContractId && !mergedSelected?.contractId) return "";
         return buildLeaseContractDocumentFilename(mergedSelected);
     }, [mergedSelected]);
+    const selectedSignedLeaseContractFilename = useMemo(() => {
+        if (!getLeaseSignedFileId(mergedSelected)) return "";
+        return mergedSelected?.signedFileName || selectedLeaseContractFilename;
+    }, [mergedSelected, selectedLeaseContractFilename]);
     const selectedContractDisplayName = mergedSelected ? getContractDisplayName(mergedSelected) : "";
     const selectedDetailTitle = selectedLeaseContractFilename
         ? withoutPdfExtension(selectedLeaseContractFilename)
@@ -1091,12 +1515,33 @@ export default function ContractTemplatePage() {
             const refreshedItem = refreshedContracts.find(
                 (item) => String(item.leaseContractId) === String(uploadedContractId),
             );
-            setSelected((current) => ({...current, ...updated, ...refreshedItem}));
+            setSelected((current) => {
+                const merged = {...current, ...refreshedItem, ...updated};
+                return {
+                    ...merged,
+                    signedFileId: updated.signedFileId ?? refreshedItem?.signedFileId ?? current?.signedFileId ?? merged.signedFileId,
+                    signedFileName: updated.signedFileName ?? refreshedItem?.signedFileName ?? current?.signedFileName ?? merged.signedFileName,
+                    signedFileUploadedAt:
+                        updated.signedFileUploadedAt ??
+                        refreshedItem?.signedFileUploadedAt ??
+                        current?.signedFileUploadedAt ??
+                        merged.signedFileUploadedAt,
+                };
+            });
 
             if (uploadedContractId) {
                 const refreshedDetails = await fetchManagementLeaseContractDetails(uploadedContractId);
-                setDetails(refreshedDetails);
-                setTermsForm(buildTermsForm(refreshedDetails));
+                const mergedDetails = {
+                    ...refreshedDetails,
+                    signedFileId: refreshedDetails.signedFileId ?? updated.signedFileId ?? refreshedItem?.signedFileId,
+                    signedFileName: refreshedDetails.signedFileName ?? updated.signedFileName ?? refreshedItem?.signedFileName,
+                    signedFileUploadedAt:
+                        refreshedDetails.signedFileUploadedAt ??
+                        updated.signedFileUploadedAt ??
+                        refreshedItem?.signedFileUploadedAt,
+                };
+                setDetails(mergedDetails);
+                setTermsForm(buildTermsForm(mergedDetails));
             }
         } catch (err) {
             setError(err?.message || "Không upload được file hợp đồng.");
@@ -1241,44 +1686,6 @@ export default function ContractTemplatePage() {
         }
     }
 
-    async function handleConfirmTransferSigned(item) {
-        if (!item?.transferRequestId) return;
-        if (!isTransferSigningStatus(item.transferStatus)) {
-            toast.info("Hợp đồng chuyển phòng đã qua bước xác nhận ký.");
-            return;
-        }
-        if (!getLeaseSignedFileId(item)) {
-            window.alert("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
-            return;
-        }
-
-        setActionLoading(`transfer-sign-${item.transferRequestId}`);
-        setError("");
-        try {
-            await signTransferContract(item.transferRequestId);
-            const refreshedContracts = await loadContracts();
-            const refreshedItem = refreshedContracts.find(
-                (contract) => String(contract.leaseContractId) === String(item.leaseContractId),
-            );
-            if (refreshedItem) {
-                setSelected((current) =>
-                    String(current?.leaseContractId) === String(item.leaseContractId)
-                        ? {...current, ...refreshedItem}
-                        : refreshedItem,
-                );
-            }
-            const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
-            setDetails(refreshedDetails);
-            setTermsForm(buildTermsForm(refreshedDetails));
-            toast.success("Đã xác nhận hợp đồng chuyển phòng đã ký đủ.");
-        } catch (err) {
-            setError(err?.message || "Không xác nhận được hợp đồng chuyển phòng đã ký.");
-            toast.error(err?.message || "Không xác nhận được hợp đồng chuyển phòng đã ký.");
-        } finally {
-            setActionLoading("");
-        }
-    }
-
     async function handleDownloadTransferDraft(item) {
         if (!item?.leaseContractId) return;
 
@@ -1293,6 +1700,48 @@ export default function ContractTemplatePage() {
         } catch (err) {
             setError(err?.message || "Không tải được hợp đồng chuyển phòng.");
             toast.error(err?.message || "Không tải được hợp đồng chuyển phòng.");
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    async function handleConfirmTransferDocumentSigned(item) {
+        if (!item?.transferRequestId || !item?.leaseContractId) return;
+        if (!isTransferSigningStatus(item.transferStatus)) {
+            toast.info("Hợp đồng chuyển phòng đã qua bước xác nhận ký.");
+            return;
+        }
+        if (item.status === "SIGNED") {
+            toast.info("Hợp đồng này đã được xác nhận ký.");
+            return;
+        }
+        if (!getLeaseSignedFileId(item)) {
+            toast.warning("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
+            return;
+        }
+
+        setActionLoading(`transfer-contract-sign-${item.leaseContractId}`);
+        setError("");
+        try {
+            await signTransferContractDocument(item.transferRequestId, item.leaseContractId);
+            const refreshedContracts = await loadContracts();
+            const refreshedItem = refreshedContracts.find(
+                (contract) => String(contract.leaseContractId) === String(item.leaseContractId),
+            );
+            if (refreshedItem) {
+                setSelected((current) =>
+                    String(current?.leaseContractId) === String(item.leaseContractId)
+                        ? {...current, ...refreshedItem}
+                        : refreshedItem,
+                );
+            }
+            const refreshedDetails = await fetchManagementLeaseContractDetails(item.leaseContractId);
+            setDetails(refreshedDetails);
+            setTermsForm(buildTermsForm(refreshedDetails));
+            toast.success("Đã xác nhận hợp đồng này đã ký.");
+        } catch (err) {
+            setError(err?.message || "Không xác nhận được hợp đồng đã ký.");
+            toast.error(err?.message || "Không xác nhận được hợp đồng đã ký.");
         } finally {
             setActionLoading("");
         }
@@ -1479,15 +1928,62 @@ export default function ContractTemplatePage() {
         }
     }
 
-    async function handleLiquidate(item) {
-        if (!item?.leaseContractId) return;
-        const deductionAmount = Number(liquidationForm.depositDeductionAmount || 0);
-        if (!Number.isFinite(deductionAmount) || deductionAmount < 0) {
-            setLiquidationError("Số tiền khấu trừ không hợp lệ.");
+    async function openLiquidationEditor(item) {
+        const initialForm = buildLiquidationForm(item);
+        setLiquidationForm(initialForm);
+        setLiquidationError("");
+        setIsEditingLiquidation(true);
+
+        if (!item?.roomId || (item.liquidationFinalInvoiceLines || []).length > 0) {
             return;
         }
-        if (deductionAmount > Number(item.depositAmount || 0)) {
-            setLiquidationError("Số tiền khấu trừ không được lớn hơn tiền cọc.");
+
+        try {
+            const latestReadings = await fetchLatestReadings(item.roomId);
+            setLiquidationForm((current) => ({
+                ...current,
+                charges: (current.charges || []).map((charge) => {
+                    if (!isMeterLiquidationCharge(charge.lineType)) return charge;
+                    const key = charge.lineType === "ELECTRICITY" ? "electricity" : "water";
+                    const reading = latestReadings?.[key] || {};
+                    const suggestedValue =
+                        reading.suggestedValue ??
+                        reading.suggested_value ??
+                        reading.previousValue ??
+                        reading.previous_value ??
+                        0;
+                    return {
+                        ...charge,
+                        previousValue: String(suggestedValue ?? 0),
+                        currentValue: String(suggestedValue ?? 0),
+                    };
+                }),
+            }));
+        } catch (err) {
+            setLiquidationForm((current) => ({
+                ...current,
+                charges: (current.charges || []).map((charge) =>
+                    isMeterLiquidationCharge(charge.lineType)
+                        ? {
+                            ...charge,
+                            previousValue: charge.previousValue || "0",
+                            currentValue: charge.currentValue || "0"
+                        }
+                        : charge,
+                ),
+            }));
+        }
+    }
+
+    async function handleLiquidate(item) {
+        if (!item?.leaseContractId) return;
+        if (!item.liquidationFinalInvoiceId) {
+            await openLiquidationEditor(item);
+            setLiquidationError("Vui lòng nhập và lưu hồ sơ thanh lý trước khi hoàn tất.");
+            return;
+        }
+        const payload = buildLiquidationPayload(item);
+        if (!payload) {
             return;
         }
         const confirmed = window.confirm("Bạn chắc chắn muốn hoàn tất thanh lý hợp đồng này?");
@@ -1496,12 +1992,7 @@ export default function ContractTemplatePage() {
         setError("");
         setLiquidationError("");
         try {
-            const updated = await liquidateLeaseContract(item.leaseContractId, {
-                liquidationDate: liquidationForm.liquidationDate,
-                reason: liquidationForm.reason,
-                depositDeductionAmount: deductionAmount,
-                depositDeductionReason: liquidationForm.depositDeductionReason,
-            });
+            const updated = await liquidateLeaseContract(item.leaseContractId, payload);
             await refreshSelectedContract(updated);
             setIsEditingLiquidation(false);
             toast.success("Đã hoàn tất thanh lý hợp đồng.");
@@ -1515,23 +2006,100 @@ export default function ContractTemplatePage() {
     }
 
     function updateLiquidationField(field, value) {
-        setLiquidationForm((current) => ({...current, [field]: value}));
+        setLiquidationForm((current) => {
+            const next = {...current, [field]: value};
+            if (field === "liquidationDate") {
+                next.charges = applyAutoLiquidationRoomRent(
+                    current.charges || [],
+                    mergedSelected || {},
+                    value,
+                );
+            }
+            return next;
+        });
         if (liquidationError) setLiquidationError("");
+    }
+
+    function updateLiquidationCharge(index, field, value) {
+        setLiquidationForm((current) => ({
+            ...current,
+            charges: (current.charges || []).map((charge, chargeIndex) => {
+                if (chargeIndex !== index) return charge;
+                const next = {...charge, [field]: value};
+                if (field === "lineType") {
+                    const meterCharge = isMeterLiquidationCharge(value);
+                    next.description = getLiquidationChargeDefaultDescription(value);
+                    next.unitPrice = next.unitPrice || "0";
+                    next.quantity = meterCharge ? "0" : next.quantity || "1";
+                    next.previousValue = meterCharge ? (next.previousValue || "0") : "0";
+                    next.currentValue = meterCharge ? (next.currentValue || "0") : "0";
+                    if (value === "ROOM_RENT") {
+                        next.description = getLiquidationRoomRentDescription(current.liquidationDate);
+                        next.quantity = "1";
+                        next.unitPrice = String(calculateLiquidationRoomRent(mergedSelected || {}, current.liquidationDate));
+                    }
+                }
+                return next;
+            }),
+        }));
+        if (liquidationError) setLiquidationError("");
+    }
+
+    function addLiquidationCharge() {
+        setLiquidationForm((current) => ({
+            ...current,
+            charges: [...(current.charges || []), createLiquidationCharge()],
+        }));
+    }
+
+    function removeLiquidationCharge(index) {
+        setLiquidationForm((current) => ({
+            ...current,
+            charges: (current.charges || []).filter((_, chargeIndex) => chargeIndex !== index),
+        }));
+    }
+
+    function buildLiquidationPayload(item) {
+        const depositAmount = Number(item.liquidationDepositAmount ?? item.depositAmount ?? 0);
+        const charges = normalizeLiquidationCharges(liquidationForm.charges);
+        const subtotal = charges.reduce((total, charge) => total + charge.quantity * charge.unitPrice, 0);
+        const safeDepositAmount = Number.isFinite(depositAmount) ? depositAmount : 0;
+        const deductionAmount = shouldForfeitDepositOnLiquidation(item, liquidationForm.liquidationDate)
+            ? safeDepositAmount
+            : Math.min(safeDepositAmount, subtotal);
+        if (!liquidationForm.liquidationDate) {
+            setLiquidationError("Vui lòng chọn ngày thanh lý.");
+            return null;
+        }
+        for (const charge of liquidationForm.charges || []) {
+            const quantity = isMeterLiquidationCharge(charge.lineType)
+                ? getMeterUsage(charge)
+                : Number(charge.quantity || 0);
+            const unitPrice = Number(charge.unitPrice || 0);
+            if (
+                !Number.isFinite(quantity) ||
+                quantity < 0 ||
+                !Number.isFinite(unitPrice) ||
+                unitPrice < 0 ||
+                (unitPrice > 0 && quantity <= 0)
+            ) {
+                setLiquidationError("Vui lòng kiểm tra số lượng và đơn giá các khoản thanh lý.");
+                return null;
+            }
+        }
+        return {
+            liquidationDate: liquidationForm.liquidationDate,
+            reason: liquidationForm.reason,
+            depositDeductionAmount: deductionAmount,
+            depositDeductionReason: liquidationForm.depositDeductionReason,
+            charges,
+        };
     }
 
     async function handleSaveLiquidationDraft(item) {
         if (!item?.leaseContractId) return;
-        const deductionAmount = Number(liquidationForm.depositDeductionAmount || 0);
-        if (!liquidationForm.liquidationDate) {
-            setLiquidationError("Vui lòng chọn ngày thanh lý.");
-            return;
-        }
-        if (!Number.isFinite(deductionAmount) || deductionAmount < 0) {
-            setLiquidationError("Số tiền khấu trừ không hợp lệ.");
-            return;
-        }
-        if (deductionAmount > Number(item.depositAmount || 0)) {
-            setLiquidationError("Số tiền khấu trừ không được lớn hơn tiền cọc.");
+        const payload = buildLiquidationPayload(item);
+        if (!payload) {
             return;
         }
 
@@ -1539,12 +2107,7 @@ export default function ContractTemplatePage() {
         setLiquidationError("");
         setError("");
         try {
-            const updated = await updateLeaseContractLiquidationDraft(item.leaseContractId, {
-                liquidationDate: liquidationForm.liquidationDate,
-                reason: liquidationForm.reason,
-                depositDeductionAmount: deductionAmount,
-                depositDeductionReason: liquidationForm.depositDeductionReason,
-            });
+            const updated = await updateLeaseContractLiquidationDraft(item.leaseContractId, payload);
             await refreshSelectedContract(updated);
             setIsEditingLiquidation(false);
             toast.success("Đã lưu hồ sơ thanh lý.");
@@ -1565,11 +2128,7 @@ export default function ContractTemplatePage() {
 
     function updateRenewField(field, value) {
         setRenewForm((current) => {
-            const next = {...current, [field]: value};
-            if (field === "newStartDate") {
-                next.newEndDate = addYearsMinusOneDay(value, 1);
-            }
-            return next;
+            return {...current, [field]: value};
         });
         setRenewFieldErrors((current) => {
             if (!current[field]) return current;
@@ -1586,17 +2145,18 @@ export default function ContractTemplatePage() {
         const paymentCycleMonths = Number(renewForm.paymentCycleMonths);
         const depositAmount = Number(renewForm.depositAmount);
         const validationErrors = {};
+        const startDate = renewForm.startDate || toDateInputValue(mergedSelected.startDate);
+        const currentEndDate = renewForm.currentEndDate || toDateInputValue(mergedSelected.endDate);
 
-        if (!renewForm.newContractCode.trim()) {
-            validationErrors.newContractCode = "Vui lòng nhập mã hợp đồng mới.";
+        if (!startDate) {
+            validationErrors.startDate = "Hợp đồng chưa có ngày bắt đầu.";
         }
-        if (!renewForm.newStartDate) {
-            validationErrors.newStartDate = "Vui lòng chọn ngày bắt đầu mới.";
-        }
-        if (!renewForm.newEndDate) {
-            validationErrors.newEndDate = "Vui lòng chọn ngày kết thúc mới.";
-        } else if (renewForm.newStartDate && renewForm.newEndDate <= renewForm.newStartDate) {
-            validationErrors.newEndDate = "Ngày kết thúc phải sau ngày bắt đầu.";
+        if (!renewForm.endDate) {
+            validationErrors.endDate = "Vui lòng chọn ngày kết thúc sau gia hạn.";
+        } else if (startDate && renewForm.endDate <= startDate) {
+            validationErrors.endDate = "Ngày kết thúc phải sau ngày bắt đầu hợp đồng.";
+        } else if (currentEndDate && renewForm.endDate <= currentEndDate) {
+            validationErrors.endDate = "Ngày kết thúc sau gia hạn phải sau ngày kết thúc hiện tại.";
         }
         if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) {
             validationErrors.monthlyRent = "Giá thuê phải lớn hơn 0.";
@@ -1609,7 +2169,7 @@ export default function ContractTemplatePage() {
         }
         if (Object.keys(validationErrors).length > 0) {
             setRenewFieldErrors(validationErrors);
-            setRenewError("Vui lòng kiểm tra thông tin hợp đồng mới.");
+            setRenewError("Vui lòng kiểm tra thông tin gia hạn.");
             return;
         }
 
@@ -1617,30 +2177,35 @@ export default function ContractTemplatePage() {
         setRenewError("");
         setError("");
         try {
-            const renewal = await renewLeaseContract(mergedSelected.leaseContractId, {
-                ...renewForm,
+            const updated = await updateLeaseContractTerms(mergedSelected.leaseContractId, {
+                startDate,
+                endDate: renewForm.endDate,
                 monthlyRent,
                 paymentCycleMonths,
                 depositAmount,
             });
             setRenewModalOpen(false);
-            const refreshedContracts = await loadContracts();
-            const newContractId = renewal?.newContractId ?? renewal?.new_contract_id;
-            const newContract = refreshedContracts.find(
-                (item) => String(item.leaseContractId) === String(newContractId),
-            );
-            const refreshedDetails = await fetchManagementLeaseContractDetails(newContractId);
-            setDetails(refreshedDetails);
-            setSelected(newContract || {
-                leaseContractId: newContractId,
-                contractId: newContractId,
-                contractCode: renewal?.newContractCode ?? renewal?.new_contract_code,
-                displayCode: renewal?.newContractCode ?? renewal?.new_contract_code,
-                status: renewal?.newContractStatus ?? renewal?.new_contract_status,
-                contractStatus: renewal?.newContractStatus ?? renewal?.new_contract_status,
-            });
+            await refreshSelectedContract(updated);
+            toast.success("Đã gia hạn hợp đồng.");
         } catch (err) {
-            setRenewError(err?.details || err?.message || "Không thể tái ký hợp đồng.");
+            const serverErrors =
+                err?.payload?.data?.fieldErrors ||
+                err?.payload?.data?.field_errors ||
+                {};
+            setRenewFieldErrors({
+                startDate: serverErrors.startDate || serverErrors.start_date,
+                endDate: serverErrors.endDate || serverErrors.end_date,
+                paymentCycleMonths:
+                    serverErrors.paymentCycleMonths || serverErrors.payment_cycle_months,
+                monthlyRent: serverErrors.monthlyRent || serverErrors.monthly_rent,
+                depositAmount: serverErrors.depositAmount || serverErrors.deposit_amount,
+            });
+            setRenewError(
+                Object.keys(serverErrors).length > 0
+                    ? "Vui lòng kiểm tra các trường được đánh dấu đỏ."
+                    : err?.details || err?.message || "Không thể gia hạn hợp đồng.",
+            );
+            toast.error(err?.message || "Không thể gia hạn hợp đồng.");
         } finally {
             setActionLoading("");
         }
@@ -1759,7 +2324,7 @@ export default function ContractTemplatePage() {
     }
 
     const isBusy = Boolean(actionLoading);
-    const canUseLiquidationActions = user?.role === ROLES.OWNER || user?.role === ROLES.MANAGER;
+    const canUseLiquidationActions = user?.role === ROLES.OWNER;
 
     return (
         <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
@@ -1977,29 +2542,20 @@ export default function ContractTemplatePage() {
                 </header>
 
                 <div
-                    className="dashboard-table dashboard-table--scroll contract-management-table custom-scrollbar"
-                    style={{
-                        maxHeight: "calc(100vh - 320px)",
-                        minHeight: 260,
-                        overflowX: "scroll",
-                        overflowY: "auto",
-                        scrollbarGutter: "stable",
-                    }}
+                    className="dashboard-table contract-management-table"
                 >
                     <table
-                        className="table-fixed text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3"
-                        style={{minWidth: 1000, width: "100%"}}
+                        className="table-auto text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3"
                     >
                         <colgroup>
-                            <col style={{width: "20%"}}/>
-                            <col style={{width: "8%"}}/>
-                            <col style={{width: "16%"}}/>
-                            <col style={{width: "8%"}}/>
+                            <col style={{width: "18%"}}/>
+                            <col style={{width: "7%"}}/>
                             <col style={{width: "15%"}}/>
-                            <col style={{width: "12%"}}/>
+                            <col style={{width: "7%"}}/>
+                            <col style={{width: "14%"}}/>
                             <col style={{width: "10%"}}/>
-                            <col style={{width: "12%"}}/>
-                            <col style={{width: "12%"}}/>
+                            <col style={{width: "13%"}}/>
+                            <col style={{width: "16%"}}/>
                         </colgroup>
                         <thead
                             className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
@@ -2010,7 +2566,6 @@ export default function ContractTemplatePage() {
                             <th>Số người</th>
                             <th>Thời hạn</th>
                             <th>Giá thuê</th>
-                            <th>File</th>
                             <th>Trạng thái</th>
                             <th className="contract-management-table__action !px-2 text-center xl:!px-2.5">Thao tác</th>
                         </tr>
@@ -2018,7 +2573,7 @@ export default function ContractTemplatePage() {
                         <tbody className="divide-y divide-[#edf1f6]">
                         {loading && (
                             <tr>
-                                <td colSpan={9} className="py-12 text-center text-sm font-bold text-[#607089]">
+                                <td colSpan={8} className="py-12 text-center text-sm font-bold text-[#607089]">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin"/>
                       Đang tải dữ liệu hợp đồng...
@@ -2116,9 +2671,6 @@ export default function ContractTemplatePage() {
                                     <td data-label="Giá thuê" className="align-middle">
                                         <p className="font-extrabold leading-5 text-[#091426]">{formatMoney(item.monthlyRent)}</p>
                                     </td>
-                                    <td data-label="File" className="align-middle">
-                                        <FileBadge item={item}/>
-                                    </td>
                                     <td data-label="Trạng thái" className="align-middle">
                                         <StatusBadge item={item}/>
                                     </td>
@@ -2131,7 +2683,7 @@ export default function ContractTemplatePage() {
                                                     event.stopPropagation();
                                                     selectContract(item);
                                                 }}
-                                                className="inline-flex h-9 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-1 text-[11px] font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10 xl:text-xs"
+                                                className="inline-flex h-9 min-w-[9.75rem] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#d1d7e0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-[11px] font-extrabold text-slate-900 dark:text-white shadow-[0_3px_8px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fafc] dark:hover:bg-white/5 xl:h-10 xl:text-xs"
                                             >
                                                 {needsActivationFlow(item) ? (
                                                     <FileCheck2 className="h-3.5 w-3.5"/>
@@ -2147,7 +2699,7 @@ export default function ContractTemplatePage() {
 
                         {!loading && filteredContracts.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
+                                <td colSpan={8} className="px-6 py-12 text-center text-sm font-bold text-[#7b8495]">
                                     Không có hợp đồng phù hợp với bộ lọc.
                                 </td>
                             </tr>
@@ -2155,18 +2707,20 @@ export default function ContractTemplatePage() {
                         </tbody>
                     </table>
                 </div>
-                <DashboardPagination
-                    page={page}
-                    size={size}
-                    totalElements={filteredTotalElements}
-                    totalPages={filteredTotalPages}
-                    itemLabel="hợp đồng"
-                    onPageChange={setPage}
-                    onSizeChange={(nextSize) => {
-                        setSize(nextSize);
-                        setPage(1);
-                    }}
-                />
+                {filteredTotalElements > size ? (
+                    <DashboardPagination
+                        page={page}
+                        size={size}
+                        totalElements={filteredTotalElements}
+                        totalPages={filteredTotalPages}
+                        itemLabel="hợp đồng"
+                        onPageChange={setPage}
+                        onSizeChange={(nextSize) => {
+                            setSize(nextSize);
+                            setPage(1);
+                        }}
+                    />
+                ) : null}
             </section>
 
             {cleanupModalOpen && (
@@ -2296,12 +2850,12 @@ export default function ContractTemplatePage() {
                                             />
                                             <InfoValue
                                                 label="Trạng thái chuyển phòng"
-                                                value={getTransferStatusLabel(mergedSelected.transferStatus)}
+                                                value={getTransferContractStatusLabel(mergedSelected)}
                                             />
-                                                <InfoValue
-                                                    label="File đã ký"
-                                                    value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa upload"}
-                                                />
+                                            <InfoValue
+                                                label="File đã ký"
+                                                value={getLeaseSignedFileId(mergedSelected) ? selectedSignedLeaseContractFilename : "Chưa upload"}
+                                            />
                                         </div>
                                         <div className="flex flex-wrap justify-end gap-2">
                                             {["WAITING_TRANSFER_DATE", "READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(mergedSelected.transferStatus) && (
@@ -2356,16 +2910,16 @@ export default function ContractTemplatePage() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleConfirmTransferSigned(mergedSelected)}
-                                                        disabled={isBusy || !getLeaseSignedFileId(mergedSelected)}
+                                                        onClick={() => handleConfirmTransferDocumentSigned(mergedSelected)}
+                                                        disabled={isBusy || !getLeaseSignedFileId(mergedSelected) || mergedSelected.status === "SIGNED"}
                                                         className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60"
                                                     >
-                                                        {actionLoading === `transfer-sign-${mergedSelected.transferRequestId}` ? (
+                                                        {actionLoading === `transfer-contract-sign-${mergedSelected.leaseContractId}` ? (
                                                             <Loader2 className="h-4 w-4 animate-spin"/>
                                                         ) : (
                                                             <CheckCircle2 className="h-4 w-4"/>
                                                         )}
-                                                        Xác nhận đã ký đủ
+                                                        {mergedSelected.status === "SIGNED" ? "Đã xác nhận ký" : "Xác nhận hợp đồng này"}
                                                     </button>
                                                 </>
                                             )}
@@ -2373,10 +2927,12 @@ export default function ContractTemplatePage() {
                                     </div>
                                     {!isTransferSigningStatus(mergedSelected.transferStatus) &&
                                         mergedSelected.transferStatus !== "WAITING_CONTRACT_CONFIRMATION" && (
-                                        <p className="mt-4 rounded-lg border border-[#dfe5ef] bg-white px-4 py-3 text-sm font-semibold text-[#607089]">
-                                            Trạng thái chuyển phòng hiện tại: {getTransferStatusLabel(mergedSelected.transferStatus)}. Tất cả thao tác xử lý đều làm ngay tại khối này.
-                                        </p>
-                                    )}
+                                            <p className="mt-4 rounded-lg border border-[#dfe5ef] bg-white px-4 py-3 text-sm font-semibold text-[#607089]">
+                                                Trạng thái chuyển phòng hiện
+                                                tại: {getTransferContractStatusLabel(mergedSelected)}. Tất cả
+                                                thao tác xử lý đều làm ngay tại khối này.
+                                            </p>
+                                        )}
                                 </DetailCard>
                             )}
                             {needsActivationFlow(mergedSelected) ? (
@@ -2397,7 +2953,7 @@ export default function ContractTemplatePage() {
                                     {getWorkflow(mergedSelected) === "EXPIRED" && (
                                         <div
                                             className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 lg:col-span-2">
-                                            Hợp đồng đã hết hạn. Vui lòng tái ký hoặc thanh lý.
+                                            Hợp đồng đã hết hạn. Vui lòng gia hạn hoặc thanh lý.
                                         </div>
                                     )}
                                     {getWorkflow(mergedSelected) === "RENEWED" && mergedSelected.renewedContractId && (
@@ -2614,7 +3170,7 @@ export default function ContractTemplatePage() {
                                                         }
                                                     />
                                                     <InfoValue
-                                                        label="Hợp đồng tái ký"
+                                                        label="Hợp đồng gia hạn"
                                                         value={
                                                             mergedSelected.renewedContractCode ||
                                                             (mergedSelected.renewedContractId ? `#${mergedSelected.renewedContractId}` : "Chưa có")
@@ -2622,7 +3178,7 @@ export default function ContractTemplatePage() {
                                                     />
                                                     <InfoValue
                                                         label="File hợp đồng"
-                                                        value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa có"}
+                                                        value={getLeaseSignedFileId(mergedSelected) ? selectedSignedLeaseContractFilename : "Chưa có"}
                                                     />
                                                 </div>
 
@@ -2690,7 +3246,7 @@ export default function ContractTemplatePage() {
                                                     }
                                                 />
                                                 <InfoValue
-                                                    label="Hợp đồng tái ký"
+                                                    label="Hợp đồng gia hạn"
                                                     value={
                                                         mergedSelected.renewedContractCode ||
                                                         (mergedSelected.renewedContractId ? `#${mergedSelected.renewedContractId}` : "Chưa có")
@@ -2698,7 +3254,7 @@ export default function ContractTemplatePage() {
                                                 />
                                                 <InfoValue
                                                     label="File hợp đồng"
-                                                    value={getLeaseSignedFileId(mergedSelected) ? selectedLeaseContractFilename : "Chưa có"}
+                                                    value={getLeaseSignedFileId(mergedSelected) ? selectedSignedLeaseContractFilename : "Chưa có"}
                                                 />
                                             </div>
                                         )}
@@ -2719,15 +3275,14 @@ export default function ContractTemplatePage() {
                                                                 setLiquidationError("");
                                                                 setIsEditingLiquidation(false);
                                                             } else {
-                                                                setLiquidationForm(buildLiquidationForm(mergedSelected));
-                                                                setLiquidationError("");
-                                                                setIsEditingLiquidation(true);
+                                                                openLiquidationEditor(mergedSelected);
                                                             }
                                                         }}
                                                         disabled={isBusy}
                                                         className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
                                                     >
-                                                        {isEditingLiquidation ? <X className="h-3.5 w-3.5"/> : <Pencil className="h-3.5 w-3.5"/>}
+                                                        {isEditingLiquidation ? <X className="h-3.5 w-3.5"/> :
+                                                            <Pencil className="h-3.5 w-3.5"/>}
                                                         {isEditingLiquidation ? "Hủy" : "Cập nhật"}
                                                     </button>
                                                 ) : null
@@ -2746,15 +3301,34 @@ export default function ContractTemplatePage() {
                                                         </label>
                                                         <label className="grid min-w-0 gap-1.5">
                                                             <span className="text-xs font-bold text-[#58667c]">Khấu trừ cọc</span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                step="1000"
-                                                                value={liquidationForm.depositDeductionAmount}
-                                                                onChange={(event) => updateLiquidationField("depositDeductionAmount", event.target.value)}
-                                                                className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
-                                                            />
+                                                            <div
+                                                                className="h-10 rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#091426]">
+                                                                {formatMoney(liquidationDraftDeduction)}
+                                                            </div>
                                                         </label>
+                                                        <LiquidationChargeRows
+                                                            charges={liquidationDraftCharges}
+                                                            onAdd={addLiquidationCharge}
+                                                            onChange={updateLiquidationCharge}
+                                                            onRemove={removeLiquidationCharge}
+                                                        />
+                                                        <div
+                                                            className="grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 sm:col-span-2 sm:grid-cols-4">
+                                                            <InfoValue label="Tổng phí chốt"
+                                                                       value={formatMoney(liquidationDraftSubtotal)}/>
+                                                            <InfoValue label="Trừ vào cọc"
+                                                                       value={formatMoney(Number.isFinite(liquidationDraftDeduction) ? liquidationDraftDeduction : 0)}/>
+                                                            <InfoValue label="Khách còn phải trả"
+                                                                       value={formatMoney(liquidationDraftRemainingPayable)}/>
+                                                            <InfoValue label="Cọc còn hoàn"
+                                                                       value={formatMoney(liquidationDraftRemainingDeposit)}/>
+                                                            {liquidationDraftDepositForfeited && (
+                                                                <p className="text-xs font-bold leading-5 text-red-600 sm:col-span-4">
+                                                                    Ngày thanh lý sớm hơn 1 tháng trước ngày hết hạn nên tiền
+                                                                    cọc không hoàn lại cho khách thuê.
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                         <label className="grid min-w-0 gap-1.5 sm:col-span-2">
                                                             <span className="text-xs font-bold text-[#58667c]">Lý do thanh lý</span>
                                                             <textarea
@@ -2776,14 +3350,50 @@ export default function ContractTemplatePage() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <InfoValue label="Trạng thái hồ sơ" value={mergedSelected.liquidationStatus === "CONFIRMED" ? "Đã xác nhận" : "Bản nháp"}/>
-                                                        <InfoValue label="Ngày thanh lý" value={formatDate(mergedSelected.liquidationDate || mergedSelected.expectedVacantDate)}/>
-                                                        <InfoValue label="Tiền cọc" value={formatOptionalMoney(mergedSelected.liquidationDepositAmount ?? mergedSelected.depositAmount)}/>
-                                                        <InfoValue label="Khấu trừ cọc" value={formatOptionalMoney(mergedSelected.liquidationDepositDeductionAmount ?? 0)}/>
-                                                        <InfoValue label="Hoàn cọc dự kiến" value={formatOptionalMoney(mergedSelected.liquidationDepositRefundAmount ?? Math.max(0, Number(mergedSelected.depositAmount || 0) - Number(mergedSelected.liquidationDepositDeductionAmount || 0)))}/>
-                                                        <InfoValue label="Hóa đơn chốt" value={mergedSelected.liquidationFinalInvoiceId ? `#${mergedSelected.liquidationFinalInvoiceId}` : "Chưa có"}/>
-                                                        <InfoValue label="Lý do thanh lý" value={mergedSelected.liquidationReason}/>
-                                                        <InfoValue label="Lý do khấu trừ" value={mergedSelected.liquidationDepositDeductionReason}/>
+                                                        <InfoValue label="Trạng thái hồ sơ"
+                                                                   value={mergedSelected.liquidationStatus === "CONFIRMED" ? "Đã xác nhận" : "Bản nháp"}/>
+                                                        <InfoValue label="Ngày thanh lý"
+                                                                   value={formatDate(mergedSelected.liquidationDate || mergedSelected.expectedVacantDate)}/>
+                                                        <InfoValue label="Cọc đã thanh toán"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositAmount ?? mergedSelected.depositAmount)}/>
+                                                        <InfoValue label="Khấu trừ cọc"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositDeductionAmount ?? 0)}/>
+                                                        <InfoValue label="Hoàn trả cọc"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositRefundAmount ?? Math.max(0, Number(mergedSelected.depositAmount || 0) - Number(mergedSelected.liquidationDepositDeductionAmount || 0)))}/>
+                                                        <InfoValue label="Trạng thái hoàn cọc"
+                                                                   value={getDepositRefundStatusLabel(mergedSelected.liquidationDepositRefundStatus)}/>
+                                                        <InfoValue label="Yêu cầu duyệt hoàn cọc"
+                                                                   value={mergedSelected.liquidationDepositRefundExpenseRequestId ? `#${mergedSelected.liquidationDepositRefundExpenseRequestId}` : "Chưa có"}/>
+                                                        <InfoValue label="Đã ghi nhận hoàn"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositRefundedAmount)}/>
+                                                        <InfoValue label="Mã giao dịch hoàn"
+                                                                   value={mergedSelected.liquidationDepositRefundTransactionRef}/>
+                                                        <InfoValue label="Hóa đơn chốt"
+                                                                   value={mergedSelected.liquidationFinalInvoiceCode || (mergedSelected.liquidationFinalInvoiceId ? `#${mergedSelected.liquidationFinalInvoiceId}` : "Chưa có")}/>
+                                                        <InfoValue label="Trạng thái hóa đơn"
+                                                                   value={mergedSelected.liquidationFinalInvoiceStatus || "Chưa có"}/>
+                                                        <InfoValue label="Tổng phí chốt"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceSubtotalAmount)}/>
+                                                        <InfoValue label="Khấu trừ từ cọc"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceDiscountAmount)}/>
+                                                        <InfoValue label="Khách còn phải trả"
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceRemainingAmount)}/>
+                                                        <InfoValue label="Lý do thanh lý"
+                                                                   value={mergedSelected.liquidationReason}/>
+                                                        <InfoValue label="Lý do khấu trừ"
+                                                                   value={mergedSelected.liquidationDepositDeductionReason}/>
+                                                        <div className="sm:col-span-2">
+                                                            <p className="mb-2 text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chi
+                                                                tiết khoản thanh lý</p>
+                                                            <LiquidationInvoiceLines
+                                                                lines={mergedSelected.liquidationFinalInvoiceLines || []}/>
+                                                        </div>
+                                                        {Number(mergedSelected.liquidationDepositRefundAmount || 0) > 0 &&
+                                                            mergedSelected.liquidationDepositRefundStatus !== "TENANT_CONFIRMED" && (
+                                                                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 sm:col-span-2">
+                                                                    Cần hoàn cọc qua yêu cầu chi, upload minh chứng và chờ khách thuê xác nhận trước khi hoàn tất thanh lý.
+                                                                </p>
+                                                            )}
                                                     </>
                                                 )}
                                             </div>
@@ -2807,19 +3417,30 @@ export default function ContractTemplatePage() {
                                                         )}
                                                         Lưu hồ sơ
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleLiquidate(mergedSelected)}
-                                                        disabled={isBusy}
-                                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
-                                                    >
-                                                        {actionLoading === `liquidate-${mergedSelected.leaseContractId}` ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin"/>
-                                                        ) : (
-                                                            <CheckCircle2 className="h-4 w-4"/>
-                                                        )}
-                                                        Hoàn tất thanh lý
-                                                    </button>
+                                                    {!isEditingLiquidation && mergedSelected.liquidationFinalInvoiceId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleLiquidate(mergedSelected)}
+                                                            disabled={isBusy || (
+                                                                Number(mergedSelected.liquidationDepositRefundAmount || 0) > 0 &&
+                                                                mergedSelected.liquidationDepositRefundStatus !== "TENANT_CONFIRMED"
+                                                            )}
+                                                            title={
+                                                                Number(mergedSelected.liquidationDepositRefundAmount || 0) > 0 &&
+                                                                mergedSelected.liquidationDepositRefundStatus !== "TENANT_CONFIRMED"
+                                                                    ? "Cần hoàn cọc và chờ khách thuê xác nhận trước."
+                                                                    : undefined
+                                                            }
+                                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
+                                                        >
+                                                            {actionLoading === `liquidate-${mergedSelected.leaseContractId}` ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin"/>
+                                                            ) : (
+                                                                <CheckCircle2 className="h-4 w-4"/>
+                                                            )}
+                                                            Hoàn tất thanh lý
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </DetailCard>
@@ -2901,20 +3522,42 @@ export default function ContractTemplatePage() {
                                     </DetailCard>
 
                                     {mergedSelected.leaseContractId &&
+                                        getWorkflow(mergedSelected) === "TERMINATION_PENDING" &&
                                         !isRoomTransferManagedContract(mergedSelected) &&
                                         !isRenewalContract(mergedSelected) && (
-                                        <ContractHandoverSection
-                                            key={mergedSelected.leaseContractId}
-                                            contractId={mergedSelected.leaseContractId}
-                                            tenantId={mergedSelected.tenantId || null}
-                                            roomId={mergedSelected.roomId || null}
-                                            roomCode={mergedSelected.roomCode || mergedSelected.room?.roomCode}
-                                            readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(
-                                                getWorkflow(mergedSelected),
-                                            )}
-                                            onSaved={handleHandoverSaved}
-                                        />
-                                    )}
+                                            <ContractHandoverSection
+                                                key={`${mergedSelected.leaseContractId}-move-out`}
+                                                contractId={mergedSelected.leaseContractId}
+                                                tenantId={mergedSelected.tenantId || null}
+                                                roomId={mergedSelected.roomId || null}
+                                                roomCode={mergedSelected.roomCode || mergedSelected.room?.roomCode}
+                                                handoverType="MOVE_OUT"
+                                                title="Bàn giao trả phòng"
+                                                description="Chốt chỉ số, hiện trạng phòng và khoản bồi thường nếu có trước khi hoàn tất thanh lý."
+                                                showCompensation
+                                                readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(
+                                                    getWorkflow(mergedSelected),
+                                                )}
+                                                onSaved={handleHandoverSaved}
+                                            />
+                                        )}
+
+                                    {mergedSelected.leaseContractId &&
+                                        getWorkflow(mergedSelected) !== "TERMINATION_PENDING" &&
+                                        !isRoomTransferManagedContract(mergedSelected) &&
+                                        !isRenewalContract(mergedSelected) && (
+                                            <ContractHandoverSection
+                                                key={mergedSelected.leaseContractId}
+                                                contractId={mergedSelected.leaseContractId}
+                                                tenantId={mergedSelected.tenantId || null}
+                                                roomId={mergedSelected.roomId || null}
+                                                roomCode={mergedSelected.roomCode || mergedSelected.room?.roomCode}
+                                                readonly={["LIQUIDATED", "RENEWED", "CANCELLED", "AUTO_TERMINATED"].includes(
+                                                    getWorkflow(mergedSelected),
+                                                )}
+                                                onSaved={handleHandoverSaved}
+                                            />
+                                        )}
 
                                     {mergedSelected.leaseContractId &&
                                         getWorkflow(mergedSelected) !== "CANCELLED" &&
@@ -2933,7 +3576,7 @@ export default function ContractTemplatePage() {
                                                 {getLeaseSignedFileId(mergedSelected) ? (
                                                     <>
                                                         <p className="break-words font-extrabold text-[#091426]">
-                                                            {selectedLeaseContractFilename}
+                                                            {selectedSignedLeaseContractFilename}
                                                         </p>
                                                         <p className="mt-1 text-sm text-[#607089]">
                                                             Upload: {formatDate(mergedSelected.signedFileUploadedAt)}
@@ -3054,7 +3697,7 @@ export default function ContractTemplatePage() {
                                                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#091426] px-4 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
                                             >
                                                 <RefreshCw className="h-4 w-4"/>
-                                                Tái ký / Gia hạn
+                                                Gia hạn hợp đồng
                                             </button>
                                         )}
                                         {details?.canRenew === false &&
@@ -3076,18 +3719,18 @@ export default function ContractTemplatePage() {
                                             </button>
                                         )}
                                         {canUseLiquidationActions && (details?.canLiquidate ??
-                                            ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) &&
+                                                ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(getWorkflow(mergedSelected))) &&
                                             getWorkflow(mergedSelected) !== "TERMINATION_PENDING" && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleLiquidate(mergedSelected)}
-                                                disabled={isBusy}
-                                                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:opacity-60"
-                                            >
-                                                <AlertTriangle className="h-4 w-4"/>
-                                                Thanh lý hợp đồng
-                                            </button>
-                                        )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleLiquidate(mergedSelected)}
+                                                    disabled={isBusy}
+                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-extrabold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                                                >
+                                                    <AlertTriangle className="h-4 w-4"/>
+                                                    Thanh lý hợp đồng
+                                                </button>
+                                            )}
                                         <button
                                             type="button"
                                             disabled
@@ -3134,27 +3777,52 @@ export default function ContractTemplatePage() {
                              onClick={(event) => event.stopPropagation()}>
                         <header className="flex items-start justify-between gap-4 border-b border-[#dfe5ef] px-5 py-5">
                             <div>
-                                <h2 className="text-xl font-extrabold text-[#091426]">Tái ký / Gia hạn hợp đồng</h2>
+                                <h2 className="text-xl font-extrabold text-[#091426]">Gia hạn hợp đồng</h2>
                                 <p className="mt-1 text-sm text-[#607089]">
-                                    Tạo hợp đồng mới từ {mergedSelected.contractCode}. Hợp đồng cũ không bị sửa đè.
+                                    Cập nhật thời hạn và điều khoản trên hợp đồng {mergedSelected.contractCode}. Không tạo hợp đồng mới.
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setRenewModalOpen(false)}
                                 className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-[#f3f6fa] dark:hover:bg-white/5"
-                                aria-label="Đóng modal tái ký"
+                                aria-label="Đóng modal gia hạn"
                             >
                                 <X className="h-5 w-5"/>
                             </button>
                         </header>
 
                         <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
+                            <div className="rounded-xl border border-[#dfe5ef] bg-[#f8fafc] p-4 sm:col-span-2">
+                                <p className="text-sm font-extrabold text-[#091426]">Hợp đồng hiện tại</p>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <InfoValue label="Ngày bắt đầu"
+                                               value={formatDisplayDate(renewForm.startDate) || "Chưa cập nhật"}/>
+                                    <InfoValue label="Ngày kết thúc hiện tại"
+                                               value={formatDisplayDate(renewForm.currentEndDate) || "Chưa cập nhật"}/>
+                                </div>
+                                {renewFieldErrors.startDate && (
+                                    <p className="mt-3 text-xs font-semibold text-red-600">
+                                        {renewFieldErrors.startDate}
+                                    </p>
+                                )}
+                            </div>
+
+                            <label className="grid gap-1.5">
+                                <span className="text-sm font-bold text-[#34445c]">Ngày kết thúc sau gia hạn *</span>
+                                <DateInput
+                                    value={renewForm.endDate}
+                                    min={renewForm.currentEndDate ? addDays(renewForm.currentEndDate, 1) : undefined}
+                                    onChange={(event) => updateRenewField("endDate", event.target.value)}
+                                    className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${renewFieldErrors.endDate ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"}`}
+                                />
+                                {renewFieldErrors.endDate && (
+                                    <span className="text-xs font-semibold text-red-600">{renewFieldErrors.endDate}</span>
+                                )}
+                            </label>
+
                             {[
-                                ["newContractCode", "Mã hợp đồng mới", "text"],
-                                ["newStartDate", "Ngày bắt đầu mới", "date"],
-                                ["newEndDate", "Ngày kết thúc mới", "date"],
-                                ["monthlyRent", "Giá thuê mới", "number"],
+                                ["monthlyRent", "Giá thuê", "number"],
                                 ["depositAmount", "Tiền cọc", "number"],
                             ].map(([field, label, type]) => (
                                 <label key={field} className="grid gap-1.5">
@@ -3164,10 +3832,8 @@ export default function ContractTemplatePage() {
                                         min={type === "number" ? (field === "depositAmount" ? "0" : "1") : undefined}
                                         step={type === "number" ? "1000" : undefined}
                                         value={renewForm[field]}
-                                        readOnly={field === "newContractCode"}
                                         onChange={(event) => updateRenewField(field, event.target.value)}
-                                        className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${field === "newContractCode" ? "bg-slate-100 text-slate-600 " : ""
-                                        }${renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
+                                        className={`h-11 rounded-lg border px-3 text-sm font-semibold outline-none ${renewFieldErrors[field] ? "border-red-500" : "border-[#cbd5e1] focus:border-[#091426]"
                                         }`}
                                     />
                                     {renewFieldErrors[field] && (
@@ -3194,18 +3860,8 @@ export default function ContractTemplatePage() {
                                 )}
                             </label>
 
-                            <label className="grid gap-1.5 sm:col-span-2">
-                                <span className="text-sm font-bold text-[#34445c]">Ghi chú</span>
-                                <textarea
-                                    rows={3}
-                                    value={renewForm.note}
-                                    onChange={(event) => updateRenewField("note", event.target.value)}
-                                    className="rounded-lg border border-[#cbd5e1] px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
-                                />
-                            </label>
-
                             <div className="rounded-xl border border-[#dfe5ef] bg-[#f8fafc] p-4 sm:col-span-2">
-                                <p className="text-sm font-extrabold text-[#091426]">Occupants giữ nguyên</p>
+                                <p className="text-sm font-extrabold text-[#091426]">Người ở giữ nguyên trên hợp đồng hiện tại</p>
                                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                     {selectedOccupants.map((occupant, index) => (
                                         <div
@@ -3247,7 +3903,7 @@ export default function ContractTemplatePage() {
                                 {actionLoading === `renew-${mergedSelected.leaseContractId}` && (
                                     <Loader2 className="h-4 w-4 animate-spin"/>
                                 )}
-                                Tạo hợp đồng mới
+                                Lưu gia hạn
                             </button>
                         </footer>
                     </section>

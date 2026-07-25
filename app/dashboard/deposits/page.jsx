@@ -105,6 +105,12 @@ function formatMoney(value) {
   return `${money.format(Number(value || 0))} VNĐ`;
 }
 
+function formatThousandMoney(value) {
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
+    Number(value || 0) / 1000,
+  );
+}
+
 function formatDate(value) {
   return formatDisplayDate(value);
 }
@@ -1410,7 +1416,8 @@ export default function DepositsPage() {
           <DashboardStatCard
             icon={WalletCards}
             label="Tổng số tiền cọc"
-            value={formatMoney(totalAmount)}
+            value={formatThousandMoney(totalAmount)}
+            unitBadge="nghìn đồng"
             subtitle="Tổng tiền cọc đã ghi nhận"
           />
           <DashboardStatCard
@@ -1426,7 +1433,8 @@ export default function DepositsPage() {
           <DashboardStatCard
             icon={WalletCards}
             label="Tổng số tiền cọc"
-            value={formatMoney(totalAmount)}
+            value={formatThousandMoney(totalAmount)}
+            unitBadge="nghìn đồng"
             subtitle="Tổng tiền cọc đã ghi nhận"
           />
           <DashboardStatCard

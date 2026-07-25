@@ -2,7 +2,7 @@
 
 import {useState, useEffect, useCallback} from "react";
 import Image from "next/image";
-import {Dialog, DialogContent} from "@/components/ui/dialog";
+import {Dialog, DialogContent, DialogTitle} from "@/components/ui/dialog";
 import {Button} from "@/components/ui/button";
 import {Badge} from "@/components/ui/badge";
 import {
@@ -108,6 +108,7 @@ export function PhotoGallery({
                     className="max-w-4xl gap-0 border-0 bg-black/95 p-0 text-white shadow-none [&>button]:hidden"
                     aria-label="Xem ảnh"
                 >
+                    <DialogTitle className="sr-only">{photo?.label || photo?.alt || "Xem ảnh"}</DialogTitle>
                     {/* top bar */}
                     <div className="flex items-center justify-between px-4 py-3">
                         <Badge variant="secondary" className="bg-white/10 text-white hover:bg-white/10">

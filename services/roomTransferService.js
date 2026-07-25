@@ -1,6 +1,6 @@
-import { ApiError, getAuthToken } from "@/services/identityAccessService";
-import { API_BASE_URL } from "@/lib/apiConfig";
-import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
+import {ApiError, getAuthToken} from "@/services/identityAccessService";
+import {API_BASE_URL} from "@/lib/apiConfig";
+import {normalizePageResponse, readPageItems} from "@/lib/pageResponse";
 
 async function request(path, options = {}) {
     const token = getAuthToken();
@@ -10,7 +10,7 @@ async function request(path, options = {}) {
         headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(token ? {Authorization: `Bearer ${token}`} : {}),
             "X-Client-Type": "web",
             ...options.headers,
         },
@@ -54,6 +54,7 @@ function mapRoomTransfer(data) {
         targetRoomName: data.targetRoomName,
         targetRoomCode: data.targetRoomCode,
         newRoomPrice: data.newRoomPrice,
+        priceDifferenceAmount: data.priceDifferenceAmount,
         priceDifferenceToPay: data.priceDifferenceToPay,
         sourceRoomWillBeEmptyAfterTransfer: data.sourceRoomWillBeEmptyAfterTransfer,
         remainingOccupantCountAfterTransfer: data.remainingOccupantCountAfterTransfer,
@@ -112,19 +113,19 @@ async function requestRoomTransferHistory(path) {
     const data = await request(path);
     const items = readPageItems(data).map(mapRoomTransfer);
     return {
-        ...normalizePageResponse(data, { items }),
+        ...normalizePageResponse(data, {items}),
         items,
     };
 }
 
 export async function fetchRoomTransferHistory({
-    page = 1,
-    size = 10,
-    floorId = "",
-    roomId = "",
-    fromDate = "",
-    toDate = "",
-} = {}) {
+                                                   page = 1,
+                                                   size = 10,
+                                                   floorId = "",
+                                                   roomId = "",
+                                                   fromDate = "",
+                                                   toDate = "",
+                                               } = {}) {
     const params = new URLSearchParams({
         page: String(Math.max(0, Number(page) - 1)),
         size: String(size),
@@ -155,15 +156,19 @@ export async function getRoomTransferById(requestId) {
 }
 
 export async function confirmTransferContract(requestId) {
-    return request(`/occupant-transfer-requests/${requestId}/contract/confirm`, { method: "POST" });
+    return request(`/occupant-transfer-requests/${requestId}/contract/confirm`, {method: "POST"});
 }
 
 export async function rejectTransferContract(requestId) {
-    return request(`/occupant-transfer-requests/${requestId}/contract/reject`, { method: "POST" });
+    return request(`/occupant-transfer-requests/${requestId}/contract/reject`, {method: "POST"});
 }
 
 export async function signTransferContract(requestId) {
-    return request(`/occupant-transfer-requests/${requestId}/contract/sign`, { method: "POST" });
+    return request(`/occupant-transfer-requests/${requestId}/contract/sign`, {method: "POST"});
+}
+
+export async function signTransferContractDocument(requestId, leaseContractId) {
+    return request(`/occupant-transfer-requests/${requestId}/contracts/${leaseContractId}/sign`, {method: "POST"});
 }
 
 export async function executeTransfer(requestId, payload) {

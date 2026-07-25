@@ -72,6 +72,7 @@ import {
 } from "@/lib/meterReadingCost.mjs";
 import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
 import { fetchSimpleProperties } from "@/services/identityAccessService";
+import { UtilityBillingRunsPanel } from "../_components/UtilityBillingRunsPanel";
 
 const SAMPLE_PHOTOS = [
     {
@@ -954,61 +955,60 @@ export default function MeterReadings() {
             {/* Header */}
             <div className="mb-4 mt-2">
                 <DashboardPageHeader
+                    className="xl:!flex-col xl:!items-start xl:!justify-start 2xl:!flex-row 2xl:!items-end 2xl:!justify-between"
                     title={
-                        <span className="flex items-center gap-3">
-                            Nhập chỉ số điện nước - {formatPeriodLabel(period)}
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
-                                <CircleDashed className="h-3.5 w-3.5" />
-                                {isBatchLocked ? "Đã chốt" : "Đang nhập"}
-                            </span>
-                        </span>
+                        <span className="min-w-0 break-words">Nhập chỉ số điện nước - {formatPeriodLabel(period)}</span>
                     }
                     description={formatPeriodRange(period)}
                     actions={
-                        <div className="mt-1 flex flex-wrap items-center gap-3">
-                            <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${isOnline ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"}`}>
-                                <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`} />
-                                {syncingOffline ? "Đang đồng bộ offline" : isOnline ? "Online" : "Offline - sẽ tự đồng bộ"}
-                            </span>
-                            {isBatchLocked ? (
-                                <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        <div className="mt-1 flex w-full flex-col items-start gap-3 2xl:items-end">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${isOnline ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"}`}>
+                                    <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`} />
+                                    {syncingOffline ? "Đang đồng bộ offline" : isOnline ? "Online" : "Offline - sẽ tự đồng bộ"}
+                                </span>
+                                {isBatchLocked ? (
+                                    <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Kỳ đã chốt, chỉ có thể xem lại
+                                    </span>
+                                ) : (pending > 0 || errors > 0) ? (
+                                    <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Đã đủ điều kiện chốt kỳ
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button
+                                    onClick={() => {
+                                        const firstPending = filtered.find(r => r.status === "pending" || !r.status);
+                                        if (firstPending) {
+                                            setFocusRoomId(firstPending.id);
+                                        } else if (filtered.length > 0) {
+                                            setFocusRoomId(filtered[0].id);
+                                        }
+                                    }}
+                                    disabled={isBatchLocked}
+                                    variant={"default"}
+                                    className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                                    <Edit3 className="h-4 w-4" />
+                                    Bắt đầu nhập
+                                </Button>
+                                <Button
+                                    onClick={requestConfirmBatch}
+                                    disabled={!canConfirmBatch || confirming}
+                                    className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
                                     <CheckCircle2 className="h-4 w-4" />
-                                    Kỳ đã chốt, chỉ có thể xem lại
-                                </span>
-                            ) : (pending > 0 || errors > 0) ? (
-                                <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Đã đủ điều kiện chốt kỳ
-                                </span>
-                            )}
-                            <Button
-                                onClick={() => {
-                                    const firstPending = filtered.find(r => r.status === "pending" || !r.status);
-                                    if (firstPending) {
-                                        setFocusRoomId(firstPending.id);
-                                    } else if (filtered.length > 0) {
-                                        setFocusRoomId(filtered[0].id);
-                                    }
-                                }}
-                                disabled={isBatchLocked}
-                                variant={"default"}
-                                className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-                                <Edit3 className="h-4 w-4" />
-                                Bắt đầu nhập
-                            </Button>
-                            <Button
-                                onClick={requestConfirmBatch}
-                                disabled={!canConfirmBatch || confirming}
-                                className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                <CheckCircle2 className="h-4 w-4" />
-                                {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
-                            </Button>
+                                    {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
+                                </Button>
+                            </div>
                         </div>
                     }
                 />
@@ -1022,6 +1022,16 @@ export default function MeterReadings() {
                 <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber" subtitle="Thay đổi đang chờ lưu" />
                 <DashboardStatCard icon={RefreshCw} label="Cập nhật" value={syncingOffline ? "Đang sync" : "Vừa tải"} tone="slate" subtitle={lastOfflineSyncAt ? `Sync offline ${lastOfflineSyncAt.toLocaleTimeString()}` : "Theo dữ liệu backend"} />
             </div>
+
+            {isBatchLocked ? (
+                <div className="mb-6">
+                    <UtilityBillingRunsPanel
+                        key={`${propertyId || "all"}-${period || formatMonthYearPeriod()}`}
+                        propertyId={propertyId}
+                        defaultPeriod={period || formatMonthYearPeriod()}
+                    />
+                </div>
+            ) : null}
 
             {/* Overall progress */}
             <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">

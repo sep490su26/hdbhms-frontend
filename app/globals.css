@@ -390,31 +390,20 @@ body {
 }
 
 .dashboard-table.contract-management-table .contract-management-table__action {
-  width: 12%;
-  min-width: 8rem;
+  width: 16%;
+  min-width: 10.5rem;
   max-width: none;
   overflow: visible;
 }
 
 .dashboard-table.contract-management-table {
-  overflow-x: scroll;
-  overflow-y: hidden;
+  overflow: visible;
 }
 
 .dashboard-table.contract-management-table > table {
-  min-width: 1080px !important;
+  min-width: 0 !important;
   width: 100% !important;
-  table-layout: fixed;
-}
-
-.dashboard-table.contract-management-table::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.dashboard-table.contract-management-table::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #94a3b8;
+  table-layout: auto;
 }
 
 .dashboard-table.contract-management-table th.contract-management-table__action {
@@ -422,8 +411,21 @@ body {
 }
 
 .dashboard-table.contract-management-table .contract-management-table__action > * {
-  max-width: 100%;
+  max-width: none;
   overflow: visible;
+}
+
+.dashboard-table.contract-management-table .contract-management-table__action button {
+  min-width: 9.75rem;
+  overflow: visible;
+}
+
+.dashboard-table.contract-management-table td[data-label="Trạng thái"],
+.dashboard-table.contract-management-table td[data-label="Trạng thái"] > * {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .dark .dashboard-table.contract-management-table th.contract-management-table__action {

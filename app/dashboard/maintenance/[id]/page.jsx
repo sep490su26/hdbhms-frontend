@@ -601,6 +601,7 @@ export default function MaintenanceTicketDetailPage() {
       <div className="grid gap-4 lg:grid-cols-4">
         <InfoItem label="Vị trí" value={locationText} />
         <InfoItem label="Hạng mục" value={CATEGORY_LABELS[ticket.category] || ticket.category} />
+        <InfoItem label="Mong muốn xử lý" value={ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"} />
         <InfoItem label="Mức độ" value={PRIORITY_LABELS[ticket.priority] || ticket.priority} />
         <InfoItem label="Ngày tạo" value={formatDateTime(ticket.createdAt)} />
       </div>
@@ -684,7 +685,7 @@ export default function MaintenanceTicketDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Field label="Cách thu tiền *">
                 <select value={completeForm.collectionMethod} onChange={(event) => updateCompleteForm("collectionMethod", event.target.value)} className={inputClassName()}>
-                  <option value="BILL_NOW">Thanh toán hóa đơn luôn</option>
+                  <option value="BILL_NOW">Thanh toán hóa đơn ngay</option>
                   <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
                 </select>
               </Field>

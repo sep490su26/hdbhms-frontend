@@ -1,24 +1,75 @@
 ﻿"use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { fetchChangeRequests, fetchChangeRequestStats, approveChangeRequest, rejectChangeRequest } from "@/services/changeRequestsService";
-import { confirmTransferContract, getRoomTransferByCode, getRoomTransferById, signTransferContract } from "@/services/roomTransferService";
-import { downloadLeaseContractDraftPdf, fetchManagementLeaseContractDetails, uploadSignedLeaseContractFile } from "@/services/leaseContractsService";
-import { Loader2, Eye, X, CheckCircle2, XCircle, Clock, ArrowRightLeft, LogOut, FileText, Wrench, MessageSquareWarning, Key, Search, FileCheck2, CalendarCheck, CalendarRange, AlertCircle, Plus, Info, Hourglass, Download, Upload, RotateCcw, SlidersHorizontal, Copy, CalendarDays, MoreVertical, Trash2 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {useState, useEffect, useCallback, useRef} from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    fetchChangeRequests,
+    fetchChangeRequestStats,
+    approveChangeRequest,
+    rejectChangeRequest
+} from "@/services/changeRequestsService";
+import {
+    confirmTransferContract,
+    getRoomTransferByCode,
+    getRoomTransferById,
+    signTransferContract,
+    signTransferContractDocument
+} from "@/services/roomTransferService";
+import {
+    downloadLeaseContractDraftPdf,
+    fetchManagementLeaseContractDetails,
+    uploadSignedLeaseContractFile
+} from "@/services/leaseContractsService";
+import {
+    approveExpenseRequest,
+    markExpensePaid,
+    rejectExpenseRequest
+} from "@/services/expenseReportService";
+import {uploadFile} from "@/services/contractHandoverService";
+import {
+    Loader2,
+    Eye,
+    X,
+    CheckCircle2,
+    XCircle,
+    Clock,
+    ArrowRightLeft,
+    LogOut,
+    FileText,
+    Wrench,
+    Wallet,
+    MessageSquareWarning,
+    Key,
+    Search,
+    FileCheck2,
+    CalendarCheck,
+    CalendarRange,
+    AlertCircle,
+    Plus,
+    Info,
+    Hourglass,
+    Download,
+    Upload,
+    RotateCcw,
+    SlidersHorizontal,
+    Copy,
+    CalendarDays,
+    MoreVertical,
+    Trash2
+} from "lucide-react";
+import {PieChart, Pie, Cell, ResponsiveContainer} from "recharts";
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
-import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
-import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import {DashboardPagination} from "@/components/dashboard/DashboardPagination";
+import {sortByNewest} from "@/lib/sortByNewest.mjs";
 import {
     TransferRequestDetail,
     MoveoutRequestDetail,
@@ -28,9 +79,12 @@ import {
     ComplaintRequestDetail,
     MeterReadingCorrectionRequestDetail,
     AccessRequestDetail,
+    ExpenseApprovalRequestDetail,
 } from "./_components/RequestTypeDetails";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import {DashboardPageHeader} from "@/components/dashboard/DashboardPageHeader";
 import TransferExecutionModal from "../_components/TransferExecutionModal";
+import {useAuth} from "../_contexts/AuthContext";
+import {ROLES} from "../_lib/rbac";
 
 const translateType = (type) => {
     const map = {
@@ -42,6 +96,7 @@ const translateType = (type) => {
         INVOICE_ADJUSTMENT: "Điều chỉnh hóa đơn",
         RENT_PRICE_ADJUSTMENT: "Điều chỉnh giá thuê",
         DEPOSIT_REFUND_REQUEST: "Hoàn cọc",
+        EXPENSE_APPROVAL: "Duyệt khoản chi",
         TRANSFER: "Chuyển phòng",
         MOVEOUT: "Trả phòng",
         RENEWAL: "Gia hạn HĐ",
@@ -68,6 +123,7 @@ const mapRequestType = (type) => {
         INVOICE_ADJUSTMENT: "INVOICE_ADJUSTMENT",
         RENT_PRICE_ADJUSTMENT: "RENT_PRICE_ADJUSTMENT",
         DEPOSIT_REFUND_REQUEST: "DEPOSIT_REFUND_REQUEST",
+        EXPENSE_APPROVAL: "EXPENSE_APPROVAL",
         MAINTENANCE: "MAINTENANCE",
         COMPLAINT: "COMPLAINT",
         ACCESS_REQUEST: "ACCESS",
@@ -95,20 +151,37 @@ const statusBadgeClass = (status) => {
 };
 
 const TYPE_CONFIG = {
-    TRANSFER: { color: "bg-violet-50", icon: <ArrowRightLeft className="w-5 h-5 text-violet-500" />, accent: "violet" },
-    MOVEOUT: { color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500" />, accent: "green" },
-    RENEWAL: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
-    TERMINATION: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" />, accent: "red" },
-    CONTRACT_LIQUIDATION: { color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500" />, accent: "red" },
-    MAINTENANCE: { color: "bg-emerald-50", icon: <Wrench className="w-5 h-5 text-emerald-500" />, accent: "emerald" },
-    COMPLAINT: { color: "bg-blue-50", icon: <MessageSquareWarning className="w-5 h-5 text-blue-500" />, accent: "blue" },
-    ACCESS: { color: "bg-orange-50", icon: <Key className="w-5 h-5 text-orange-500" />, accent: "orange" },
-    PERMISSION_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" />, accent: "gray" },
-    TENANT_PROFILE_ACCESS: { color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500" />, accent: "gray" },
-    METER_READING_CORRECTION: { color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500" />, accent: "cyan" },
-    INVOICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
-    RENT_PRICE_ADJUSTMENT: { color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500" />, accent: "indigo" },
-    DEPOSIT_REFUND_REQUEST: { color: "bg-green-50", icon: <FileCheck2 className="w-5 h-5 text-green-500" />, accent: "green" },
+    TRANSFER: {color: "bg-violet-50", icon: <ArrowRightLeft className="w-5 h-5 text-violet-500"/>, accent: "violet"},
+    MOVEOUT: {color: "bg-green-50", icon: <LogOut className="w-5 h-5 text-green-500"/>, accent: "green"},
+    RENEWAL: {color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500"/>, accent: "indigo"},
+    TERMINATION: {color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500"/>, accent: "red"},
+    CONTRACT_LIQUIDATION: {color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500"/>, accent: "red"},
+    MAINTENANCE: {color: "bg-emerald-50", icon: <Wrench className="w-5 h-5 text-emerald-500"/>, accent: "emerald"},
+    COMPLAINT: {color: "bg-blue-50", icon: <MessageSquareWarning className="w-5 h-5 text-blue-500"/>, accent: "blue"},
+    ACCESS: {color: "bg-orange-50", icon: <Key className="w-5 h-5 text-orange-500"/>, accent: "orange"},
+    PERMISSION_ACCESS: {color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500"/>, accent: "gray"},
+    TENANT_PROFILE_ACCESS: {color: "bg-gray-50", icon: <Key className="w-5 h-5 text-gray-500"/>, accent: "gray"},
+    METER_READING_CORRECTION: {color: "bg-cyan-50", icon: <Wrench className="w-5 h-5 text-cyan-500"/>, accent: "cyan"},
+    INVOICE_ADJUSTMENT: {
+        color: "bg-indigo-50",
+        icon: <FileText className="w-5 h-5 text-indigo-500"/>,
+        accent: "indigo"
+    },
+    RENT_PRICE_ADJUSTMENT: {
+        color: "bg-indigo-50",
+        icon: <FileText className="w-5 h-5 text-indigo-500"/>,
+        accent: "indigo"
+    },
+    DEPOSIT_REFUND_REQUEST: {
+        color: "bg-green-50",
+        icon: <FileCheck2 className="w-5 h-5 text-green-500"/>,
+        accent: "green"
+    },
+    EXPENSE_APPROVAL: {
+        color: "bg-emerald-50",
+        icon: <Wallet className="w-5 h-5 text-emerald-500"/>,
+        accent: "emerald"
+    },
 };
 
 const translateTransferStatus = (status) => {
@@ -232,6 +305,7 @@ const TYPE_DETAIL_COMPONENTS = {
     COMPLAINT: ComplaintRequestDetail,
     ACCESS: AccessRequestDetail,
     METER_READING_CORRECTION: MeterReadingCorrectionRequestDetail,
+    EXPENSE_APPROVAL: ExpenseApprovalRequestDetail,
 };
 
 function parseRequestPayload(rawPayload) {
@@ -242,6 +316,31 @@ function parseRequestPayload(rawPayload) {
     } catch {
         return null;
     }
+}
+
+function getExpenseIdFromRequest(req) {
+    const payload = parseRequestPayload(req?.requestPayload) || {};
+    return payload.operatingExpenseId || payload.operating_expense_id || req?.targetId || null;
+}
+
+function isExpenseApprovalRequest(req) {
+    return req?.requestType === "EXPENSE_APPROVAL";
+}
+
+function isContractLiquidationRequest(req) {
+    return ["CONTRACT_LIQUIDATION", "CONTRACT_TERMINATION", "TERMINATION"].includes(req?.requestType);
+}
+
+function isLiquidationRefundExpenseRequest(req) {
+    if (!isExpenseApprovalRequest(req)) return false;
+    const payload = parseRequestPayload(req?.requestPayload) || {};
+    return (payload.sourceRequestType || payload.source_request_type) === "CONTRACT_LIQUIDATION";
+}
+
+function canResolveRequest(req, isOwner) {
+    if (req?.status !== "PENDING") return false;
+    if (isContractLiquidationRequest(req) || isLiquidationRefundExpenseRequest(req)) return isOwner;
+    return true;
 }
 
 function buildTransferFallback(req) {
@@ -285,7 +384,7 @@ function buildRequiredSigningDocuments(transfer) {
         documents.push({
             id: transfer.replacementOldContractId,
             kind: "source-replacement",
-            label: "Hop dong tai ky phong cu",
+            label: "Hợp đồng gia hạn phòng cũ",
         });
     }
     return documents;
@@ -298,9 +397,19 @@ function getTransferSigningDocuments(transfer) {
     return buildRequiredSigningDocuments(transfer);
 }
 
-function allTransferSigningDocumentsUploaded(transfer) {
+function isTransferSigningDocumentSigned(document) {
+    return document?.contractStatus === "SIGNED";
+}
+
+function allTransferSigningDocumentsSigned(transfer) {
     const documents = getTransferSigningDocuments(transfer);
-    return documents.length > 0 && documents.every((document) => Boolean(document.contractFileId));
+    return documents.length > 0 && documents.every(isTransferSigningDocumentSigned);
+}
+
+function getMissingTransferSigningDocumentLabels(transfer) {
+    return getTransferSigningDocuments(transfer)
+        .filter((document) => !isTransferSigningDocumentSigned(document))
+        .map((document) => document.label || document.contractCode || `Hợp đồng #${document.id}`);
 }
 
 function allowsTransferAction(transfer, action) {
@@ -311,7 +420,7 @@ async function hydrateTransferSigningDocuments(transfer) {
     if (!transfer) return transfer;
     const documents = buildRequiredSigningDocuments(transfer);
     if (documents.length === 0) {
-        return { ...transfer, signingDocuments: [] };
+        return {...transfer, signingDocuments: []};
     }
 
     const signingDocuments = await Promise.all(
@@ -326,18 +435,21 @@ async function hydrateTransferSigningDocuments(transfer) {
                     contractFileId: details?.contractFileId ?? contractFile?.id ?? null,
                     contractFileName: details?.contractFileName ?? contractFile?.fileName ?? null,
                     contractFileUploadedAt: details?.contractFileUploadedAt ?? contractFile?.uploadedAt ?? null,
+                    signedFileId: details?.signedFileId ?? details?.signedFile?.id ?? null,
+                    signedFileName: details?.signedFileName ?? details?.signedFile?.fileName ?? null,
+                    signedFileUploadedAt: details?.signedFileUploadedAt ?? details?.signedFile?.uploadedAt ?? null,
                 };
             } catch (error) {
                 console.warn("Unable to load transfer contract signing metadata.", error);
-                return { ...document, loadError: true };
+                return {...document, loadError: true};
             }
         }),
     );
 
-    return { ...transfer, signingDocuments };
+    return {...transfer, signingDocuments};
 }
 
-function RequestDetailContent({ req, detailTransfer }) {
+function RequestDetailContent({req, detailTransfer}) {
     const mappedType = mapRequestType(req.requestType);
     const payload = parseRequestPayload(req.requestPayload);
     const TypeDetailComponent = TYPE_DETAIL_COMPONENTS[mappedType];
@@ -349,8 +461,9 @@ function RequestDetailContent({ req, detailTransfer }) {
         <div className="space-y-6">
             {/* Header info */}
             <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${TYPE_CONFIG[mappedType]?.color || "bg-gray-50"}`}>
-                    {TYPE_CONFIG[mappedType]?.icon || <FileCheck2 className="w-6 h-6 text-gray-500" />}
+                <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${TYPE_CONFIG[mappedType]?.color || "bg-gray-50"}`}>
+                    {TYPE_CONFIG[mappedType]?.icon || <FileCheck2 className="w-6 h-6 text-gray-500"/>}
                 </div>
                 <div className="flex-1">
                     <h3 className="text-lg font-bold text-gray-900">{req.title || translateType(mappedType)}</h3>
@@ -388,11 +501,11 @@ function RequestDetailContent({ req, detailTransfer }) {
                 <div className={`rounded-xl p-4 border ${resolvedTone}`}>
                     <div className="flex items-center gap-2 mb-2">
                         {isProcessingStatus ? (
-                            <Hourglass className="w-4 h-4 text-blue-600" />
+                            <Hourglass className="w-4 h-4 text-blue-600"/>
                         ) : isPositiveStatus ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            <CheckCircle2 className="w-4 h-4 text-green-600"/>
                         ) : (
-                            <XCircle className="w-4 h-4 text-red-600" />
+                            <XCircle className="w-4 h-4 text-red-600"/>
                         )}
                         <p className="text-sm font-semibold">
                             {translateStatus(req.status)}
@@ -418,7 +531,7 @@ function RequestDetailContent({ req, detailTransfer }) {
 
             {!payload && req.requestType && req.requestType !== "ROOM_TRANSFER" && (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex items-start gap-3">
-                    <AlertCircle className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-gray-500 mt-0.5 shrink-0"/>
                     <div className="text-xs text-gray-600">
                         <p className="font-semibold mb-1">Không có chi tiết bổ sung</p>
                         <p>Yêu cầu này không có thông tin chi tiết bổ sung.</p>
@@ -430,14 +543,22 @@ function RequestDetailContent({ req, detailTransfer }) {
 }
 
 export default function ApprovalCenter() {
-  const [typeFilter, setTypeFilter] = useState("All Types");
-  const [statusFilter, setStatusFilter] = useState("Pending");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [size, setSize] = useState(10);
+    const {user} = useAuth();
+    const isOwner = user?.role === ROLES.OWNER;
+    const [typeFilter, setTypeFilter] = useState("All Types");
+    const [statusFilter, setStatusFilter] = useState("Pending");
+    const [search, setSearch] = useState("");
+    const [page, setPage] = useState(1);
+    const [size, setSize] = useState(10);
 
     const [data, setData] = useState([]);
-    const [stats, setStats] = useState({ breakdown: [], pendingCount: 0, approvedCount: 0, rejectedCount: 0, totalCount: 0 });
+    const [stats, setStats] = useState({
+        breakdown: [],
+        pendingCount: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+        totalCount: 0
+    });
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -447,6 +568,13 @@ export default function ApprovalCenter() {
     const [detailModal, setDetailModal] = useState(null);
     const [detailTransfer, setDetailTransfer] = useState(null);
     const [executeModal, setExecuteModal] = useState(null);
+    const [paymentModal, setPaymentModal] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({
+        paymentDate: "",
+        paymentReference: "",
+        note: "",
+        proofFile: null,
+    });
     const [selectedTransferContractId, setSelectedTransferContractId] = useState(null);
     const signedTransferContractInputRef = useRef(null);
 
@@ -455,7 +583,13 @@ export default function ApprovalCenter() {
         try {
             const apiStatus = statusFilter === "All" ? undefined : statusFilter;
             const [dataRes, statsRes] = await Promise.all([
-                fetchChangeRequests({ page: page - 1, size, type: typeFilter === "All Types" ? undefined : typeFilter, status: apiStatus, search }),
+                fetchChangeRequests({
+                    page: page - 1,
+                    size,
+                    type: typeFilter === "All Types" ? undefined : typeFilter,
+                    status: apiStatus,
+                    search
+                }),
                 fetchChangeRequestStats()
             ]);
             setData(sortByNewest(dataRes.requests, ["createdAt", "created_at"]));
@@ -472,6 +606,7 @@ export default function ApprovalCenter() {
                     INVOICE_ADJUSTMENT: "#6366F1",
                     RENT_PRICE_ADJUSTMENT: "#6366F1",
                     DEPOSIT_REFUND_REQUEST: "#22C55E",
+                    EXPENSE_APPROVAL: "#10B981",
                     TRANSFER: "#3B82F6",
                     MOVEOUT: "#22C55E",
                     TERMINATION: "#FACC15",
@@ -500,13 +635,24 @@ export default function ApprovalCenter() {
         }
     }, [page, search, size, statusFilter, typeFilter]);
 
-    const handleApprove = async (id) => {
+    const handleApprove = async (requestOrId) => {
+        const req = typeof requestOrId === "object" ? requestOrId : data.find((item) => item.id === requestOrId);
+        const id = typeof requestOrId === "object" ? requestOrId.id : requestOrId;
+        if (!canResolveRequest(req, isOwner)) {
+            window.alert("Chỉ chủ trọ được quyết định yêu cầu thanh lý hợp đồng.");
+            return;
+        }
         setActionLoading(`approve-${id}`);
         try {
-            await approveChangeRequest(id);
+            if (isExpenseApprovalRequest(req)) {
+                await approveExpenseRequest(getExpenseIdFromRequest(req));
+            } else {
+                await approveChangeRequest(id);
+            }
             await loadData();
         } catch (e) {
             console.error(e);
+            window.alert(e?.message || "Không thể duyệt yêu cầu.");
         } finally {
             setActionLoading(null);
         }
@@ -514,14 +660,69 @@ export default function ApprovalCenter() {
 
     const handleReject = async () => {
         if (!rejectModal) return;
+        if (!canResolveRequest(rejectModal, isOwner)) {
+            window.alert("Chỉ chủ trọ được quyết định yêu cầu thanh lý hợp đồng.");
+            setRejectModal(null);
+            setRejectNote("");
+            return;
+        }
         setActionLoading(`reject-${rejectModal.id}`);
         try {
-            await rejectChangeRequest(rejectModal.id, rejectNote || "Không có lý do");
+            if (isExpenseApprovalRequest(rejectModal)) {
+                await rejectExpenseRequest(getExpenseIdFromRequest(rejectModal), rejectNote || "Không có lý do");
+            } else {
+                await rejectChangeRequest(rejectModal.id, rejectNote || "Không có lý do");
+            }
             setRejectModal(null);
             setRejectNote("");
             await loadData();
         } catch (e) {
             console.error(e);
+            window.alert(e?.message || "Không thể từ chối yêu cầu.");
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const openPaymentModal = (req) => {
+        setPaymentModal(req);
+        setPaymentForm({
+            paymentDate: new Date().toISOString().slice(0, 10),
+            paymentReference: "",
+            note: "",
+            proofFile: null,
+        });
+    };
+
+    const handleMarkExpensePaid = async () => {
+        if (!paymentModal) return;
+        const expenseId = getExpenseIdFromRequest(paymentModal);
+        if (!expenseId) {
+            window.alert("Không xác định được khoản chi cần ghi nhận.");
+            return;
+        }
+        if (!paymentForm.proofFile) {
+            window.alert("Vui lòng upload ảnh minh chứng đã hoàn tiền.");
+            return;
+        }
+        setActionLoading(`mark-paid-${paymentModal.id}`);
+        try {
+            const uploaded = await uploadFile(paymentForm.proofFile, "RECEIPT");
+            await markExpensePaid(expenseId, {
+                paymentDate: paymentForm.paymentDate,
+                paymentMethod: "BANK_TRANSFER",
+                paymentReference: paymentForm.paymentReference,
+                receiptFileId: uploaded?.id || uploaded?.fileId,
+                note: paymentForm.note,
+            });
+            setPaymentModal(null);
+            await loadData();
+            if (detailModal?.id === paymentModal.id) {
+                closeDetailModal();
+            }
+        } catch (e) {
+            console.error(e);
+            window.alert(e?.message || "Không thể ghi nhận đã hoàn tiền.");
         } finally {
             setActionLoading(null);
         }
@@ -607,6 +808,11 @@ export default function ApprovalCenter() {
             window.alert("Hợp đồng chuyển phòng đã qua bước xác nhận ký.");
             return;
         }
+        const missingDocuments = getMissingTransferSigningDocumentLabels(detailTransfer);
+        if (missingDocuments.length > 0) {
+            window.alert(`Vui lòng xác nhận từng hợp đồng đã ký trước khi xác nhận đủ bộ. Còn thiếu: ${missingDocuments.join(", ")}.`);
+            return;
+        }
         setActionLoading(`sign-transfer-contract-${detailModal.id}`);
         try {
             await signTransferContract(detailTransfer.id);
@@ -644,7 +850,7 @@ export default function ApprovalCenter() {
         setActionLoading(`upload-transfer-contract-${contractId}`);
         try {
             await uploadSignedLeaseContractFile(
-                { leaseContractId: contractId },
+                {leaseContractId: contractId},
                 file
             );
             const refreshedTransfer = await loadTransferDetail(detailModal);
@@ -656,6 +862,26 @@ export default function ApprovalCenter() {
         } finally {
             event.target.value = "";
             setSelectedTransferContractId(null);
+            setActionLoading(null);
+        }
+    };
+
+    const handleSignTransferContractDocument = async (document) => {
+        if (!detailModal || !detailTransfer || !document?.id) return;
+        if (!document.signedFileId) {
+            window.alert("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
+            return;
+        }
+        setActionLoading(`sign-transfer-contract-document-${document.id}`);
+        try {
+            await signTransferContractDocument(detailTransfer.id, document.id);
+            const refreshedTransfer = await loadTransferDetail(detailModal);
+            setDetailTransfer(refreshedTransfer);
+            await loadData();
+        } catch (e) {
+            console.error(e);
+            window.alert(e?.message || "Không thể xác nhận hợp đồng này đã ký.");
+        } finally {
             setActionLoading(null);
         }
     };
@@ -673,10 +899,38 @@ export default function ApprovalCenter() {
     const openVisibleCount = data.filter((req) => req.status === "PENDING" || req.status === "PROCESSING").length;
 
     const statCards = [
-        { label: "Chờ xử lý", value: stats.pendingCount, sub: "Yêu cầu cần xử lý", iconBg: "bg-amber-50", iconColor: "text-amber-500", icon: Clock },
-        { label: "Cần ưu tiên", value: overdueItems.length, sub: "Mục quá hạn trong danh sách hiện tại", iconBg: "bg-red-50", iconColor: "text-red-500", icon: AlertCircle },
-        { label: "Đang xử lý", value: processingVisibleCount, sub: "Yêu cầu đang ở trạng thái xử lý", iconBg: "bg-blue-50", iconColor: "text-blue-500", icon: Hourglass },
-        { label: "Đang mở", value: openVisibleCount, sub: "Pending + Processing trong danh sách", iconBg: "bg-violet-50", iconColor: "text-violet-500", icon: FileText },
+        {
+            label: "Chờ xử lý",
+            value: stats.pendingCount,
+            sub: "Yêu cầu cần xử lý",
+            iconBg: "bg-amber-50",
+            iconColor: "text-amber-500",
+            icon: Clock
+        },
+        {
+            label: "Cần ưu tiên",
+            value: overdueItems.length,
+            sub: "Mục quá hạn trong danh sách hiện tại",
+            iconBg: "bg-red-50",
+            iconColor: "text-red-500",
+            icon: AlertCircle
+        },
+        {
+            label: "Đang xử lý",
+            value: processingVisibleCount,
+            sub: "Yêu cầu đang ở trạng thái xử lý",
+            iconBg: "bg-blue-50",
+            iconColor: "text-blue-500",
+            icon: Hourglass
+        },
+        {
+            label: "Đang mở",
+            value: openVisibleCount,
+            sub: "Pending + Processing trong danh sách",
+            iconBg: "bg-violet-50",
+            iconColor: "text-violet-500",
+            icon: FileText
+        },
     ];
 
     const OPEN_REQUEST_STATUSES = new Set([
@@ -726,7 +980,7 @@ export default function ApprovalCenter() {
 
     return (
         <div className="bg-[#f8fafc] font-sans">
-            <div className="mx-auto w-full max-w-[1600px] space-y-6">
+            <div className="mx-auto w-full space-y-6">
                 <DashboardPageHeader
                     title={
                         <span className="flex items-center gap-2">
@@ -736,503 +990,394 @@ export default function ApprovalCenter() {
                     description="Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê."
                     actions={
                         <Button className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800">
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className="mr-2 h-4 w-4"/>
                             Tạo yêu cầu mới
                         </Button>
                     }
                 />
-            <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_240px] 2xl:items-start">
-                {/* LEFT: main content */}
-                <div className="min-w-0 space-y-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        {statCards.map((card) => {
-                            const Icon = card.icon;
-                            return (
-                                <div key={card.label} className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                                    <div className="flex items-start gap-3">
-                                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${card.iconBg}`}>
-                                            <Icon className={`h-4 w-4 ${card.iconColor}`} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium leading-5 text-slate-500">{card.label}</p>
-                                            <p className="mt-1 text-2xl font-bold leading-none text-slate-900">{card.value}</p>
-                                            <p className="mt-1 text-xs leading-4 text-slate-400">{card.sub}</p>
+                <div className="grid grid-cols-1 gap-6 2xl:items-start">
+                    {/* LEFT: main content */}
+                    <div className="min-w-0 space-y-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            {statCards.map((card) => {
+                                const Icon = card.icon;
+                                return (
+                                    <div key={card.label}
+                                         className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                        <div className="flex items-start gap-3">
+                                            <div
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${card.iconBg}`}>
+                                                <Icon className={`h-4 w-4 ${card.iconColor}`}/>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium leading-5 text-slate-500">{card.label}</p>
+                                                <p className="mt-1 text-2xl font-bold leading-none text-slate-900">{card.value}</p>
+                                                <p className="mt-1 text-xs leading-4 text-slate-400">{card.sub}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="relative min-w-0">
-                            <p className="mb-2 text-sm font-medium text-slate-500">Tìm kiếm</p>
-                            <Search className="absolute left-4 top-[calc(50%+14px)] h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                className="h-12 rounded-2xl border-slate-200 bg-background pl-11 text-sm"
-                                placeholder="Tìm theo mã yêu cầu, tiêu đề, người tạo..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
+                                );
+                            })}
                         </div>
 
-                        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
-                            <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
-                                <div className="min-w-0">
-                                    <p className="mb-2 text-sm font-medium text-slate-500">Loại yêu cầu</p>
-                                    <select
-                                        className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
-                                        value={typeFilter}
-                                        onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-                                    >
-                                        <option value="All Types">Tất cả loại</option>
-                                        {Object.keys(TYPE_CONFIG).map((t) => <option key={t} value={t}>{translateType(t)}</option>)}
-                                    </select>
-                                </div>
-
-                                <div className="min-w-0">
-                                    <p className="mb-2 text-sm font-medium text-slate-500">Trạng thái</p>
-                                    <select
-                                        className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                    >
-                                        <option value="Pending">Đang chờ</option>
-                                        <option value="Approved">Đã duyệt</option>
-                                        <option value="Rejected">Đã từ chối</option>
-                                        <option value="All">Tất cả</option>
-                                    </select>
-                                </div>
-
-                                <div className="min-w-0">
-                                    <p className="mb-2 text-sm font-medium text-slate-500">Thời gian tạo</p>
-                                    <button className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-background px-4 text-left text-sm text-slate-400 hover:bg-muted">
-                                        <CalendarDays className="mr-3 h-4 w-4 shrink-0" />
-                                        <span className="truncate">Chọn khoảng thời gian</span>
-                                    </button>
-                                </div>
+                        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <div className="relative min-w-0">
+                                <p className="mb-2 text-sm font-medium text-slate-500">Tìm kiếm</p>
+                                <Search
+                                    className="absolute left-4 top-[calc(50%+14px)] h-4 w-4 -translate-y-1/2 text-slate-400"/>
+                                <Input
+                                    className="h-12 rounded-2xl border-slate-200 bg-background pl-11 text-sm"
+                                    placeholder="Tìm theo mã yêu cầu, tiêu đề, người tạo..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
                             </div>
 
-                            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap 2xl:justify-end">
-                                <Button
-                                    variant="outline"
-                                    className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted sm:min-w-[140px]"
-                                    onClick={() => { setTypeFilter("All Types"); setStatusFilter("Pending"); setSearch(""); }}
-                                >
-                                    <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
-                                    Đặt lại
-                                </Button>
+                            <div
+                                className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+                                <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
+                                    <div className="min-w-0">
+                                        <p className="mb-2 text-sm font-medium text-slate-500">Loại yêu cầu</p>
+                                        <select
+                                            className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
+                                            value={typeFilter}
+                                            onChange={(e) => {
+                                                setTypeFilter(e.target.value);
+                                                setPage(1);
+                                            }}
+                                        >
+                                            <option value="All Types">Tất cả loại</option>
+                                            {Object.keys(TYPE_CONFIG).map((t) => <option key={t}
+                                                                                         value={t}>{translateType(t)}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <p className="mb-2 text-sm font-medium text-slate-500">Trạng thái</p>
+                                        <select
+                                            className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                        >
+                                            <option value="Pending">Đang chờ</option>
+                                            <option value="Approved">Đã duyệt</option>
+                                            <option value="Rejected">Đã từ chối</option>
+                                            <option value="All">Tất cả</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <p className="mb-2 text-sm font-medium text-slate-500">Thời gian tạo</p>
+                                        <button
+                                            className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-background px-4 text-left text-sm text-slate-400 hover:bg-muted">
+                                            <CalendarDays className="mr-3 h-4 w-4 shrink-0"/>
+                                            <span className="truncate">Chọn khoảng thời gian</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap 2xl:justify-end">
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted sm:min-w-[140px]"
+                                        onClick={() => {
+                                            setTypeFilter("All Types");
+                                            setStatusFilter("Pending");
+                                            setSearch("");
+                                        }}
+                                    >
+                                        <RotateCcw className="mr-2 h-4 w-4 shrink-0"/>
+                                        Đặt lại
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Table */}
-                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                        <div className="hidden min-[1536px]:block">
-                            <Table className="w-full">
-                                <TableHeader>
-                                    <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-                                        <TableHead className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Mã yêu cầu</TableHead>
-                                        <TableHead className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Loại yêu cầu</TableHead>
-                                        <TableHead className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Tiêu đề</TableHead>
-                                        <TableHead className="hidden min-[1700px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Người tạo</TableHead>
-                                        <TableHead className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Ngày tạo</TableHead>
-                                        <TableHead className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Trạng thái</TableHead>
-                                        <TableHead className="hidden min-[1650px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Hạn xử lý</TableHead>
-                                        <TableHead className="h-12 px-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Thao tác</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                        {/* Table */}
+                        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                            <div className="hidden min-[1536px]:block">
+                                <Table className="w-full">
+                                    <TableHeader>
+                                        <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+                                            <TableHead
+                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Mã
+                                                yêu cầu</TableHead>
+                                            <TableHead
+                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Loại
+                                                yêu cầu</TableHead>
+                                            <TableHead
+                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Tiêu
+                                                đề</TableHead>
+                                            <TableHead
+                                                className="hidden min-[1700px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Người
+                                                tạo</TableHead>
+                                            <TableHead
+                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Ngày
+                                                tạo</TableHead>
+                                            <TableHead
+                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Trạng
+                                                thái</TableHead>
+                                            <TableHead
+                                                className="hidden min-[1650px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Hạn
+                                                xử lý</TableHead>
+                                            <TableHead
+                                                className="h-12 px-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Thao
+                                                tác</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="py-12 text-center text-slate-500">
+                                                    <Loader2
+                                                        className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2"/>
+                                                    Đang tải dữ liệu...
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : data.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="py-12 text-center text-slate-500">
+                                                    Không tìm thấy yêu cầu nào.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            data.map((req) => {
+                                                const tc = TYPE_CONFIG[mapRequestType(req.requestType)] || TYPE_CONFIG.ACCESS;
+                                                return (
+                                                    <TableRow key={req.id}
+                                                              className="border-slate-100 transition-colors hover:bg-slate-50/60">
+                                                        <TableCell className="px-3 py-3 align-top">
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="break-all font-mono text-xs font-semibold text-slate-900">{req.requestCode || `#${req.id}`}</p>
+                                                                    <Copy className="h-4 w-4 text-slate-300"/>
+                                                                </div>
+                                                                <Badge variant="outline"
+                                                                       className="rounded-full border-slate-200 bg-slate-50 text-xs text-slate-500">
+                                                                    Ưu tiên: Thường
+                                                                </Badge>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="px-3 py-3 align-top">
+                                                            <div className="flex items-start gap-2">
+                                                                <div
+                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tc.color}`}>
+                                                                    {tc.icon}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-semibold text-slate-900">{translateType(req.requestType)}</p>
+                                                                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{req.requestType}</p>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="min-w-0 px-3 py-3 align-top">
+                                                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{req.title || "--"}</p>
+                                                            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{req.description || "Không có mô tả bổ sung"}</p>
+                                                        </TableCell>
+                                                        <TableCell
+                                                            className="hidden min-[1700px]:table-cell px-3 py-3 align-top">
+                                                            <div className="flex items-center gap-2">
+                                                                <div
+                                                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                                                                    {(req.requestCode || "R").slice(-1)}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-slate-900">Người
+                                                                        tạo</p>
+                                                                    <p className="mt-1 text-sm text-slate-500">ID
+                                                                        #{req.requesterId || "--"}</p>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell
+                                                            className="px-3 py-3 align-top text-sm text-slate-700">
+                                                            <p>{req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "--"}</p>
+                                                            <p className="mt-2 text-slate-400">{req.createdAt ? new Date(req.createdAt).toLocaleTimeString("vi-VN", {
+                                                                hour: "2-digit",
+                                                                minute: "2-digit"
+                                                            }) : "--"}</p>
+                                                        </TableCell>
+                                                        <TableCell className="px-3 py-3 align-top">
+                                                            <Badge variant="outline"
+                                                                   className={`rounded-full capitalize ${statusBadgeClass(req.status)}`}>
+                                                                {translateStatus(req.status)}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell
+                                                            className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm">
+                                                            <p className={`${req.status === "REJECTED" ? "text-red-500" : "text-slate-900"}`}>
+                                                                {req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "--"}
+                                                            </p>
+                                                            <p className={`mt-2 ${req.status === "PENDING" ? "text-orange-500" : req.status === "REJECTED" ? "text-red-500" : "text-slate-400"}`}>
+                                                                {req.status === "PENDING" ? "Còn 1 ngày" : req.status === "REJECTED" ? "Quá hạn" : "Đúng hạn"}
+                                                            </p>
+                                                        </TableCell>
+                                                        <TableCell className="px-3 py-3 align-top">
+                                                            <div className="flex items-center justify-end gap-1.5">
+                                                                <Button size="icon" variant="outline"
+                                                                        onClick={() => openDetailModal(req)}
+                                                                        className="h-8 w-8 rounded-xl border-slate-200 text-slate-500">
+                                                                    <Eye className="h-4 w-4"/>
+                                                                </Button>
+                                                                <Button size="icon" variant="outline"
+                                                                        className="h-8 w-8 rounded-xl border-slate-200 text-slate-500">
+                                                                    <MoreVertical className="h-4 w-4"/>
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 min-[1536px]:hidden">
                                 {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="py-12 text-center text-slate-500">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
-                                            Đang tải dữ liệu...
-                                        </TableCell>
-                                    </TableRow>
+                                    <div className="py-10 text-center text-gray-500">
+                                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2"/>
+                                        Đang tải dữ liệu...
+                                    </div>
                                 ) : data.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="py-12 text-center text-slate-500">
-                                            Không tìm thấy yêu cầu nào.
-                                        </TableCell>
-                                    </TableRow>
+                                    <div className="py-10 text-center text-gray-500">
+                                        Không tìm thấy yêu cầu nào.
+                                    </div>
                                 ) : (
                                     data.map((req) => {
                                         const tc = TYPE_CONFIG[mapRequestType(req.requestType)] || TYPE_CONFIG.ACCESS;
                                         return (
-                                            <TableRow key={req.id} className="border-slate-100 transition-colors hover:bg-slate-50/60">
-                                                <TableCell className="px-3 py-3 align-top">
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="break-all font-mono text-xs font-semibold text-slate-900">{req.requestCode || `#${req.id}`}</p>
-                                                            <Copy className="h-4 w-4 text-slate-300" />
-                                                        </div>
-                                                        <Badge variant="outline" className="rounded-full border-slate-200 bg-slate-50 text-xs text-slate-500">
-                                                            Ưu tiên: Thường
-                                                        </Badge>
+                                            <div key={req.id} className="p-4 space-y-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="font-mono text-sm font-semibold text-gray-900 break-all">{req.requestCode || `#${req.id}`}</p>
+                                                        <p className="mt-1 text-sm font-medium text-gray-900">{req.title || "--"}</p>
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="px-3 py-3 align-top">
-                                                    <div className="flex items-start gap-2">
-                                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tc.color}`}>
-                                                            {tc.icon}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-slate-900">{translateType(req.requestType)}</p>
-                                                            <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{req.requestType}</p>
-                                                        </div>
+                                                    <div
+                                                        className={`w-9 h-9 ${tc.color} rounded-lg flex items-center justify-center shrink-0`}>
+                                                        {tc.icon}
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="min-w-0 px-3 py-3 align-top">
-                                                    <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{req.title || "--"}</p>
-                                                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{req.description || "Không có mô tả bổ sung"}</p>
-                                                </TableCell>
-                                                <TableCell className="hidden min-[1700px]:table-cell px-3 py-3 align-top">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                                                            {(req.requestCode || "R").slice(-1)}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-slate-900">Người tạo</p>
-                                                            <p className="mt-1 text-sm text-slate-500">ID #{req.requesterId || "--"}</p>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="px-3 py-3 align-top text-sm text-slate-700">
-                                                    <p>{req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "--"}</p>
-                                                    <p className="mt-2 text-slate-400">{req.createdAt ? new Date(req.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "--"}</p>
-                                                </TableCell>
-                                                <TableCell className="px-3 py-3 align-top">
-                                                    <Badge variant="outline" className={`rounded-full capitalize ${statusBadgeClass(req.status)}`}>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge variant="outline"
+                                                           className={`capitalize ${statusBadgeClass(req.status)}`}>
                                                         {translateStatus(req.status)}
                                                     </Badge>
-                                                </TableCell>
-                                                <TableCell className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm">
-                                                    <p className={`${req.status === "REJECTED" ? "text-red-500" : "text-slate-900"}`}>
-                                                        {req.createdAt ? new Date(req.createdAt).toLocaleDateString("vi-VN") : "--"}
-                                                    </p>
-                                                    <p className={`mt-2 ${req.status === "PENDING" ? "text-orange-500" : req.status === "REJECTED" ? "text-red-500" : "text-slate-400"}`}>
-                                                        {req.status === "PENDING" ? "Còn 1 ngày" : req.status === "REJECTED" ? "Quá hạn" : "Đúng hạn"}
-                                                    </p>
-                                                </TableCell>
-                                                <TableCell className="px-3 py-3 align-top">
-                                                    <div className="flex items-center justify-end gap-1.5">
-                                                        <Button size="icon" variant="outline" onClick={() => openDetailModal(req)} className="h-8 w-8 rounded-xl border-slate-200 text-slate-500">
-                                                            <Eye className="h-4 w-4" />
+                                                    <Badge variant="outline"
+                                                           className="bg-white text-gray-600 border-gray-200">
+                                                        {translateType(req.requestType)}
+                                                    </Badge>
+                                                    <span className="text-xs text-gray-500">
+                                                    {req.createdAt ? new Date(req.createdAt).toLocaleDateString('vi-VN') : "--"}
+                                                </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button size="sm" variant="outline"
+                                                            onClick={() => openDetailModal(req)}
+                                                            className="rounded-lg h-8 px-3 text-gray-600 hover:text-gray-900">
+                                                        <Eye className="w-3.5 h-3.5 mr-1"/>
+                                                        Xem
+                                                    </Button>
+                                                    {canResolveRequest(req, isOwner) && (
+                                                        <>
+                                                            <Button size="sm" onClick={() => handleApprove(req)}
+                                                                    disabled={actionLoading?.startsWith('approve') || actionLoading?.startsWith('reject')}
+                                                                    className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 px-3 disabled:opacity-60">
+                                                                {actionLoading === `approve-${req.id}` ? <Loader2
+                                                                    className="w-3.5 h-3.5 animate-spin"/> : "Duyệt"}
+                                                            </Button>
+                                                            <Button size="sm" variant="outline" onClick={() => {
+                                                                setRejectModal(req);
+                                                                setRejectNote("");
+                                                            }}
+                                                                    disabled={actionLoading?.startsWith('approve') || actionLoading?.startsWith('reject')}
+                                                                    className="rounded-lg h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-60">
+                                                                Từ chối
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    {isExpenseApprovalRequest(req) && req.status === "APPROVED" && (
+                                                        <Button size="sm" onClick={() => openPaymentModal(req)}
+                                                                disabled={Boolean(actionLoading)}
+                                                                className="rounded-lg h-8 px-3 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
+                                                            Ghi nhận đã hoàn tiền
                                                         </Button>
-                                                        <Button size="icon" variant="outline" className="h-8 w-8 rounded-xl border-slate-200 text-slate-500">
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
+                                                    )}
+                                                </div>
+                                            </div>
                                         );
                                     })
                                 )}
-                            </TableBody>
-                        </Table>
-                        </div>
-
-                        <div className="divide-y divide-slate-100 min-[1536px]:hidden">
-                            {loading ? (
-                                <div className="py-10 text-center text-gray-500">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
-                                    Đang tải dữ liệu...
-                                </div>
-                            ) : data.length === 0 ? (
-                                <div className="py-10 text-center text-gray-500">
-                                    Không tìm thấy yêu cầu nào.
-                                </div>
-                            ) : (
-                                data.map((req) => {
-                                    const tc = TYPE_CONFIG[mapRequestType(req.requestType)] || TYPE_CONFIG.ACCESS;
-                                    return (
-                                        <div key={req.id} className="p-4 space-y-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="font-mono text-sm font-semibold text-gray-900 break-all">{req.requestCode || `#${req.id}`}</p>
-                                                    <p className="mt-1 text-sm font-medium text-gray-900">{req.title || "--"}</p>
-                                                </div>
-                                                <div className={`w-9 h-9 ${tc.color} rounded-lg flex items-center justify-center shrink-0`}>
-                                                    {tc.icon}
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge variant="outline" className={`capitalize ${statusBadgeClass(req.status)}`}>
-                                                    {translateStatus(req.status)}
-                                                </Badge>
-                                                <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
-                                                    {translateType(req.requestType)}
-                                                </Badge>
-                                                <span className="text-xs text-gray-500">
-                                                    {req.createdAt ? new Date(req.createdAt).toLocaleDateString('vi-VN') : "--"}
-                                                </span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => openDetailModal(req)} className="rounded-lg h-8 px-3 text-gray-600 hover:text-gray-900">
-                                                    <Eye className="w-3.5 h-3.5 mr-1" />
-                                                    Xem
-                                                </Button>
-                                                {req.status === 'PENDING' && (
-                                                    <>
-                                                        <Button size="sm" onClick={() => handleApprove(req.id)} disabled={actionLoading?.startsWith('approve') || actionLoading?.startsWith('reject')} className="bg-green-600 hover:bg-green-700 text-white rounded-lg h-8 px-3 disabled:opacity-60">
-                                                            {actionLoading === `approve-${req.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Duyệt"}
-                                                        </Button>
-                                                        <Button size="sm" variant="outline" onClick={() => { setRejectModal(req); setRejectNote(""); }} disabled={actionLoading?.startsWith('approve') || actionLoading?.startsWith('reject')} className="rounded-lg h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-60">
-                                                            Từ chối
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
-
-                    <DashboardPagination
-                        page={page}
-                        size={size}
-                        totalElements={total}
-                        totalPages={totalPages}
-                        itemLabel="yêu cầu"
-                        className="rounded-b-3xl"
-                        onPageChange={setPage}
-                        onSizeChange={(nextSize) => {
-                            setSize(nextSize);
-                            setPage(1);
-                        }}
-                    />
-                </div>
-
-                <div className="min-w-0 space-y-5">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm 2xl:sticky 2xl:top-6">
-                        <p className="mb-1 text-xl font-semibold text-slate-900">Phân bố yêu cầu đang mở</p>
-                        <p className="mb-3 text-sm text-slate-500">Theo danh sách đang hiển thị và chỉ tính các request còn cần xử lý.</p>
-                        <div className="mb-4 flex justify-center h-40">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={activeRequestBreakdown.length > 0 ? activeRequestBreakdown : [{ type: "OTHER", count: 1, color: "#D1D5DB" }]}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={45}
-                                        outerRadius={65}
-                                        paddingAngle={2}
-                                        dataKey="count"
-                                        stroke="none"
-                                    >
-                                        {(activeRequestBreakdown.length > 0 ? activeRequestBreakdown : [{ type: "OTHER", count: 1, color: "#D1D5DB" }]).map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div className="space-y-4">
-                            {activeRequestBreakdown.map((item) => (
-                                <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }}></span>
-                                        <span className="truncate text-slate-600">{item.label}</span>
-                                    </div>
-                                    <span className="shrink-0 text-slate-400">{item.count} ({openVisibleCount ? ((item.count / openVisibleCount) * 100).toFixed(1) : "0"}%)</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between">
-                            <p className="text-xl font-semibold text-slate-900">Yêu cầu quá hạn</p>
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-500">
-                                {overdueItems.length}
                             </div>
                         </div>
-                        <div className="space-y-4">
-                            {overdueItems.length === 0 ? (
-                                <p className="text-sm text-slate-400">Hiện chưa có yêu cầu quá hạn.</p>
-                            ) : overdueItems.map((item) => (
-                                <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-100 p-3">
-                                    <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${(TYPE_CONFIG[item.requestType] || TYPE_CONFIG.ACCESS).color}`}>
-                                        {(TYPE_CONFIG[item.requestType] || TYPE_CONFIG.ACCESS).icon}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate font-mono text-sm font-semibold text-slate-900">{item.requestCode || `#${item.id}`}</p>
-                                        <p className="mt-1 text-sm text-slate-500">{translateType(item.requestType)}</p>
-                                    </div>
-                                    <p className="shrink-0 text-sm font-medium text-red-500">Quá hạn</p>
-                                </div>
-                            ))}
-                        </div>
+
+                        <DashboardPagination
+                            page={page}
+                            size={size}
+                            totalElements={total}
+                            totalPages={totalPages}
+                            itemLabel="yêu cầu"
+                            className="rounded-b-3xl"
+                            onPageChange={setPage}
+                            onSizeChange={(nextSize) => {
+                                setSize(nextSize);
+                                setPage(1);
+                            }}
+                        />
                     </div>
                 </div>
-            </div>
             </div>
 
             {/* Detail modal */}
             {detailModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-2 sm:p-3 backdrop-blur-sm" onClick={closeDetailModal}>
-                    <div className="w-full max-w-4xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between z-10">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-2 sm:p-3 backdrop-blur-sm"
+                    onClick={closeDetailModal}>
+                    <div
+                        className="w-full max-w-4xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div
+                            className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between z-10">
                             <h3 className="text-lg font-bold text-gray-900">Chi tiết yêu cầu</h3>
                             <Button variant="ghost" size="sm" onClick={closeDetailModal} className="rounded-lg">
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4"/>
                             </Button>
                         </div>
                         <div className="p-6 space-y-6">
-                            <RequestDetailContent req={detailModal} detailTransfer={detailTransfer} />
-
-                            {detailModal.requestType === "ROOM_TRANSFER" && (
-                                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 space-y-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h4 className="text-sm font-bold text-blue-900">Luồng chuyển phòng vận hành</h4>
-                                            <p className="mt-1 text-sm text-blue-700">
-                                                Màn quản lý này bám theo trạng thái transfer thực tế, không chỉ trạng thái duyệt yêu cầu.
-                                            </p>
-                                        </div>
-                                        {detailTransfer && (
-                                            <Badge variant="outline" className={`${getTransferStatusTone(detailTransfer.status)} border`}>
-                                                {translateTransferStatus(detailTransfer.status)}
-                                            </Badge>
-                                        )}
-                                    </div>
-
-                                    {actionLoading === `load-transfer-${detailModal.id}` && (
-                                        <div className="flex items-center gap-2 text-sm text-blue-700">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Đang tải chi tiết chuyển phòng...
-                                        </div>
-                                    )}
-
-                                    {detailTransfer && (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                    <p className="text-xs font-semibold text-gray-500 mb-1">Phòng cũ</p>
-                                                    <p className="text-sm font-semibold text-gray-900">{detailTransfer.oldRoomName || detailTransfer.oldRoomCode || "--"}</p>
-                                                    <p className="mt-2 text-xs text-gray-600">
-                                                        Chỉ làm full move-out nếu sau chuyển phòng này phòng cũ trở thành phòng trống.
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                    <p className="text-xs font-semibold text-gray-500 mb-1">Phòng đích</p>
-                                                    <p className="text-sm font-semibold text-gray-900">{detailTransfer.targetRoomName || detailTransfer.targetRoomCode || "--"}</p>
-                                                    <p className="mt-2 text-xs text-gray-600">
-                                                        {requiresFullMoveIn(detailTransfer)
-                                                            ? "Move-in chỉ áp dụng khi phòng đích là phòng trống hoặc sắp trống."
-                                                            : "Ca này chủ yếu là thêm người vào hợp đồng/phòng đích đang có người."}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                <p className="text-sm font-semibold text-gray-900 mb-2">Lưu ý thời điểm</p>
-                                                <p className="text-sm text-gray-700">{getTransferTimingNote(detailTransfer)}</p>
-                                            </div>
-
-                                            <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                <p className="text-sm font-semibold text-gray-900 mb-2">Bước hiện tại cho quản lý</p>
-                                                <p className="text-sm text-gray-700">{getTransferActionMeta(detailTransfer).helperText}</p>
-                                            </div>
-
-                                            {detailTransfer.oldRoomFinalInvoiceId && (
-                                                <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                    <p className="text-sm font-semibold text-gray-900 mb-2">Hóa đơn điện/nước chốt khi chuyển phòng</p>
-                                                    <p className="text-sm font-semibold text-gray-900">#{detailTransfer.oldRoomFinalInvoiceId}</p>
-                                                </div>
-                                            )}
-
-                                            {isTransferSigningStatus(detailTransfer.status) && getTransferSigningDocuments(detailTransfer).length > 0 && (
-                                                <div className="rounded-xl bg-white p-4 border border-blue-100">
-                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <p className="text-sm font-semibold text-gray-900">Tài liệu cần ký</p>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={allTransferSigningDocumentsUploaded(detailTransfer)
-                                                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                                : "border-amber-200 bg-amber-50 text-amber-700"}
-                                                        >
-                                                            {allTransferSigningDocumentsUploaded(detailTransfer)
-                                                                ? "Đã upload đủ"
-                                                                : "Còn thiếu bản ký"}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        {getTransferSigningDocuments(detailTransfer).map((document) => (
-                                                            <div key={document.kind} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                                                <div className="flex items-start justify-between gap-2">
-                                                                    <div>
-                                                                        <p className="text-sm font-semibold text-gray-900">{document.label}</p>
-                                                                        <p className="mt-1 text-xs text-gray-500">{document.contractCode || `#${document.id}`}</p>
-                                                                    </div>
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className={document.contractFileId
-                                                                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                                            : "border-gray-200 bg-white text-gray-600"}
-                                                                    >
-                                                                        {document.contractFileId ? "Đã upload" : "Chưa upload"}
-                                                                    </Badge>
-                                                                </div>
-                                                                <p className="mt-2 truncate text-xs text-gray-600">
-                                                                    {document.contractFileName || "Chưa có file bản ký"}
-                                                                </p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    {Array.isArray(detailTransfer.blockingReasons) && detailTransfer.blockingReasons.length > 0 && (
-                                                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                                                            {detailTransfer.blockingReasons.join(" ")}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {detailTransfer.status === "WAITING_TRANSFER_DATE" && (
-                                                <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
-                                                    <p className="text-sm font-semibold text-cyan-800 mb-1">Sẵn sàng bắt đầu phiên chuyển phòng</p>
-                                                    <p className="text-sm text-cyan-700">
-                                                        Ngày chuyển chỉ là ngày dự kiến. Manager có thể bắt đầu phiên chuyển phòng khi tenant và quản lý đã có mặt thực tế.
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {detailTransfer.status === "READY_FOR_HANDOVER" && detailTransfer.sourceRoomWillBeEmptyAfterTransfer === false && (
-                                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                                    <p className="text-sm font-semibold text-amber-800 mb-1">Phòng cũ còn người ở lại</p>
-                                                    <p className="text-sm text-amber-700">
-                                                        Nhập điện nước phòng cũ để tạo hóa đơn utility transfer. Sau khi hóa đơn này thanh toán, chỉ số đó là baseline mới cho phòng cũ.
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {!detailTransfer.status && (
-                                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                                    <p className="text-sm font-semibold text-amber-800 mb-1">Chế độ dữ liệu dự phòng</p>
-                                                    <p className="text-sm text-amber-700">
-                                                        API chi tiết transfer hiện chưa truy cập được từ màn này. Hệ thống đang hiển thị dữ liệu cơ bản từ payload yêu cầu, nên chưa thể xác định chính xác trạng thái vận hành để mở các nút hành động tiếp theo.
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                            <RequestDetailContent req={detailModal} detailTransfer={detailTransfer}/>
                         </div>
-                        {(detailModal.status === 'PENDING' || (detailModal.requestType === 'ROOM_TRANSFER' && detailTransfer)) && (
-                            <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 flex flex-wrap items-center justify-end gap-3">
-                                {detailModal.status === 'PENDING' && (
+                        {(canResolveRequest(detailModal, isOwner) ||
+                            (isExpenseApprovalRequest(detailModal) && detailModal.status === "APPROVED") ||
+                            (detailModal.requestType === 'ROOM_TRANSFER' && detailTransfer)) && (
+                            <div
+                                className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 flex flex-wrap items-center justify-end gap-3">
+                                {canResolveRequest(detailModal, isOwner) && (
                                     <>
-                                        <Button variant="outline" onClick={() => { setRejectModal(detailModal); setRejectNote(""); closeDetailModal(); }} className="rounded-lg text-red-600 border-red-200 hover:bg-red-50">
+                                        <Button variant="outline" onClick={() => {
+                                            setRejectModal(detailModal);
+                                            setRejectNote("");
+                                            closeDetailModal();
+                                        }} className="rounded-lg text-red-600 border-red-200 hover:bg-red-50">
                                             Từ chối
                                         </Button>
-                                        <Button onClick={() => { handleApprove(detailModal.id); closeDetailModal(); }} disabled={actionLoading?.startsWith('approve')} className="rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-60">
-                                            {actionLoading === `approve-${detailModal.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : "Duyệt yêu cầu"}
+                                        <Button onClick={() => {
+                                            handleApprove(detailModal);
+                                            closeDetailModal();
+                                        }} disabled={actionLoading?.startsWith('approve')}
+                                                className="rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-60">
+                                            {actionLoading === `approve-${detailModal.id}` ?
+                                                <Loader2 className="w-4 h-4 animate-spin"/> : "Duyệt yêu cầu"}
                                         </Button>
                                     </>
+                                )}
+                                {isExpenseApprovalRequest(detailModal) && detailModal.status === "APPROVED" && (
+                                    <Button
+                                        onClick={() => openPaymentModal(detailModal)}
+                                        disabled={Boolean(actionLoading)}
+                                        className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                                    >
+                                        Ghi nhận đã hoàn tiền
+                                    </Button>
                                 )}
                                 {detailModal.requestType === 'ROOM_TRANSFER' && detailTransfer?.status === 'WAITING_CONTRACT_CONFIRMATION' && (
                                     <Button
@@ -1240,28 +1385,37 @@ export default function ApprovalCenter() {
                                         disabled={Boolean(actionLoading)}
                                         className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
                                     >
-                                        {actionLoading === `confirm-contract-${detailModal.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận hợp đồng"}
+                                        {actionLoading === `confirm-contract-${detailModal.id}` ?
+                                            <Loader2 className="w-4 h-4 animate-spin"/> : "Xác nhận hợp đồng"}
                                     </Button>
                                 )}
                                 {detailModal.requestType === 'ROOM_TRANSFER' && isTransferSigningStatus(detailTransfer?.status) && getTransferSigningDocuments(detailTransfer).length > 0 && (
                                     <>
                                         {getTransferSigningDocuments(detailTransfer).map((document) => (
-                                            <div key={document.kind} className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
+                                            <div key={document.kind}
+                                                 className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
                                                 <div className="min-w-0">
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-xs font-semibold text-gray-700">{document.label}</span>
+                                                        <span
+                                                            className="text-xs font-semibold text-gray-700">{document.label}</span>
                                                         <Badge
                                                             variant="outline"
-                                                            className={document.contractFileId
+                                                            className={isTransferSigningDocumentSigned(document)
                                                                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                                : "border-gray-200 bg-white text-gray-600"}
+                                                                : document.signedFileId
+                                                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                                                    : "border-gray-200 bg-white text-gray-600"}
                                                         >
-                                                            {document.contractFileId ? "Đã upload" : "Chưa upload"}
+                                                            {isTransferSigningDocumentSigned(document)
+                                                                ? "Đã xác nhận ký"
+                                                                : document.signedFileId
+                                                                    ? "Đã upload, chờ xác nhận"
+                                                                    : "Chưa upload"}
                                                         </Badge>
                                                     </div>
-                                                    {document.contractFileName && (
+                                                    {(document.signedFileName || document.contractFileName) && (
                                                         <p className="mt-1 max-w-[220px] truncate text-[11px] text-gray-500">
-                                                            {document.contractFileName}
+                                                            {document.signedFileName || document.contractFileName}
                                                         </p>
                                                     )}
                                                 </div>
@@ -1272,8 +1426,8 @@ export default function ApprovalCenter() {
                                                     className="rounded-lg"
                                                 >
                                                     {actionLoading === `download-transfer-contract-${document.id}`
-                                                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                                                        : <Download className="w-4 h-4" />}
+                                                        ? <Loader2 className="w-4 h-4 animate-spin"/>
+                                                        : <Download className="w-4 h-4"/>}
                                                     Tải
                                                 </Button>
                                                 <Button
@@ -1285,9 +1439,19 @@ export default function ApprovalCenter() {
                                                     className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
                                                 >
                                                     {actionLoading === `upload-transfer-contract-${document.id}`
-                                                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                                                        : <Upload className="w-4 h-4" />}
-                                                    {document.contractFileId ? "Upload lại" : "Upload"}
+                                                        ? <Loader2 className="w-4 h-4 animate-spin"/>
+                                                        : <Upload className="w-4 h-4"/>}
+                                                    {document.signedFileId ? "Upload lại" : "Upload"}
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleSignTransferContractDocument(document)}
+                                                    disabled={Boolean(actionLoading) || !document.signedFileId || isTransferSigningDocumentSigned(document)}
+                                                    className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                                                >
+                                                    {actionLoading === `sign-transfer-contract-document-${document.id}`
+                                                        ? <Loader2 className="w-4 h-4 animate-spin"/>
+                                                        : <CheckCircle2 className="w-4 h-4"/>}
+                                                    {isTransferSigningDocumentSigned(document) ? "Đã xác nhận" : "Xác nhận ký"}
                                                 </Button>
                                             </div>
                                         ))}
@@ -1300,35 +1464,122 @@ export default function ApprovalCenter() {
                                         />
                                         {isTransferSigningStatus(detailTransfer.status) &&
                                             allowsTransferAction(detailTransfer, "SIGN_TRANSFER_CONTRACT") && (
-                                            <Button
-                                                onClick={handleSignTransferContract}
-                                                disabled={Boolean(actionLoading)}
-                                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
-                                            >
-                                                {actionLoading === `sign-transfer-contract-${detailModal.id}`
-                                                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                                                    : <CheckCircle2 className="w-4 h-4" />}
-                                                Xác nhận đã ký đủ
-                                            </Button>
-                                        )}
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <Button
+                                                        onClick={handleSignTransferContract}
+                                                        disabled={Boolean(actionLoading) || !allTransferSigningDocumentsSigned(detailTransfer)}
+                                                        className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                                                    >
+                                                        {actionLoading === `sign-transfer-contract-${detailModal.id}`
+                                                            ? <Loader2 className="w-4 h-4 animate-spin"/>
+                                                            : <CheckCircle2 className="w-4 h-4"/>}
+                                                        Xác nhận đã ký đủ
+                                                    </Button>
+                                                    {!allTransferSigningDocumentsSigned(detailTransfer) && (
+                                                        <p className="max-w-xs text-right text-xs font-semibold text-amber-700">
+                                                            Còn thiếu: {getMissingTransferSigningDocumentLabels(detailTransfer).join(", ")}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                     </>
                                 )}
                                 {detailModal.requestType === 'ROOM_TRANSFER'
                                     && detailTransfer
                                     && ['WAITING_TRANSFER_DATE', 'READY_FOR_HANDOVER', 'WAITING_EXECUTION'].includes(detailTransfer.status)
                                     && (detailTransfer.status !== 'WAITING_EXECUTION' || allowsTransferAction(detailTransfer, "COMPLETE_TRANSFER")) && (
-                                    <Button
-                                        onClick={() => openExecuteModal(detailModal, detailTransfer)}
-                                        disabled={Boolean(actionLoading)}
-                                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
-                                    >
-                                        {detailTransfer?.status === "WAITING_EXECUTION"
-                                            ? "Hoàn tất chuyển phòng"
-                                            : "Chốt phòng cũ"}
-                                    </Button>
-                                )}
+                                        <Button
+                                            onClick={() => openExecuteModal(detailModal, detailTransfer)}
+                                            disabled={Boolean(actionLoading)}
+                                            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+                                        >
+                                            {detailTransfer?.status === "WAITING_EXECUTION"
+                                                ? "Hoàn tất chuyển phòng"
+                                                : "Chốt phòng cũ"}
+                                        </Button>
+                                    )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {paymentModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm"
+                    onClick={() => setPaymentModal(null)}>
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+                         onClick={(e) => e.stopPropagation()}>
+                        <div className="border-b border-gray-200 px-6 py-4">
+                            <h3 className="text-lg font-bold text-gray-900">Ghi nhận đã hoàn tiền</h3>
+                            <p className="mt-1 text-sm text-gray-500">{paymentModal.title || paymentModal.requestCode}</p>
+                        </div>
+                        <div className="space-y-4 p-6">
+                            <label className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">Ngày hoàn tiền</span>
+                                <input
+                                    type="date"
+                                    value={paymentForm.paymentDate}
+                                    onChange={(event) => setPaymentForm((current) => ({
+                                        ...current,
+                                        paymentDate: event.target.value,
+                                    }))}
+                                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-blue-500"
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">Mã giao dịch</span>
+                                <input
+                                    value={paymentForm.paymentReference}
+                                    onChange={(event) => setPaymentForm((current) => ({
+                                        ...current,
+                                        paymentReference: event.target.value,
+                                    }))}
+                                    placeholder="VD: mã giao dịch ngân hàng"
+                                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-blue-500"
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">Ảnh minh chứng *</span>
+                                <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    onChange={(event) => setPaymentForm((current) => ({
+                                        ...current,
+                                        proofFile: event.target.files?.[0] || null,
+                                    }))}
+                                    className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="mb-2 block text-sm font-medium text-gray-700">Ghi chú</span>
+                                <textarea
+                                    rows={3}
+                                    value={paymentForm.note}
+                                    onChange={(event) => setPaymentForm((current) => ({
+                                        ...current,
+                                        note: event.target.value,
+                                    }))}
+                                    className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                                />
+                            </label>
+                        </div>
+                        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                            <Button variant="outline" onClick={() => setPaymentModal(null)} className="rounded-lg">
+                                Hủy
+                            </Button>
+                            <Button
+                                onClick={handleMarkExpensePaid}
+                                disabled={actionLoading === `mark-paid-${paymentModal.id}`}
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60"
+                            >
+                                {actionLoading === `mark-paid-${paymentModal.id}` ? (
+                                    <Loader2 className="h-4 w-4 animate-spin"/>
+                                ) : (
+                                    "Lưu và gửi khách xác nhận"
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1350,8 +1601,11 @@ export default function ApprovalCenter() {
             />
             {/* Reject modal */}
             {rejectModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm" onClick={() => setRejectModal(null)}>
-                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm"
+                    onClick={() => setRejectModal(null)}>
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+                         onClick={(e) => e.stopPropagation()}>
                         <div className="border-b border-gray-200 px-6 py-4">
                             <h3 className="text-lg font-bold text-gray-900">Từ chối yêu cầu</h3>
                             <p className="text-sm text-gray-500 mt-1">{rejectModal.title || rejectModal.requestCode}</p>
@@ -1370,13 +1624,15 @@ export default function ApprovalCenter() {
                             <Button variant="outline" onClick={() => setRejectModal(null)} className="rounded-lg">
                                 Hủy
                             </Button>
-                            <Button onClick={handleReject} disabled={actionLoading?.startsWith('reject')} className="rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
-                                {actionLoading === `reject-${rejectModal.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : "Xác nhận từ chối"}
+                            <Button onClick={handleReject} disabled={actionLoading?.startsWith('reject')}
+                                    className="rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                                {actionLoading === `reject-${rejectModal.id}` ?
+                                    <Loader2 className="w-4 h-4 animate-spin"/> : "Xác nhận từ chối"}
                             </Button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
-  );
+    );
 }

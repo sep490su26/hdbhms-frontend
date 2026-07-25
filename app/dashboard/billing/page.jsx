@@ -127,6 +127,12 @@ function formatMoney(value) {
   return `${money.format(Number(value || 0))} VNĐ`;
 }
 
+function formatThousandMoney(value) {
+  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
+    Number(value || 0) / 1000,
+  );
+}
+
 function statusLabel(value) {
   return STATUS_LABELS[value] || value || "Chưa rõ";
 }
@@ -583,21 +589,24 @@ export default function BillingPage() {
         <DashboardStatCard
           icon={ReceiptText}
           label="Tổng hóa đơn"
-          value={formatMoney(totals.total)}
+          value={formatThousandMoney(totals.total)}
+          unitBadge="nghìn đồng"
           tone="blue"
           subtitle="Tổng giá trị trong kỳ"
         />
         <DashboardStatCard
           icon={CheckCircle2}
           label="Đã thu"
-          value={formatMoney(totals.paid)}
+          value={formatThousandMoney(totals.paid)}
+          unitBadge="nghìn đồng"
           tone="emerald"
           subtitle="Khoản đã ghi nhận"
         />
         <DashboardStatCard
           icon={WalletCards}
           label="Còn lại"
-          value={formatMoney(totals.remaining)}
+          value={formatThousandMoney(totals.remaining)}
+          unitBadge="nghìn đồng"
           tone="rose"
           subtitle="Khoản cần tiếp tục thu"
         />

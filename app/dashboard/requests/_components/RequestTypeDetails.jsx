@@ -122,12 +122,12 @@ function parseDateValue(value) {
 }
 
 function buildRenewalTermChecks(payload) {
-    const newStartDate = firstValue(payload.newStartDate, payload.new_start_date);
+    const startDateValue = firstValue(payload.startDate, payload.start_date);
     const newEndDate = firstValue(payload.newEndDate, payload.new_end_date, payload.endDate, payload.end_date);
     const monthlyRent = firstValue(payload.monthlyRent, payload.monthly_rent, payload.newRent, payload.new_rent);
     const paymentCycleMonths = firstValue(payload.paymentCycleMonths, payload.payment_cycle_months);
     const depositAmount = firstValue(payload.depositAmount, payload.deposit_amount);
-    const startDate = parseDateValue(newStartDate);
+    const startDate = parseDateValue(startDateValue);
     const endDate = parseDateValue(newEndDate);
     const rent = Number(monthlyRent);
     const cycle = Number(paymentCycleMonths);
@@ -135,9 +135,9 @@ function buildRenewalTermChecks(payload) {
 
     return [
         {
-            label: "Thời hạn mới",
-            valid: Boolean(startDate && endDate && endDate > startDate),
-            detail: startDate && endDate ? `${newStartDate} → ${newEndDate}` : "Thiếu ngày bắt đầu/kết thúc",
+            label: "Thời hạn sau gia hạn",
+            valid: Boolean(endDate && (!startDate || endDate > startDate)),
+            detail: endDate ? `Kết thúc ${newEndDate}` : "Thiếu ngày kết thúc sau gia hạn",
         },
         {
             label: "Giá thuê",
@@ -247,7 +247,7 @@ export function TransferRequestDetail({ payload, transfer }) {
     const rawSettlementType = firstValue(transfer?.priceDifferenceSettlementType, transfer?.positiveDifferenceSettlementType, payload?.positiveDifferenceSettlementType, payload?.positive_difference_settlement_type, payload?.settlementType, payload?.settlement_type);
     const settlementType = formatPaymentBranch(rawSettlementType) || formatSettlementType(rawSettlementType);
     const paymentBranch = formatPaymentBranch(firstValue(transfer?.paymentBranch, rawSettlementType));
-    const priceDifference = firstValue(transfer?.priceDifferenceToPay, payload?.priceDifferenceToPay, payload?.price_difference_to_pay, payload?.additionalPaymentAmount, payload?.additional_payment_amount);
+    const priceDifference = firstValue(transfer?.priceDifferenceAmount, payload?.priceDifferenceAmount, payload?.price_difference_amount, transfer?.priceDifferenceToPay, payload?.priceDifferenceToPay, payload?.price_difference_to_pay, payload?.additionalPaymentAmount, payload?.additional_payment_amount);
     const currentHolder = firstValue(transferringTenantNames, payload?.currentHolderName, payload?.current_holder_name, payload?.currentTenantName, payload?.current_tenant_name);
     const targetHolder = firstValue(holderCandidateNames, payload?.targetHolderName, payload?.target_holder_name, payload?.targetTenantName, payload?.target_tenant_name);
     const note = firstValue(payload?.note, payload?.transferNote, payload?.transfer_note, payload?.additionalNote, payload?.additional_note);
@@ -328,12 +328,16 @@ export function MoveoutRequestDetail({ payload }) {
 
 export function RenewalRequestDetail({ payload }) {
     if (!payload) return null;
+    const renewalTermMonths = payload.renewalTermMonths || payload.renewal_term_months || payload.termMonths || payload.term_months;
 
     return (
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <InfoField label="Phòng" value={payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
-                <InfoField label="Thời hạn mới" value={payload.newEndDate || payload.new_end_date || payload.endDate || payload.end_date} icon={<Calendar className="w-4 h-4" />} />
+                {renewalTermMonths && (
+                    <InfoField label="Thời hạn gia hạn" value={`${renewalTermMonths} tháng`} icon={<Calendar className="w-4 h-4" />} />
+                )}
+                <InfoField label="Ngày kết thúc sau gia hạn" value={payload.newEndDate || payload.new_end_date || payload.endDate || payload.end_date} icon={<Calendar className="w-4 h-4" />} />
                 {(payload.newRent || payload.new_rent || payload.monthlyRent || payload.monthly_rent) && (
                     <InfoField label="Giá thuê mới" value={formatMoney(payload.newRent || payload.new_rent || payload.monthlyRent || payload.monthly_rent)} icon={<DollarSign className="w-4 h-4" />} />
                 )}
@@ -364,6 +368,33 @@ export function TerminationRequestDetail({ payload }) {
                 <div className="col-span-2 rounded-xl bg-red-50 p-4">
                     <p className="text-sm font-semibold text-red-700 mb-1">Lý do thanh lý</p>
                     <p className="text-sm text-red-600 whitespace-pre-wrap">{reason}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export function ExpenseApprovalRequestDetail({ payload }) {
+    if (!payload) return null;
+    const amount = firstValue(payload.amount, payload.depositRefundAmount, payload.deposit_refund_amount);
+    const isLiquidationRefund = firstValue(payload.sourceRequestType, payload.source_request_type) === "CONTRACT_LIQUIDATION";
+
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Loại khoản chi" value={isLiquidationRefund ? "Hoàn cọc thanh lý hợp đồng" : "Chi phí vận hành"} icon={<Wallet className="w-4 h-4" />} />
+                <InfoField label="Số tiền" value={amount == null ? null : formatMoney(amount)} icon={<DollarSign className="w-4 h-4" />} />
+                <InfoField label="Mã khoản chi" value={firstValue(payload.expenseCode, payload.expense_code)} icon={<FileText className="w-4 h-4" />} />
+                <InfoField label="Phòng" value={firstValue(payload.roomCode, payload.room_code)} icon={<MapPin className="w-4 h-4" />} />
+                <InfoField label="Hợp đồng" value={firstValue(payload.contractCode, payload.contract_code)} icon={<FileText className="w-4 h-4" />} />
+                <InfoField label="Ngày thanh lý" value={firstValue(payload.liquidationDate, payload.liquidation_date)} icon={<Calendar className="w-4 h-4" />} />
+            </div>
+            {isLiquidationRefund && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                    <p className="text-sm font-semibold text-emerald-800">Quy trình hoàn cọc</p>
+                    <p className="mt-1 text-sm text-emerald-700">
+                        Sau khi chủ trọ duyệt, chủ trọ hoặc quản lý hoàn tiền ngoài hệ thống, upload minh chứng và hệ thống sẽ gửi thông báo để khách thuê xác nhận đã nhận tiền.
+                    </p>
                 </div>
             )}
         </div>

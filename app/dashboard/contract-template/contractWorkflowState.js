@@ -39,7 +39,7 @@ export function getContractActivationReadiness({
           },
           {
             key: "handover-signed-file",
-            label: "Bien ban ban giao da ky",
+            label: "Biên bản bàn giao đã ký",
             complete: Boolean(handoverSignedFileId),
           },
         ]

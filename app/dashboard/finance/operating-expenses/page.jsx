@@ -257,12 +257,15 @@ function signedThousandVND(value) {
 function ExpenseCard({ icon: Icon, label, value, color, tone = "light", note, badge }) {
   const dark = tone === "dark";
   return (
-    <article className={`min-h-[132px] rounded-lg border p-4 shadow-sm ${dark ? "border-[#14243d] bg-[#0d1b31] text-white" : "border-[#dce2ec] bg-white text-[#0f1d33]"}`}>
+    <article className={`relative min-h-[132px] rounded-lg border p-4 shadow-sm ${dark ? "border-[#14243d] bg-[#0d1b31] text-white" : "border-[#dce2ec] bg-white text-[#0f1d33]"}`}>
+      <span className={`absolute right-4 top-4 rounded-full border px-2.5 py-1 text-[10px] font-black ${dark ? "border-white/10 bg-white/5 text-slate-300" : "border-[#dce2ec] bg-[#f8fafc] text-[#5f6b7c]"}`}>
+        nghìn đồng
+      </span>
       <div className="flex items-start justify-between gap-2">
         <span className={`grid h-9 w-9 place-items-center rounded ${dark ? "bg-[#172b4b] text-[#8ca8ff]" : "bg-[#eef3ff]"}`} style={!dark ? { color } : undefined}>
           <Icon className="h-4 w-4" />
         </span>
-        {badge && <span className="inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />{badge}</span>}
+        {badge && <span className="mt-7 inline-flex items-center gap-1 rounded bg-[#172b4b] px-2 py-1 text-[10px] text-slate-300"><TrendingUp className="h-3 w-3" />{badge}</span>}
       </div>
       <p className={`mt-3 text-[10px] font-bold uppercase ${dark ? "text-slate-400" : "text-[#5f6b7c]"}`}>{label}</p>
       <p className="mt-1 truncate text-lg font-black">{formatThousandVND(value)}</p>
@@ -409,9 +412,6 @@ export default function OperatingExpensesPage() {
           <Link href="/dashboard/finance/income-expense" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Thu chi tổng hợp</Link>
           <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Chi phí vận hành</span>
         </nav>
-        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
-          Đơn vị: Nghìn VND
-        </p>
       </div>
 
       {errorMessage && (

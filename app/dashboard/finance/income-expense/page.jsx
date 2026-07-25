@@ -233,10 +233,13 @@ function MetricCard({ icon: Icon, label, value, badge, note, tone = "blue", inve
   const theme = themes[tone];
 
   return (
-    <article className={`min-h-[150px] rounded-lg border p-5 shadow-sm ${theme.card}`}>
+    <article className={`relative min-h-[150px] rounded-lg border p-5 shadow-sm ${theme.card}`}>
+      <span className={`absolute right-5 top-5 rounded-full border px-2.5 py-1 text-[10px] font-black ${tone === "dark" ? "border-white/10 bg-white/5 text-slate-300" : "border-[#dfe5ef] bg-[#f8fafc] text-[#64748b]"}`}>
+        nghìn đồng
+      </span>
       <div className="flex items-start justify-between gap-3">
         <span className={`grid h-9 w-9 place-items-center rounded ${theme.icon}`}><Icon className="h-4 w-4" /></span>
-        <span className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold ${theme.badge}`}>
+        <span className={`mt-7 inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold ${theme.badge}`}>
           {inverse ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
           {badge}
         </span>
@@ -373,9 +376,6 @@ export default function IncomeExpenseReportPage() {
           <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">Thu chi tổng hợp</span>
           <Link href="/dashboard/finance/operating-expenses" className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70">Chi phí vận hành</Link>
         </nav>
-        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
-          Đơn vị: Nghìn VND
-        </p>
       </div>
 
       {errorMessage && (

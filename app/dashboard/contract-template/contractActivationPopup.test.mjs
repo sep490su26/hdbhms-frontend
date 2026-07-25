@@ -81,15 +81,37 @@ test("activated contract details expose the optional handover document actions",
   assert.match(handoverDocumentCardSource, /h-11.*text-sm/);
 });
 
-test("active contracts show one context-aware dossier badge", () => {
-  assert.match(pageSource, /Chưa có biên bản ký/);
-  assert.match(pageSource, /Đủ hồ sơ/);
-  assert.match(pageSource, /activeDossierComplete/);
-  assert.doesNotMatch(pageSource, /flex flex-col items-start gap-1\.5/);
+test("contract list keeps badges readable without internal table scroll", () => {
+  assert.match(pageSource, /<span className="whitespace-nowrap">\{label\}<\/span>/);
+  assert.doesNotMatch(pageSource, /dashboard-table--scroll contract-management-table/);
+  assert.doesNotMatch(pageSource, /maxHeight:\s*"calc\(100vh - 320px\)"/);
+  assert.doesNotMatch(pageSource, /overflowX:\s*"scroll"/);
+  assert.doesNotMatch(pageSource, /className="table-fixed/);
+});
+
+test("contract list does not render the file column", () => {
+  const contractTable =
+    pageSource.match(/contract-management-table[\s\S]*?<\/table>/)?.[0] || "";
+
+  assert.doesNotMatch(contractTable, /<th>File<\/th>/);
+  assert.doesNotMatch(contractTable, /data-label="File"/);
+  assert.doesNotMatch(pageSource, /function FileBadge/);
+});
+
+test("contract list hides pagination until rows exceed page size", () => {
+  assert.match(pageSource, /filteredTotalElements > size \? \(/);
+  assert.match(pageSource, /<DashboardPagination[\s\S]*itemLabel="hợp đồng"/);
+});
+
+test("contract list action button keeps activation label visible", () => {
+  assert.match(pageSource, /min-w-\[9\.75rem\]/);
+  assert.match(pageSource, /\? "Kích hoạt hợp đồng" : "Xem chi tiết"/);
+  assert.doesNotMatch(pageSource, /h-9 w-full[\s\S]*Kích hoạt hợp đồng/);
 });
 
 test("management table headers align with all contract columns", () => {
-  const header = pageSource.match(/<thead[\s\S]*?<\/thead>/)?.[0] || "";
+  const header =
+    pageSource.match(/contract-management-table[\s\S]*?<thead[\s\S]*?<\/thead>/)?.[0] || "";
   const labels = [
     "Mã HĐ",
     "Phòng",
@@ -97,11 +119,24 @@ test("management table headers align with all contract columns", () => {
     "Số người",
     "Thời hạn",
     "Giá thuê",
-    "File",
     "Trạng thái",
     "Thao tác",
   ];
 
   assert.equal((header.match(/<th\b/g) || []).length, labels.length);
   labels.forEach((label) => assert.match(header, new RegExp(label)));
+  assert.doesNotMatch(header, /File/);
+});
+
+test("contract extension updates the current contract instead of creating a renewal contract", () => {
+  assert.match(pageSource, /Gia hạn hợp đồng/);
+  assert.match(pageSource, /Lưu gia hạn/);
+  assert.match(
+    pageSource,
+    /const updated = await updateLeaseContractTerms\(mergedSelected\.leaseContractId/,
+  );
+  assert.doesNotMatch(pageSource, /renewLeaseContract/);
+  assert.doesNotMatch(pageSource, /Mã hợp đồng mới/);
+  assert.doesNotMatch(pageSource, /Tạo hợp đồng mới/);
+  assert.doesNotMatch(pageSource, /Tái ký \/ Gia hạn/);
 });

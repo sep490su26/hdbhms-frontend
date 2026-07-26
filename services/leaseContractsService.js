@@ -124,6 +124,14 @@ function normalizeInvoiceLine(line = {}) {
     quantity: line.quantity ?? null,
     unitPrice: line.unitPrice ?? line.unit_price ?? null,
     amount: line.amount ?? null,
+    meterReadingId:
+      line.meterReadingId ?? line.meter_reading_id ?? null,
+    photoFileId:
+      line.photoFileId ?? line.photo_file_id ?? null,
+    previousValue:
+      line.previousValue ?? line.previous_value ?? null,
+    currentValue:
+      line.currentValue ?? line.current_value ?? null,
   };
 }
 
@@ -153,7 +161,18 @@ export function normalizeLeaseContractItem(item = {}) {
     displayCode: displayedContractCode,
     depositCode,
     contractCode,
-    propertyId: item.propertyId ?? item.property_id ?? null,
+    propertyId:
+      item.propertyId ??
+      item.property_id ??
+      item.property?.id ??
+      item.property?.propertyId ??
+      item.property?.property_id ??
+      item.room?.propertyId ??
+      item.room?.property_id ??
+      item.room?.property?.id ??
+      item.room?.property?.propertyId ??
+      item.room?.property?.property_id ??
+      null,
     propertyName: item.propertyName ?? item.property_name ?? null,
     propertyAddress: item.propertyAddress ?? item.property_address ?? null,
     tenantId: item.tenantId ?? item.tenant_id ?? null,
@@ -539,8 +558,6 @@ export async function updateLeaseContractLiquidationDraft(leaseContractId, paylo
       body: JSON.stringify({
         liquidationDate: payload.liquidationDate,
         reason: payload.reason,
-        depositDeductionAmount: payload.depositDeductionAmount,
-        depositDeductionReason: payload.depositDeductionReason,
         charges: payload.charges,
       }),
     },
@@ -605,6 +622,11 @@ async function fetchPrivateFileBlob(fileId) {
     throw new Error("Không thể tải file hợp đồng.");
   }
   return response.blob();
+}
+
+export async function fetchLeaseContractFileObjectUrl(fileId) {
+  const blob = await fetchPrivateFileBlob(fileId);
+  return URL.createObjectURL(blob);
 }
 
 export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
@@ -861,6 +883,18 @@ function normalizeLeaseContractDetails(details = {}) {
     contractId: details.contractId ?? details.contract_id ?? null,
     contractCode: details.contractCode ?? details.contract_code ?? "",
     tenantId: details.tenantId ?? details.tenant_id ?? null,
+    propertyId:
+      details.propertyId ??
+      details.property_id ??
+      details.property?.id ??
+      details.property?.propertyId ??
+      details.property?.property_id ??
+      details.room?.propertyId ??
+      details.room?.property_id ??
+      details.room?.property?.id ??
+      details.room?.property?.propertyId ??
+      details.room?.property?.property_id ??
+      null,
     startDate: details.startDate ?? details.start_date ?? null,
     endDate: details.endDate ?? details.end_date ?? null,
     rentStartDate: details.rentStartDate ?? details.rent_start_date ?? null,
@@ -1102,6 +1136,18 @@ function normalizeLeaseContractDetails(details = {}) {
           mustChangePassword:
             occupant.mustChangePassword ??
             occupant.must_change_password ??
+            null,
+          occupantIntention:
+            occupant.occupantIntention ??
+            occupant.occupant_intention ??
+            null,
+          occupantIntentionNote:
+            occupant.occupantIntentionNote ??
+            occupant.occupant_intention_note ??
+            null,
+          occupantIntentionRecordedAt:
+            occupant.occupantIntentionRecordedAt ??
+            occupant.occupant_intention_recorded_at ??
             null,
         }))
       : [],

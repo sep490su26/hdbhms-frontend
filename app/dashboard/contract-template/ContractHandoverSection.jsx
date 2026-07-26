@@ -80,13 +80,16 @@ function apiAssetToRow(raw) {
     compensationAmount: a.compensationAmount ?? 0,
     damageNote: a.damageNote ?? "",
     evidenceFileId: a.evidenceFileId ?? null,
+    evidenceImageFile: null,
+    evidenceImageUrl: raw.evidenceFileUrl ?? raw.evidence_file_url ?? "",
     imageFile: null,
     imageUrl:
       raw.fileImageUrl ?? raw.file_image_url ?? raw.imageUrl ?? raw.image_url ?? "",
   };
 }
 
-function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
+function ImageUploadButton({ imageUrl, fileId, label, disabled, onChange }) {
+  const hasImage = Boolean(imageUrl || fileId);
   return (
     <div className="flex flex-col gap-2">
       <label
@@ -114,6 +117,11 @@ function ImageUploadButton({ imageUrl, label, disabled, onChange }) {
           unoptimized
           className="h-16 w-full rounded-lg border border-[#dfe5ef] dark:border-white/10 object-cover"
         />
+      )}
+      {!imageUrl && fileId && (
+        <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700">
+          Đã có ảnh minh chứng
+        </span>
       )}
     </div>
   );
@@ -147,8 +155,10 @@ export default function ContractHandoverSection({
   const [waterReadingDate, setWaterReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricImageFile, setElectricImageFile] = useState(null);
   const [electricImageUrl, setElectricImageUrl] = useState("");
+  const [electricPhotoFileId, setElectricPhotoFileId] = useState(null);
   const [waterImageFile, setWaterImageFile] = useState(null);
   const [waterImageUrl, setWaterImageUrl] = useState("");
+  const [waterPhotoFileId, setWaterPhotoFileId] = useState(null);
 
   /* assets ---------------------------------------------------------- */
   const [assets, setAssets] = useState(() =>
@@ -276,8 +286,10 @@ export default function ContractHandoverSection({
               
               const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
               setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
+              setElectricPhotoFileId(data.electricity?.photoFileId ?? data.electricity?.photo_file_id ?? null);
               const watValue = data.water?.current_value ?? data.water?.currentValue;
               setWaterReading(prev => watValue != null ? String(watValue) : (prev === "" ? "0" : prev));
+              setWaterPhotoFileId(data.water?.photoFileId ?? data.water?.photo_file_id ?? null);
               if (data.note) setNote(data.note);
               if (showCompensation && Array.isArray(data.items) && data.items.length > 0) {
                 setAssets(
@@ -292,7 +304,9 @@ export default function ContractHandoverSection({
                       compensationAmount: item.compensationAmount ?? 0,
                       damageNote: item.note ?? "",
                       evidenceFileId: item.evidenceFileId ?? null,
-                      imageUrl: item.evidenceFileUrl ?? "",
+                      evidenceImageFile: null,
+                      evidenceImageUrl: item.evidenceFileUrl ?? "",
+                      imageUrl: "",
                     })),
                     `handover-${contractId}-${handoverType}`,
                   ),
@@ -345,10 +359,12 @@ export default function ContractHandoverSection({
       if (electricImageUrl) URL.revokeObjectURL(electricImageUrl);
       setElectricImageFile(file);
       setElectricImageUrl(url);
+      setElectricPhotoFileId(null);
     } else {
       if (waterImageUrl) URL.revokeObjectURL(waterImageUrl);
       setWaterImageFile(file);
       setWaterImageUrl(url);
+      setWaterPhotoFileId(null);
     }
   }, [electricImageUrl, waterImageUrl, makeBlobUrl]);
 
@@ -417,6 +433,26 @@ export default function ContractHandoverSection({
     );
   }
 
+  function handleAssetEvidenceImageChange(index, file) {
+    if (!file) return;
+    const url = makeBlobUrl(file);
+    setAssets((prev) =>
+      prev.map((a, i) => {
+        if (i !== index) return a;
+        if (a.evidenceImageUrl) {
+          URL.revokeObjectURL(a.evidenceImageUrl);
+          previewUrlsRef.current?.delete(a.evidenceImageUrl);
+        }
+        return {
+          ...a,
+          evidenceImageFile: file,
+          evidenceImageUrl: url,
+          evidenceFileId: null,
+        };
+      }),
+    );
+  }
+
   const isValid =
     Boolean(contractId && handoverDate) &&
     electricReading !== "" &&
@@ -466,8 +502,8 @@ export default function ContractHandoverSection({
 
     try {
       // 1. Upload meter photos
-      let electricPhotoId = null;
-      let waterPhotoId = null;
+      let electricPhotoId = electricPhotoFileId;
+      let waterPhotoId = waterPhotoFileId;
       if (electricImageFile) {
         const res = await uploadFile(electricImageFile, "METER_PHOTO");
         electricPhotoId = res?.fileId || res?.id;
@@ -487,6 +523,11 @@ export default function ContractHandoverSection({
           } else if (asset.fileImageId) {
             assetImageId = asset.fileImageId;
           }
+          let evidenceFileId = asset.evidenceFileId ?? null;
+          if (showCompensation && asset.evidenceImageFile) {
+            const res = await uploadFile(asset.evidenceImageFile, "ROOM_IMAGE");
+            evidenceFileId = res?.fileId || res?.id;
+          }
 
           const currentCondition =
             ASSET_CONDITION_VALUES[asset.currentCondition] ??
@@ -502,7 +543,7 @@ export default function ContractHandoverSection({
             fileImageId: assetImageId,
             compensationAmount: showCompensation ? Number(asset.compensationAmount || 0) : undefined,
             damageNote: showCompensation ? asset.damageNote?.trim() ?? "" : undefined,
-            evidenceFileId: showCompensation ? asset.evidenceFileId ?? undefined : undefined,
+            evidenceFileId: showCompensation ? evidenceFileId ?? undefined : undefined,
           };
 
           // A canonical UI row can represent legacy split records such as
@@ -559,6 +600,8 @@ export default function ContractHandoverSection({
       setRemovedAssets([]);
       setSaveSuccess(true);
       setIsConfirmed(true);
+      setElectricPhotoFileId(electricPhotoId ?? null);
+      setWaterPhotoFileId(waterPhotoId ?? null);
       onSaved?.(response || {status: "CONFIRMED", handoverType});
       return true;
     } catch (err) {
@@ -660,7 +703,8 @@ export default function ContractHandoverSection({
           <div className="mt-1">
             <ImageUploadButton
               imageUrl={electricImageUrl}
-              label="Chụp ảnh đồng hồ điện"
+              fileId={electricPhotoFileId}
+              label="Upload ảnh bằng chứng điện"
               disabled={effectiveReadonly}
               onChange={(e) => handleMeterImage("electric", e.target.files?.[0])}
             />
@@ -698,7 +742,8 @@ export default function ContractHandoverSection({
           <div className="mt-1">
             <ImageUploadButton
               imageUrl={waterImageUrl}
-              label="Chụp ảnh đồng hồ nước"
+              fileId={waterPhotoFileId}
+              label="Upload ảnh bằng chứng nước"
               disabled={effectiveReadonly}
               onChange={(e) => handleMeterImage("water", e.target.files?.[0])}
             />
@@ -778,7 +823,7 @@ export default function ContractHandoverSection({
         )}
 
         <div className="overflow-x-auto">
-          <table className={`w-full ${showCompensation ? "min-w-[1260px]" : "min-w-[980px]"} text-left text-xs xl:text-sm`}>
+          <table className={`w-full ${showCompensation ? "min-w-[1380px]" : "min-w-[980px]"} text-left text-xs xl:text-sm`}>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="w-10 px-3 py-3">STT</th>
@@ -793,6 +838,9 @@ export default function ContractHandoverSection({
                     <th className="w-40 px-3 py-3">Bồi thường</th>
                     <th className="min-w-56 px-3 py-3">Thiệt hại</th>
                   </>
+                )}
+                {showCompensation && (
+                  <th className="w-36 px-3 py-3">Minh chứng</th>
                 )}
                 {!effectiveReadonly && (
                   <th className="w-20 px-3 py-3 text-center">Thao tác</th>
@@ -917,6 +965,17 @@ export default function ContractHandoverSection({
                       </td>
                     </>
                   )}
+                  {showCompensation && (
+                    <td className="px-3 py-2.5">
+                      <ImageUploadButton
+                        imageUrl={asset.evidenceImageUrl}
+                        fileId={asset.evidenceFileId}
+                        label="Upload ảnh minh chứng"
+                        disabled={assetEditingDisabled}
+                        onChange={(e) => handleAssetEvidenceImageChange(index, e.target.files?.[0])}
+                      />
+                    </td>
+                  )}
                   {!effectiveReadonly && (
                     <td className="px-3 py-2.5 text-center">
                       <button
@@ -938,7 +997,7 @@ export default function ContractHandoverSection({
               {assets.length === 0 && (
                 <tr>
                   <td
-                    colSpan={(effectiveReadonly ? 7 : 8) + (showCompensation ? 2 : 0)}
+                    colSpan={(effectiveReadonly ? 7 : 8) + (showCompensation ? 3 : 0)}
                     className="px-4 py-10 text-center"
                   >
                     <p className="font-bold text-slate-700 dark:text-slate-200">

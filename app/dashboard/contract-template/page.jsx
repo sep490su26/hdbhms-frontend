@@ -31,6 +31,7 @@ import {
     createDraftLeaseContractFromDeposit,
     downloadLeaseContractDraftPdf,
     downloadLeaseContractSignedFile,
+    fetchLeaseContractFileObjectUrl,
     fetchLeaseContractManagementList,
     fetchManagementLeaseContractDetails,
     openLeaseContractFile,
@@ -45,7 +46,8 @@ import {
     signTransferContractDocument,
 } from "@/services/roomTransferService";
 import {sendTenantAccountCredentials} from "@/services/identityAccessService";
-import {fetchContractHandover, fetchLatestReadings} from "@/services/contractHandoverService";
+import {fetchContractHandover, fetchLatestReadings, uploadFile} from "@/services/contractHandoverService";
+import {fetchPropertyUtilitySettings} from "@/services/propertyUtilitySettingsService";
 import ContractActivationFlow from "./ContractActivationFlow";
 import ContractHandoverSection from "./ContractHandoverSection";
 import ContractPrintWizard from "./ContractPrintWizard";
@@ -54,6 +56,11 @@ import TransferExecutionModal from "../_components/TransferExecutionModal";
 import {toast} from "sonner";
 import {formatDate as formatDisplayDate, formatDateTime as formatDisplayDateTime} from "@/lib/dateFormat";
 import {sortByNewest} from "@/lib/sortByNewest.mjs";
+import {
+    calculateUtilityCharge,
+    DEFAULT_UTILITY_TARIFFS,
+    normalizeUtilityTariff,
+} from "@/lib/meterReadingCost.mjs";
 import {DashboardPageHeader} from "@/components/dashboard/DashboardPageHeader";
 import {DashboardPagination} from "@/components/dashboard/DashboardPagination";
 import DateInput from "@/components/DateInput";
@@ -177,6 +184,11 @@ const TRANSFER_STATUS_LABELS = {
 const ROLE_LABELS = {
     PRIMARY: "Người ký chính",
     CO_OCCUPANT: "Người ở cùng",
+};
+
+const OCCUPANT_INTENTION_LABELS = {
+    FOLLOW_PRIMARY_MOVE_OUT: "Rời phòng theo người đứng tên",
+    JOIN_RENEWAL: "Tiếp tục ở nếu tái ký",
 };
 
 const TENANT_INTENTION_OPTIONS = [
@@ -324,20 +336,6 @@ function toDateInputValue(value) {
     return String(value).slice(0, 10);
 }
 
-function shouldForfeitDepositOnLiquidation(item = {}, liquidationDateValue) {
-    const liquidationDate = toDateInputValue(liquidationDateValue || item.liquidationDate || item.expectedVacantDate);
-    const endDate = toDateInputValue(item.endDate);
-    if (!liquidationDate || !endDate) return false;
-    const liquidation = new Date(`${liquidationDate}T00:00:00`);
-    const end = new Date(`${endDate}T00:00:00`);
-    if (Number.isNaN(liquidation.getTime()) || Number.isNaN(end.getTime()) || liquidation >= end) {
-        return false;
-    }
-    const refundableFrom = new Date(end);
-    refundableFrom.setMonth(refundableFrom.getMonth() - 1);
-    return liquidation < refundableFrom;
-}
-
 function buildTermsForm(item = {}) {
     return {
         startDate: toDateInputValue(item.startDate),
@@ -357,6 +355,33 @@ function isMeterLiquidationCharge(lineType) {
     return lineType === "ELECTRICITY" || lineType === "WATER";
 }
 
+function getContractPropertyId(item = {}) {
+    return (
+        item.propertyId ??
+        item.property_id ??
+        item.property?.id ??
+        item.property?.propertyId ??
+        item.property?.property_id ??
+        item.room?.propertyId ??
+        item.room?.property_id ??
+        item.room?.property?.id ??
+        item.room?.property?.propertyId ??
+        item.room?.property?.property_id ??
+        null
+    );
+}
+
+const DEFAULT_LIQUIDATION_TARIFFS = {
+    ELECTRICITY: DEFAULT_UTILITY_TARIFFS.electricity,
+    WATER: DEFAULT_UTILITY_TARIFFS.water,
+};
+
+function getLiquidationTariff(lineType, tariffs = DEFAULT_LIQUIDATION_TARIFFS) {
+    const key = lineType === "ELECTRICITY" ? "electricity" : lineType === "WATER" ? "water" : null;
+    const fallback = DEFAULT_LIQUIDATION_TARIFFS[lineType] || DEFAULT_UTILITY_TARIFFS[key] || {};
+    return normalizeUtilityTariff(tariffs?.[lineType] || tariffs?.[key], fallback);
+}
+
 function getLiquidationChargeDefaultDescription(lineType) {
     return DEFAULT_LIQUIDATION_CHARGES.find(([type]) => type === lineType)?.[1] || "Chi phí phát sinh";
 }
@@ -370,7 +395,28 @@ function getMeterUsage(charge = {}) {
     if (!Number.isFinite(previousValue) || !Number.isFinite(currentValue)) {
         return 0;
     }
-    return Math.max(0, Math.ceil(currentValue - previousValue));
+    return currentValue - previousValue;
+}
+
+function getLiquidationMeterEstimate(charge = {}) {
+    const tariff = normalizeUtilityTariff(
+        {
+            unitPrice: charge.unitPrice,
+            freeAllowance: charge.freeAllowance,
+        },
+        getLiquidationTariff(charge.lineType),
+    );
+    return calculateUtilityCharge(getMeterUsage(charge), tariff);
+}
+
+function getLiquidationChargeLiveAmount(charge = {}) {
+    if (isMeterLiquidationCharge(charge.lineType)) {
+        const estimate = getLiquidationMeterEstimate(charge);
+        return estimate?.isInvalid ? null : estimate?.amount;
+    }
+    const quantity = Number(charge.quantity || 0);
+    const unitPrice = Number(charge.unitPrice || 0);
+    return Number.isFinite(quantity) && Number.isFinite(unitPrice) ? quantity * unitPrice : 0;
 }
 
 function calculateLiquidationRoomRent(item = {}, liquidationDateValue) {
@@ -419,7 +465,7 @@ function applyAutoLiquidationRoomRent(charges = [], item = {}, liquidationDateVa
     );
 }
 
-function createLiquidationCharge(lineType = "OTHER", description = "") {
+function createLiquidationCharge(lineType = "OTHER", description = "", tariffs = DEFAULT_LIQUIDATION_TARIFFS) {
     const meterCharge = isMeterLiquidationCharge(lineType);
     return {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -428,11 +474,14 @@ function createLiquidationCharge(lineType = "OTHER", description = "") {
         previousValue: "0",
         currentValue: "0",
         quantity: meterCharge ? "0" : "1",
-        unitPrice: "0",
+        unitPrice: meterCharge ? String(getLiquidationTariff(lineType, tariffs).unitPrice) : "0",
+        freeAllowance: meterCharge ? String(getLiquidationTariff(lineType, tariffs).freeAllowance) : "0",
+        photoFileId: null,
+        proofFile: null,
     };
 }
 
-function buildLiquidationCharges(item = {}) {
+function buildLiquidationCharges(item = {}, tariffs = DEFAULT_LIQUIDATION_TARIFFS) {
     const lines = Array.isArray(item.liquidationFinalInvoiceLines)
         ? item.liquidationFinalInvoiceLines
         : [];
@@ -441,55 +490,59 @@ function buildLiquidationCharges(item = {}) {
             id: `${line.id || Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             lineType: line.lineType || "OTHER",
             description: line.description || "",
-            previousValue: "0",
-            currentValue: "0",
+            previousValue: line.previousValue == null ? "0" : String(line.previousValue),
+            currentValue: line.currentValue == null ? "0" : String(line.currentValue),
             quantity: line.quantity == null ? "1" : String(line.quantity),
             unitPrice: line.unitPrice == null ? "0" : String(line.unitPrice),
+            freeAllowance: "0",
+            photoFileId: line.photoFileId ?? null,
+            proofFile: null,
         }));
     }
     return applyAutoLiquidationRoomRent(
         DEFAULT_LIQUIDATION_CHARGES.map(([lineType, description]) =>
-            createLiquidationCharge(lineType, description),
+            createLiquidationCharge(lineType, description, tariffs),
         ),
         item,
         item.liquidationDate || item.expectedVacantDate || todayInputValue(),
     );
 }
 
-function buildLiquidationForm(item = {}) {
-    const subtotal = Number(item.liquidationFinalInvoiceSubtotalAmount ?? 0);
-    const depositAmount = Number(item.liquidationDepositAmount ?? item.depositAmount ?? 0);
-    const safeDepositAmount = Number.isFinite(depositAmount) ? depositAmount : 0;
-    const safeSubtotal = Number.isFinite(subtotal) ? subtotal : 0;
-    const forfeitDeposit = shouldForfeitDepositOnLiquidation(item);
+function buildLiquidationForm(item = {}, tariffs = DEFAULT_LIQUIDATION_TARIFFS) {
     return {
         liquidationDate: toDateInputValue(item.liquidationDate || item.expectedVacantDate) || todayInputValue(),
         reason: item.liquidationReason || item.intentionNote || "",
-        depositDeductionAmount: String(forfeitDeposit ? safeDepositAmount : Math.min(safeDepositAmount, safeSubtotal)),
-        depositDeductionReason: item.liquidationDepositDeductionReason || "",
-        charges: buildLiquidationCharges(item),
+        charges: buildLiquidationCharges(item, tariffs),
     };
 }
 
 function normalizeLiquidationCharges(charges = []) {
     return charges
         .map((charge) => {
-            const rawQuantity = isMeterLiquidationCharge(charge.lineType)
-                ? getMeterUsage(charge)
-                : Number(charge.quantity || 0);
-            const unitPrice = Number(charge.unitPrice || 0);
-            const quantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? rawQuantity : 0;
+            const estimate = isMeterLiquidationCharge(charge.lineType)
+                ? getLiquidationMeterEstimate(charge)
+                : null;
+            const rawQuantity = estimate ? estimate.billableUsage : Number(charge.quantity || 0);
+            const unitPrice = estimate ? estimate.unitPrice : Number(charge.unitPrice || 0);
+            const quantity = Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.ceil(rawQuantity) : 0;
             const description = String(charge.description || getLiquidationChargeDefaultDescription(charge.lineType)).trim();
             return {
                 lineType: charge.lineType || "OTHER",
                 description: isMeterLiquidationCharge(charge.lineType)
-                    ? `${description}: ${charge.previousValue || 0} -> ${charge.currentValue || 0}`
+                    ? `${description}: ${charge.previousValue || 0} -> ${charge.currentValue || 0}, miễn phí ${estimate?.freeAllowance || 0}, tính ${quantity} x ${unitPrice}`
                     : description,
                 quantity,
                 unitPrice: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0,
+                previousValue: isMeterLiquidationCharge(charge.lineType) ? Number(charge.previousValue || 0) : null,
+                currentValue: isMeterLiquidationCharge(charge.lineType) ? Number(charge.currentValue || 0) : null,
+                photoFileId: isMeterLiquidationCharge(charge.lineType) ? charge.photoFileId ?? null : null,
             };
         })
-        .filter((charge) => charge.quantity > 0 && charge.unitPrice > 0);
+        .filter((charge) =>
+            isMeterLiquidationCharge(charge.lineType)
+                ? charge.unitPrice > 0
+                : charge.quantity > 0 && charge.unitPrice > 0,
+        );
 }
 
 function getLiquidationChargeSubtotal(charges = []) {
@@ -693,6 +746,16 @@ function isRoomTransferManagedContract(item) {
     return Boolean(item?.transferRequestId);
 }
 
+function isTransferExecuted(item) {
+    return item?.transferStatus === "EXECUTED";
+}
+
+function shouldShowSignedFileCard(item) {
+    if (!item?.leaseContractId) return false;
+    if (!isRoomTransferManagedContract(item)) return true;
+    return item?.status === "SIGNED" || Boolean(getLeaseSignedFileId(item));
+}
+
 function isTransferSigningStatus(status) {
     return status === "WAITING_SIGNING" || status === "WAITING_CONTRACT_SIGNING";
 }
@@ -883,14 +946,14 @@ function LiquidationInvoiceLines({lines = []}) {
     const electricityLines = lines.filter((line) => line.lineType === "ELECTRICITY");
     const waterLines = lines.filter((line) => line.lineType === "WATER");
     const otherLines = lines.filter((line) => !isMeterLiquidationCharge(line.lineType));
-    const renderLines = (items) => (
+    const renderLines = (items, {compactMeter = false} = {}) => (
         <table className="w-full table-auto text-left">
             <thead className="bg-[#f7f9fe] text-[11px] font-bold uppercase tracking-[0.04em] text-[#6b7280] xl:text-xs">
             <tr>
                 <th className="px-4 py-3">Loại phí</th>
                 <th className="px-4 py-3">Diễn giải</th>
-                <th className="px-4 py-3 text-right">SL</th>
-                <th className="px-4 py-3 text-right">Đơn giá</th>
+                {!compactMeter && <th className="px-4 py-3 text-right">SL</th>}
+                {!compactMeter && <th className="px-4 py-3 text-right">Đơn giá</th>}
                 <th className="px-4 py-3 text-right">Thành tiền</th>
             </tr>
             </thead>
@@ -899,8 +962,8 @@ function LiquidationInvoiceLines({lines = []}) {
                 <tr key={line.id || `${line.lineType}-${line.description}`} className="border-t border-[#edf1f6]">
                     <td className="px-4 py-3 text-sm font-bold text-[#091426]">{getLiquidationChargeTypeLabel(line.lineType)}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-[#091426]">{line.description || "Chưa có"}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{line.quantity ?? 1}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{formatOptionalMoney(line.unitPrice)}</td>
+                    {!compactMeter && <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{line.quantity ?? 1}</td>}
+                    {!compactMeter && <td className="px-4 py-3 text-right text-sm font-semibold text-[#091426]">{formatOptionalMoney(line.unitPrice)}</td>}
                     <td className="px-4 py-3 text-right text-sm font-extrabold text-[#091426]">{formatMoney(getInvoiceLineAmount(line))}</td>
                 </tr>
             ))}
@@ -915,7 +978,7 @@ function LiquidationInvoiceLines({lines = []}) {
                     <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
                         Chốt điện
                     </p>
-                    {renderLines(electricityLines)}
+                    {renderLines(electricityLines, {compactMeter: true})}
                 </div>
             )}
             {waterLines.length > 0 && (
@@ -923,7 +986,7 @@ function LiquidationInvoiceLines({lines = []}) {
                     <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
                         Chốt nước
                     </p>
-                    {renderLines(waterLines)}
+                    {renderLines(waterLines, {compactMeter: true})}
                 </div>
             )}
             {otherLines.length > 0 && (
@@ -938,7 +1001,72 @@ function LiquidationInvoiceLines({lines = []}) {
     );
 }
 
-function LiquidationChargeRows({charges = [], onAdd, onChange, onRemove}) {
+function LiquidationProofPreview({file, fileId}) {
+    const [preview, setPreview] = useState({key: "", url: "", error: ""});
+    const remoteKey = !file && fileId ? `remote-${fileId}` : "";
+    const localUrl = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
+    const url = file ? localUrl : preview.key === remoteKey ? preview.url : "";
+    const error = file ? "" : preview.key === remoteKey ? preview.error : "";
+
+    useEffect(() => {
+        return () => {
+            if (localUrl) URL.revokeObjectURL(localUrl);
+        };
+    }, [localUrl]);
+
+    useEffect(() => {
+        let isMounted = true;
+        let objectUrl = "";
+        if (!remoteKey) return undefined;
+
+        fetchLeaseContractFileObjectUrl(fileId)
+            .then((nextUrl) => {
+                objectUrl = nextUrl;
+                if (isMounted) {
+                    setPreview({key: remoteKey, url: nextUrl, error: ""});
+                } else if (nextUrl) {
+                    URL.revokeObjectURL(nextUrl);
+                }
+            })
+            .catch(() => {
+                if (isMounted) setPreview({key: remoteKey, url: "", error: "Không tải được ảnh"});
+            });
+
+        return () => {
+            isMounted = false;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [fileId, remoteKey]);
+
+    if (!file && !fileId) {
+        return (
+            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] text-xs font-bold text-[#607089]">
+                Chưa có ảnh
+            </div>
+        );
+    }
+
+    if (!url) {
+        return (
+            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-2 text-center text-xs font-bold text-[#607089]">
+                {error || "Đang tải ảnh..."}
+            </div>
+        );
+    }
+
+    return (
+        <a href={url} target="_blank" rel="noreferrer" className="block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={url}
+                alt="Ảnh bằng chứng"
+                className="h-24 w-full rounded-lg border border-[#dfe5ef] object-cover"
+            />
+        </a>
+    );
+}
+
+function LiquidationChargeRows({charges = [], onAdd, onChange, onProofChange, onRemove}) {
     const electricityCharges = charges
         .map((charge, index) => ({charge, index}))
         .filter(({charge}) => charge.lineType === "ELECTRICITY");
@@ -953,8 +1081,8 @@ function LiquidationChargeRows({charges = [], onAdd, onChange, onRemove}) {
             key={charge.id || index}
             className={`grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 ${
                 isMeterLiquidationCharge(charge.lineType)
-                    ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.4fr)_110px_110px_90px_140px_auto]"
-                    : "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.4fr)_120px_140px_auto]"
+                    ? "xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_95px_95px_125px_220px_auto]"
+                    : "xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_100px_120px_130px_auto]"
             }`}
         >
             <label className="grid min-w-0 gap-1.5">
@@ -1001,13 +1129,6 @@ function LiquidationChargeRows({charges = [], onAdd, onChange, onRemove}) {
                             className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
                         />
                     </label>
-                    <div className="grid min-w-0 gap-1.5">
-                        <span className="text-[11px] font-bold text-[#58667c]">Sản lượng</span>
-                        <div
-                            className="h-10 rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#091426]">
-                            {getMeterUsage(charge)}
-                        </div>
-                    </div>
                 </>
             ) : (
                 <label className="grid min-w-0 gap-1.5">
@@ -1023,18 +1144,46 @@ function LiquidationChargeRows({charges = [], onAdd, onChange, onRemove}) {
                     />
                 </label>
             )}
-            <label className="grid min-w-0 gap-1.5">
-                <span className="text-[11px] font-bold text-[#58667c]">Đơn giá</span>
-                <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={charge.unitPrice}
-                    disabled={charge.lineType === "ROOM_RENT"}
-                    onChange={(event) => onChange(index, "unitPrice", event.target.value)}
-                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
-                />
-            </label>
+            {!isMeterLiquidationCharge(charge.lineType) && (
+                <label className="grid min-w-0 gap-1.5">
+                    <span className="text-[11px] font-bold text-[#58667c]">Đơn giá</span>
+                    <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={charge.unitPrice}
+                        disabled={charge.lineType === "ROOM_RENT"}
+                        onChange={(event) => onChange(index, "unitPrice", event.target.value)}
+                        className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
+                    />
+                </label>
+            )}
+            <div className="grid min-w-0 gap-1.5">
+                <span className="text-[11px] font-bold text-[#58667c]">Thành tiền</span>
+                <div className="flex h-10 min-w-0 items-center justify-end rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-extrabold text-[#091426]">
+                    {getLiquidationChargeLiveAmount(charge) == null
+                        ? "Không hợp lệ"
+                        : formatMoney(getLiquidationChargeLiveAmount(charge))}
+                </div>
+            </div>
+            {isMeterLiquidationCharge(charge.lineType) && (
+                <label className="grid min-w-0 gap-1.5">
+                    <span className="text-[11px] font-bold text-[#58667c]">Ảnh bằng chứng</span>
+                    <span className="inline-flex h-10 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc]">
+                        <Upload className="h-3.5 w-3.5"/>
+                        <span className="truncate">
+                            {charge.proofFile?.name || (charge.photoFileId ? "Đã có ảnh" : "Upload ảnh")}
+                        </span>
+                    </span>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(event) => onProofChange(index, event.target.files?.[0] || null)}
+                    />
+                    <LiquidationProofPreview file={charge.proofFile} fileId={charge.photoFileId}/>
+                </label>
+            )}
             <div className="flex items-end justify-end">
                 <button
                     type="button"
@@ -1129,6 +1278,7 @@ export default function ContractTemplatePage() {
     const [termsFieldErrors, setTermsFieldErrors] = useState({});
     const [isEditingLiquidation, setIsEditingLiquidation] = useState(false);
     const [liquidationForm, setLiquidationForm] = useState(buildLiquidationForm());
+    const [liquidationTariffs, setLiquidationTariffs] = useState(DEFAULT_LIQUIDATION_TARIFFS);
     const [liquidationError, setLiquidationError] = useState("");
     const [renewModalOpen, setRenewModalOpen] = useState(false);
     const [renewForm, setRenewForm] = useState(buildRenewForm());
@@ -1322,6 +1472,7 @@ export default function ContractTemplatePage() {
             signedFileName: details.signedFile?.fileName ?? details.signedFileName ?? selected.signedFileName,
             signedFileUploadedAt: details.signedFile?.uploadedAt ?? details.signedFileUploadedAt ?? selected.signedFileUploadedAt,
             propertyName: details.property?.name || selected.propertyName,
+            propertyId: getContractPropertyId(details) ?? getContractPropertyId(selected),
             tenantId: details.tenantId || selected.tenantId || null,
             roomCode: details.room?.roomCode || selected.roomCode,
             roomId: details.room?.id || selected.roomId || null,
@@ -1343,6 +1494,35 @@ export default function ContractTemplatePage() {
             intentionRecordedAt: details.intentionRecordedAt ?? selected.intentionRecordedAt ?? null,
             intentionNote: details.intentionNote ?? selected.intentionNote ?? null,
             intentionSource: details.intentionSource ?? selected.intentionSource ?? null,
+            liquidationId: details.liquidationId ?? selected.liquidationId ?? null,
+            liquidationDate: details.liquidationDate ?? selected.liquidationDate ?? null,
+            liquidationReason: details.liquidationReason ?? selected.liquidationReason ?? null,
+            liquidationDepositAmount: details.liquidationDepositAmount ?? selected.liquidationDepositAmount ?? null,
+            liquidationDepositDeductionAmount: details.liquidationDepositDeductionAmount ?? selected.liquidationDepositDeductionAmount ?? null,
+            liquidationDepositDeductionReason: details.liquidationDepositDeductionReason ?? selected.liquidationDepositDeductionReason ?? null,
+            liquidationDepositRefundAmount: details.liquidationDepositRefundAmount ?? selected.liquidationDepositRefundAmount ?? null,
+            liquidationFinalInvoiceId: details.liquidationFinalInvoiceId ?? selected.liquidationFinalInvoiceId ?? null,
+            liquidationFinalInvoiceCode: details.liquidationFinalInvoiceCode ?? selected.liquidationFinalInvoiceCode ?? null,
+            liquidationFinalInvoiceStatus: details.liquidationFinalInvoiceStatus ?? selected.liquidationFinalInvoiceStatus ?? null,
+            liquidationFinalInvoiceSubtotalAmount: details.liquidationFinalInvoiceSubtotalAmount ?? selected.liquidationFinalInvoiceSubtotalAmount ?? null,
+            liquidationFinalInvoiceDiscountAmount: details.liquidationFinalInvoiceDiscountAmount ?? selected.liquidationFinalInvoiceDiscountAmount ?? null,
+            liquidationFinalInvoiceTotalAmount: details.liquidationFinalInvoiceTotalAmount ?? selected.liquidationFinalInvoiceTotalAmount ?? null,
+            liquidationFinalInvoiceRemainingAmount: details.liquidationFinalInvoiceRemainingAmount ?? selected.liquidationFinalInvoiceRemainingAmount ?? null,
+            liquidationFinalInvoiceLines:
+                Array.isArray(details.liquidationFinalInvoiceLines) && details.liquidationFinalInvoiceLines.length > 0
+                    ? details.liquidationFinalInvoiceLines
+                    : selected.liquidationFinalInvoiceLines ?? [],
+            liquidationSignedFileId: details.liquidationSignedFileId ?? selected.liquidationSignedFileId ?? null,
+            liquidationStatus: details.liquidationStatus ?? selected.liquidationStatus ?? null,
+            liquidationCreatedAt: details.liquidationCreatedAt ?? selected.liquidationCreatedAt ?? null,
+            liquidationDepositRefundRequestId: details.liquidationDepositRefundRequestId ?? selected.liquidationDepositRefundRequestId ?? null,
+            liquidationDepositRefundExpenseId: details.liquidationDepositRefundExpenseId ?? selected.liquidationDepositRefundExpenseId ?? null,
+            liquidationDepositRefundExpenseRequestId: details.liquidationDepositRefundExpenseRequestId ?? selected.liquidationDepositRefundExpenseRequestId ?? null,
+            liquidationDepositRefundStatus: details.liquidationDepositRefundStatus ?? selected.liquidationDepositRefundStatus ?? null,
+            liquidationDepositRefundProofFileId: details.liquidationDepositRefundProofFileId ?? selected.liquidationDepositRefundProofFileId ?? null,
+            liquidationDepositRefundedAmount: details.liquidationDepositRefundedAmount ?? selected.liquidationDepositRefundedAmount ?? null,
+            liquidationDepositRefundedAt: details.liquidationDepositRefundedAt ?? selected.liquidationDepositRefundedAt ?? null,
+            liquidationDepositRefundTransactionRef: details.liquidationDepositRefundTransactionRef ?? selected.liquidationDepositRefundTransactionRef ?? null,
         };
     }, [details, selected]);
 
@@ -1358,16 +1538,8 @@ export default function ContractTemplatePage() {
         mergedSelected?.liquidationDepositAmount ?? mergedSelected?.depositAmount ?? 0,
     );
     const safeLiquidationDraftDeposit = Number.isFinite(liquidationDraftDeposit) ? liquidationDraftDeposit : 0;
-    const liquidationDraftDepositForfeited = shouldForfeitDepositOnLiquidation(
-        mergedSelected || {},
-        liquidationForm.liquidationDate,
-    );
-    const liquidationDraftDeduction = Math.min(
-        safeLiquidationDraftDeposit,
-        liquidationDraftDepositForfeited ? safeLiquidationDraftDeposit : liquidationDraftSubtotal,
-    );
-    const liquidationDraftRemainingDeposit = Math.max(0, liquidationDraftDeposit - liquidationDraftDeduction);
-    const liquidationDraftRemainingPayable = Math.max(0, liquidationDraftSubtotal - liquidationDraftDeduction);
+    const liquidationDraftRemainingDeposit = Math.max(0, safeLiquidationDraftDeposit);
+    const liquidationDraftRemainingPayable = Math.max(0, liquidationDraftSubtotal);
 
     const selectedLeaseContractFilename = useMemo(() => {
         if (!mergedSelected?.leaseContractId && !mergedSelected?.contractId) return "";
@@ -1786,17 +1958,16 @@ export default function ContractTemplatePage() {
         const refreshedItem = refreshedContracts.find(
             (item) => String(item.leaseContractId) === String(contract.leaseContractId),
         );
-        if (refreshedItem) {
-            setSelected((current) =>
-                String(current?.leaseContractId) === String(contract.leaseContractId)
-                    ? {...current, ...refreshedItem}
-                    : refreshedItem,
-            );
-        }
+        const selectedUpdate = {...contract, ...(refreshedItem || {})};
+        setSelected((current) =>
+            String(current?.leaseContractId) === String(contract.leaseContractId)
+                ? {...current, ...selectedUpdate}
+                : selectedUpdate,
+        );
         const refreshedDetails = await fetchManagementLeaseContractDetails(contract.leaseContractId);
         setDetails(refreshedDetails);
         setTermsForm(buildTermsForm(refreshedDetails));
-        setLiquidationForm(buildLiquidationForm(refreshedDetails));
+        setLiquidationForm(buildLiquidationForm(selectedUpdate));
     }
 
     async function handleRetrySendAccount(item) {
@@ -1929,7 +2100,26 @@ export default function ContractTemplatePage() {
     }
 
     async function openLiquidationEditor(item) {
-        const initialForm = buildLiquidationForm(item);
+        const propertyId = getContractPropertyId(item);
+        if (!propertyId) {
+            setLiquidationError("Không xác định được cơ sở để tải đơn giá điện nước.");
+            toast.error("Không xác định được cơ sở để tải đơn giá điện nước.");
+            return;
+        }
+        let tariffs = DEFAULT_LIQUIDATION_TARIFFS;
+        try {
+            const settings = await fetchPropertyUtilitySettings(propertyId);
+            tariffs = {
+                ELECTRICITY: normalizeUtilityTariff(settings?.electricity, DEFAULT_LIQUIDATION_TARIFFS.ELECTRICITY),
+                WATER: normalizeUtilityTariff(settings?.water, DEFAULT_LIQUIDATION_TARIFFS.WATER),
+            };
+        } catch (err) {
+            setLiquidationError(err?.message || "Không tải được đơn giá điện nước của cơ sở.");
+            toast.error(err?.message || "Không tải được đơn giá điện nước của cơ sở.");
+            return;
+        }
+        setLiquidationTariffs(tariffs);
+        const initialForm = buildLiquidationForm(item, tariffs);
         setLiquidationForm(initialForm);
         setLiquidationError("");
         setIsEditingLiquidation(true);
@@ -1956,6 +2146,8 @@ export default function ContractTemplatePage() {
                         ...charge,
                         previousValue: String(suggestedValue ?? 0),
                         currentValue: String(suggestedValue ?? 0),
+                        unitPrice: String(getLiquidationTariff(charge.lineType, tariffs).unitPrice),
+                        freeAllowance: String(getLiquidationTariff(charge.lineType, tariffs).freeAllowance),
                     };
                 }),
             }));
@@ -1967,7 +2159,9 @@ export default function ContractTemplatePage() {
                         ? {
                             ...charge,
                             previousValue: charge.previousValue || "0",
-                            currentValue: charge.currentValue || "0"
+                            currentValue: charge.currentValue || "0",
+                            unitPrice: String(getLiquidationTariff(charge.lineType, tariffs).unitPrice),
+                            freeAllowance: String(getLiquidationTariff(charge.lineType, tariffs).freeAllowance),
                         }
                         : charge,
                 ),
@@ -1982,8 +2176,8 @@ export default function ContractTemplatePage() {
             setLiquidationError("Vui lòng nhập và lưu hồ sơ thanh lý trước khi hoàn tất.");
             return;
         }
-        const payload = buildLiquidationPayload(item);
-        if (!payload) {
+        const validationPayload = await buildLiquidationPayload();
+        if (!validationPayload) {
             return;
         }
         const confirmed = window.confirm("Bạn chắc chắn muốn hoàn tất thanh lý hợp đồng này?");
@@ -1992,6 +2186,8 @@ export default function ContractTemplatePage() {
         setError("");
         setLiquidationError("");
         try {
+            const payload = await buildLiquidationPayload({uploadPhotos: true});
+            if (!payload) return;
             const updated = await liquidateLeaseContract(item.leaseContractId, payload);
             await refreshSelectedContract(updated);
             setIsEditingLiquidation(false);
@@ -2029,10 +2225,13 @@ export default function ContractTemplatePage() {
                 if (field === "lineType") {
                     const meterCharge = isMeterLiquidationCharge(value);
                     next.description = getLiquidationChargeDefaultDescription(value);
-                    next.unitPrice = next.unitPrice || "0";
+                    next.unitPrice = meterCharge ? String(getLiquidationTariff(value, liquidationTariffs).unitPrice) : next.unitPrice || "0";
+                    next.freeAllowance = meterCharge ? String(getLiquidationTariff(value, liquidationTariffs).freeAllowance) : "0";
                     next.quantity = meterCharge ? "0" : next.quantity || "1";
                     next.previousValue = meterCharge ? (next.previousValue || "0") : "0";
                     next.currentValue = meterCharge ? (next.currentValue || "0") : "0";
+                    next.photoFileId = meterCharge ? next.photoFileId ?? null : null;
+                    next.proofFile = meterCharge ? next.proofFile ?? null : null;
                     if (value === "ROOM_RENT") {
                         next.description = getLiquidationRoomRentDescription(current.liquidationDate);
                         next.quantity = "1";
@@ -2041,6 +2240,19 @@ export default function ContractTemplatePage() {
                 }
                 return next;
             }),
+        }));
+        if (liquidationError) setLiquidationError("");
+    }
+
+    function updateLiquidationChargeProof(index, file) {
+        if (!file) return;
+        setLiquidationForm((current) => ({
+            ...current,
+            charges: (current.charges || []).map((charge, chargeIndex) =>
+                chargeIndex === index
+                    ? {...charge, proofFile: file, photoFileId: null}
+                    : charge,
+            ),
         }));
         if (liquidationError) setLiquidationError("");
     }
@@ -2059,54 +2271,77 @@ export default function ContractTemplatePage() {
         }));
     }
 
-    function buildLiquidationPayload(item) {
-        const depositAmount = Number(item.liquidationDepositAmount ?? item.depositAmount ?? 0);
-        const charges = normalizeLiquidationCharges(liquidationForm.charges);
-        const subtotal = charges.reduce((total, charge) => total + charge.quantity * charge.unitPrice, 0);
-        const safeDepositAmount = Number.isFinite(depositAmount) ? depositAmount : 0;
-        const deductionAmount = shouldForfeitDepositOnLiquidation(item, liquidationForm.liquidationDate)
-            ? safeDepositAmount
-            : Math.min(safeDepositAmount, subtotal);
+    async function buildLiquidationPayload({uploadPhotos = false} = {}) {
         if (!liquidationForm.liquidationDate) {
             setLiquidationError("Vui lòng chọn ngày thanh lý.");
             return null;
         }
+        let uploadedCharges = liquidationForm.charges || [];
         for (const charge of liquidationForm.charges || []) {
-            const quantity = isMeterLiquidationCharge(charge.lineType)
-                ? getMeterUsage(charge)
+            const meterCharge = isMeterLiquidationCharge(charge.lineType);
+            const quantity = meterCharge
+                ? getLiquidationMeterEstimate(charge)?.billableUsage
                 : Number(charge.quantity || 0);
             const unitPrice = Number(charge.unitPrice || 0);
+            const previousValue = Number(charge.previousValue || 0);
+            const currentValue = Number(charge.currentValue || 0);
+            if (
+                meterCharge &&
+                (!Number.isFinite(previousValue) ||
+                    !Number.isFinite(currentValue) ||
+                    previousValue < 0 ||
+                    currentValue < 0 ||
+                    currentValue < previousValue)
+            ) {
+                setLiquidationError("Chỉ số mới không được nhỏ hơn chỉ số cũ.");
+                return null;
+            }
             if (
                 !Number.isFinite(quantity) ||
                 quantity < 0 ||
                 !Number.isFinite(unitPrice) ||
                 unitPrice < 0 ||
-                (unitPrice > 0 && quantity <= 0)
+                (!meterCharge && unitPrice > 0 && quantity <= 0)
             ) {
                 setLiquidationError("Vui lòng kiểm tra số lượng và đơn giá các khoản thanh lý.");
                 return null;
             }
         }
+        if (uploadPhotos) {
+            uploadedCharges = [];
+            for (const charge of liquidationForm.charges || []) {
+                if (isMeterLiquidationCharge(charge.lineType) && charge.proofFile) {
+                    const uploaded = await uploadFile(charge.proofFile, "METER_PHOTO");
+                    uploadedCharges.push({
+                        ...charge,
+                        proofFile: null,
+                        photoFileId: uploaded?.fileId || uploaded?.id || null,
+                    });
+                } else {
+                    uploadedCharges.push(charge);
+                }
+            }
+            setLiquidationForm((current) => ({
+                ...current,
+                charges: uploadedCharges,
+            }));
+        }
+        const charges = normalizeLiquidationCharges(uploadedCharges);
         return {
             liquidationDate: liquidationForm.liquidationDate,
             reason: liquidationForm.reason,
-            depositDeductionAmount: deductionAmount,
-            depositDeductionReason: liquidationForm.depositDeductionReason,
             charges,
         };
     }
 
     async function handleSaveLiquidationDraft(item) {
         if (!item?.leaseContractId) return;
-        const payload = buildLiquidationPayload(item);
-        if (!payload) {
-            return;
-        }
-
         setActionLoading(`liquidation-draft-${item.leaseContractId}`);
         setLiquidationError("");
         setError("");
         try {
+            const payload = await buildLiquidationPayload({uploadPhotos: true});
+            if (!payload) return;
             const updated = await updateLeaseContractLiquidationDraft(item.leaseContractId, payload);
             await refreshSelectedContract(updated);
             setIsEditingLiquidation(false);
@@ -2839,7 +3074,7 @@ export default function ContractTemplatePage() {
                                     </div>
                                 </div>
                             )}
-                            {isRoomTransferManagedContract(mergedSelected) && (
+                            {isRoomTransferManagedContract(mergedSelected) && !isTransferExecuted(mergedSelected) && (
                                 <DetailCard title="Xử lý hợp đồng chuyển phòng" icon={ArrowRightLeft}
                                             className="lg:col-span-2">
                                     <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -3299,35 +3534,21 @@ export default function ContractTemplatePage() {
                                                                 className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
                                                             />
                                                         </label>
-                                                        <label className="grid min-w-0 gap-1.5">
-                                                            <span className="text-xs font-bold text-[#58667c]">Khấu trừ cọc</span>
-                                                            <div
-                                                                className="h-10 rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#091426]">
-                                                                {formatMoney(liquidationDraftDeduction)}
-                                                            </div>
-                                                        </label>
                                                         <LiquidationChargeRows
                                                             charges={liquidationDraftCharges}
                                                             onAdd={addLiquidationCharge}
                                                             onChange={updateLiquidationCharge}
+                                                            onProofChange={updateLiquidationChargeProof}
                                                             onRemove={removeLiquidationCharge}
                                                         />
                                                         <div
                                                             className="grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 sm:col-span-2 sm:grid-cols-4">
                                                             <InfoValue label="Tổng phí chốt"
                                                                        value={formatMoney(liquidationDraftSubtotal)}/>
-                                                            <InfoValue label="Trừ vào cọc"
-                                                                       value={formatMoney(Number.isFinite(liquidationDraftDeduction) ? liquidationDraftDeduction : 0)}/>
                                                             <InfoValue label="Khách còn phải trả"
-                                                                       value={formatMoney(liquidationDraftRemainingPayable)}/>
-                                                            <InfoValue label="Cọc còn hoàn"
-                                                                       value={formatMoney(liquidationDraftRemainingDeposit)}/>
-                                                            {liquidationDraftDepositForfeited && (
-                                                                <p className="text-xs font-bold leading-5 text-red-600 sm:col-span-4">
-                                                                    Ngày thanh lý sớm hơn 1 tháng trước ngày hết hạn nên tiền
-                                                                    cọc không hoàn lại cho khách thuê.
-                                                                </p>
-                                                            )}
+                                                                        value={formatMoney(liquidationDraftRemainingPayable)}/>
+                                                            <InfoValue label="Cọc phải hoàn"
+                                                                        value={formatMoney(liquidationDraftRemainingDeposit)}/>
                                                         </div>
                                                         <label className="grid min-w-0 gap-1.5 sm:col-span-2">
                                                             <span className="text-xs font-bold text-[#58667c]">Lý do thanh lý</span>
@@ -3336,15 +3557,6 @@ export default function ContractTemplatePage() {
                                                                 value={liquidationForm.reason}
                                                                 onChange={(event) => updateLiquidationField("reason", event.target.value)}
                                                                 className="min-h-24 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
-                                                            />
-                                                        </label>
-                                                        <label className="grid min-w-0 gap-1.5 sm:col-span-2">
-                                                            <span className="text-xs font-bold text-[#58667c]">Lý do khấu trừ</span>
-                                                            <textarea
-                                                                rows={2}
-                                                                value={liquidationForm.depositDeductionReason}
-                                                                onChange={(event) => updateLiquidationField("depositDeductionReason", event.target.value)}
-                                                                className="min-h-20 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
                                                             />
                                                         </label>
                                                     </>
@@ -3356,10 +3568,8 @@ export default function ContractTemplatePage() {
                                                                    value={formatDate(mergedSelected.liquidationDate || mergedSelected.expectedVacantDate)}/>
                                                         <InfoValue label="Cọc đã thanh toán"
                                                                    value={formatOptionalMoney(mergedSelected.liquidationDepositAmount ?? mergedSelected.depositAmount)}/>
-                                                        <InfoValue label="Khấu trừ cọc"
-                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositDeductionAmount ?? 0)}/>
                                                         <InfoValue label="Hoàn trả cọc"
-                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositRefundAmount ?? Math.max(0, Number(mergedSelected.depositAmount || 0) - Number(mergedSelected.liquidationDepositDeductionAmount || 0)))}/>
+                                                                   value={formatOptionalMoney(mergedSelected.liquidationDepositRefundAmount ?? mergedSelected.depositAmount)}/>
                                                         <InfoValue label="Trạng thái hoàn cọc"
                                                                    value={getDepositRefundStatusLabel(mergedSelected.liquidationDepositRefundStatus)}/>
                                                         <InfoValue label="Yêu cầu duyệt hoàn cọc"
@@ -3374,14 +3584,10 @@ export default function ContractTemplatePage() {
                                                                    value={mergedSelected.liquidationFinalInvoiceStatus || "Chưa có"}/>
                                                         <InfoValue label="Tổng phí chốt"
                                                                    value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceSubtotalAmount)}/>
-                                                        <InfoValue label="Khấu trừ từ cọc"
-                                                                   value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceDiscountAmount)}/>
                                                         <InfoValue label="Khách còn phải trả"
                                                                    value={formatOptionalMoney(mergedSelected.liquidationFinalInvoiceRemainingAmount)}/>
                                                         <InfoValue label="Lý do thanh lý"
                                                                    value={mergedSelected.liquidationReason}/>
-                                                        <InfoValue label="Lý do khấu trừ"
-                                                                   value={mergedSelected.liquidationDepositDeductionReason}/>
                                                         <div className="sm:col-span-2">
                                                             <p className="mb-2 text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">Chi
                                                                 tiết khoản thanh lý</p>
@@ -3397,6 +3603,11 @@ export default function ContractTemplatePage() {
                                                     </>
                                                 )}
                                             </div>
+                                            {!canUseLiquidationActions && mergedSelected.liquidationStatus !== "CONFIRMED" && (
+                                                <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                                                    Chỉ chủ trọ được cập nhật hồ sơ và hoàn tất thanh lý hợp đồng.
+                                                </p>
+                                            )}
                                             {liquidationError && (
                                                 <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
                                                     {liquidationError}
@@ -3455,6 +3666,7 @@ export default function ContractTemplatePage() {
                                                 <tr>
                                                     <th className="min-w-44 px-4 py-3">Họ tên</th>
                                                     <th className="min-w-32 px-4 py-3">Vai trò</th>
+                                                    <th className="min-w-44 px-4 py-3">Ý định</th>
                                                     <th className="min-w-32 px-4 py-3">SĐT</th>
                                                     <th className="min-w-36 px-4 py-3">CCCD</th>
                                                 </tr>
@@ -3462,7 +3674,7 @@ export default function ContractTemplatePage() {
                                                 <tbody className="divide-y divide-[#edf1f6] text-xs xl:text-sm">
                                                 {detailLoading && (
                                                     <tr>
-                                                        <td colSpan={4}
+                                                        <td colSpan={5}
                                                             className="px-4 py-5 text-sm font-bold text-[#607089]">
                                                             <Loader2 className="mr-2 inline h-4 w-4 animate-spin"/>
                                                             Đang tải danh sách người ở...
@@ -3488,6 +3700,16 @@ export default function ContractTemplatePage() {
                                 </span>
                               </span>
                                                             </td>
+                                                            <td data-label="Ý định" className="px-4 py-3">
+                                                                <span
+                                                                    className="inline-flex max-w-full rounded-full border border-[#d8e1f2] bg-white px-2.5 py-1 text-[11px] font-bold text-[#34445c] xl:text-xs"
+                                                                    title={occupant.occupantIntentionNote || undefined}
+                                                                >
+                                                                    <span className="truncate">
+                                                                        {OCCUPANT_INTENTION_LABELS[occupant.occupantIntention] || "Chưa phản hồi"}
+                                                                    </span>
+                                                                </span>
+                                                            </td>
                                                             <td data-label="SĐT"
                                                                 className="break-words px-4 py-3 text-[#4b5563]"
                                                                 title={occupant.phone || "Chưa có"}>
@@ -3503,7 +3725,7 @@ export default function ContractTemplatePage() {
                                                 ) : (
                                                     !detailLoading && (
                                                         <tr>
-                                                            <td colSpan={4}
+                                                            <td colSpan={5}
                                                                 className="px-4 py-5 text-sm font-semibold text-[#607089]">
                                                                 Chưa có danh sách người ở trong hợp đồng.
                                                             </td>
@@ -3569,7 +3791,7 @@ export default function ContractTemplatePage() {
                                             />
                                         )}
 
-                                    {mergedSelected.leaseContractId && (
+                                    {shouldShowSignedFileCard(mergedSelected) && (
                                         <DetailCard title="File hợp đồng đã ký" icon={FileCheck2}
                                                     className="lg:col-span-2">
                                             <div className="mt-5 rounded-lg bg-white p-4">
@@ -3871,6 +4093,9 @@ export default function ContractTemplatePage() {
                                             <p className="font-bold text-[#091426]">{occupant.fullName || "Chưa cập nhật"}</p>
                                             <p className="text-xs text-[#607089]">
                                                 {ROLE_LABELS[occupant.occupantRole] || occupant.occupantRole}
+                                            </p>
+                                            <p className="mt-1 text-xs font-semibold text-[#34445c]">
+                                                {OCCUPANT_INTENTION_LABELS[occupant.occupantIntention] || "Chưa phản hồi ý định"}
                                             </p>
                                         </div>
                                     ))}

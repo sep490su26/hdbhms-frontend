@@ -6,14 +6,15 @@ function toNonNegativeNumber(value) {
 }
 
 export async function fetchPropertyUtilitySettings(propertyId) {
-  return authenticatedFetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/utility-settings`,
     { method: "GET" },
   );
+  return response?.data ?? response;
 }
 
 export async function updatePropertyUtilitySettings(propertyId, payload) {
-  return authenticatedFetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/utility-settings`,
     {
       method: "PUT",
@@ -26,4 +27,5 @@ export async function updatePropertyUtilitySettings(propertyId, payload) {
       }),
     },
   );
+  return response?.data ?? response;
 }

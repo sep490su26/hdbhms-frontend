@@ -54,7 +54,8 @@ import {
     Copy,
     CalendarDays,
     MoreVertical,
-    Trash2
+    Trash2,
+    UserPlus
 } from "lucide-react";
 import {PieChart, Pie, Cell, ResponsiveContainer} from "recharts";
 import {Input} from "@/components/ui/input";
@@ -102,6 +103,7 @@ const translateType = (type) => {
         RENEWAL: "Gia hạn HĐ",
         TERMINATION: "Thanh lý HĐ",
         CONTRACT_LIQUIDATION: "Thanh lý HĐ",
+        ADD_CO_OCCUPANT: "Thêm người ở cùng",
         MAINTENANCE: "Bảo trì",
         COMPLAINT: "Khiếu nại",
         ACCESS: "Yêu cầu thẻ"
@@ -117,6 +119,7 @@ const mapRequestType = (type) => {
         CONTRACT_RENEWAL: "RENEWAL",
         CONTRACT_TERMINATION: "TERMINATION",
         CONTRACT_LIQUIDATION: "TERMINATION",
+        ADD_CO_OCCUPANT: "ADD_CO_OCCUPANT",
         PERMISSION_ACCESS: "PERMISSION_ACCESS",
         TENANT_PROFILE_ACCESS: "TENANT_PROFILE_ACCESS",
         METER_READING_CORRECTION: "METER_READING_CORRECTION",
@@ -169,6 +172,7 @@ const TYPE_CONFIG = {
     RENEWAL: {color: "bg-indigo-50", icon: <FileText className="w-5 h-5 text-indigo-500"/>, accent: "indigo"},
     TERMINATION: {color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500"/>, accent: "red"},
     CONTRACT_LIQUIDATION: {color: "bg-red-50", icon: <XCircle className="w-5 h-5 text-red-500"/>, accent: "red"},
+    ADD_CO_OCCUPANT: {color: "bg-orange-50", icon: <UserPlus className="w-5 h-5 text-orange-500"/>, accent: "orange"},
     MAINTENANCE: {color: "bg-emerald-50", icon: <Wrench className="w-5 h-5 text-emerald-500"/>, accent: "emerald"},
     COMPLAINT: {color: "bg-blue-50", icon: <MessageSquareWarning className="w-5 h-5 text-blue-500"/>, accent: "blue"},
     ACCESS: {color: "bg-orange-50", icon: <Key className="w-5 h-5 text-orange-500"/>, accent: "orange"},
@@ -1118,32 +1122,32 @@ export default function ApprovalCenter() {
                         {/* Table */}
                         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                             <div className="hidden min-[1536px]:block">
-                                <Table className="w-full">
+                                <Table className="w-full table-fixed">
                                     <TableHeader>
                                         <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
                                             <TableHead
-                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Mã
+                                                className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Mã
                                                 yêu cầu</TableHead>
                                             <TableHead
-                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Loại
+                                                className="h-12 w-[17%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Loại
                                                 yêu cầu</TableHead>
                                             <TableHead
-                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Tiêu
+                                                className="h-12 w-[25%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Tiêu
                                                 đề</TableHead>
                                             <TableHead
-                                                className="hidden min-[1700px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Người
+                                                className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell">Người
                                                 tạo</TableHead>
                                             <TableHead
-                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Ngày
+                                                className="h-12 w-[11%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Ngày
                                                 tạo</TableHead>
                                             <TableHead
-                                                className="h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Trạng
+                                                className="h-12 w-[10%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Trạng
                                                 thái</TableHead>
                                             <TableHead
-                                                className="hidden min-[1650px]:table-cell h-12 px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Hạn
+                                                className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell">Hạn
                                                 xử lý</TableHead>
                                             <TableHead
-                                                className="h-12 px-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Thao
+                                                className="h-12 w-[8%] px-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Thao
                                                 tác</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -1186,15 +1190,14 @@ export default function ApprovalCenter() {
                                                                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tc.color}`}>
                                                                     {tc.icon}
                                                                 </div>
-                                                                <div>
-                                                                    <p className="text-sm font-semibold text-slate-900">{translateType(req.requestType)}</p>
-                                                                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{req.requestType}</p>
+                                                                <div className="min-w-0">
+                                                                    <p className="truncate text-sm font-semibold text-slate-900">{translateType(req.requestType)}</p>
                                                                 </div>
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell className="min-w-0 px-3 py-3 align-top">
-                                                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{req.title || "--"}</p>
-                                                            <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{req.description || "Không có mô tả bổ sung"}</p>
+                                                        <TableCell className="min-w-0 max-w-0 px-3 py-3 align-top">
+                                                            <p className="truncate text-sm font-semibold leading-5 text-slate-900" title={req.title || "--"}>{req.title || "--"}</p>
+                                                            <p className="mt-1 truncate text-sm leading-5 text-slate-500" title={req.description || "Không có mô tả bổ sung"}>{req.description || "Không có mô tả bổ sung"}</p>
                                                         </TableCell>
                                                         <TableCell
                                                             className="hidden min-[1700px]:table-cell px-3 py-3 align-top">

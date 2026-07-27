@@ -65,6 +65,14 @@ function occupancyPercent(occupied, total) {
   return Math.round((Number(occupied || 0) / Number(total || 0)) * 100);
 }
 
+function UnitBadge() {
+  return (
+    <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+      Đơn vị: Nghìn VND
+    </p>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -74,7 +82,6 @@ function StatCard({
   badge,
   badgeTone = "green",
   accent = "blue",
-  unitBadge,
 }) {
   const accentClasses = {
     blue: "bg-[#eef3ff] text-[#4360b6]",
@@ -88,26 +95,14 @@ function StatCard({
   };
 
   return (
-    <article className="relative rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm">
-      {unitBadge ? (
-        <span className="absolute right-4 top-4 rounded-full border border-[#dfe5f0] bg-[#f8fafc] px-2.5 py-1 text-[10px] font-black text-[#526070]">
-          {unitBadge}
-        </span>
-      ) : null}
-      {unitBadge && badge ? (
-        <span
-          className={`absolute right-4 top-12 rounded px-2.5 py-1 text-xs font-bold ${badgeClasses[badgeTone]}`}
-        >
-          {badge}
-        </span>
-      ) : null}
-      <div className="flex items-start justify-between gap-3">
+    <article className="relative flex h-full flex-col rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${accentClasses[accent]}`}
         >
           <Icon className="h-4.5 w-4.5" />
         </span>
-        {badge && !unitBadge ? (
+        {badge ? (
           <span
             className={`rounded px-2.5 py-1 text-xs font-bold ${badgeClasses[badgeTone]}`}
           >
@@ -115,12 +110,20 @@ function StatCard({
           </span>
         ) : null}
       </div>
-      <p className={`mt-5 text-xs font-bold uppercase text-[#526070] ${unitBadge ? "pr-28" : ""}`}>{label}</p>
+      <p className="mt-5 truncate text-xs font-bold uppercase text-[#526070]">
+        {label}
+      </p>
       <div className="mt-2 flex items-baseline gap-1.5 text-[#102039]">
         <span className="text-2xl font-extrabold leading-none">{value}</span>
-        {suffix ? <span className="text-sm font-semibold">{suffix}</span> : null}
+        {suffix ? (
+          <span className="text-sm font-semibold">{suffix}</span>
+        ) : null}
       </div>
-      {note ? <p className="mt-3 text-xs font-semibold text-[#d71920]">{note}</p> : null}
+      {note ? (
+        <p className="mt-auto pt-3 text-xs font-semibold text-[#d71920]">
+          {note}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -128,7 +131,10 @@ function StatCard({
 function SegmentControl() {
   return (
     <div className="inline-grid h-8 grid-cols-3 rounded-lg bg-[#eef3fb] p-1 text-xs font-bold text-[#4b5563]">
-      <button className="rounded-md bg-white px-4 text-[#315ac8] shadow-sm" type="button">
+      <button
+        className="rounded-md bg-white px-4 text-[#315ac8] shadow-sm"
+        type="button"
+      >
         Tháng
       </button>
       <button className="rounded-md px-4" type="button">
@@ -170,11 +176,12 @@ function RevenueChart({ items = [] }) {
     return {
       ...item,
       amount,
-      fill: amount === 0
-        ? chartMuted
-        : index === items.length - 1
-          ? chartPrimary
-          : chartSecondary,
+      fill:
+        amount === 0
+          ? chartMuted
+          : index === items.length - 1
+            ? chartPrimary
+            : chartSecondary,
     };
   });
 
@@ -182,8 +189,12 @@ function RevenueChart({ items = [] }) {
     <section className="h-full rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm lg:col-span-2">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-extrabold text-[#102039]">Biểu đồ doanh thu</h2>
-          <p className="mt-1 text-xs font-semibold text-[#64748b]">6 tháng gần nhất</p>
+          <h2 className="text-base font-extrabold text-[#102039]">
+            Biểu đồ doanh thu
+          </h2>
+          <p className="mt-1 text-xs font-semibold text-[#64748b]">
+            6 tháng gần nhất
+          </p>
         </div>
         <SegmentControl />
       </div>
@@ -193,8 +204,15 @@ function RevenueChart({ items = [] }) {
         aria-label="Biểu đồ doanh thu 6 tháng gần nhất"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartItems} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-            <CartesianGrid stroke="#e5ebf4" strokeDasharray="4 4" vertical={false} />
+          <BarChart
+            data={chartItems}
+            margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
+          >
+            <CartesianGrid
+              stroke="#e5ebf4"
+              strokeDasharray="4 4"
+              vertical={false}
+            />
             <XAxis
               dataKey="label"
               axisLine={false}
@@ -208,7 +226,10 @@ function RevenueChart({ items = [] }) {
               tickFormatter={formatCompactMoney}
               width={46}
             />
-            <Tooltip cursor={{ fill: "rgba(49, 90, 200, 0.08)" }} content={<RevenueTooltip />} />
+            <Tooltip
+              cursor={{ fill: "rgba(49, 90, 200, 0.08)" }}
+              content={<RevenueTooltip />}
+            />
             <Bar dataKey="amount" radius={[6, 6, 0, 0]} barSize={34}>
               {chartItems.map((item) => (
                 <Cell key={item.period || item.label} fill={item.fill} />
@@ -224,13 +245,17 @@ function RevenueChart({ items = [] }) {
 function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading }) {
   const occupiedRate = occupancyPercent(occupiedRooms, totalRooms);
   const vacantRate = totalRooms ? Math.max(0, 100 - occupiedRate) : 0;
-  const chartData = [{ name: "Đã thuê", value: occupiedRate, fill: chartPrimary }];
+  const chartData = [
+    { name: "Đã thuê", value: occupiedRate, fill: chartPrimary },
+  ];
 
   return (
     <section className="h-full rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-extrabold text-[#102039]">Tỷ lệ lấp đầy</h2>
+          <h2 className="text-base font-extrabold text-[#102039]">
+            Tỷ lệ lấp đầy
+          </h2>
           <p className="mt-1 text-xs font-semibold text-[#64748b]">
             {loading ? "Đang tải dữ liệu" : `${formatNumber(totalRooms)} phòng`}
           </p>
@@ -275,14 +300,18 @@ function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading }) {
             <i className="h-2.5 w-2.5 rounded-full bg-[#315ac8]" />
             Đã thuê ({formatNumber(occupiedRooms)} phòng)
           </span>
-          <span className="text-[#102039]">{loading ? "..." : `${occupiedRate}%`}</span>
+          <span className="text-[#102039]">
+            {loading ? "..." : `${occupiedRate}%`}
+          </span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="flex items-center gap-2 text-[#334155]">
             <i className="h-2.5 w-2.5 rounded-full bg-[#c5161d]" />
             Phòng trống ({formatNumber(vacantRooms)} phòng)
           </span>
-          <span className="text-[#c5161d]">{loading ? "..." : `${vacantRate}%`}</span>
+          <span className="text-[#c5161d]">
+            {loading ? "..." : `${vacantRate}%`}
+          </span>
         </div>
       </div>
     </section>
@@ -304,8 +333,13 @@ function ActivityFeed({ items = [] }) {
   return (
     <section className="rounded-lg border border-[#dfe5f0] bg-white p-6 shadow-sm">
       <div className="mb-8 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-extrabold text-[#102039]">Hoạt động gần đây</h2>
-        <Link href="/dashboard/requests" className="text-sm font-bold text-[#315ac8]">
+        <h2 className="text-xl font-extrabold text-[#102039]">
+          Hoạt động gần đây
+        </h2>
+        <Link
+          href="/dashboard/requests"
+          className="text-sm font-bold text-[#315ac8]"
+        >
           Xem tất cả
         </Link>
       </div>
@@ -314,7 +348,10 @@ function ActivityFeed({ items = [] }) {
           {items.map((activity) => {
             const Icon = iconByType[activity.type] || CheckCircle2;
             return (
-              <div key={`${activity.type}-${activity.occurredAt}-${activity.title}`} className="flex items-center gap-4">
+              <div
+                key={`${activity.type}-${activity.occurredAt}-${activity.title}`}
+                className="flex items-center gap-4"
+              >
                 <span
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneClasses[activity.tone] || toneClasses.info}`}
                 >
@@ -348,7 +385,9 @@ function UtilityCard({ icon: Icon, label, value, note, dark = false }) {
         dark ? "bg-[#102039] text-white" : "bg-[#425db3] text-white"
       }`}
     >
-      <p className="text-xs font-bold uppercase tracking-wide text-white/55">{label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-white/55">
+        {label}
+      </p>
       <div className="mt-3 flex items-baseline gap-2">
         <span className="text-2xl font-extrabold">{value}</span>
       </div>
@@ -434,7 +473,9 @@ export default function DashboardPage() {
       setOverview(await getDashboardOverview());
     } catch (loadError) {
       setOverview(null);
-      setError(loadError?.message || "Không tải được dữ liệu tổng quan từ backend.");
+      setError(
+        loadError?.message || "Không tải được dữ liệu tổng quan từ backend.",
+      );
     } finally {
       setLoading(false);
     }
@@ -458,46 +499,47 @@ export default function DashboardPage() {
       <DashboardPageHeader
         title="Dashboard tổng quan"
         description="Thống kê hoạt động của Nhà trọ Hải Đăng"
-        className="mb-8"
+        className="mb-5"
         actions={
-          <button
-            type="button"
-            onClick={loadDashboard}
-            disabled={loading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Làm mới
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <UnitBadge />
+          </div>
         }
       />
 
-      {error ? <DashboardNotice message={error} onRetry={loadDashboard} /> : null}
+      {error ? (
+        <DashboardNotice message={error} onRetry={loadDashboard} />
+      ) : null}
 
       <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={HandCoins}
           label="Doanh thu tháng"
-          value={loading ? "..." : formatThousandMoney(overview?.currentMonthRevenue)}
-          unitBadge="nghìn đồng"
+          value={
+            loading ? "..." : formatThousandMoney(overview?.currentMonthRevenue)
+          }
           badge={`${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth}%`}
         />
         <StatCard
           icon={Building2}
           label="Tỷ lệ lấp đầy"
           value={loading ? "..." : `${occupiedRate}%`}
-          badge={totalRooms ? `${formatNumber(occupiedRooms)}/${formatNumber(totalRooms)}` : ""}
+          badge={
+            totalRooms
+              ? `${formatNumber(occupiedRooms)}/${formatNumber(totalRooms)}`
+              : ""
+          }
         />
         <StatCard
           icon={DoorOpenIcon}
           label="Phòng trống"
           value={loading ? "..." : formatNumber(vacantRooms)}
           suffix="Phòng"
-          note={vacantRooms ? `Có ${formatNumber(vacantRooms)} phòng đang trống` : ""}
+          note={
+            vacantRooms
+              ? `Có ${formatNumber(vacantRooms)} phòng đang trống`
+              : ""
+          }
           badge={vacantRooms ? "Cần chú ý" : ""}
           badgeTone="red"
           accent="red"
@@ -505,8 +547,9 @@ export default function DashboardPage() {
         <StatCard
           icon={AlertTriangle}
           label="Tổng công nợ"
-          value={loading ? "..." : formatThousandMoney(overview?.totalDebtAmount)}
-          unitBadge="nghìn đồng"
+          value={
+            loading ? "..." : formatThousandMoney(overview?.totalDebtAmount)
+          }
           note={
             debtWarningRoomCount
               ? `${formatNumber(debtWarningRoomCount)} phòng vượt ngưỡng`
@@ -533,14 +576,20 @@ export default function DashboardPage() {
             <UtilityCard
               icon={Zap}
               label="Tiêu thụ điện"
-              value={loading ? "..." : formatUsage(utilityUsage.electricityUsage, "kWh")}
+              value={
+                loading
+                  ? "..."
+                  : formatUsage(utilityUsage.electricityUsage, "kWh")
+              }
               note={`Kỳ ${utilityUsage.period || "hiện tại"} từ backend`}
               dark
             />
             <UtilityCard
               icon={Droplets}
               label="Tiêu thụ nước"
-              value={loading ? "..." : formatUsage(utilityUsage.waterUsage, "m³")}
+              value={
+                loading ? "..." : formatUsage(utilityUsage.waterUsage, "m³")
+              }
               note={`Kỳ ${utilityUsage.period || "hiện tại"} từ backend`}
             />
           </div>

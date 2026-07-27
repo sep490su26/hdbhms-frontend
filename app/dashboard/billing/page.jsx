@@ -4,21 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle,
   Banknote,
-  CheckCircle2,
+  Bell,
+  Check,
   History,
   Loader2,
-  ReceiptText,
   RefreshCw,
   Save,
-  SlidersHorizontal,
-  WalletCards,
+  Settings,
   X,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
-import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -93,7 +90,9 @@ function displayRoomCode(value) {
 }
 
 function formatVietnameseDateInput(value) {
-  const text = String(value || "").replace(/[^\d/]/g, "").slice(0, 10);
+  const text = String(value || "")
+    .replace(/[^\d/]/g, "")
+    .slice(0, 10);
   if (text.includes("/")) return text;
   const digits = text.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
@@ -130,6 +129,53 @@ function formatMoney(value) {
 function formatThousandMoney(value) {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
     Number(value || 0) / 1000,
+  );
+}
+
+function BillingMetricCard({ label, value, note, color }) {
+  return (
+    <article className="relative flex h-full min-h-[112px] flex-col overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+      <span
+        className="absolute inset-x-0 top-0 h-0.5"
+        style={{ backgroundColor: color }}
+      />
+      <p className="text-[10px] font-bold uppercase leading-4 text-[#5f6b7c] dark:text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 truncate text-2xl font-black text-[#0f1d33] dark:text-white">
+        {value}
+      </p>
+      <p className="mt-auto pt-2 text-[10px] font-semibold text-[#5f6b7c] dark:text-slate-400">
+        {note}
+      </p>
+    </article>
+  );
+}
+
+function UnitBadge() {
+  return (
+    <div className="inline-flex h-9 shrink-0 overflow-hidden rounded-md border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+      <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+        Đơn vị: Nghìn VND
+      </p>
+    </div>
+  );
+}
+
+const metricToneColors = {
+  blue: "#3f5db5",
+  emerald: "#10b981",
+  rose: "#ef627f",
+};
+
+function DashboardStatCard({ label, value, tone, subtitle }) {
+  return (
+    <BillingMetricCard
+      label={label}
+      value={value}
+      note={subtitle}
+      color={metricToneColors[tone] || "#3f5db5"}
+    />
   );
 }
 
@@ -227,6 +273,7 @@ export default function BillingPage() {
   const [message, setMessage] = useState("");
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [warningInvoice, setWarningInvoice] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
 
@@ -238,7 +285,14 @@ export default function BillingPage() {
     [invoices, selectedInvoiceId],
   );
   const visibleInvoices = useMemo(
-    () => sortByNewest(invoices, ["createdAt", "created_at", "issueDate", "issue_date", "billingPeriod"]),
+    () =>
+      sortByNewest(invoices, [
+        "createdAt",
+        "created_at",
+        "issueDate",
+        "issue_date",
+        "billingPeriod",
+      ]),
     [invoices],
   );
   const selectedInvoicePaymentHistory = useMemo(
@@ -315,7 +369,13 @@ export default function BillingPage() {
     setError("");
     try {
       const data = await fetchBillingInvoices(filters);
-      const sortedInvoices = sortByNewest(data, ["createdAt", "created_at", "issueDate", "issue_date", "billingPeriod"]);
+      const sortedInvoices = sortByNewest(data, [
+        "createdAt",
+        "created_at",
+        "issueDate",
+        "issue_date",
+        "billingPeriod",
+      ]);
       setInvoices(sortedInvoices);
       setSelectedInvoiceId((current) =>
         current &&
@@ -450,6 +510,11 @@ export default function BillingPage() {
     setIsPaymentModalOpen(true);
   }
 
+  function openOverrideModal(invoice) {
+    setSelectedInvoiceId(invoice.id || "");
+    setIsOverrideModalOpen(true);
+  }
+
   async function sendOverdueWarning(invoice) {
     if (!invoice?.id) return;
     setSaving(`warning-${invoice.id}`);
@@ -463,7 +528,9 @@ export default function BillingPage() {
           : "Không tìm thấy khách thuê đang nhận thông báo cho phòng này.",
       );
     } catch (warningError) {
-      setError(warningError?.message || "Không gửi được cảnh báo thanh toán quá hạn.");
+      setError(
+        warningError?.message || "Không gửi được cảnh báo thanh toán quá hạn.",
+      );
     } finally {
       setSaving("");
     }
@@ -563,13 +630,16 @@ export default function BillingPage() {
         title="Hóa đơn & Thu tiền"
         description="Theo dõi hóa đơn phòng, ghi nhận thanh toán thủ công và quản lý các khoản còn phải thu."
         actions={
-          <Link
-            href="/dashboard/billing/history"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200 "
-          >
-            <History className="h-4 w-4 dark:text-slate-300" />
-            Lịch sử thanh toán
-          </Link>
+          <div className="flex items-center gap-4">
+            <UnitBadge />
+            <Link
+              href="/dashboard/billing/history"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200"
+            >
+              <History className="h-4 w-4 dark:text-slate-300" />
+              Lịch sử thanh toán
+            </Link>
+          </div>
         }
       />
 
@@ -585,43 +655,28 @@ export default function BillingPage() {
         </section>
       )}
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid items-stretch gap-3 md:grid-cols-3">
         <DashboardStatCard
-          icon={ReceiptText}
           label="Tổng hóa đơn"
           value={formatThousandMoney(totals.total)}
-          unitBadge="nghìn đồng"
           tone="blue"
           subtitle="Tổng giá trị trong kỳ"
         />
         <DashboardStatCard
-          icon={CheckCircle2}
           label="Đã thu"
           value={formatThousandMoney(totals.paid)}
-          unitBadge="nghìn đồng"
           tone="emerald"
           subtitle="Khoản đã ghi nhận"
         />
         <DashboardStatCard
-          icon={WalletCards}
           label="Còn lại"
           value={formatThousandMoney(totals.remaining)}
-          unitBadge="nghìn đồng"
           tone="rose"
           subtitle="Khoản cần tiếp tục thu"
         />
       </section>
 
       <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-            <SlidersHorizontal className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">Bộ lọc hóa đơn</h2>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Lọc theo kỳ, trạng thái, cơ sở và phòng.</p>
-          </div>
-        </div>
         <div className="grid gap-3 md:grid-cols-5">
           <label className="grid gap-1 text-sm font-bold">
             Tháng
@@ -717,59 +772,15 @@ export default function BillingPage() {
             </select>
           </label>
         </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={loadInvoices}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Tải hóa đơn
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsOverrideModalOpen(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Điều chỉnh giá
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsPaymentModalOpen(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
-          >
-            <Banknote className="h-4 w-4" />
-            Thanh toán thủ công
-          </button>
-        </div>
       </section>
 
       <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
-              <ReceiptText className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                Danh sách hóa đơn
-              </h2>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Theo dõi trạng thái thu tiền theo từng phòng.
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700 dark:bg-white/5 dark:text-slate-300">
-            {totalElements} hóa đơn
-          </span>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] text-left text-sm">
             <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Hóa đơn</th>
-                <th className="px-4 py-3">Phòng</th>
+                <th className="px-4 py-3 text-center">Phòng</th>
                 <th className="px-4 py-3">Khách thuê</th>
                 <th className="px-4 py-3">Tháng</th>
                 <th className="px-4 py-3">Trạng thái</th>
@@ -780,14 +791,20 @@ export default function BillingPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
+                  <td
+                    className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
+                    colSpan={7}
+                  >
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Đang tải hóa đơn...
                   </td>
                 </tr>
               ) : invoices.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400" colSpan={7}>
+                  <td
+                    className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
+                    colSpan={7}
+                  >
                     Chưa có hóa đơn phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -797,18 +814,28 @@ export default function BillingPage() {
                     key={invoice.id}
                     onClick={() => setSelectedInvoiceId(invoice.id || "")}
                     className={`cursor-pointer border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5 ${
-                      String(selectedInvoiceId) === String(invoice.id) ? "bg-blue-50/60 dark:bg-blue-500/10" : ""
+                      String(selectedInvoiceId) === String(invoice.id)
+                        ? "bg-blue-50/60 dark:bg-blue-500/10"
+                        : ""
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <p className="font-black">{invoice.invoiceCode}</p>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <p className="font-black">
                         {typeLabel(invoice.invoiceType)}
                       </p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {invoice.invoiceCode}
+                      </p>
                     </td>
-                    <td className="px-4 py-3 font-semibold">{displayRoomCode(invoice.roomCode)}</td>
-                    <td className="px-4 py-3">{invoice.tenantName || "Chưa có"}</td>
-                    <td className="px-4 py-3">{formatBillingPeriod(invoice.billingPeriod)}</td>
+                    <td className="px-4 py-3 font-semibold text-center">
+                      {displayRoomCode(invoice.roomCode)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {invoice.tenantName || "Chưa có"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatBillingPeriod(invoice.billingPeriod)}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${invoiceStatusClasses(invoice.status)}`}
@@ -821,39 +848,50 @@ export default function BillingPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          title="Điều chỉnh giá"
+                          aria-label="Điều chỉnh giá"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openOverrideModal(invoice);
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-all duration-200 hover:scale-110 hover:bg-slate-100 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </button>
                         {isPendingInvoice(invoice) && (
                           <button
                             type="button"
+                            title="Xác nhận thanh toán"
+                            aria-label="Xác nhận thanh toán"
                             onClick={(event) => {
                               event.stopPropagation();
                               openManualPayment(invoice);
                             }}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-700"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 p-0 text-xs font-black text-white transition-all duration-200 hover:scale-110 hover:bg-emerald-700 active:scale-95"
                           >
-                            <Banknote className="h-3.5 w-3.5" />
-                            Xác nhận
+                            <Check className="h-3.5 w-3.5" />
                           </button>
                         )}
                         {isExpiredInvoice(invoice) && (
                           <button
                             type="button"
+                            title="Gửi cảnh báo quá hạn"
+                            aria-label="Gửi cảnh báo quá hạn"
                             disabled={saving === `warning-${invoice.id}`}
                             onClick={(event) => {
                               event.stopPropagation();
-                              sendOverdueWarning(invoice);
+                              setWarningInvoice(invoice);
                             }}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-black text-amber-700 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-0 text-xs font-black text-amber-700 transition-all duration-200 hover:scale-110 hover:bg-amber-100 active:scale-95 disabled:opacity-60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
                           >
                             {saving === `warning-${invoice.id}` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <Bell className="h-3.5 w-3.5" />
                             )}
-                            Cảnh báo
                           </button>
-                        )}
-                        {!isPendingInvoice(invoice) && !isExpiredInvoice(invoice) && (
-                          <span className="text-xs font-semibold text-slate-400">-</span>
                         )}
                       </div>
                     </td>
@@ -1100,7 +1138,8 @@ export default function BillingPage() {
                     </option>
                     {paymentInvoices.map((invoice) => (
                       <option key={invoice.id} value={invoice.id}>
-                        {invoice.invoiceCode} - {displayRoomCode(invoice.roomCode)}
+                        {invoice.invoiceCode} -{" "}
+                        {displayRoomCode(invoice.roomCode)}
                       </option>
                     ))}
                   </select>
@@ -1148,6 +1187,43 @@ export default function BillingPage() {
                 Xác nhận đã nhận tiền
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {warningInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl dark:bg-[#0f172a]">
+            <h2 className="text-sm font-black text-slate-900 dark:text-white">
+              Xác nhận gửi cảnh báo
+            </h2>
+            <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
+              Bạn có chắc chắn muốn gửi cảnh báo thanh toán quá hạn cho phòng
+              này không?
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setWarningInvoice(null)}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={saving === `warning-${warningInvoice.id}`}
+                onClick={async () => {
+                  await sendOverdueWarning(warningInvoice);
+                  setWarningInvoice(null);
+                }}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-bold text-white transition hover:bg-amber-700 disabled:opacity-60"
+              >
+                {saving === `warning-${warningInvoice.id}` && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Gửi cảnh báo
+              </button>
+            </div>
           </div>
         </div>
       )}

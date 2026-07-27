@@ -1527,7 +1527,9 @@ export default function TenantsPage() {
     try {
       setIsExporting(true);
       setExportError("");
-      await downloadTenantProfilesPoliceReportPackageExport(selectedExportColumns);
+      await downloadTenantProfilesPoliceReportPackageExport(
+        selectedExportColumns,
+      );
       setExportDialogOpen(false);
     } catch (downloadError) {
       setExportError(
@@ -2047,7 +2049,6 @@ export default function TenantsPage() {
                               <th className="px-6 py-4">Họ tên</th>
                               <th className="px-6 py-4 text-center">SĐT</th>
                               <th className="px-6 py-4 text-center">Email</th>
-                              <th className="px-6 py-4">Số người</th>
                               <th className="px-6 py-4 text-center">Vai trò</th>
                               <th className="px-6 py-4">Tài khoản app</th>
                               <th className="px-6 py-4 text-center">
@@ -2087,12 +2088,6 @@ export default function TenantsPage() {
                                   {valueOf(profile, "email") || "Chưa cập nhật"}
                                 </td>
 
-                                <td
-                                  data-label="Số người"
-                                  className="px-6 py-5 text-sm font-black text-slate-900 dark:text-white text-center"
-                                >
-                                  {roomOccupancyText(profile)}
-                                </td>
                                 <td
                                   data-label="Vai trò"
                                   className="px-6 py-5 text-center"

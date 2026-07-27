@@ -32,22 +32,26 @@ import {
 const statusMeta = {
   [FACILITY_STATUS.DRAFT]: {
     label: "Bản nháp",
-    badge: "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
+    badge:
+      "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
     dot: "bg-slate-400",
   },
   [FACILITY_STATUS.ACTIVE]: {
     label: "Đang hoạt động",
-    badge: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
+    badge:
+      "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20",
     dot: "bg-emerald-500",
   },
   [FACILITY_STATUS.TEMPORARILY_CLOSED]: {
     label: "Tạm ngừng",
-    badge: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
+    badge:
+      "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
     dot: "bg-amber-500",
   },
   [FACILITY_STATUS.PERMANENTLY_CLOSED]: {
     label: "Ngừng hoạt động",
-    badge: "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20",
+    badge:
+      "bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20",
     dot: "bg-rose-500",
   },
 };
@@ -101,19 +105,35 @@ function FacilityActionsMenu({
         sideOffset={8}
         className="w-72 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
       >
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
-          <Link href={getFacilityRoomsHref(facility)} className={facilityActionItemClass}>
+        <DropdownMenuItem
+          asChild
+          className="rounded-lg p-0 focus:bg-transparent"
+        >
+          <Link
+            href={getFacilityRoomsHref(facility)}
+            className={facilityActionItemClass}
+          >
             <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Xem chi tiết
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
-          <button type="button" onClick={() => onEdit(facility)} className={facilityActionItemClass}>
+        <DropdownMenuItem
+          asChild
+          className="rounded-lg p-0 focus:bg-transparent"
+        >
+          <button
+            type="button"
+            onClick={() => onEdit(facility)}
+            className={facilityActionItemClass}
+          >
             <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Chỉnh sửa
           </button>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+        <DropdownMenuItem
+          asChild
+          className="rounded-lg p-0 focus:bg-transparent"
+        >
           <Link
             href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
             className={facilityActionItemClass}
@@ -123,21 +143,40 @@ function FacilityActionsMenu({
           </Link>
         </DropdownMenuItem>
         {showMeterReadingsAction ? (
-          <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
-            <Link href={getFacilityMeterReadingsHref(facility)} className={facilityActionItemClass}>
+          <DropdownMenuItem
+            asChild
+            className="rounded-lg p-0 focus:bg-transparent"
+          >
+            <Link
+              href={getFacilityMeterReadingsHref(facility)}
+              className={facilityActionItemClass}
+            >
               <Gauge className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               Điện nước
             </Link>
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
-          <Link href={`/dashboard/rules?propertyId=${encodeURIComponent(String(facility.id))}`} className={facilityActionItemClass}>
+        <DropdownMenuItem
+          asChild
+          className="rounded-lg p-0 focus:bg-transparent"
+        >
+          <Link
+            href={`/dashboard/rules?propertyId=${encodeURIComponent(String(facility.id))}`}
+            className={facilityActionItemClass}
+          >
             <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Quản lý nội quy
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
-          <button type="button" onClick={() => onUtilitySettings(facility)} className={facilityActionItemClass}>
+        <DropdownMenuItem
+          asChild
+          className="rounded-lg p-0 focus:bg-transparent"
+        >
+          <button
+            type="button"
+            onClick={() => onUtilitySettings(facility)}
+            className={facilityActionItemClass}
+          >
             <CircleDollarSign className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Giá điện nước
           </button>
@@ -222,7 +261,7 @@ function FacilityTree({ facility }) {
                       ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300"
                       : room.status === "DRAFT"
                         ? "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300"
-                      : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                        : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                   }`}
                 >
                   {room.name.replace("Phòng ", "")}
@@ -276,7 +315,9 @@ function MobileFacilityCard({
               key={label}
               className="rounded-lg bg-[#f7f9fb] dark:bg-white/5 px-2 py-2.5 text-center"
             >
-              <p className="text-lg font-black text-slate-900 dark:text-white">{value}</p>
+              <p className="text-lg font-black text-slate-900 dark:text-white">
+                {value}
+              </p>
               <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
                 {label}
               </p>
@@ -331,13 +372,16 @@ export function FacilityList({
   const activeExpandedIds = useMemo(() => {
     const firstFacilityId = facilities[0]?.id;
     if (!firstFacilityId) return new Set();
+    if (expandedIds.size === 0) return expandedIds;
     if ([...expandedIds].some((id) => visibleIds.has(id))) return expandedIds;
     return new Set([firstFacilityId]);
   }, [expandedIds, facilities, visibleIds]);
 
   const toggleFacility = (id) => {
     setExpandedIds((current) => {
-      const currentVisible = [...current].some((itemId) => visibleIds.has(itemId))
+      const currentVisible = [...current].some((itemId) =>
+        visibleIds.has(itemId),
+      )
         ? current
         : activeExpandedIds;
       const next = new Set(currentVisible);

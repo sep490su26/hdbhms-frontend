@@ -36,6 +36,16 @@ function debtTypeLabel(value) {
   return DEBT_TYPE_LABELS[value] || value || "Nợ khác";
 }
 
+function UnitBadge() {
+  return (
+    <div className="inline-flex h-10 shrink-0 overflow-hidden rounded-lg border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10">
+      <span className="inline-flex items-center bg-white px-3 text-[#5f6b7c]">
+        Đơn vị: Nghìn VND
+      </span>
+    </div>
+  );
+}
+
 function readDebtCache() {
   if (typeof window === "undefined") return null;
   try {
@@ -131,7 +141,8 @@ export default function DebtDashboardPage() {
         title="Công nợ tổng hợp"
         description="Theo dõi phòng đang nợ tiền phòng, điện nước và các phòng vượt ngưỡng."
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <UnitBadge />
             <select
               value={propertyId}
               onChange={(event) => setPropertyId(event.target.value)}
@@ -166,39 +177,32 @@ export default function DebtDashboardPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-4">
-        <article className="relative rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <span className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-            nghìn đồng
-          </span>
-          <p className="pr-20 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
+          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
             Tổng công nợ
           </p>
-          <p className="mt-2 text-xl font-black">{formatThousandMoney(totals.total)}</p>
+          <p className="mt-2 text-xl font-black">
+            {formatThousandMoney(totals.total)}
+          </p>
         </article>
-        <article className="relative rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <span className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-            nghìn đồng
-          </span>
-          <p className="pr-20 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
+          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
             Nợ phòng
           </p>
           <p className="mt-2 text-xl font-black text-[#3156b6]">
             {formatThousandMoney(totals.rent)}
           </p>
         </article>
-        <article className="relative rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <span className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-            nghìn đồng
-          </span>
-          <p className="pr-20 text-xs font-black uppercase text-slate-500 dark:text-slate-400">
+        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
+          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
             Nợ điện nước
           </p>
           <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
             {formatThousandMoney(totals.utility)}
           </p>
         </article>
-        <article className="rounded-lg border border-rose-200 dark:border-rose-500/20 bg-white dark:bg-[#0f172a] p-4">
-          <p className="text-xs font-black uppercase text-rose-600 dark:text-rose-300">
+        <article className="flex h-full flex-col rounded-lg border border-rose-200 bg-white p-4 dark:border-rose-500/20 dark:bg-[#0f172a]">
+          <p className="truncate text-xs font-black uppercase text-rose-600 dark:text-rose-300">
             Vượt ngưỡng
           </p>
           <p className="mt-2 text-xl font-black text-rose-700 dark:text-rose-300">

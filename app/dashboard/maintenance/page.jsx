@@ -222,16 +222,21 @@ function InlineNotice({ type = "info", children }) {
   );
 }
 
-function Metric({ label, value, icon: Icon, tone, unitBadge }) {
+function UnitBadge() {
   return (
-    <article className="relative min-h-28 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-      {unitBadge ? (
-        <span className="absolute right-4 top-4 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-          {unitBadge}
-        </span>
-      ) : null}
-      <div className="flex items-start justify-between gap-4">
-        <p className={`text-xs font-black uppercase text-slate-500 dark:text-slate-400 ${unitBadge ? "pr-20" : ""}`}>
+    <div className="inline-flex h-11 shrink-0 overflow-hidden rounded-lg border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10">
+      <span className="inline-flex items-center bg-white px-3 text-[#5f6b7c]">
+        Đơn vị: Nghìn VND
+      </span>
+    </div>
+  );
+}
+
+function Metric({ label, value, icon: Icon, tone }) {
+  return (
+    <article className="relative flex h-full min-h-28 flex-col rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+      <div className="flex items-center justify-between gap-4">
+        <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
           {label}
         </p>
         <span
@@ -370,14 +375,12 @@ export default function MaintenancePage() {
       {
         label: "Chi phí ghi nhận",
         value: formatThousandMoney(totalCost),
-        unitBadge: "nghìn đồng",
         icon: Check,
         tone: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
       },
       {
         label: "Chi phí chủ trọ chịu",
         value: formatThousandMoney(landlordCost),
-        unitBadge: "nghìn đồng",
         icon: Wrench,
         tone: "bg-slate-100 text-slate-700",
       },
@@ -610,17 +613,8 @@ export default function MaintenancePage() {
         title="Báo sự cố & Bảo trì"
         description="Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất."
         actions={
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={loadTickets}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-bold text-slate-900 dark:text-white hover:bg-[#f8fafc] dark:hover:bg-white/5"
-            >
-              <RefreshCcw
-                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-              />
-              Làm mới
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <UnitBadge />
             {canManage && (
               <button
                 type="button"
@@ -635,7 +629,7 @@ export default function MaintenancePage() {
                   }));
                   setIsInternalOpen((value) => !value);
                 }}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
               >
                 {isInternalOpen ? (
                   <X className="h-4 w-4" />
@@ -1019,16 +1013,16 @@ export default function MaintenancePage() {
                           href={`/dashboard/maintenance/${ticket.id}`}
                           className="font-black text-slate-900 dark:text-white hover:text-[#3156b6]"
                         >
-                          {ticket.ticketCode}
+                          {ticket.title || ticket.description}
                         </Link>
                         <p className="mt-1 max-w-72 truncate text-sm font-semibold text-slate-600 dark:text-slate-300">
-                          {ticket.title || ticket.description}
+                          {ticket.ticketCode}
                         </p>
                       </div>
                     </td>
                     <td
                       data-label="Vị trí"
-                      className="px-5 py-4 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                      className="px-5 py-4 text-sm font-semibold text-slate-700 dark:text-slate-200 text-center align-middle "
                     >
                       <p>
                         {ticket.roomCode ||
@@ -1068,12 +1062,16 @@ export default function MaintenancePage() {
                               ticket.category ||
                               "Khác"}
                           </span>
-                          <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${
-                            ticket.repairRequested === false
-                              ? "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"
-                              : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
-                          }`}>
-                            {ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"}
+                          <span
+                            className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${
+                              ticket.repairRequested === false
+                                ? "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"
+                                : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+                            }`}
+                          >
+                            {ticket.repairRequested === false
+                              ? "Chỉ báo sự cố"
+                              : "Cần sửa chữa"}
                           </span>
                         </span>
                       )}

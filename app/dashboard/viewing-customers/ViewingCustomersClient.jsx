@@ -744,7 +744,7 @@ export default function ViewingCustomersClient() {
               {errorMessage}
             </div>
           )}
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
                 Danh sách khách xem phòng
@@ -753,7 +753,7 @@ export default function ViewingCustomersClient() {
                 Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center ">
               <select
                 value={filters.propertyId}
                 onChange={(event) =>
@@ -907,7 +907,10 @@ export default function ViewingCustomersClient() {
                       >
                         {customer.propertyName}
                       </td>
-                      <td data-label="Phòng quan tâm" className="px-5 py-4">
+                      <td
+                        data-label="Phòng quan tâm"
+                        className="px-5 py-4 text-center"
+                      >
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase ${
                             customer.interestedRoomId
@@ -949,7 +952,7 @@ export default function ViewingCustomersClient() {
                         />
                       </td>
                       <td data-label="Thao tác" className="px-5 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 justify-center">
                           <button
                             type="button"
                             onClick={() => openEdit(customer)}

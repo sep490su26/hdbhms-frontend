@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Ban,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   Home,
   KeyRound,
@@ -169,15 +171,6 @@ function resolveAccountState(item) {
     };
   }
 
-  if (!item.recipientEmail) {
-    return {
-      key: "MISSING_EMAIL",
-      label: "Thiếu email",
-      hint: "Bổ sung email người ký chính trước khi gửi tài khoản.",
-      className: "border-rose-200 bg-rose-50 text-rose-700",
-    };
-  }
-
   if (item.provisioningStatus === "PENDING") {
     return {
       key: "PENDING",
@@ -312,6 +305,7 @@ export default function AccountsPage() {
   const [message, setMessage] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [expandedRooms, setExpandedRooms] = useState(() => new Set());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -321,16 +315,18 @@ export default function AccountsPage() {
         page: 0,
         size: TENANT_ACCOUNT_FETCH_SIZE,
       });
-      setItems(sortByNewest(data.items, [
-        "accountCreatedAt",
-        "account_created_at",
-        "createdAt",
-        "created_at",
-        "sentAt",
-        "sent_at",
-        "signedAt",
-        "signed_at",
-      ]));
+      setItems(
+        sortByNewest(data.items, [
+          "accountCreatedAt",
+          "account_created_at",
+          "createdAt",
+          "created_at",
+          "sentAt",
+          "sent_at",
+          "signedAt",
+          "signed_at",
+        ]),
+      );
     } catch (loadError) {
       setError(loadError?.message || "Không tải được danh sách cấp tài khoản.");
     } finally {
@@ -347,16 +343,18 @@ export default function AccountsPage() {
           size: TENANT_ACCOUNT_FETCH_SIZE,
         });
         if (active) {
-          setItems(sortByNewest(data.items, [
-            "accountCreatedAt",
-            "account_created_at",
-            "createdAt",
-            "created_at",
-            "sentAt",
-            "sent_at",
-            "signedAt",
-            "signed_at",
-          ]));
+          setItems(
+            sortByNewest(data.items, [
+              "accountCreatedAt",
+              "account_created_at",
+              "createdAt",
+              "created_at",
+              "sentAt",
+              "sent_at",
+              "signedAt",
+              "signed_at",
+            ]),
+          );
         }
       } catch (loadError) {
         if (active)
@@ -407,33 +405,36 @@ export default function AccountsPage() {
 
   const filteredItems = useMemo(() => {
     const keyword = normalize(query);
-    return sortByNewest(items.filter((item) => {
-      const state = resolveAccountState(item);
-      const matchesQuery =
-        !keyword ||
-        normalize(item.fullName).includes(keyword) ||
-        normalize(item.phone).includes(keyword) ||
-        normalize(item.email).includes(keyword) ||
-        normalize(item.recipientEmail).includes(keyword) ||
-        normalize(item.roomCode).includes(keyword) ||
-        normalize(item.contractCode).includes(keyword);
-      const matchesProperty =
-        propertyFilter === ALL_VALUE || item.propertyName === propertyFilter;
-      const matchesState =
-        stateFilter === ALL_VALUE || state.label === stateFilter;
-      const matchesRole =
-        roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
-      return matchesQuery && matchesProperty && matchesState && matchesRole;
-    }), [
-      "accountCreatedAt",
-      "account_created_at",
-      "createdAt",
-      "created_at",
-      "sentAt",
-      "sent_at",
-      "signedAt",
-      "signed_at",
-    ]);
+    return sortByNewest(
+      items.filter((item) => {
+        const state = resolveAccountState(item);
+        const matchesQuery =
+          !keyword ||
+          normalize(item.fullName).includes(keyword) ||
+          normalize(item.phone).includes(keyword) ||
+          normalize(item.email).includes(keyword) ||
+          normalize(item.recipientEmail).includes(keyword) ||
+          normalize(item.roomCode).includes(keyword) ||
+          normalize(item.contractCode).includes(keyword);
+        const matchesProperty =
+          propertyFilter === ALL_VALUE || item.propertyName === propertyFilter;
+        const matchesState =
+          stateFilter === ALL_VALUE || state.label === stateFilter;
+        const matchesRole =
+          roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
+        return matchesQuery && matchesProperty && matchesState && matchesRole;
+      }),
+      [
+        "accountCreatedAt",
+        "account_created_at",
+        "createdAt",
+        "created_at",
+        "sentAt",
+        "sent_at",
+        "signedAt",
+        "signed_at",
+      ],
+    );
   }, [items, propertyFilter, query, roleFilter, stateFilter]);
 
   const filteredTotalElements = filteredItems.length;
@@ -476,6 +477,18 @@ export default function AccountsPage() {
       safeKey: contractGroupKey(group.rows[0] || {}, index),
     }));
   }, [pagedItems]);
+
+  const toggleRoom = useCallback((roomId) => {
+    setExpandedRooms((current) => {
+      const next = new Set(current);
+      if (next.has(roomId)) {
+        next.delete(roomId);
+      } else {
+        next.add(roomId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleSend = async (contractId) => {
     if (!contractId || sendingContractId) return;
@@ -546,17 +559,6 @@ export default function AccountsPage() {
       <DashboardPageHeader
         title="Quản lý tài khoản khách thuê"
         description="Cấp tài khoản mobile cho người thuê trong hợp đồng thuê đang ACTIVE."
-        actions={
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(15,29,51,0.18)] transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Làm mới
-          </button>
-        }
       />
 
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
@@ -583,12 +585,6 @@ export default function AccountsPage() {
           label="Đã kích hoạt"
           value={metrics.activated}
           tone="emerald"
-        />
-        <MetricCard
-          icon={AlertCircle}
-          label="Thiếu email"
-          value={metrics.missingEmail}
-          tone="rose"
         />
       </section>
 
@@ -626,7 +622,6 @@ export default function AccountsPage() {
               "Đã kích hoạt",
               "Đã vô hiệu hóa",
               "Gửi thất bại",
-              "Thiếu email",
             ]}
             onChange={(value) => {
               setStateFilter(value);
@@ -682,8 +677,9 @@ export default function AccountsPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#d4dbe8]">
+          <div className="grid gap-4 p-4">
             {groupedContracts.map((group) => {
+              const isExpanded = expandedRooms.has(group.safeKey);
               const groupStates = group.rows.map(
                 (row) => resolveAccountState(row).key,
               );
@@ -704,8 +700,23 @@ export default function AccountsPage() {
                 isSending;
 
               return (
-                <article key={group.safeKey} className="bg-white">
-                  <div className="flex flex-col gap-4 bg-[#f7f9fc] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <article
+                  key={group.safeKey}
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                >
+                  <div
+                    className="flex cursor-pointer flex-col gap-4 bg-[#f7f9fc] p-4 transition hover:bg-[#f1f5fb] lg:flex-row lg:items-center lg:justify-between"
+                    onClick={() => toggleRoom(group.safeKey)}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        toggleRoom(group.safeKey);
+                      }
+                    }}
+                  >
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
                         <h3 className="text-lg font-extrabold text-[#0f1d33]">
@@ -735,7 +746,11 @@ export default function AccountsPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleSend(group.contractId)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSend(group.contractId);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
                         disabled={sendDisabled}
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2]"
                       >
@@ -754,106 +769,127 @@ export default function AccountsPage() {
                                     ? "Gửi tài khoản"
                                     : "Đã gửi tài khoản"}
                       </button>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#526179]">
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5" />
+                        )}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="dashboard-table">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
-                        <tr>
-                          <th className="px-5 py-4">Khách thuê</th>
-                          <th className="px-5 py-4">Vai trò</th>
-                          <th className="px-5 py-4">SĐT</th>
-                          <th className="px-5 py-4">Email cá nhân</th>
-                          <th className="px-5 py-4">Ngày ký</th>
-                          <th className="px-5 py-4">Trạng thái</th>
-                          <th className="px-5 py-4 text-right">Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#eef1f6]">
-                        {group.rows.map((item, index) => {
-                          const state = resolveAccountState(item);
-                          const isDisabled = state.key === "DISABLED";
-                          const isDisabling =
-                            disablingKey === tenantContextKey(item);
-                          const disableActionDisabled =
-                            isDisabled ||
-                            isDisabling ||
-                            !item.contractId ||
-                            !item.profileId;
-                          return (
-                            <tr key={rowKey(item, index)}>
-                              <td data-label="Khách thuê" className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dbe7ff] text-xs font-extrabold text-[#3157b7]">
-                                    {getInitials(item.fullName)}
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="max-w-[220px] truncate font-extrabold text-[#0f1d33]">
-                                      {item.fullName || "Chưa cập nhật"}
-                                    </p>
-                                    <p className="mt-0.5 text-xs text-[#687184]">
-                                      Hồ sơ #{item.profileId || "chưa tạo"}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td data-label="Vai trò" className="px-5 py-4">
-                                <span
-                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}
+                  {isExpanded ? (
+                    <div className="dashboard-table border-t border-slate-200">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
+                          <tr>
+                            <th className="px-5 py-4 text-center">
+                              Khách thuê
+                            </th>
+                            <th className="px-5 py-4 text-center">Vai trò</th>
+                            <th className="px-5 py-4 text-center">SĐT</th>
+                            <th className="px-5 py-4 text-center">
+                              Email cá nhân
+                            </th>
+                            <th className="px-5 py-4 text-center">Ngày ký</th>
+                            <th className="px-5 py-4 text-center">
+                              Trạng thái
+                            </th>
+                            <th className="px-5 py-4 text-center">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#eef1f6]">
+                          {group.rows.map((item, index) => {
+                            const state = resolveAccountState(item);
+                            const isDisabled = state.key === "DISABLED";
+                            const isDisabling =
+                              disablingKey === tenantContextKey(item);
+                            const disableActionDisabled =
+                              isDisabled ||
+                              isDisabling ||
+                              !item.contractId ||
+                              !item.profileId;
+                            return (
+                              <tr key={rowKey(item, index)}>
+                                <td
+                                  data-label="Khách thuê"
+                                  className="px-5 py-4"
                                 >
-                                  {roleLabel(item.roomRole)}
-                                </span>
-                              </td>
-                              <td
-                                data-label="SĐT"
-                                className="px-5 py-4 font-semibold text-[#0f1d33]"
-                              >
-                                {item.phone || "Chưa có"}
-                              </td>
-                              <td
-                                data-label="Email cá nhân"
-                                className="break-words px-5 py-4 font-semibold text-[#0f1d33]"
-                              >
-                                {item.email || "Không có"}
-                              </td>
-                              <td
-                                data-label="Ngày ký"
-                                className="px-5 py-4 font-semibold text-[#0f1d33]"
-                              >
-                                {formatDate(item.signedAt)}
-                              </td>
-                              <td data-label="Trạng thái" className="px-5 py-4">
-                                <div className="grid gap-1">
-                                  <StatusBadge item={item} />
-                                  <span className="text-xs text-[#687184]">
-                                    {state.hint}
-                                  </span>
-                                </div>
-                              </td>
-                              <td data-label="Thao tác" className="px-5 py-4">
-                                <div className="flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDisable(item)}
-                                    disabled={disableActionDisabled}
-                                    className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                  <div className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dbe7ff] text-xs font-extrabold text-[#3157b7]">
+                                      {getInitials(item.fullName)}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="max-w-[220px] truncate font-extrabold text-[#0f1d33]">
+                                        {item.fullName || "Chưa cập nhật"}
+                                      </p>
+                                      <p className="mt-0.5 text-xs text-[#687184]">
+                                        Hồ sơ #{item.profileId || "chưa tạo"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td data-label="Vai trò" className="px-5 py-4">
+                                  <span
+                                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}
                                   >
-                                    <Ban className="h-4 w-4" />
-                                    {isDisabled
-                                      ? "Đã vô hiệu hóa"
-                                      : isDisabling
-                                        ? "Đang xử lý..."
-                                        : "Vô hiệu hóa"}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                    {roleLabel(item.roomRole)}
+                                  </span>
+                                </td>
+                                <td
+                                  data-label="SĐT"
+                                  className="px-5 py-4 font-semibold text-[#0f1d33]"
+                                >
+                                  {item.phone || "Chưa có"}
+                                </td>
+                                <td
+                                  data-label="Email cá nhân"
+                                  className="break-words px-5 py-4 font-semibold text-[#0f1d33]"
+                                >
+                                  {item.email || "Không có"}
+                                </td>
+                                <td
+                                  data-label="Ngày ký"
+                                  className="px-5 py-4 font-semibold text-[#0f1d33]"
+                                >
+                                  {formatDate(item.signedAt)}
+                                </td>
+                                <td
+                                  data-label="Trạng thái"
+                                  className="px-5 py-4"
+                                >
+                                  <div className="grid gap-1">
+                                    <StatusBadge item={item} />
+                                    <span className="text-xs text-[#687184]">
+                                      {state.hint}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td data-label="Thao tác" className="px-5 py-4">
+                                  <div className="flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDisable(item)}
+                                      disabled={disableActionDisabled}
+                                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                    >
+                                      <Ban className="h-4 w-4" />
+                                      {isDisabled
+                                        ? "Đã vô hiệu hóa"
+                                        : isDisabling
+                                          ? "Đang xử lý..."
+                                          : "Vô hiệu hóa"}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
                 </article>
               );
             })}

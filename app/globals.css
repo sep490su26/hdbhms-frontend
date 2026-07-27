@@ -15,14 +15,24 @@
   @keyframes enter {
     from {
       opacity: var(--tw-enter-opacity, 1);
-      transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+      transform: translate3d(
+          var(--tw-enter-translate-x, 0),
+          var(--tw-enter-translate-y, 0),
+          0
+        )
+        scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
     }
   }
 
   @keyframes exit {
     to {
       opacity: var(--tw-exit-opacity, 1);
-      transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
+      transform: translate3d(
+          var(--tw-exit-translate-x, 0),
+          var(--tw-exit-translate-y, 0),
+          0
+        )
+        scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
     }
   }
 
@@ -32,13 +42,19 @@
     }
 
     to {
-      height: var(--radix-accordion-content-height, var(--accordion-panel-height, auto));
+      height: var(
+        --radix-accordion-content-height,
+        var(--accordion-panel-height, auto)
+      );
     }
   }
 
   @keyframes accordion-up {
     from {
-      height: var(--radix-accordion-content-height, var(--accordion-panel-height, auto));
+      height: var(
+        --radix-accordion-content-height,
+        var(--accordion-panel-height, auto)
+      );
     }
 
     to {
@@ -164,8 +180,10 @@
 
 :root {
   --navbar-height: 7rem;
-  --font-sans: "Be Vietnam Pro", "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
-  --font-geist-mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-sans:
+    "Inter", "Be Vietnam Pro", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-geist-mono:
+    "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -290,8 +308,8 @@ body {
   }
 }
 
-.dashboard-content>*,
-.dashboard-content :where(.grid, .flex)>* {
+.dashboard-content > *,
+.dashboard-content :where(.grid, .flex) > * {
   min-width: 0;
 }
 
@@ -346,28 +364,31 @@ body {
 }
 
 .dashboard-table td,
-.dashboard-table td>* {
+.dashboard-table td > * {
   min-width: 0;
 }
 
-.dashboard-table td:is([data-label^="Mã"],
-  [data-label^="Ngày"],
-  [data-label^="Số"],
-  [data-label="ID"],
-  [data-label="STT"],
-  [data-label="Phòng"],
-  [data-label="Tầng"],
-  [data-label="Diện tích"],
-  [data-label="Hạn thu"],
-  [data-label="Thời hạn"],
-  [data-label="Vai trò"],
-  [data-label="Mức độ"],
-  [data-label="Trạng thái"],
-  [data-label="File"],
-  [data-label="Xem"],
-  [data-label="Chi tiết"],
-  [data-label="Thao tác"],
-  [data-label="Hành động"]) {
+.dashboard-table
+  td:is(
+    [data-label^="Mã"],
+    [data-label^="Ngày"],
+    [data-label^="Số"],
+    [data-label="ID"],
+    [data-label="STT"],
+    [data-label="Phòng"],
+    [data-label="Tầng"],
+    [data-label="Diện tích"],
+    [data-label="Hạn thu"],
+    [data-label="Thời hạn"],
+    [data-label="Vai trò"],
+    [data-label="Mức độ"],
+    [data-label="Trạng thái"],
+    [data-label="File"],
+    [data-label="Xem"],
+    [data-label="Chi tiết"],
+    [data-label="Thao tác"],
+    [data-label="Hành động"]
+  ) {
   overflow: hidden;
   min-width: max-content;
   text-overflow: ellipsis;
@@ -375,14 +396,18 @@ body {
   word-break: normal;
 }
 
-.dashboard-table td:is([data-label="Vai trò"],
-  [data-label="Mức độ"],
-  [data-label="Trạng thái"],
-  [data-label="File"],
-  [data-label="Xem"],
-  [data-label="Chi tiết"],
-  [data-label="Thao tác"],
-  [data-label="Hành động"])>* {
+.dashboard-table
+  td:is(
+    [data-label="Vai trò"],
+    [data-label="Mức độ"],
+    [data-label="Trạng thái"],
+    [data-label="File"],
+    [data-label="Xem"],
+    [data-label="Chi tiết"],
+    [data-label="Thao tác"],
+    [data-label="Hành động"]
+  )
+  > * {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -406,16 +431,21 @@ body {
   table-layout: auto;
 }
 
-.dashboard-table.contract-management-table th.contract-management-table__action {
+.dashboard-table.contract-management-table
+  th.contract-management-table__action {
   background: #f7f9fe;
 }
 
-.dashboard-table.contract-management-table .contract-management-table__action > * {
+.dashboard-table.contract-management-table
+  .contract-management-table__action
+  > * {
   max-width: none;
   overflow: visible;
 }
 
-.dashboard-table.contract-management-table .contract-management-table__action button {
+.dashboard-table.contract-management-table
+  .contract-management-table__action
+  button {
   min-width: 9.75rem;
   overflow: visible;
 }
@@ -428,7 +458,9 @@ body {
   white-space: nowrap;
 }
 
-.dark .dashboard-table.contract-management-table th.contract-management-table__action {
+.dark
+  .dashboard-table.contract-management-table
+  th.contract-management-table__action {
   background: #172033;
 }
 
@@ -510,24 +542,28 @@ body {
     text-align: left;
   }
 
-  .dashboard-table tbody td:is([data-label^="Mã"],
-    [data-label^="Ngày"],
-    [data-label^="Số"],
-    [data-label="ID"],
-    [data-label="STT"],
-    [data-label="Phòng"],
-    [data-label="Tầng"],
-    [data-label="Diện tích"],
-    [data-label="Hạn thu"],
-    [data-label="Thời hạn"],
-    [data-label="Vai trò"],
-    [data-label="Mức độ"],
-    [data-label="Trạng thái"],
-    [data-label="File"],
-    [data-label="Xem"],
-    [data-label="Chi tiết"],
-    [data-label="Thao tác"],
-    [data-label="Hành động"]) {
+  .dashboard-table
+    tbody
+    td:is(
+      [data-label^="Mã"],
+      [data-label^="Ngày"],
+      [data-label^="Số"],
+      [data-label="ID"],
+      [data-label="STT"],
+      [data-label="Phòng"],
+      [data-label="Tầng"],
+      [data-label="Diện tích"],
+      [data-label="Hạn thu"],
+      [data-label="Thời hạn"],
+      [data-label="Vai trò"],
+      [data-label="Mức độ"],
+      [data-label="Trạng thái"],
+      [data-label="File"],
+      [data-label="Xem"],
+      [data-label="Chi tiết"],
+      [data-label="Thao tác"],
+      [data-label="Hành động"]
+    ) {
     min-width: 0;
   }
 
@@ -554,22 +590,26 @@ body {
     content: none;
   }
 
-  .dashboard-table tbody td>* {
+  .dashboard-table tbody td > * {
     min-width: 0;
     max-width: 100%;
     justify-self: start;
   }
 
-  .dashboard-table tbody td:is([data-label^="Mã"],
-    [data-label^="Ngày"],
-    [data-label^="Số"],
-    [data-label="ID"],
-    [data-label="STT"],
-    [data-label="Phòng"],
-    [data-label="Tầng"],
-    [data-label="Diện tích"],
-    [data-label="Hạn thu"],
-    [data-label="Thời hạn"]) {
+  .dashboard-table
+    tbody
+    td:is(
+      [data-label^="Mã"],
+      [data-label^="Ngày"],
+      [data-label^="Số"],
+      [data-label="ID"],
+      [data-label="STT"],
+      [data-label="Phòng"],
+      [data-label="Tầng"],
+      [data-label="Diện tích"],
+      [data-label="Hạn thu"],
+      [data-label="Thời hạn"]
+    ) {
     text-overflow: ellipsis;
   }
 }

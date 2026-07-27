@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +31,12 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { ROOM_HOLD_DURATION_MS, clearRoomHold, createRoomHold, formatHoldCountdown } from "../../../lib/roomHoldStorage";
+import {
+  ROOM_HOLD_DURATION_MS,
+  clearRoomHold,
+  createRoomHold,
+  formatHoldCountdown,
+} from "../../../lib/roomHoldStorage";
 import {
   cancelDepositPayment,
   checkoutDeposit,
@@ -38,7 +50,11 @@ import {
   openDepositContractByPaymentPdf,
   previewDepositContract,
 } from "../../../services/depositContractsService";
-import { fetchMyTenantProfile, fetchPrivateFile, lookupPersonProfileByPhone } from "../../../services/tenantProfilesService";
+import {
+  fetchMyTenantProfile,
+  fetchPrivateFile,
+  lookupPersonProfileByPhone,
+} from "../../../services/tenantProfilesService";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CameraCapture from "../../../components/CameraCapture";
 import DateInput from "../../../components/DateInput";
@@ -59,10 +75,16 @@ const resolvePaymentExpiresAtMs = (paymentIntent) => {
 };
 
 const readPaymentIntentId = (paymentIntent) =>
-  paymentIntent?.paymentIntentId ?? paymentIntent?.payment_intent_id ?? paymentIntent?.id ?? null;
+  paymentIntent?.paymentIntentId ??
+  paymentIntent?.payment_intent_id ??
+  paymentIntent?.id ??
+  null;
 
 const readPaymentContent = (paymentIntent) =>
-  paymentIntent?.paymentContent ?? paymentIntent?.payment_content ?? paymentIntent?.description ?? "";
+  paymentIntent?.paymentContent ??
+  paymentIntent?.payment_content ??
+  paymentIntent?.description ??
+  "";
 
 const readTransferDescription = (paymentIntent) =>
   paymentIntent?.transferDescription ??
@@ -71,22 +93,40 @@ const readTransferDescription = (paymentIntent) =>
   "";
 
 const readCheckoutUrl = (paymentIntent) =>
-  paymentIntent?.checkoutUrl ?? paymentIntent?.checkout_url ?? paymentIntent?.checkOutUrl ?? paymentIntent?.check_out_url ?? "";
+  paymentIntent?.checkoutUrl ??
+  paymentIntent?.checkout_url ??
+  paymentIntent?.checkOutUrl ??
+  paymentIntent?.check_out_url ??
+  "";
 
 const readQrPayload = (paymentIntent) =>
-  paymentIntent?.qrPayload ?? paymentIntent?.qr_payload ?? paymentIntent?.qrCode ?? paymentIntent?.qr_code ?? "";
+  paymentIntent?.qrPayload ??
+  paymentIntent?.qr_payload ??
+  paymentIntent?.qrCode ??
+  paymentIntent?.qr_code ??
+  "";
 
 const isPaidPaymentStatus = (status) => {
   const paymentStatus = String(status?.status ?? "").toUpperCase();
-  const depositStatus = String(status?.depositStatus ?? status?.deposit_status ?? "").toUpperCase();
+  const depositStatus = String(
+    status?.depositStatus ?? status?.deposit_status ?? "",
+  ).toUpperCase();
 
-  return paymentStatus === "SUCCEEDED" || depositStatus === "PAID" || depositStatus === "CONFIRMED";
+  return (
+    paymentStatus === "SUCCEEDED" ||
+    depositStatus === "PAID" ||
+    depositStatus === "CONFIRMED"
+  );
 };
 
 const isTerminalFailedPaymentStatus = (status) => {
   const paymentStatus = String(status?.status ?? "").toUpperCase();
 
-  return paymentStatus === "EXPIRED" || paymentStatus === "FAILED" || paymentStatus === "CANCELLED";
+  return (
+    paymentStatus === "EXPIRED" ||
+    paymentStatus === "FAILED" ||
+    paymentStatus === "CANCELLED"
+  );
 };
 
 const copyTextToClipboard = async (value) => {
@@ -113,7 +153,9 @@ const copyTextToClipboard = async (value) => {
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
 
-  const remainingSeconds = Number(status.remainingSeconds ?? status.remaining_seconds ?? 0);
+  const remainingSeconds = Number(
+    status.remainingSeconds ?? status.remaining_seconds ?? 0,
+  );
 
   return {
     canBook: Boolean(status.canBook ?? status.can_book),
@@ -129,9 +171,9 @@ const toBlockingStatus = (status) => {
   const normalizedStatus = normalizeHoldStatus(status);
   if (!normalizedStatus || normalizedStatus.canBook) return null;
   if (
-    String(normalizedStatus.roomStatus || "").toUpperCase() === "SOON_VACANT"
-    && !normalizedStatus.holdStatus
-    && normalizedStatus.remainingSeconds <= 0
+    String(normalizedStatus.roomStatus || "").toUpperCase() === "SOON_VACANT" &&
+    !normalizedStatus.holdStatus &&
+    normalizedStatus.remainingSeconds <= 0
   ) {
     return null;
   }
@@ -160,8 +202,10 @@ const toBlockingStatusFromMessage = (message) => {
   };
 };
 
-const DATE_IN_PAST_ERROR_MESSAGE = "Ngày chọn không được là ngày trong quá khứ.";
-const DATE_TOO_FAR_ERROR_MESSAGE = "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
+const DATE_IN_PAST_ERROR_MESSAGE =
+  "Ngày chọn không được là ngày trong quá khứ.";
+const DATE_TOO_FAR_ERROR_MESSAGE =
+  "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
@@ -181,7 +225,8 @@ const getDateStringWithOffset = (days) => {
 };
 
 const getTodayDateString = () => getDateStringWithOffset(0);
-const getMaxDepositScheduleDateString = () => getDateStringWithOffset(MAX_DEPOSIT_SCHEDULE_DAYS);
+const getMaxDepositScheduleDateString = () =>
+  getDateStringWithOffset(MAX_DEPOSIT_SCHEDULE_DAYS);
 
 const normalizeDateInputString = (value) => {
   const text = String(value || "").trim();
@@ -310,21 +355,57 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
 };
 
 const API_ERROR_HINTS = [
-  { pattern: /full\s*name|fullName|full_name|họ\s*và\s*tên/i, field: "fullName" },
+  {
+    pattern: /full\s*name|fullName|full_name|họ\s*và\s*tên/i,
+    field: "fullName",
+  },
   { pattern: /dob|birth|ngày\s*sinh|age|tuổi/i, field: "birthDate" },
   { pattern: /phone|số\s*điện\s*thoại/i, field: "phone" },
   { pattern: /email/i, field: "email" },
-  { pattern: /id\s*number|idNumber|id_number|citizen|cccd|cmnd/i, field: "citizenId" },
-  { pattern: /id\s*issue\s*date|idIssueDate|id_issue_date|ngày\s*cấp/i, field: "idIssueDate" },
-  { pattern: /id\s*issue\s*place|idIssuePlace|id_issue_place|nơi\s*cấp/i, field: "idIssuePlace" },
-  { pattern: /permanent\s*address|permanentAddress|permanent_address|địa\s*chỉ/i, field: "permanentAddress" },
-  { pattern: /payment\s*cycle|paymentCycleMonths|payment_cycle_months|chu\s*kỳ\s*thanh\s*toán/i, field: "paymentCycleMonths" },
-  { pattern: /lease\s*sign|expectedLeaseSignDate|expected_lease_sign_date|ký\s*hợp\s*đồng/i, field: "contractDate" },
-  { pattern: /move\s*in|expectedMoveInDate|expected_move_in_date|vào\s*ở/i, field: "moveInDate" },
-  { pattern: /idFrontFile|id_front_file|mặt\s*trước/i, field: "citizenIdFront" },
+  {
+    pattern: /id\s*number|idNumber|id_number|citizen|cccd|cmnd/i,
+    field: "citizenId",
+  },
+  {
+    pattern: /id\s*issue\s*date|idIssueDate|id_issue_date|ngày\s*cấp/i,
+    field: "idIssueDate",
+  },
+  {
+    pattern: /id\s*issue\s*place|idIssuePlace|id_issue_place|nơi\s*cấp/i,
+    field: "idIssuePlace",
+  },
+  {
+    pattern:
+      /permanent\s*address|permanentAddress|permanent_address|địa\s*chỉ/i,
+    field: "permanentAddress",
+  },
+  {
+    pattern:
+      /payment\s*cycle|paymentCycleMonths|payment_cycle_months|chu\s*kỳ\s*thanh\s*toán/i,
+    field: "paymentCycleMonths",
+  },
+  {
+    pattern:
+      /lease\s*sign|expectedLeaseSignDate|expected_lease_sign_date|ký\s*hợp\s*đồng/i,
+    field: "contractDate",
+  },
+  {
+    pattern: /move\s*in|expectedMoveInDate|expected_move_in_date|vào\s*ở/i,
+    field: "moveInDate",
+  },
+  {
+    pattern: /idFrontFile|id_front_file|mặt\s*trước/i,
+    field: "citizenIdFront",
+  },
   { pattern: /idBackFile|id_back_file|mặt\s*sau/i, field: "citizenIdBack" },
-  { pattern: /portraitFile|portrait_file|portrait|chân\s*dung/i, field: "portraitImage" },
-  { pattern: /occupant|coOccupants|co_occupants|người\s*ở/i, field: "occupantCount" },
+  {
+    pattern: /portraitFile|portrait_file|portrait|chân\s*dung/i,
+    field: "portraitImage",
+  },
+  {
+    pattern: /occupant|coOccupants|co_occupants|người\s*ở/i,
+    field: "occupantCount",
+  },
 ];
 
 const DEPOSIT_FIELD_LABELS = {
@@ -355,16 +436,31 @@ const buildRetryFieldMessage = (fieldName, fallbackMessage) => {
 };
 
 const normalizeBackendFieldName = (fieldName) => {
-  const normalizedFieldName = String(fieldName || "").replace(/^metadata\.?/, "");
-  return BACKEND_DEPOSIT_FIELD_MAP[normalizedFieldName] || BACKEND_DEPOSIT_FIELD_MAP[fieldName] || "";
+  const normalizedFieldName = String(fieldName || "").replace(
+    /^metadata\.?/,
+    "",
+  );
+  return (
+    BACKEND_DEPOSIT_FIELD_MAP[normalizedFieldName] ||
+    BACKEND_DEPOSIT_FIELD_MAP[fieldName] ||
+    ""
+  );
 };
 
 const collectErrorText = (value) => {
   if (!value) return "";
   if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value.map(collectErrorText).filter(Boolean).join(" ");
+  if (Array.isArray(value))
+    return value.map(collectErrorText).filter(Boolean).join(" ");
   if (typeof value === "object") {
-    return [value.field, value.name, value.message, value.defaultMessage, value.details, value.error]
+    return [
+      value.field,
+      value.name,
+      value.message,
+      value.defaultMessage,
+      value.details,
+      value.error,
+    ]
       .map(collectErrorText)
       .filter(Boolean)
       .join(" ");
@@ -379,7 +475,10 @@ const getCheckoutErrorMessage = (error) => {
     .map((value) => value.trim())
     .find((value) => value && value.toLowerCase() !== "undefined");
 
-  return message || "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại.";
+  return (
+    message ||
+    "Không thể gửi thông tin đặt cọc. Vui lòng kiểm tra lại thông tin và thử lại."
+  );
 };
 
 const extractDepositApiFieldErrors = (error) => {
@@ -396,8 +495,14 @@ const extractDepositApiFieldErrors = (error) => {
   candidates.forEach((candidate) => {
     if (Array.isArray(candidate)) {
       candidate.forEach((item) => {
-        const fieldName = normalizeBackendFieldName(item?.field || item?.name || item?.propertyPath);
-        if (fieldName) nextErrors[fieldName] = buildRetryFieldMessage(fieldName, collectErrorText(item));
+        const fieldName = normalizeBackendFieldName(
+          item?.field || item?.name || item?.propertyPath,
+        );
+        if (fieldName)
+          nextErrors[fieldName] = buildRetryFieldMessage(
+            fieldName,
+            collectErrorText(item),
+          );
       });
       return;
     }
@@ -405,15 +510,28 @@ const extractDepositApiFieldErrors = (error) => {
     if (typeof candidate === "object") {
       Object.entries(candidate).forEach(([key, value]) => {
         const fieldName = normalizeBackendFieldName(key);
-        if (fieldName) nextErrors[fieldName] = buildRetryFieldMessage(fieldName, collectErrorText(value));
+        if (fieldName)
+          nextErrors[fieldName] = buildRetryFieldMessage(
+            fieldName,
+            collectErrorText(value),
+          );
       });
     }
   });
 
-  const combinedMessage = [error?.message, payload.message, payload.details].map(collectErrorText).filter(Boolean).join(" ");
+  const combinedMessage = [error?.message, payload.message, payload.details]
+    .map(collectErrorText)
+    .filter(Boolean)
+    .join(" ");
   if (!Object.keys(nextErrors).length && combinedMessage) {
-    const hintedField = API_ERROR_HINTS.find(({ pattern }) => pattern.test(combinedMessage))?.field;
-    if (hintedField) nextErrors[hintedField] = buildRetryFieldMessage(hintedField, combinedMessage);
+    const hintedField = API_ERROR_HINTS.find(({ pattern }) =>
+      pattern.test(combinedMessage),
+    )?.field;
+    if (hintedField)
+      nextErrors[hintedField] = buildRetryFieldMessage(
+        hintedField,
+        combinedMessage,
+      );
   }
 
   return nextErrors;
@@ -445,17 +563,33 @@ const DEPOSIT_DRAFT_FIELDS = [
   "coOccupant2FullName",
   "coOccupant2Phone",
 ];
-const DEPOSIT_DATE_FIELDS = new Set(["birthDate", "idIssueDate", "contractDate", "moveInDate"]);
-const CO_OCCUPANT_FULL_NAME_FIELDS = new Set(["coOccupant1FullName", "coOccupant2FullName"]);
-const CO_OCCUPANT_PHONE_FIELDS = new Set(["coOccupant1Phone", "coOccupant2Phone"]);
-const CO_OCCUPANT_NAME_PATTERN_MESSAGE = "Họ tên người ở cùng chỉ được chứa chữ cái và khoảng trắng.";
-const CO_OCCUPANT_PHONE_PATTERN_MESSAGE = "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
-const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng với số điện thoại người đặt cọc chính.";
-const CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng nhau.";
-const EXISTING_PERSON_PROFILE_HINT = "Hồ sơ với số điện thoại này đã có trong hệ thống. Khi lập hợp đồng, hệ thống sẽ dùng lại hồ sơ phù hợp.";
+const DEPOSIT_DATE_FIELDS = new Set([
+  "birthDate",
+  "idIssueDate",
+  "contractDate",
+  "moveInDate",
+]);
+const CO_OCCUPANT_FULL_NAME_FIELDS = new Set([
+  "coOccupant1FullName",
+  "coOccupant2FullName",
+]);
+const CO_OCCUPANT_PHONE_FIELDS = new Set([
+  "coOccupant1Phone",
+  "coOccupant2Phone",
+]);
+const CO_OCCUPANT_NAME_PATTERN_MESSAGE =
+  "Họ tên người ở cùng chỉ được chứa chữ cái và khoảng trắng.";
+const CO_OCCUPANT_PHONE_PATTERN_MESSAGE =
+  "Số điện thoại người ở cùng phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
+const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE =
+  "Số điện thoại người ở cùng không được trùng với số điện thoại người đặt cọc chính.";
+const CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE =
+  "Số điện thoại người ở cùng không được trùng nhau.";
+const EXISTING_PERSON_PROFILE_HINT =
+  "Hồ sơ với số điện thoại này đã có trong hệ thống. Khi lập hợp đồng, hệ thống sẽ dùng lại hồ sơ phù hợp.";
 const DepositFormErrorContext = createContext({
   errors: {},
-  setError: () => { },
+  setError: () => {},
 });
 
 const canUseDocumentCookie = () => typeof document !== "undefined";
@@ -463,24 +597,30 @@ const canUseDocumentCookie = () => typeof document !== "undefined";
 const readCookie = (name) => {
   if (!canUseDocumentCookie()) return "";
 
-  return document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`))
-    ?.split("=")
-    .slice(1)
-    .join("=") || "";
+  return (
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${name}=`))
+      ?.split("=")
+      .slice(1)
+      .join("=") || ""
+  );
 };
 
 const readDepositDraftCookie = () => {
-  const rawValue = readCookie(DEPOSIT_DRAFT_COOKIE_NAME) || readCookie(LEGACY_DEPOSIT_DRAFT_COOKIE_NAME);
+  const rawValue =
+    readCookie(DEPOSIT_DRAFT_COOKIE_NAME) ||
+    readCookie(LEGACY_DEPOSIT_DRAFT_COOKIE_NAME);
   if (!rawValue) return {};
 
   try {
     const parsed = JSON.parse(decodeURIComponent(rawValue));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
 
     return DEPOSIT_DRAFT_FIELDS.reduce((safeDraft, fieldName) => {
-      safeDraft[fieldName] = typeof parsed[fieldName] === "string" ? parsed[fieldName] : "";
+      safeDraft[fieldName] =
+        typeof parsed[fieldName] === "string" ? parsed[fieldName] : "";
       return safeDraft;
     }, {});
   } catch {
@@ -556,7 +696,8 @@ const collectDepositFormData = (form) => {
   return data;
 };
 
-const hasDepositDraftValue = (draft) => Object.values(draft || {}).some((value) => String(value || "").trim());
+const hasDepositDraftValue = (draft) =>
+  Object.values(draft || {}).some((value) => String(value || "").trim());
 
 const normalizePhoneValue = (value) => {
   return String(value || "").replace(/[\s.\-()]/g, "");
@@ -565,12 +706,19 @@ const normalizePhoneValue = (value) => {
 const validateDepositValue = (name, value, scheduleWindow = null) => {
   const rawValue = String(value || "").trim();
   const isDateField = DEPOSIT_DATE_FIELDS.has(name);
-  const normalizedValue = isDateField ? normalizeDateInputString(rawValue) : rawValue;
+  const normalizedValue = isDateField
+    ? normalizeDateInputString(rawValue)
+    : rawValue;
   const todayDate = getTodayDateString();
-  const maxScheduleDate = scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
+  const maxScheduleDate =
+    scheduleWindow?.maxDate || getMaxDepositScheduleDateString();
   const minScheduleDate = scheduleWindow?.minDate || todayDate;
-  const isSoonVacantSchedule = Boolean(scheduleWindow?.isSoonVacant && scheduleWindow?.expectedVacantDate);
-  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow?.expectedVacantDate);
+  const isSoonVacantSchedule = Boolean(
+    scheduleWindow?.isSoonVacant && scheduleWindow?.expectedVacantDate,
+  );
+  const expectedVacantDateLabel = formatDateForMessage(
+    scheduleWindow?.expectedVacantDate,
+  );
 
   if (name !== "email" && !rawValue) {
     return REQUIRED_DEPOSIT_MESSAGES[name] || "";
@@ -584,7 +732,10 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
   }
 
-  if (CO_OCCUPANT_FULL_NAME_FIELDS.has(name) && !FULL_NAME_PATTERN.test(normalizedValue)) {
+  if (
+    CO_OCCUPANT_FULL_NAME_FIELDS.has(name) &&
+    !FULL_NAME_PATTERN.test(normalizedValue)
+  ) {
     return CO_OCCUPANT_NAME_PATTERN_MESSAGE;
   }
 
@@ -600,11 +751,18 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
   }
 
-  if (CO_OCCUPANT_PHONE_FIELDS.has(name) && !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))) {
+  if (
+    CO_OCCUPANT_PHONE_FIELDS.has(name) &&
+    !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))
+  ) {
     return CO_OCCUPANT_PHONE_PATTERN_MESSAGE;
   }
 
-  if (name === "email" && normalizedValue && !EMAIL_PATTERN.test(normalizedValue)) {
+  if (
+    name === "email" &&
+    normalizedValue &&
+    !EMAIL_PATTERN.test(normalizedValue)
+  ) {
     return "Email không đúng định dạng.";
   }
 
@@ -620,14 +778,20 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
   }
 
-  if ((name === "contractDate" || name === "moveInDate") && normalizedValue < minScheduleDate) {
+  if (
+    (name === "contractDate" || name === "moveInDate") &&
+    normalizedValue < minScheduleDate
+  ) {
     if (isSoonVacantSchedule) {
       return `${DATE_FIELD_LABELS[name]} phải sau ngày khách cũ trả phòng (${expectedVacantDateLabel}).`;
     }
     return DATE_IN_PAST_ERROR_MESSAGE;
   }
 
-  if ((name === "contractDate" || name === "moveInDate") && normalizedValue > maxScheduleDate) {
+  if (
+    (name === "contractDate" || name === "moveInDate") &&
+    normalizedValue > maxScheduleDate
+  ) {
     if (isSoonVacantSchedule) {
       return `${DATE_FIELD_LABELS[name]} chỉ được tối đa 14 ngày kể từ ngày khách cũ trả phòng.`;
     }
@@ -680,7 +844,8 @@ const validateCoOccupantGroup = ({ occupantCount, coOccupants, mainPhone }) => {
     const duplicatedField = seenPhones.get(phone);
     if (duplicatedField) {
       nextErrors[phoneField] = CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
-      nextErrors[duplicatedField] = nextErrors[duplicatedField] || CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
+      nextErrors[duplicatedField] =
+        nextErrors[duplicatedField] || CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE;
       continue;
     }
 
@@ -690,20 +855,21 @@ const validateCoOccupantGroup = ({ occupantCount, coOccupants, mainPhone }) => {
   return nextErrors;
 };
 
-const validateOccupancyData = (data) => validateCoOccupantGroup({
-  occupantCount: data.occupantCount,
-  mainPhone: data.phone,
-  coOccupants: {
-    1: {
-      fullName: data.coOccupant1FullName,
-      phone: data.coOccupant1Phone,
+const validateOccupancyData = (data) =>
+  validateCoOccupantGroup({
+    occupantCount: data.occupantCount,
+    mainPhone: data.phone,
+    coOccupants: {
+      1: {
+        fullName: data.coOccupant1FullName,
+        phone: data.coOccupant1Phone,
+      },
+      2: {
+        fullName: data.coOccupant2FullName,
+        phone: data.coOccupant2Phone,
+      },
     },
-    2: {
-      fullName: data.coOccupant2FullName,
-      phone: data.coOccupant2Phone,
-    },
-  },
-});
+  });
 
 const buildDepositMetadata = (room, data) => ({
   roomId: room.roomId || "",
@@ -731,7 +897,21 @@ const buildDepositMetadata = (room, data) => ({
 
 const signatureFromMetadata = (metadata) => JSON.stringify(metadata);
 
-function Field({ label, name, placeholder, type = "text", className = "", required = true, min, max, error, onChange, onBlur, defaultValue = "", validateValue = validateDepositValue }) {
+function Field({
+  label,
+  name,
+  placeholder,
+  type = "text",
+  className = "",
+  required = true,
+  min,
+  max,
+  error,
+  onChange,
+  onBlur,
+  defaultValue = "",
+  validateValue = validateDepositValue,
+}) {
   const { errors: formErrors, setError } = useContext(DepositFormErrorContext);
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
@@ -768,10 +948,11 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
           onBlur={handleBlur}
           placeholder="dd/mm/yyyy"
           aria-invalid={displayError ? "true" : "false"}
-          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
-            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-            }`}
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+            displayError
+              ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+              : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+          }`}
         />
       ) : (
         <input
@@ -785,20 +966,27 @@ function Field({ label, name, placeholder, type = "text", className = "", requir
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={displayError ? "true" : "false"}
-          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${displayError
-            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-            : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-            }`}
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+            displayError
+              ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+              : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+          }`}
         />
       )}
-      {displayError && <span className="text-xs font-medium text-rose-600">{displayError}</span>}
+      {displayError && (
+        <span className="text-xs font-medium text-rose-600">
+          {displayError}
+        </span>
+      )}
     </label>
   );
 }
 
 function FormSection({ title, icon: Icon, children, className = "" }) {
   return (
-    <section className={`grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2 ${className}`}>
+    <section
+      className={`grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2 ${className}`}
+    >
       <div className="flex items-center gap-3">
         {Icon && <Icon className="h-5 w-5 text-[#4f46e5]" />}
         <h2 className="text-lg font-bold text-[#091426]">{title}</h2>
@@ -808,10 +996,16 @@ function FormSection({ title, icon: Icon, children, className = "" }) {
   );
 }
 
-function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) {
+function ContractPreviewModal({
+  preview,
+  accepted,
+  onAcceptedChange,
+  onClose,
+}) {
   const resizePreviewFrame = (event) => {
     const frameDocument = event.currentTarget.contentDocument;
-    if (frameDocument?.documentElement) frameDocument.documentElement.style.overflow = "hidden";
+    if (frameDocument?.documentElement)
+      frameDocument.documentElement.style.overflow = "hidden";
     if (frameDocument?.body) frameDocument.body.style.overflow = "hidden";
     const contentHeight = Math.max(
       frameDocument?.documentElement?.scrollHeight || 0,
@@ -826,8 +1020,12 @@ function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) 
       <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">Xem trước hợp đồng</p>
-            <h2 className="text-lg font-bold text-[#091426]">Hợp đồng đặt cọc</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">
+              Xem trước hợp đồng
+            </p>
+            <h2 className="text-lg font-bold text-[#091426]">
+              Hợp đồng đặt cọc
+            </h2>
           </div>
           <button
             type="button"
@@ -839,7 +1037,10 @@ function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) 
           </button>
         </div>
         <div className="flex-1 overflow-auto bg-[#eef2f7] px-3 py-6">
-          <div className="origin-top scale-[0.46] sm:scale-[0.7] lg:scale-90 xl:scale-100" style={{ width: 794, margin: "0 auto", minHeight: 540 }}>
+          <div
+            className="origin-top scale-[0.46] sm:scale-[0.7] lg:scale-90 xl:scale-100"
+            style={{ width: 794, margin: "0 auto", minHeight: 540 }}
+          >
             <iframe
               title="Xem trước hợp đồng đặt cọc"
               srcDoc={preview?.html || ""}
@@ -858,7 +1059,9 @@ function ContractPreviewModal({ preview, accepted, onAcceptedChange, onClose }) 
               className="mt-1 h-4 w-4 rounded border-[#c5c6cd] accent-[#091426]"
             />
             <span>
-              Tôi đã đọc và đồng ý với <strong className="text-[#091426]">điều khoản đặt cọc</strong> trong hợp đồng này.
+              Tôi đã đọc và đồng ý với{" "}
+              <strong className="text-[#091426]">điều khoản đặt cọc</strong>{" "}
+              trong hợp đồng này.
             </span>
           </label>
           <button
@@ -888,15 +1091,24 @@ function RoomSummary({ room }) {
   const isSoonVacant = room?.status === "soonVacant";
   const statusCopy = isSoonVacant ? "Sắp trống" : "Còn trống";
   const statusClassName = isSoonVacant ? "bg-[#5b6472]" : "bg-[#006c49]";
-  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
+  const expectedVacantDateLabel = formatDateForMessage(
+    scheduleWindow.expectedVacantDate,
+  );
 
   return (
-    <aside
-      className="overflow-hidden rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
+    <aside className="overflow-hidden rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
       <div className="relative h-48 overflow-hidden">
-        <Image src={room.image} alt={`Phòng ${room.id}`} fill sizes="352px" className="object-cover" priority />
+        <Image
+          src={room.image}
+          alt={`Phòng ${room.id}`}
+          fill
+          sizes="352px"
+          className="object-cover"
+          priority
+        />
         <div
-          className={`absolute right-4 top-4 rounded-full px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow ${statusClassName}`}>
+          className={`absolute right-4 top-4 rounded-full px-4 py-1.5 text-xs font-bold tracking-wide text-white shadow ${statusClassName}`}
+        >
           {statusCopy}
         </div>
       </div>
@@ -912,10 +1124,13 @@ function RoomSummary({ room }) {
           </p>
         </div>
 
-        <p className="mt-3 text-sm leading-6 text-[#45474c]">{room.description}</p>
+        <p className="mt-3 text-sm leading-6 text-[#45474c]">
+          {room.description}
+        </p>
         {isSoonVacant && expectedVacantDateLabel && (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
-            Sắp trống từ {expectedVacantDateLabel}. Chỉ đặt cọc với ngày ký/vào ở sau ngày này và trong vòng 14 ngày.
+            Sắp trống từ {expectedVacantDateLabel}. Chỉ đặt cọc với ngày ký/vào
+            ở sau ngày này và trong vòng 14 ngày.
           </div>
         )}
 
@@ -923,15 +1138,19 @@ function RoomSummary({ room }) {
           <div className="grid gap-4">
             <SummaryLine icon={Ruler}>{room.area} m²</SummaryLine>
             <SummaryLine icon={Wifi}>Wifi tốc độ cao</SummaryLine>
-            <SummaryLine icon={ShieldCheck}>An ninh 24/7, camera giám sát</SummaryLine>
+            <SummaryLine icon={ShieldCheck}>
+              An ninh 24/7, camera giám sát
+            </SummaryLine>
           </div>
         </div>
 
         <div className="mt-8 rounded-lg border border-[#c5c6cd] bg-[#f5f3f4] p-4">
-          <h3 className="text-xs font-bold uppercase tracking-[0.05em] text-[#091426]">Lưu ý đặt cọc</h3>
+          <h3 className="text-xs font-bold uppercase tracking-[0.05em] text-[#091426]">
+            Lưu ý đặt cọc
+          </h3>
           <p className="mt-2 text-sm italic leading-6 text-[#45474c]">
-            Yêu cầu đặt cọc sẽ được xử lý trong vòng 24h làm việc. Quý khách vui lòng kiểm tra email sau khi
-            gửi yêu cầu.
+            Yêu cầu đặt cọc sẽ được xử lý trong vòng 24h làm việc. Quý khách vui
+            lòng kiểm tra email sau khi gửi yêu cầu.
           </p>
         </div>
       </div>
@@ -939,12 +1158,20 @@ function RoomSummary({ room }) {
   );
 }
 
-function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFieldErrors }) {
+function DepositInfoForm({
+  room,
+  onSubmit,
+  isSubmitting,
+  blockingStatus,
+  apiFieldErrors,
+}) {
   const scheduleWindow = buildDepositScheduleWindow(room);
   const todayDate = getTodayDateString();
   const minScheduleDate = scheduleWindow.minDate;
   const maxScheduleDate = scheduleWindow.maxDate;
-  const expectedVacantDateLabel = formatDateForMessage(scheduleWindow.expectedVacantDate);
+  const expectedVacantDateLabel = formatDateForMessage(
+    scheduleWindow.expectedVacantDate,
+  );
   const formRef = useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [savedDraft, setSavedDraft] = useState({});
@@ -988,42 +1215,90 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
           if (profile && profile.person) {
             draft = {
               ...draft,
-              fullName: profile.person?.full_name || profile.person?.fullName || draft.fullName || "",
+              fullName:
+                profile.person?.full_name ||
+                profile.person?.fullName ||
+                draft.fullName ||
+                "",
               birthDate: profile.person?.dob || draft.birthDate || "",
               phone: profile.person?.phone || draft.phone || "",
               email: profile.person?.email || draft.email || "",
-              permanentAddress: profile.person?.permanent_address || profile.person?.permanentAddress || draft.permanentAddress || "",
-              citizenId: profile.identity_document?.doc_number || profile.identityDocument?.docNumber || profile.identity_document?.docNumber || draft.citizenId || "",
-              idIssueDate: profile.identity_document?.issued_date || profile.identityDocument?.issuedDate || profile.identity_document?.issuedDate || draft.idIssueDate || "",
-              idIssuePlace: profile.identity_document?.issued_place || profile.identityDocument?.issuedPlace || profile.identity_document?.issuedPlace || draft.idIssuePlace || "",
+              permanentAddress:
+                profile.person?.permanent_address ||
+                profile.person?.permanentAddress ||
+                draft.permanentAddress ||
+                "",
+              citizenId:
+                profile.identity_document?.doc_number ||
+                profile.identityDocument?.docNumber ||
+                profile.identity_document?.docNumber ||
+                draft.citizenId ||
+                "",
+              idIssueDate:
+                profile.identity_document?.issued_date ||
+                profile.identityDocument?.issuedDate ||
+                profile.identity_document?.issuedDate ||
+                draft.idIssueDate ||
+                "",
+              idIssuePlace:
+                profile.identity_document?.issued_place ||
+                profile.identityDocument?.issuedPlace ||
+                profile.identity_document?.issuedPlace ||
+                draft.idIssuePlace ||
+                "",
             };
 
             // Attempt to fetch files in background
-            const frontUrl = profile.identity_document?.front_file_url || profile.identityDocument?.frontFileUrl;
-            const backUrl = profile.identity_document?.back_file_url || profile.identityDocument?.backFileUrl;
-            const portraitUrl = profile.person?.portrait_url || profile.person?.portraitUrl;
+            const frontUrl =
+              profile.identity_document?.front_file_url ||
+              profile.identityDocument?.frontFileUrl;
+            const backUrl =
+              profile.identity_document?.back_file_url ||
+              profile.identityDocument?.backFileUrl;
+            const portraitUrl =
+              profile.person?.portrait_url || profile.person?.portraitUrl;
 
             if (frontUrl || backUrl || portraitUrl) {
               Promise.all([
                 fetchPrivateFile(frontUrl, "cccd_front.jpg"),
                 fetchPrivateFile(backUrl, "cccd_back.jpg"),
-                fetchPrivateFile(portraitUrl, "portrait.jpg")
-              ]).then(([frontFile, backFile, portraitFile]) => {
-                if (!isMounted) return;
+                fetchPrivateFile(portraitUrl, "portrait.jpg"),
+              ])
+                .then(([frontFile, backFile, portraitFile]) => {
+                  if (!isMounted) return;
 
-                if (frontFile) {
-                  setSelectedFiles(prev => ({ ...prev, citizenIdFront: frontFile }));
-                  setImagePreviews(prev => ({ ...prev, citizenIdFront: URL.createObjectURL(frontFile) }));
-                }
-                if (backFile) {
-                  setSelectedFiles(prev => ({ ...prev, citizenIdBack: backFile }));
-                  setImagePreviews(prev => ({ ...prev, citizenIdBack: URL.createObjectURL(backFile) }));
-                }
-                if (portraitFile) {
-                  setSelectedFiles(prev => ({ ...prev, portraitImage: portraitFile }));
-                  setImagePreviews(prev => ({ ...prev, portraitImage: URL.createObjectURL(portraitFile) }));
-                }
-              }).catch(console.error);
+                  if (frontFile) {
+                    setSelectedFiles((prev) => ({
+                      ...prev,
+                      citizenIdFront: frontFile,
+                    }));
+                    setImagePreviews((prev) => ({
+                      ...prev,
+                      citizenIdFront: URL.createObjectURL(frontFile),
+                    }));
+                  }
+                  if (backFile) {
+                    setSelectedFiles((prev) => ({
+                      ...prev,
+                      citizenIdBack: backFile,
+                    }));
+                    setImagePreviews((prev) => ({
+                      ...prev,
+                      citizenIdBack: URL.createObjectURL(backFile),
+                    }));
+                  }
+                  if (portraitFile) {
+                    setSelectedFiles((prev) => ({
+                      ...prev,
+                      portraitImage: portraitFile,
+                    }));
+                    setImagePreviews((prev) => ({
+                      ...prev,
+                      portraitImage: URL.createObjectURL(portraitFile),
+                    }));
+                  }
+                })
+                .catch(console.error);
             }
           }
         } catch (error) {
@@ -1036,7 +1311,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       if (isMounted) {
         setSavedDraft(draft);
         setMainPhoneValue(draft.phone || "");
-        setOccupantCount(["1", "2", "3"].includes(draft.occupantCount) ? draft.occupantCount : "1");
+        setOccupantCount(
+          ["1", "2", "3"].includes(draft.occupantCount)
+            ? draft.occupantCount
+            : "1",
+        );
         setCoOccupants({
           1: {
             fullName: draft.coOccupant1FullName || "",
@@ -1084,7 +1363,11 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     for (let displayOrder = 1; displayOrder < count; displayOrder += 1) {
       const phone = normalizePhoneValue(coOccupants[displayOrder]?.phone);
       const phoneField = `coOccupant${displayOrder}Phone`;
-      if (phone && !validationErrors[phoneField] && VIETNAM_PHONE_PATTERN.test(phone)) {
+      if (
+        phone &&
+        !validationErrors[phoneField] &&
+        VIETNAM_PHONE_PATTERN.test(phone)
+      ) {
         lookupTargets.push({ displayOrder, phone });
       }
     }
@@ -1101,22 +1384,26 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     }
 
     const timerId = window.setTimeout(async () => {
-      const results = await Promise.all(lookupTargets.map(async (target) => {
-        try {
-          const lookup = await lookupPersonProfileByPhone(target.phone);
-          return { ...target, exists: Boolean(lookup?.exists) };
-        } catch {
-          return { ...target, exists: false };
-        }
-      }));
+      const results = await Promise.all(
+        lookupTargets.map(async (target) => {
+          try {
+            const lookup = await lookupPersonProfileByPhone(target.phone);
+            return { ...target, exists: Boolean(lookup?.exists) };
+          } catch {
+            return { ...target, exists: false };
+          }
+        }),
+      );
 
       if (cancelled) return;
-      setCoOccupantProfileHints(() => results.reduce((nextHints, result) => {
-        if (result.exists) {
-          nextHints[result.displayOrder] = { phone: result.phone };
-        }
-        return nextHints;
-      }, {}));
+      setCoOccupantProfileHints(() =>
+        results.reduce((nextHints, result) => {
+          if (result.exists) {
+            nextHints[result.displayOrder] = { phone: result.phone };
+          }
+          return nextHints;
+        }, {}),
+      );
     }, 350);
 
     return () => {
@@ -1145,9 +1432,14 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     return !message;
   };
 
-  const getMainPhoneValue = () => formRef.current?.elements?.namedItem("phone")?.value || "";
+  const getMainPhoneValue = () =>
+    formRef.current?.elements?.namedItem("phone")?.value || "";
 
-  const getCoOccupantErrors = (nextCoOccupants = coOccupants, nextCount = occupantCount, mainPhoneValue = getMainPhoneValue()) =>
+  const getCoOccupantErrors = (
+    nextCoOccupants = coOccupants,
+    nextCount = occupantCount,
+    mainPhoneValue = getMainPhoneValue(),
+  ) =>
     validateCoOccupantGroup({
       occupantCount: nextCount,
       coOccupants: nextCoOccupants,
@@ -1169,7 +1461,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     if (name === "phone") {
       setMainPhoneValue(value);
       const nextErrors = getCoOccupantErrors(coOccupants, occupantCount, value);
-      setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
+      setFieldErrors((currentErrors) =>
+        mergeCoOccupantErrors(currentErrors, nextErrors),
+      );
     }
   };
 
@@ -1179,7 +1473,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     if (name === "phone") {
       setMainPhoneValue(value);
       const nextErrors = getCoOccupantErrors(coOccupants, occupantCount, value);
-      setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
+      setFieldErrors((currentErrors) =>
+        mergeCoOccupantErrors(currentErrors, nextErrors),
+      );
     }
   };
 
@@ -1191,12 +1487,19 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     };
     setOccupantCount(nextCount);
     setCoOccupants(nextCoOccupants);
-    const nextCoOccupantErrors = getCoOccupantErrors(nextCoOccupants, nextCount);
+    const nextCoOccupantErrors = getCoOccupantErrors(
+      nextCoOccupants,
+      nextCount,
+    );
     setFieldErrors((currentErrors) => ({
       ...mergeCoOccupantErrors(currentErrors, nextCoOccupantErrors),
       occupantCount: validateDepositField("occupantCount", nextCount),
-      ...(Number(nextCount) < 2 ? { coOccupant1FullName: "", coOccupant1Phone: "" } : {}),
-      ...(Number(nextCount) < 3 ? { coOccupant2FullName: "", coOccupant2Phone: "" } : {}),
+      ...(Number(nextCount) < 2
+        ? { coOccupant1FullName: "", coOccupant1Phone: "" }
+        : {}),
+      ...(Number(nextCount) < 3
+        ? { coOccupant2FullName: "", coOccupant2Phone: "" }
+        : {}),
     }));
   };
 
@@ -1211,7 +1514,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     };
     setCoOccupants(nextCoOccupants);
     const nextErrors = getCoOccupantErrors(nextCoOccupants);
-    setFieldErrors((currentErrors) => mergeCoOccupantErrors(currentErrors, nextErrors));
+    setFieldErrors((currentErrors) =>
+      mergeCoOccupantErrors(currentErrors, nextErrors),
+    );
   };
 
   const handleDraftChange = (event) => {
@@ -1263,7 +1568,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       setFieldErrors((currentErrors) => ({
         ...currentErrors,
         _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
-        [name]: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+        [name]:
+          "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
       }));
       return false;
     }
@@ -1306,12 +1612,16 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     const field = form?.elements?.namedItem(name);
     if (!field || typeof value !== "string" || !value.trim()) return;
 
-    const prototype = field instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : field instanceof HTMLSelectElement
-        ? HTMLSelectElement.prototype
-        : HTMLInputElement.prototype;
-    const valueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+    const prototype =
+      field instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : field instanceof HTMLSelectElement
+          ? HTMLSelectElement.prototype
+          : HTMLInputElement.prototype;
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      prototype,
+      "value",
+    )?.set;
 
     if (valueSetter) {
       valueSetter.call(field, value);
@@ -1342,7 +1652,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
     setSavedDraft((currentDraft) => ({
       ...currentDraft,
-      ...Object.fromEntries(Object.entries(extractedValues).filter(([, value]) => value)),
+      ...Object.fromEntries(
+        Object.entries(extractedValues).filter(([, value]) => value),
+      ),
     }));
     setAcceptedContract(false);
 
@@ -1355,10 +1667,12 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       });
 
       const birthDate = normalizeDateInputString(
-        extractedValues.birthDate || formRef.current?.elements?.namedItem("birthDate")?.value,
+        extractedValues.birthDate ||
+          formRef.current?.elements?.namedItem("birthDate")?.value,
       );
       const idIssueDate = normalizeDateInputString(
-        extractedValues.idIssueDate || formRef.current?.elements?.namedItem("idIssueDate")?.value,
+        extractedValues.idIssueDate ||
+          formRef.current?.elements?.namedItem("idIssueDate")?.value,
       );
       if (birthDate && idIssueDate && idIssueDate <= birthDate) {
         nextErrors.idIssueDate = "Ngày cấp CCCD phải sau ngày sinh.";
@@ -1382,8 +1696,10 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       setFieldErrors((currentErrors) => ({
         ...currentErrors,
         _form: "Tổng dung lượng ảnh CCCD/chân dung không được vượt quá 30MB.",
-        citizenIdFront: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
-        citizenIdBack: "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+        citizenIdFront:
+          "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
+        citizenIdBack:
+          "Vui lòng chọn ảnh nhỏ hơn để tổng dung lượng không vượt quá 30MB.",
       }));
       return;
     }
@@ -1397,8 +1713,12 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
       _form: "",
-      citizenIdFront: nextSelectedFiles.citizenIdFront ? "" : currentErrors.citizenIdFront,
-      citizenIdBack: nextSelectedFiles.citizenIdBack ? "" : currentErrors.citizenIdBack,
+      citizenIdFront: nextSelectedFiles.citizenIdFront
+        ? ""
+        : currentErrors.citizenIdFront,
+      citizenIdBack: nextSelectedFiles.citizenIdBack
+        ? ""
+        : currentErrors.citizenIdBack,
     }));
   };
 
@@ -1406,7 +1726,10 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     applyExtractedCccdIdentity(identity);
   };
 
-  const validateFormData = (data, { includeFiles = true, includeContractAcceptance = true } = {}) => {
+  const validateFormData = (
+    data,
+    { includeFiles = true, includeContractAcceptance = true } = {},
+  ) => {
     const requiredFields = [
       "fullName",
       "birthDate",
@@ -1437,17 +1760,23 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     Object.assign(nextErrors, validateOccupancyData(data));
 
     if (includeFiles) {
-      ["citizenIdFront", "citizenIdBack", "portraitImage"].forEach((fieldName) => {
-        if (!selectedFiles[fieldName]) {
-          nextErrors[fieldName] = REQUIRED_DEPOSIT_MESSAGES[fieldName];
-        }
-      });
+      ["citizenIdFront", "citizenIdBack", "portraitImage"].forEach(
+        (fieldName) => {
+          if (!selectedFiles[fieldName]) {
+            nextErrors[fieldName] = REQUIRED_DEPOSIT_MESSAGES[fieldName];
+          }
+        },
+      );
     }
 
     if (includeContractAcceptance) {
       const metadata = buildDepositMetadata(room, data);
-      if (!acceptedContract || acceptedSignature !== signatureFromMetadata(metadata)) {
-        nextErrors.terms = "Vui lòng xem hợp đồng đặt cọc và tick đồng ý trước khi tiếp tục thanh toán.";
+      if (
+        !acceptedContract ||
+        acceptedSignature !== signatureFromMetadata(metadata)
+      ) {
+        nextErrors.terms =
+          "Vui lòng xem hợp đồng đặt cọc và tick đồng ý trước khi tiếp tục thanh toán.";
       }
     }
 
@@ -1476,7 +1805,10 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
       setAcceptedSignature(signatureFromMetadata(metadata));
       setIsPreviewOpen(true);
     } catch (error) {
-      setFieldError("terms", error.message || "Không thể tạo bản xem trước hợp đồng đặt cọc.");
+      setFieldError(
+        "terms",
+        error.message || "Không thể tạo bản xem trước hợp đồng đặt cọc.",
+      );
     } finally {
       setIsLoadingPreview(false);
     }
@@ -1500,21 +1832,32 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
     const metadata = buildDepositMetadata(room, data);
 
     // Chuẩn bị payload chuẩn theo backend yêu cầu
-    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-    if (selectedFiles.citizenIdFront) formData.append("idFrontFile", selectedFiles.citizenIdFront);
-    if (selectedFiles.citizenIdBack) formData.append("idBackFile", selectedFiles.citizenIdBack);
-    if (selectedFiles.portraitImage) formData.append("portraitFile", selectedFiles.portraitImage);
+    formData.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    );
+    if (selectedFiles.citizenIdFront)
+      formData.append("idFrontFile", selectedFiles.citizenIdFront);
+    if (selectedFiles.citizenIdBack)
+      formData.append("idBackFile", selectedFiles.citizenIdBack);
+    if (selectedFiles.portraitImage)
+      formData.append("portraitFile", selectedFiles.portraitImage);
 
     onSubmit(formData, metadata);
   };
 
   return (
-    <DepositFormErrorContext.Provider value={{ errors: fieldErrors, setError: setFieldError }}>
+    <DepositFormErrorContext.Provider
+      value={{ errors: fieldErrors, setError: setFieldError }}
+    >
       <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-4 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
         <div>
-          <h1 className="text-4xl font-bold tracking-[-0.02em] text-[#091426]">Thông tin đặt cọc</h1>
+          <h1 className="text-4xl font-bold tracking-[-0.02em] text-[#091426]">
+            Thông tin đặt cọc
+          </h1>
           <p className="mt-2 text-base leading-7 text-[#45474c]">
-            Vui lòng hoàn thành các thông tin dưới đây để tiến hành giữ chỗ cho phòng {room.id}.
+            Vui lòng hoàn thành các thông tin dưới đây để tiến hành giữ chỗ cho
+            phòng {room.id}.
           </p>
         </div>
 
@@ -1549,12 +1892,48 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
 
           <FormSection title="Thông tin định danh" icon={ShieldCheck}>
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field className="sm:col-span-2" label="Họ và tên" name="fullName" placeholder="Phạm Thèng C" defaultValue={savedDraft.fullName} />
-              <Field label="Ngày sinh" name="birthDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.birthDate} />
-              <Field label="Số CCCD" name="citizenId" placeholder="Số căn cước công dân" defaultValue={savedDraft.citizenId} />
-              <Field label="Ngày cấp" name="idIssueDate" type="date" placeholder="dd/MM/yyyy" max={todayDate} defaultValue={savedDraft.idIssueDate} />
-              <Field label="Nơi cấp" name="idIssuePlace" placeholder="Cục CS QLHC về TTXH" defaultValue={savedDraft.idIssuePlace} />
-              <Field className="sm:col-span-2" label="Địa chỉ thường trú" name="permanentAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP" defaultValue={savedDraft.permanentAddress} />
+              <Field
+                className="sm:col-span-2"
+                label="Họ và tên"
+                name="fullName"
+                placeholder="Phạm Thèng C"
+                defaultValue={savedDraft.fullName}
+              />
+              <Field
+                label="Ngày sinh"
+                name="birthDate"
+                type="date"
+                placeholder="dd/MM/yyyy"
+                max={todayDate}
+                defaultValue={savedDraft.birthDate}
+              />
+              <Field
+                label="Số CCCD"
+                name="citizenId"
+                placeholder="Số căn cước công dân"
+                defaultValue={savedDraft.citizenId}
+              />
+              <Field
+                label="Ngày cấp"
+                name="idIssueDate"
+                type="date"
+                placeholder="dd/MM/yyyy"
+                max={todayDate}
+                defaultValue={savedDraft.idIssueDate}
+              />
+              <Field
+                label="Nơi cấp"
+                name="idIssuePlace"
+                placeholder="Cục CS QLHC về TTXH"
+                defaultValue={savedDraft.idIssuePlace}
+              />
+              <Field
+                className="sm:col-span-2"
+                label="Địa chỉ thường trú"
+                name="permanentAddress"
+                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP"
+                defaultValue={savedDraft.permanentAddress}
+              />
             </div>
           </FormSection>
 
@@ -1569,7 +1948,14 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
               />
-              <Field label="Email (không bắt buộc)" name="email" type="email" placeholder="example@gmail.com" required={false} defaultValue={savedDraft.email} />
+              <Field
+                label="Email (không bắt buộc)"
+                name="email"
+                type="email"
+                placeholder="example@gmail.com"
+                required={false}
+                defaultValue={savedDraft.email}
+              />
             </div>
           </FormSection>
 
@@ -1585,72 +1971,113 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                   required
                   onChange={handleOccupantCountChange}
                   aria-invalid={fieldErrors.occupantCount ? "true" : "false"}
-                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.occupantCount
-                    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                    : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-                    }`}
+                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${
+                    fieldErrors.occupantCount
+                      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                      : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                  }`}
                 >
                   <option value="1">1 người</option>
                   <option value="2">2 người</option>
                   <option value="3">3 người</option>
                 </select>
-                {fieldErrors.occupantCount && <span className="text-xs font-medium text-rose-600">{fieldErrors.occupantCount}</span>}
+                {fieldErrors.occupantCount && (
+                  <span className="text-xs font-medium text-rose-600">
+                    {fieldErrors.occupantCount}
+                  </span>
+                )}
               </label>
               <div className="rounded-lg border border-[#d8dde6] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-[#5a6678]">
-                <p className="font-bold text-[#091426]">Người đặt cọc chính sẽ là người ký chính.</p>
-                <p>Người ở cùng chỉ cần nhập tên và số điện thoại ở bước đặt cọc. CCCD và hồ sơ đầy đủ sẽ bổ sung sau khi ký hợp đồng.</p>
+                <p className="font-bold text-[#091426]">
+                  Người đặt cọc chính sẽ là người ký chính.
+                </p>
+                <p>
+                  Người ở cùng chỉ cần nhập tên và số điện thoại ở bước đặt cọc.
+                  CCCD và hồ sơ đầy đủ sẽ bổ sung sau khi ký hợp đồng.
+                </p>
               </div>
             </div>
 
-            {[1, 2].map((displayOrder) => Number(occupantCount) > displayOrder && (
-              <div key={displayOrder} className="rounded-xl border border-[#d8dde6] bg-white p-5">
-                <h3 className="text-base font-bold text-[#091426]">Người ở cùng {displayOrder}</h3>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
-                      Họ tên <span className="text-rose-600">*</span>
-                    </span>
-                    <input
-                      name={`coOccupant${displayOrder}FullName`}
-                      value={coOccupants[displayOrder].fullName}
-                      onChange={handleCoOccupantChange(displayOrder, "fullName")}
-                      placeholder={`Nhập họ tên người ở cùng ${displayOrder}`}
-                      aria-invalid={fieldErrors[`coOccupant${displayOrder}FullName`] ? "true" : "false"}
-                      className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${fieldErrors[`coOccupant${displayOrder}FullName`]
-                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                        : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-                        }`}
-                    />
-                    {fieldErrors[`coOccupant${displayOrder}FullName`] && (
-                      <span className="text-xs font-medium text-rose-600">{fieldErrors[`coOccupant${displayOrder}FullName`]}</span>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
-                      Số điện thoại <span className="text-rose-600">*</span>
-                    </span>
-                    <input
-                      name={`coOccupant${displayOrder}Phone`}
-                      type="tel"
-                      value={coOccupants[displayOrder].phone}
-                      onChange={handleCoOccupantChange(displayOrder, "phone")}
-                      placeholder="Nhập số điện thoại"
-                      aria-invalid={fieldErrors[`coOccupant${displayOrder}Phone`] ? "true" : "false"}
-                      className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${fieldErrors[`coOccupant${displayOrder}Phone`]
-                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                        : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-                        }`}
-                    />
-                    {fieldErrors[`coOccupant${displayOrder}Phone`] && (
-                      <span className="text-xs font-medium text-rose-600">{fieldErrors[`coOccupant${displayOrder}Phone`]}</span>
-                    )}
-                    {!fieldErrors[`coOccupant${displayOrder}Phone`] && coOccupantProfileHints[displayOrder] && (
-                      <span className="text-xs font-medium text-emerald-700">{EXISTING_PERSON_PROFILE_HINT}</span>
-                    )}
-                  </label>
-                </div>
-              </div>
-            ))}
+            {[1, 2].map(
+              (displayOrder) =>
+                Number(occupantCount) > displayOrder && (
+                  <div
+                    key={displayOrder}
+                    className="rounded-xl border border-[#d8dde6] bg-white p-5"
+                  >
+                    <h3 className="text-base font-bold text-[#091426]">
+                      Người ở cùng {displayOrder}
+                    </h3>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                          Họ tên <span className="text-rose-600">*</span>
+                        </span>
+                        <input
+                          name={`coOccupant${displayOrder}FullName`}
+                          value={coOccupants[displayOrder].fullName}
+                          onChange={handleCoOccupantChange(
+                            displayOrder,
+                            "fullName",
+                          )}
+                          placeholder={`Nhập họ tên người ở cùng ${displayOrder}`}
+                          aria-invalid={
+                            fieldErrors[`coOccupant${displayOrder}FullName`]
+                              ? "true"
+                              : "false"
+                          }
+                          className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+                            fieldErrors[`coOccupant${displayOrder}FullName`]
+                              ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                              : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                          }`}
+                        />
+                        {fieldErrors[`coOccupant${displayOrder}FullName`] && (
+                          <span className="text-xs font-medium text-rose-600">
+                            {fieldErrors[`coOccupant${displayOrder}FullName`]}
+                          </span>
+                        )}
+                      </label>
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                          Số điện thoại <span className="text-rose-600">*</span>
+                        </span>
+                        <input
+                          name={`coOccupant${displayOrder}Phone`}
+                          type="tel"
+                          value={coOccupants[displayOrder].phone}
+                          onChange={handleCoOccupantChange(
+                            displayOrder,
+                            "phone",
+                          )}
+                          placeholder="Nhập số điện thoại"
+                          aria-invalid={
+                            fieldErrors[`coOccupant${displayOrder}Phone`]
+                              ? "true"
+                              : "false"
+                          }
+                          className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+                            fieldErrors[`coOccupant${displayOrder}Phone`]
+                              ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                              : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                          }`}
+                        />
+                        {fieldErrors[`coOccupant${displayOrder}Phone`] && (
+                          <span className="text-xs font-medium text-rose-600">
+                            {fieldErrors[`coOccupant${displayOrder}Phone`]}
+                          </span>
+                        )}
+                        {!fieldErrors[`coOccupant${displayOrder}Phone`] &&
+                          coOccupantProfileHints[displayOrder] && (
+                            <span className="text-xs font-medium text-emerald-700">
+                              {EXISTING_PERSON_PROFILE_HINT}
+                            </span>
+                          )}
+                      </label>
+                    </div>
+                  </div>
+                ),
+            )}
           </FormSection>
 
           <FormSection title="Lịch đặt cọc và thanh toán" icon={CalendarDays}>
@@ -1683,7 +2110,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
               />
               {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
-                  Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong vòng 14 ngày.
+                  Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp
+                  đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong
+                  vòng 14 ngày.
                 </div>
               )}
               <label className="flex flex-col gap-1.5">
@@ -1694,17 +2123,29 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                   name="paymentCycleMonths"
                   defaultValue={savedDraft.paymentCycleMonths || "1"}
                   required
-                  aria-invalid={fieldErrors.paymentCycleMonths ? "true" : "false"}
-                  onChange={(event) => validateAndSetDepositField("paymentCycleMonths", event.target.value)}
-                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${fieldErrors.paymentCycleMonths
-                    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-                    : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
-                    }`}
+                  aria-invalid={
+                    fieldErrors.paymentCycleMonths ? "true" : "false"
+                  }
+                  onChange={(event) =>
+                    validateAndSetDepositField(
+                      "paymentCycleMonths",
+                      event.target.value,
+                    )
+                  }
+                  className={`h-[58px] rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 ${
+                    fieldErrors.paymentCycleMonths
+                      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                      : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                  }`}
                 >
                   <option value="1">1 tháng/lần</option>
                   <option value="3">3 tháng/lần</option>
                 </select>
-                {fieldErrors.paymentCycleMonths && <span className="text-xs font-medium text-rose-600">{fieldErrors.paymentCycleMonths}</span>}
+                {fieldErrors.paymentCycleMonths && (
+                  <span className="text-xs font-medium text-rose-600">
+                    {fieldErrors.paymentCycleMonths}
+                  </span>
+                )}
               </label>
             </div>
           </FormSection>
@@ -1739,7 +2180,9 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
               )}
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">Ghi chú thêm (không bắt buộc)</span>
+                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                  Ghi chú thêm (không bắt buộc)
+                </span>
                 <textarea
                   name="note"
                   rows={4}
@@ -1759,7 +2202,8 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                   Hợp đồng đặt cọc
                 </p>
                 <p className="mt-1 text-sm leading-6 text-[#45474c]">
-                  Xem trước hợp đồng đã tự điền thông tin trước khi chuyển sang màn thanh toán.
+                  Xem trước hợp đồng đã tự điền thông tin trước khi chuyển sang
+                  màn thanh toán.
                 </p>
               </div>
               <button
@@ -1771,12 +2215,18 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
                 {isLoadingPreview ? "Đang tạo..." : "Xem hợp đồng đặt cọc"}
               </button>
             </div>
-            <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${acceptedContract ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+            <div
+              className={`rounded-lg px-4 py-3 text-sm font-semibold ${acceptedContract ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+            >
               {acceptedContract
                 ? "Đã đọc và đồng ý điều khoản đặt cọc."
                 : "Bạn cần xem hợp đồng và tick đồng ý trong bản preview trước khi tiếp tục thanh toán."}
             </div>
-            {fieldErrors.terms && <p className="text-sm font-semibold text-rose-600">{fieldErrors.terms}</p>}
+            {fieldErrors.terms && (
+              <p className="text-sm font-semibold text-rose-600">
+                {fieldErrors.terms}
+              </p>
+            )}
           </div>
 
           <label className="hidden">
@@ -1796,25 +2246,34 @@ function DepositInfoForm({ room, onSubmit, isSubmitting, blockingStatus, apiFiel
               className="mt-1 h-4 w-4 rounded border-[#c5c6cd] accent-[#091426]"
             />
             <span className="text-sm leading-6 text-[#45474c]">
-              Tôi cam kết các thông tin trên là chính xác và đồng ý với các <strong className="text-[#091426]">điều khoản đặt cọc</strong> của Hải Đăng House.
+              Tôi cam kết các thông tin trên là chính xác và đồng ý với các{" "}
+              <strong className="text-[#091426]">điều khoản đặt cọc</strong> của
+              Hải Đăng House.
             </span>
           </label>
 
           {Object.values(fieldErrors).some(Boolean) && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 sm:col-span-2">
-              {fieldErrors._form || "Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục."}
+              {fieldErrors._form ||
+                "Vui lòng kiểm tra lại các thông tin bắt buộc trước khi tiếp tục."}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={isSubmitting || (blockingStatus && !blockingStatus.canBook)}
+            disabled={
+              isSubmitting || (blockingStatus && !blockingStatus.canBook)
+            }
             className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75 sm:col-span-2"
           >
-            {isSubmitting ? "Đang xử lý..." : blockingStatus && !blockingStatus.canBook ? (
-              blockingStatus.remainingMs > 0
-                ? `Phòng đang có người đặt cọc, vui lòng chờ ${formatHoldCountdown(blockingStatus.remainingMs)}`
-                : "Phòng đã được đặt cọc, vui lòng chọn phòng khác"
+            {isSubmitting ? (
+              "Đang xử lý..."
+            ) : blockingStatus && !blockingStatus.canBook ? (
+              blockingStatus.remainingMs > 0 ? (
+                `Phòng đang có người đặt cọc, vui lòng chờ ${formatHoldCountdown(blockingStatus.remainingMs)}`
+              ) : (
+                "Phòng đã được đặt cọc, vui lòng chọn phòng khác"
+              )
             ) : (
               <>
                 Tiếp tục đặt cọc
@@ -1862,8 +2321,12 @@ function CopyablePaymentField({ label, value, valueClassName = "" }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-xl border border-[#e4e7ec] bg-[#f8fafc] px-4 py-3">
       <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-[0.04em] text-[#8b97aa]">{label}</p>
-        <p className={`mt-1 break-words text-sm font-bold text-[#091426] ${valueClassName}`}>
+        <p className="text-xs font-bold uppercase tracking-[0.04em] text-[#8b97aa]">
+          {label}
+        </p>
+        <p
+          className={`mt-1 break-words text-sm font-bold text-[#091426] ${valueClassName}`}
+        >
           {displayValue || "Chưa có thông tin"}
         </p>
       </div>
@@ -1874,7 +2337,11 @@ function CopyablePaymentField({ label, value, valueClassName = "" }) {
         className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[#c5c6cd] bg-white px-3 text-xs font-bold text-[#091426] transition hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
         title={`Sao chép ${label.toLowerCase()}`}
       >
-        {copied ? <Check className="h-4 w-4 text-[#006c49]" /> : <Copy className="h-4 w-4" />}
+        {copied ? (
+          <Check className="h-4 w-4 text-[#006c49]" />
+        ) : (
+          <Copy className="h-4 w-4" />
+        )}
         {copied ? "Đã copy" : "Copy"}
       </button>
     </div>
@@ -1883,12 +2350,17 @@ function CopyablePaymentField({ label, value, valueClassName = "" }) {
 
 function DepositPaymentStep({ room, customer, paymentIntent }) {
   const router = useRouter();
-  const identityDigits = String(customer.phone || customer.citizenId || "00000").replace(/\D/g, "").slice(-5).padStart(5, "0");
-  const paymentCode = readPaymentContent(paymentIntent) || `HD-${room.id}-${identityDigits}`;
+  const identityDigits = String(customer.phone || customer.citizenId || "00000")
+    .replace(/\D/g, "")
+    .slice(-5)
+    .padStart(5, "0");
+  const paymentCode =
+    readPaymentContent(paymentIntent) || `HD-${room.id}-${identityDigits}`;
   const paymentIntentId = readPaymentIntentId(paymentIntent);
   const checkoutUrl = readCheckoutUrl(paymentIntent);
   const qrPayload = readQrPayload(paymentIntent);
-  const paymentLinkId = paymentIntent?.paymentLinkId ?? paymentIntent?.payment_link_id ?? "";
+  const paymentLinkId =
+    paymentIntent?.paymentLinkId ?? paymentIntent?.payment_link_id ?? "";
   const accountName =
     paymentIntent?.accountName ??
     paymentIntent?.account_name ??
@@ -1901,17 +2373,32 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     paymentIntent?.bankName ??
     paymentIntent?.bank_name ??
     "";
-  const accountNumber = paymentIntent?.accountNumber ?? paymentIntent?.account_number ?? "";
+  const accountNumber =
+    paymentIntent?.accountNumber ?? paymentIntent?.account_number ?? "";
   const transferDescription = readTransferDescription(paymentIntent);
-  const hasManualTransferDetails = Boolean(bankName && accountNumber && accountName);
-  const depositAmount = paymentIntent?.amount ?? paymentIntent?.depositAmount ?? paymentIntent?.deposit_amount;
-  const depositAmountLabel = Number(depositAmount) > 0
-    ? `${Number(depositAmount).toLocaleString("vi-VN")} VNĐ`
-    : room.depositLabel;
-  const [expiresAtMs] = useState(() => resolvePaymentExpiresAtMs(paymentIntent) ?? Date.now() + ROOM_HOLD_DURATION_MS);
-  const [remainingMs, setRemainingMs] = useState(() => Math.max(0, expiresAtMs - Date.now()));
+  const hasManualTransferDetails = Boolean(
+    bankName && accountNumber && accountName,
+  );
+  const depositAmount =
+    paymentIntent?.amount ??
+    paymentIntent?.depositAmount ??
+    paymentIntent?.deposit_amount;
+  const depositAmountLabel =
+    Number(depositAmount) > 0
+      ? `${Number(depositAmount).toLocaleString("vi-VN")} VNĐ`
+      : room.depositLabel;
+  const [expiresAtMs] = useState(
+    () =>
+      resolvePaymentExpiresAtMs(paymentIntent) ??
+      Date.now() + ROOM_HOLD_DURATION_MS,
+  );
+  const [remainingMs, setRemainingMs] = useState(() =>
+    Math.max(0, expiresAtMs - Date.now()),
+  );
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const [paymentStatusMessage, setPaymentStatusMessage] = useState("Đang chờ thanh toán qua PayOS.");
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState(
+    "Đang chờ thanh toán qua PayOS.",
+  );
   const [isConfirming, setIsConfirming] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -1981,10 +2468,16 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
           return;
         }
 
-        if (isTerminalFailedPaymentStatus(status) && !didHandleExpiryRef.current) {
+        if (
+          isTerminalFailedPaymentStatus(status) &&
+          !didHandleExpiryRef.current
+        ) {
           didHandleExpiryRef.current = true;
           clearRoomHold(room.id);
-          alert(status?.message || "Phiên thanh toán đã kết thúc. Vui lòng chọn lại phòng.");
+          alert(
+            status?.message ||
+              "Phiên thanh toán đã kết thúc. Vui lòng chọn lại phòng.",
+          );
           router.replace("/rooms");
         }
       } catch {
@@ -1999,7 +2492,9 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
 
   const handleOpenCheckout = () => {
     if (!checkoutUrl) {
-      alert("Chưa có đường dẫn thanh toán PayOS. Vui lòng quét mã QR hoặc tạo lại yêu cầu đặt cọc.");
+      alert(
+        "Chưa có đường dẫn thanh toán PayOS. Vui lòng quét mã QR hoặc tạo lại yêu cầu đặt cọc.",
+      );
       return;
     }
     window.open(checkoutUrl, "_blank", "noopener,noreferrer");
@@ -2057,7 +2552,11 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     }
 
     try {
-      await downloadDepositContractByPaymentPdf(paymentIntentId, paymentCode, `hop-dong-dat-coc-${room.id}.pdf`);
+      await downloadDepositContractByPaymentPdf(
+        paymentIntentId,
+        paymentCode,
+        `hop-dong-dat-coc-${room.id}.pdf`,
+      );
     } catch (error) {
       alert(error.message || "Không thể tải hợp đồng đặt cọc.");
     }
@@ -2069,9 +2568,12 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#ecfdf5]">
           <BadgeCheck className="h-8 w-8 text-[#006c49]" />
         </div>
-        <h2 className="mt-5 text-2xl font-bold text-[#091426]">Xác nhận thành công!</h2>
+        <h2 className="mt-5 text-2xl font-bold text-[#091426]">
+          Xác nhận thành công!
+        </h2>
         <p className="mt-2 max-w-md text-sm leading-6 text-[#45474c]">
-          Yêu cầu đặt cọc phòng {room.id} đã được ghi nhận. Chủ nhà sẽ liên hệ xác nhận trong thời gian sớm nhất.
+          Yêu cầu đặt cọc phòng {room.id} đã được ghi nhận. Chủ nhà sẽ liên hệ
+          xác nhận trong thời gian sớm nhất.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <button
@@ -2105,15 +2607,22 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     <section className="rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-6 shadow-[0_4px_10px_rgba(9,20,38,0.04)] sm:p-8">
       <div className="flex flex-col gap-4 border-b border-[#c5c6cd] pb-6 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">Bước đặt cọc</p>
-          <h1 className="mt-2 text-4xl font-bold tracking-[-0.02em] text-[#091426]">Đặt cọc giữ phòng</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">
+            Bước đặt cọc
+          </p>
+          <h1 className="mt-2 text-4xl font-bold tracking-[-0.02em] text-[#091426]">
+            Đặt cọc giữ phòng
+          </h1>
           <p className="mt-2 text-base leading-7 text-[#45474c]">
-            {customer.fullName || "Khách thuê"} vui lòng chuyển khoản tiền cọc để giữ phòng {room.id}.
+            {customer.fullName || "Khách thuê"} vui lòng chuyển khoản tiền cọc
+            để giữ phòng {room.id}.
           </p>
         </div>
         <div className="rounded-xl bg-[#ecfdf5] px-5 py-4 text-right">
           <p className="text-sm text-[#007a55]">Số tiền cọc</p>
-          <p className="text-2xl font-bold text-[#006c49]">{depositAmountLabel}</p>
+          <p className="text-2xl font-bold text-[#006c49]">
+            {depositAmountLabel}
+          </p>
         </div>
       </div>
 
@@ -2122,17 +2631,30 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
           <div className="rounded-xl border border-[#c5c6cd] bg-white p-5">
             <div className="flex items-center gap-3">
               <CreditCard className="h-5 w-5 text-[#091426]" />
-              <h2 className="text-lg font-bold text-[#091426]">Thông tin thanh toán</h2>
+              <h2 className="text-lg font-bold text-[#091426]">
+                Thông tin thanh toán
+              </h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-[#6b7280]">
-              Vui lòng chuyển đúng số tiền và đúng nội dung chuyển khoản để hệ thống tự động xác nhận.
+              Vui lòng chuyển đúng số tiền và đúng nội dung chuyển khoản để hệ
+              thống tự động xác nhận.
             </p>
             {hasManualTransferDetails ? (
               <div className="mt-5 grid gap-3">
                 <CopyablePaymentField label="Ngân hàng" value={bankName} />
-                <CopyablePaymentField label="Số tài khoản" value={accountNumber} />
-                <CopyablePaymentField label="Tên người nhận" value={accountName} />
-                <CopyablePaymentField label="Số tiền" value={depositAmountLabel} valueClassName="text-[#006c49]" />
+                <CopyablePaymentField
+                  label="Số tài khoản"
+                  value={accountNumber}
+                />
+                <CopyablePaymentField
+                  label="Tên người nhận"
+                  value={accountName}
+                />
+                <CopyablePaymentField
+                  label="Số tiền"
+                  value={depositAmountLabel}
+                  valueClassName="text-[#006c49]"
+                />
                 <CopyablePaymentField
                   label="Nội dung chuyển khoản"
                   value={transferDescription}
@@ -2147,13 +2669,26 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
           </div>
 
           <div className="rounded-xl border border-[#c5c6cd] bg-white p-5">
-            <h2 className="text-lg font-bold text-[#091426]">Thông tin giữ chỗ</h2>
+            <h2 className="text-lg font-bold text-[#091426]">
+              Thông tin giữ chỗ
+            </h2>
             <div className="mt-4 grid gap-3 text-sm text-[#45474c] sm:grid-cols-2">
-              <p><CalendarDays className="mr-2 inline h-4 w-4" /> Ký
-                HĐ: {customer.contractDate || "Chưa chọn"}</p>
-              <p><Home className="mr-2 inline h-4 w-4" /> Vào ở: {customer.moveInDate || "Chưa chọn"}</p>
-              <p><Phone className="mr-2 inline h-4 w-4" /> {customer.phone || "Chưa có SĐT"}</p>
-              <p><Mail className="mr-2 inline h-4 w-4" /> {customer.email || "Chưa có email"}</p>
+              <p>
+                <CalendarDays className="mr-2 inline h-4 w-4" /> Ký HĐ:{" "}
+                {customer.contractDate || "Chưa chọn"}
+              </p>
+              <p>
+                <Home className="mr-2 inline h-4 w-4" /> Vào ở:{" "}
+                {customer.moveInDate || "Chưa chọn"}
+              </p>
+              <p>
+                <Phone className="mr-2 inline h-4 w-4" />{" "}
+                {customer.phone || "Chưa có SĐT"}
+              </p>
+              <p>
+                <Mail className="mr-2 inline h-4 w-4" />{" "}
+                {customer.email || "Chưa có email"}
+              </p>
             </div>
           </div>
         </div>
@@ -2161,7 +2696,14 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
         <div className="rounded-xl border border-[#c5c6cd] bg-white p-5 text-center">
           <div className="mx-auto flex aspect-square w-full max-w-[220px] items-center justify-center rounded-xl border border-dashed border-[#c5c6cd] bg-[#f5f3f4]">
             {qrDataUrl ? (
-              <Image src={qrDataUrl} alt={`Mã QR thanh toán PayOS ${paymentCode}`} width={260} height={260} className="h-full w-full rounded-xl object-contain p-3" unoptimized />
+              <Image
+                src={qrDataUrl}
+                alt={`Mã QR thanh toán PayOS ${paymentCode}`}
+                width={260}
+                height={260}
+                className="h-full w-full rounded-xl object-contain p-3"
+                unoptimized
+              />
             ) : (
               <div className="px-4 text-sm font-semibold leading-6 text-[#45474c]">
                 Đang tạo mã QR thanh toán...
@@ -2169,16 +2711,27 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
             )}
           </div>
           <p className="mt-4 text-sm leading-6 text-[#45474c]">
-            Quét mã QR hoặc chuyển khoản theo thông tin bên cạnh. Hệ thống sẽ tự cập nhật khi giao dịch được xác nhận.
+            Quét mã QR hoặc chuyển khoản theo thông tin bên cạnh. Hệ thống sẽ tự
+            cập nhật khi giao dịch được xác nhận.
           </p>
           {paymentLinkId && (
-            <p className="mt-2 break-all text-xs text-[#6b7280]">Mã liên kết thanh toán: {paymentLinkId}</p>
+            <p className="mt-2 break-all text-xs text-[#6b7280]">
+              Mã liên kết thanh toán: {paymentLinkId}
+            </p>
           )}
-          <p className="mt-2 text-xs font-semibold text-[#091426]">{paymentStatusMessage}</p>
+          <p className="mt-2 text-xs font-semibold text-[#091426]">
+            {paymentStatusMessage}
+          </p>
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">Thời gian giữ chỗ còn lại</p>
-            <p className="mt-1 text-2xl font-bold text-amber-800">{formatHoldCountdown(remainingMs)}</p>
-            <p className="mt-1 text-xs leading-5 text-amber-700">Hết thời gian, hệ thống sẽ trả phòng về trạng thái trống.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">
+              Thời gian giữ chỗ còn lại
+            </p>
+            <p className="mt-1 text-2xl font-bold text-amber-800">
+              {formatHoldCountdown(remainingMs)}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-amber-700">
+              Hết thời gian, hệ thống sẽ trả phòng về trạng thái trống.
+            </p>
           </div>
         </div>
       </div>
@@ -2189,7 +2742,9 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
         onClick={handleConfirmPayment}
         className="mt-8 flex h-[64px] w-full items-center justify-center gap-3 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75"
       >
-        {isConfirming ? "Đang mở trang thanh toán..." : (
+        {isConfirming ? (
+          "Đang mở trang thanh toán..."
+        ) : (
           <>
             Mở trang thanh toán
             <ArrowRight className="h-5 w-5" />
@@ -2211,8 +2766,10 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
 export function DepositClient({ room: initialRoom = null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryRoomIdentifier = searchParams.get("roomCode") || searchParams.get("roomId") || "";
-  const queryPropertyId = searchParams.get("propertyId") || searchParams.get("buildingId") || "";
+  const queryRoomIdentifier =
+    searchParams.get("roomCode") || searchParams.get("roomId") || "";
+  const queryPropertyId =
+    searchParams.get("propertyId") || searchParams.get("buildingId") || "";
   const [room, setRoom] = useState(initialRoom);
   const [roomLookup, setRoomLookup] = useState(() => ({
     identifier: initialRoom ? queryRoomIdentifier : "",
@@ -2226,9 +2783,15 @@ export function DepositClient({ room: initialRoom = null }) {
   const [depositApiFieldErrors, setDepositApiFieldErrors] = useState({});
   const didRedirectReservedRef = useRef(false);
   const roomIdentifier = room?.roomId ?? room?.roomCode ?? room?.id;
-  const isLoadingRoom = !initialRoom && Boolean(queryRoomIdentifier) && roomLookup.identifier !== queryRoomIdentifier;
-  const roomLoadError = roomLookup.identifier === queryRoomIdentifier ? roomLookup.error : "";
-  const isBlockedOnInfoStep = Boolean(step === "info" && blockingStatus && !blockingStatus.canBook);
+  const isLoadingRoom =
+    !initialRoom &&
+    Boolean(queryRoomIdentifier) &&
+    roomLookup.identifier !== queryRoomIdentifier;
+  const roomLoadError =
+    roomLookup.identifier === queryRoomIdentifier ? roomLookup.error : "";
+  const isBlockedOnInfoStep = Boolean(
+    step === "info" && blockingStatus && !blockingStatus.canBook,
+  );
 
   useEffect(() => {
     if (initialRoom) return undefined;
@@ -2256,21 +2819,30 @@ export function DepositClient({ room: initialRoom = null }) {
     };
   }, [initialRoom, queryPropertyId, queryRoomIdentifier]);
 
-  const applyRoomHoldStatus = useCallback((status) => {
-    const nextBlockingStatus = toBlockingStatus(status);
+  const applyRoomHoldStatus = useCallback(
+    (status) => {
+      const nextBlockingStatus = toBlockingStatus(status);
 
-    if (!nextBlockingStatus) {
-      setBlockingStatus(null);
-      return;
-    }
+      if (!nextBlockingStatus) {
+        setBlockingStatus(null);
+        return;
+      }
 
-    setBlockingStatus(nextBlockingStatus);
-    if (nextBlockingStatus.roomStatus === "RESERVED" && !didRedirectReservedRef.current) {
-      didRedirectReservedRef.current = true;
-      alert(nextBlockingStatus.message || "Phòng đã được đặt cọc. Vui lòng chọn phòng khác.");
-      router.replace("/rooms");
-    }
-  }, [router]);
+      setBlockingStatus(nextBlockingStatus);
+      if (
+        nextBlockingStatus.roomStatus === "RESERVED" &&
+        !didRedirectReservedRef.current
+      ) {
+        didRedirectReservedRef.current = true;
+        alert(
+          nextBlockingStatus.message ||
+            "Phòng đã được đặt cọc. Vui lòng chọn phòng khác.",
+        );
+        router.replace("/rooms");
+      }
+    },
+    [router],
+  );
 
   const refreshRoomHoldStatus = useCallback(async () => {
     if (!roomIdentifier) return null;
@@ -2305,10 +2877,10 @@ export function DepositClient({ room: initialRoom = null }) {
     }
 
     const initialPollTimer = window.setTimeout(() => {
-      refreshRoomHoldStatus().catch(() => { });
+      refreshRoomHoldStatus().catch(() => {});
     }, 0);
     const pollingTimer = window.setInterval(() => {
-      refreshRoomHoldStatus().catch(() => { });
+      refreshRoomHoldStatus().catch(() => {});
     }, 2000);
 
     return () => {
@@ -2329,7 +2901,9 @@ export function DepositClient({ room: initialRoom = null }) {
       // Lưu state cục bộ phục vụ các bước sau
       setCustomer(metadata);
       setPaymentIntent(createdPaymentIntent);
-      const holdExpiresAt = resolvePaymentExpiresAtMs(createdPaymentIntent) ?? Date.now() + ROOM_HOLD_DURATION_MS;
+      const holdExpiresAt =
+        resolvePaymentExpiresAtMs(createdPaymentIntent) ??
+        Date.now() + ROOM_HOLD_DURATION_MS;
       createRoomHold(room.id, {
         customerName: metadata.fullName,
         phone: metadata.phone,
@@ -2344,10 +2918,11 @@ export function DepositClient({ room: initialRoom = null }) {
     } catch (error) {
       if (error.status === 409) {
         const status = await refreshRoomHoldStatus().catch(() => null);
-        const nextBlockingStatus = toBlockingStatus(status)
-          ?? toBlockingStatusFromMessage(error.message)
-          ?? toBlockingStatusFromMessage(error.payload?.message)
-          ?? toBlockingStatusFromMessage(error.payload?.details);
+        const nextBlockingStatus =
+          toBlockingStatus(status) ??
+          toBlockingStatusFromMessage(error.message) ??
+          toBlockingStatusFromMessage(error.payload?.message) ??
+          toBlockingStatusFromMessage(error.payload?.details);
         if (nextBlockingStatus) {
           setBlockingStatus(nextBlockingStatus);
           return;
@@ -2381,14 +2956,16 @@ export function DepositClient({ room: initialRoom = null }) {
   if (!room) {
     return (
       <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
-        <div
-          className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
+        <div className="mx-auto max-w-2xl rounded-xl border border-[#c5c6cd] bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
           <h1 className="text-2xl font-bold">Không tìm thấy phòng</h1>
           <p className="mt-3 text-sm leading-6 text-[#45474c]">
-            {roomLoadError || "Mã phòng trong đường dẫn không tồn tại trong dữ liệu backend hiện tại."}
+            {roomLoadError ||
+              "Mã phòng trong đường dẫn không tồn tại trong dữ liệu backend hiện tại."}
           </p>
-          <Link href="/rooms"
-            className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-[#091426] px-6 text-sm font-bold text-white transition hover:bg-[#16253a]">
+          <Link
+            href="/rooms"
+            className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-[#091426] px-6 text-sm font-bold text-white transition hover:bg-[#16253a]"
+          >
             Quay lại /rooms
           </Link>
         </div>
@@ -2399,14 +2976,17 @@ export function DepositClient({ room: initialRoom = null }) {
   if (room.status !== "available" && room.status !== "soonVacant") {
     return (
       <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
-        <div
-          className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
-          <h1 className="text-2xl font-bold">Phòng này hiện không thể đặt cọc</h1>
+        <div className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-white p-8 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
+          <h1 className="text-2xl font-bold">
+            Phòng này hiện không thể đặt cọc
+          </h1>
           <p className="mt-3 text-sm leading-6 text-[#45474c]">
             Vui lòng chọn phòng đang ở trạng thái trống trong danh sách phòng.
           </p>
-          <Link href="/rooms"
-            className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-[#091426] px-6 text-sm font-bold text-white transition hover:bg-[#16253a]">
+          <Link
+            href="/rooms"
+            className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-[#091426] px-6 text-sm font-bold text-white transition hover:bg-[#16253a]"
+          >
             Quay lại /rooms
           </Link>
         </div>
@@ -2417,8 +2997,10 @@ export function DepositClient({ room: initialRoom = null }) {
   return (
     <div className="min-h-screen bg-[#fbf8fa] px-4 pb-20 pt-8 text-[#091426] sm:px-6 lg:px-12">
       <div className="mx-auto max-w-[1120px]">
-        <Link href="/rooms"
-          className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#45474c] transition hover:text-[#091426]">
+        <Link
+          href="/rooms"
+          className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#45474c] transition hover:text-[#091426]"
+        >
           <ArrowLeft className="h-4 w-4" />
           Quay lại xem phòng
         </Link>
@@ -2434,7 +3016,13 @@ export function DepositClient({ room: initialRoom = null }) {
               apiFieldErrors={depositApiFieldErrors}
             />
           )}
-          {step === "deposit" && <DepositPaymentStep room={room} customer={customer} paymentIntent={paymentIntent} />}
+          {step === "deposit" && (
+            <DepositPaymentStep
+              room={room}
+              customer={customer}
+              paymentIntent={paymentIntent}
+            />
+          )}
         </div>
 
         <div className="mt-16 grid gap-8 border-t border-[#c5c6cd] pt-10 text-sm text-[#45474c] md:grid-cols-3">

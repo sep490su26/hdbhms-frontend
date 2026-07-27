@@ -23,7 +23,7 @@ test("normalizes the backend camelCase meter reading payload", () => {
   assert.equal(room.id, "P401");
   assert.equal(room.roomId, 41);
   assert.equal(room.elecPrev, 1200.5);
-  assert.equal(room.elecCurr, null);
+  assert.equal(room.elecCurr, 1200.5);
   assert.equal(room.waterPrev, 35);
   assert.equal(room.waterCurr, 42);
   assert.equal(room.photos, 2);

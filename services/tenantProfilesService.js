@@ -112,6 +112,39 @@ export async function downloadTenantProfilesPoliceReportExport(columns = []) {
   URL.revokeObjectURL(url);
 }
 
+export async function fetchTenantProfilesPoliceReportPackageExportFile(columns = []) {
+  const params = new URLSearchParams();
+  columns.filter(Boolean).forEach((column) => params.append("columns", column));
+  const query = params.toString();
+  const response = await fetchWithAuth(`${API_BASE_URL}/tenant-profiles/police-report/export-package${query ? `?${query}` : ""}`);
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Xuất file ZIP thất bại, vui lòng thử lại."));
+  }
+
+  const contentDisposition =
+    response.headers?.get?.("content-disposition") ||
+    response.headers?.get?.("Content-Disposition") ||
+    "";
+
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function downloadTenantProfilesPoliceReportPackageExport(columns = []) {
+  const { blob, filename } = await fetchTenantProfilesPoliceReportPackageExportFile(columns);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename || "ho-so-bao-cong-an.zip";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function normalizePermissionGrant(item = {}) {
   return {
     ...item,

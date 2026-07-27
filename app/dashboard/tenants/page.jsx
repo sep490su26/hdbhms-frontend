@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  Archive,
   Bike,
   BriefcaseBusiness,
   ChevronDown,
@@ -30,6 +31,7 @@ import {
   fetchTenantProfilePermissionGrants,
   fetchPrivateFileObjectUrl,
   fetchTenantProfiles,
+  downloadTenantProfilesPoliceReportPackageExport,
   downloadTenantProfilesPoliceReportExport,
   requestTenantProfileAccess,
   revokeTenantProfilePermissionGrant,
@@ -52,10 +54,19 @@ import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 const TENANT_PROFILE_FETCH_SIZE = 1000;
 
 const POLICE_REPORT_EXPORT_COLUMNS = [
+  { key: "propertyName", label: "Cơ sở" },
+  { key: "roomCode", label: "Phòng" },
+  { key: "contractCode", label: "Mã hợp đồng" },
   { key: "fullName", label: "Họ tên" },
   { key: "cccdNumber", label: "CCCD" },
+  { key: "documentType", label: "Loại giấy tờ" },
   { key: "dateOfBirth", label: "Ngày sinh" },
+  { key: "gender", label: "Giới tính" },
+  { key: "phone", label: "Số điện thoại" },
   { key: "permanentAddress", label: "Địa chỉ thường trú" },
+  { key: "issuedDate", label: "Ngày cấp" },
+  { key: "issuedPlace", label: "Nơi cấp" },
+  { key: "expiryDate", label: "Ngày hết hạn" },
   { key: "cccdImageLinks", label: "Link ảnh CCCD" },
 ];
 const DEFAULT_POLICE_REPORT_EXPORT_COLUMNS = POLICE_REPORT_EXPORT_COLUMNS.map(
@@ -1308,6 +1319,7 @@ function PoliceReportExportModal({
   onClear,
   onClose,
   onExport,
+  onExportPackage,
 }) {
   const selectedCount = selectedColumns.length;
 
@@ -1328,7 +1340,7 @@ function PoliceReportExportModal({
                 Báo công an
               </p>
               <h2 className="mt-1 text-xl font-black text-[#091426] dark:text-white">
-                Xuất Excel
+                Xuất báo công an
               </h2>
             </div>
           </div>
@@ -1410,6 +1422,15 @@ function PoliceReportExportModal({
             <FileSpreadsheet className="h-4 w-4" />
             {exporting ? "Đang xuất..." : "Xuất Excel"}
           </button>
+          <button
+            type="button"
+            onClick={onExportPackage}
+            disabled={exporting || selectedCount === 0}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+          >
+            <Archive className="h-4 w-4" />
+            {exporting ? "Đang xuất..." : "Xuất ZIP hồ sơ"}
+          </button>
         </footer>
       </section>
     </div>
@@ -1487,6 +1508,30 @@ export default function TenantsPage() {
     } catch (downloadError) {
       setExportError(
         downloadError?.message || "Xuất file Excel thất bại, vui lòng thử lại.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPoliceReportPackage = async () => {
+    if (!isOwner) {
+      setExportError("Chỉ chủ trọ có quyền xuất file này.");
+      return;
+    }
+    if (selectedExportColumns.length === 0) {
+      setExportError("Vui lòng chọn ít nhất một cột để xuất.");
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      setExportError("");
+      await downloadTenantProfilesPoliceReportPackageExport(selectedExportColumns);
+      setExportDialogOpen(false);
+    } catch (downloadError) {
+      setExportError(
+        downloadError?.message || "Xuất file ZIP thất bại, vui lòng thử lại.",
       );
     } finally {
       setIsExporting(false);
@@ -1796,7 +1841,7 @@ export default function TenantsPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                Xuất Excel
+                Xuất báo công an
               </button>
             )}
           </div>
@@ -2218,6 +2263,7 @@ export default function TenantsPage() {
             if (!isExporting) setExportDialogOpen(false);
           }}
           onExport={handleExportPoliceReport}
+          onExportPackage={handleExportPoliceReportPackage}
         />
       )}
 

@@ -1329,7 +1329,7 @@ function PoliceReportExportModal({
       role="dialog"
       aria-modal="true"
     >
-      <section className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
+      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
         <header className="flex items-start justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 px-6 py-5">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
@@ -1354,7 +1354,7 @@ function PoliceReportExportModal({
           </button>
         </header>
 
-        <div className="grid gap-4 p-6">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-black text-[#091426] dark:text-white">
               Chọn cột ({selectedCount}/{columns.length})
@@ -1377,7 +1377,7 @@ function PoliceReportExportModal({
             </div>
           </div>
 
-          <div className="grid gap-2">
+          <div className="custom-scrollbar grid max-h-[min(48vh,420px)] gap-2 overflow-y-auto pr-1">
             {columns.map((column) => {
               const checked = selectedColumns.includes(column.key);
               return (

@@ -32,6 +32,7 @@ import {
   updateViewingCustomer,
   updateViewingCustomerStatus,
 } from "@/services/viewingCustomersService";
+import { DateInput } from "@/components/DateInput";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
@@ -841,20 +842,24 @@ export default function ViewingCustomersClient() {
               <span className="font-semibold text-slate-900 dark:text-white">
                 Thời gian:
               </span>
-              <input
-                type="date"
+              <DateInput
                 value={filters.fromDate}
                 onChange={(event) =>
                   updateFilter("fromDate", event.target.value)
                 }
-                className="h-9 w-full rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10 sm:w-40"
+                max={filters.toDate || undefined}
+                placeholder="Từ ngày"
+                wrapperClassName="w-full sm:w-40"
+                className="h-9 rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10"
               />
               <span>đến</span>
-              <input
-                type="date"
+              <DateInput
                 value={filters.toDate}
                 onChange={(event) => updateFilter("toDate", event.target.value)}
-                className="h-9 w-full rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10 sm:w-40"
+                min={filters.fromDate || undefined}
+                placeholder="Đến ngày"
+                wrapperClassName="w-full sm:w-40"
+                className="h-9 rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10"
               />
               <button
                 type="button"

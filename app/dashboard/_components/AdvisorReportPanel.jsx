@@ -20,7 +20,7 @@ import {
 import { MarkdownContent } from "./MarkdownContent";
 import { MonthYearField } from "./MonthYearField";
 
-const REPORT_CACHE_KEY = "advisor:report-cache:v1";
+const REPORT_CACHE_KEY = "advisor:report-cache:v2";
 
 function readCachedReports() {
   if (typeof window === "undefined") return {};
@@ -67,7 +67,6 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
 
   const loadReport = async ({ refresh = false } = {}) => {
     if (isLoading || !selectedPeriod) return;
-    if (!refresh && reports[selectedPeriod]) return;
 
     const reportPeriod = selectedPeriod;
     setLoading(true);

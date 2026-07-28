@@ -51,7 +51,6 @@ import {
   Upload,
   RotateCcw,
   SlidersHorizontal,
-  Copy,
   CalendarDays,
   MoreVertical,
   Trash2,
@@ -86,6 +85,9 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import TransferExecutionModal from "../_components/TransferExecutionModal";
 import { useAuth } from "../_contexts/AuthContext";
 import { ROLES } from "../_lib/rbac";
+import { toDate } from "@/lib/dateFormat";
+
+const REQUEST_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 const translateType = (type) => {
   const map = {
@@ -146,6 +148,62 @@ const translateStatus = (status) => {
   };
   return map[status] || status;
 };
+
+function formatRequestDateTime(value) {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleString("vi-VN", {
+        timeZone: REQUEST_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--";
+}
+
+function formatRequestDate(value) {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleDateString("vi-VN", {
+        timeZone: REQUEST_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "--";
+}
+
+function formatRequestTime(value) {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleTimeString("vi-VN", {
+        timeZone: REQUEST_TIME_ZONE,
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--";
+}
+
+function requesterName(request) {
+  return String(request?.requesterName || "").trim() || "Người gửi";
+}
+
+function requesterSecondaryText(request) {
+  return (
+    String(request?.requesterPhone || "").trim() ||
+    String(request?.requestCode || "").trim() ||
+    (request?.requesterId ? `ID #${request.requesterId}` : "")
+  );
+}
+
+function requesterInitials(request) {
+  const name = requesterName(request);
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length > 1) return `${words[0][0]}${words.at(-1)[0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 const STATUS_FILTERS = [
   { value: "PENDING", label: "Đang chờ" },
@@ -678,7 +736,7 @@ function RequestDetailContent({ req, detailTransfer }) {
           )}
           {req.resolvedAt && (
             <p className="text-xs mt-2">
-              {new Date(req.resolvedAt).toLocaleString("vi-VN")}
+              {formatRequestDateTime(req.resolvedAt)}
             </p>
           )}
         </div>
@@ -688,9 +746,7 @@ function RequestDetailContent({ req, detailTransfer }) {
       <div className="flex items-center gap-4 text-xs text-gray-400 pt-2 border-t border-gray-100">
         <span>
           Tạo:{" "}
-          {req.createdAt
-            ? new Date(req.createdAt).toLocaleString("vi-VN")
-            : "--"}
+          {formatRequestDateTime(req.createdAt)}
         </span>
       </div>
 
@@ -1228,7 +1284,7 @@ export default function ApprovalCenter() {
                 />
               </div>
 
-              <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+              <div className="mt-5 flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
                 <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="min-w-0">
                     <p className="mb-2 text-sm font-medium text-slate-500">
@@ -1307,7 +1363,7 @@ export default function ApprovalCenter() {
                   <TableHeader>
                     <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
                       <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Mã yêu cầu
+                        Người gửi
                       </TableHead>
                       <TableHead className="h-12 w-[17%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                         Loại yêu cầu
@@ -1316,7 +1372,7 @@ export default function ApprovalCenter() {
                         Tiêu đề
                       </TableHead>
                       <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell">
-                        Người tạo
+                        Mã yêu cầu
                       </TableHead>
                       <TableHead className="h-12 w-[11%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                         Ngày tạo
@@ -1363,19 +1419,18 @@ export default function ApprovalCenter() {
                             className="border-slate-100 transition-colors hover:bg-slate-50/60"
                           >
                             <TableCell className="px-3 py-3 align-top">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <p className="break-all font-mono text-xs font-semibold text-slate-900">
-                                    {req.requestCode || `#${req.id}`}
-                                  </p>
-                                  <Copy className="h-4 w-4 text-slate-300" />
+                              <div className="flex min-w-0 items-center gap-2">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-700">
+                                  {requesterInitials(req)}
                                 </div>
-                                <Badge
-                                  variant="outline"
-                                  className="rounded-full border-slate-200 bg-slate-50 text-xs text-slate-500"
-                                >
-                                  Ưu tiên: Thường
-                                </Badge>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-900" title={requesterName(req)}>
+                                    {requesterName(req)}
+                                  </p>
+                                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={requesterSecondaryText(req)}>
+                                    {requesterSecondaryText(req) || "--"}
+                                  </p>
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="px-3 py-3 align-top">
@@ -1409,38 +1464,19 @@ export default function ApprovalCenter() {
                               </p>
                             </TableCell>
                             <TableCell className="hidden min-[1700px]:table-cell px-3 py-3 align-top">
-                              <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                                  {(req.requestCode || "R").slice(-1)}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-slate-900">
-                                    Người tạo
-                                  </p>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    ID #{req.requesterId || "--"}
-                                  </p>
-                                </div>
-                              </div>
+                              <p className="break-all font-mono text-xs font-semibold text-slate-900">
+                                {req.requestCode || `#${req.id}`}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                Ưu tiên: Thường
+                              </p>
                             </TableCell>
                             <TableCell className="px-3 py-3 align-top text-sm text-slate-700">
                               <p>
-                                {req.createdAt
-                                  ? new Date(req.createdAt).toLocaleDateString(
-                                      "vi-VN",
-                                    )
-                                  : "--"}
+                                {formatRequestDate(req.createdAt)}
                               </p>
                               <p className="mt-2 text-slate-400">
-                                {req.createdAt
-                                  ? new Date(req.createdAt).toLocaleTimeString(
-                                      "vi-VN",
-                                      {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      },
-                                    )
-                                  : "--"}
+                                {formatRequestTime(req.createdAt)}
                               </p>
                             </TableCell>
                             <TableCell className="px-3 py-3 align-top">
@@ -1455,11 +1491,7 @@ export default function ApprovalCenter() {
                               <p
                                 className={`${req.status === "REJECTED" ? "text-red-500" : "text-slate-900"}`}
                               >
-                                {req.createdAt
-                                  ? new Date(req.createdAt).toLocaleDateString(
-                                      "vi-VN",
-                                    )
-                                  : "--"}
+                                {formatRequestDate(req.createdAt)}
                               </p>
                               <p
                                 className={`mt-2 ${req.status === "PENDING" ? "text-orange-500" : req.status === "REJECTED" ? "text-red-500" : "text-slate-400"}`}
@@ -1517,8 +1549,11 @@ export default function ApprovalCenter() {
                       <div key={req.id} className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-sans text-sm font-semibold text-gray-900 break-all">
-                              {req.requestCode || `#${req.id}`}
+                            <p className="truncate font-sans text-sm font-semibold text-gray-900" title={requesterName(req)}>
+                              {requesterName(req)}
+                            </p>
+                            <p className="mt-0.5 truncate text-xs font-semibold text-gray-500" title={requesterSecondaryText(req)}>
+                              {requesterSecondaryText(req) || req.requestCode || `#${req.id}`}
                             </p>
                             <p className="mt-1 text-sm font-medium text-gray-900">
                               {req.title || "--"}
@@ -1544,11 +1579,7 @@ export default function ApprovalCenter() {
                             {translateType(req.requestType)}
                           </Badge>
                           <span className="text-xs text-gray-500">
-                            {req.createdAt
-                              ? new Date(req.createdAt).toLocaleDateString(
-                                  "vi-VN",
-                                )
-                              : "--"}
+                            {formatRequestDate(req.createdAt)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-2">

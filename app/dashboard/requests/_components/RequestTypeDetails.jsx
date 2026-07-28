@@ -1,8 +1,10 @@
 import { MapPin, Calendar, DollarSign, ArrowRightLeft, FileText, Wallet, User, Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toDate } from "@/lib/dateFormat";
 import { InfoField, formatMoney } from "./RequestDetailFields";
 
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && value !== "");
+const REQUEST_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 const joinObjectValues = (value) => {
     if (!value || typeof value !== "object") return "";
@@ -37,15 +39,26 @@ function formatVnd(value) {
 }
 
 function formatDateTimeValue(value) {
-    if (!value) return "--";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
+    const date = toDate(value);
+    if (!date) return value ? String(value) : "--";
     return date.toLocaleString("vi-VN", {
+        timeZone: REQUEST_TIME_ZONE,
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+    });
+}
+
+function formatDateValue(value) {
+    const date = toDate(value);
+    if (!date) return value ? String(value) : "";
+    return date.toLocaleDateString("vi-VN", {
+        timeZone: REQUEST_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
     });
 }
 
@@ -116,9 +129,7 @@ function RoomTransferEligibilitySummary({ transfer }) {
 }
 
 function parseDateValue(value) {
-    if (!value) return null;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
+    return toDate(value);
 }
 
 function buildRenewalTermChecks(payload) {
@@ -137,7 +148,7 @@ function buildRenewalTermChecks(payload) {
         {
             label: "Thời hạn sau gia hạn",
             valid: Boolean(endDate && (!startDate || endDate > startDate)),
-            detail: endDate ? `Kết thúc ${newEndDate}` : "Thiếu ngày kết thúc sau gia hạn",
+            detail: endDate ? `Kết thúc ${formatDateValue(newEndDate)}` : "Thiếu ngày kết thúc sau gia hạn",
         },
         {
             label: "Giá thuê",
@@ -275,7 +286,7 @@ export function TransferRequestDetail({ payload, transfer }) {
                 <InfoField label="Phòng cũ" value={currentRoomLabel} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Phòng muốn chuyển" value={targetRoomLabel} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Hợp đồng sau chuyển" value={contractTarget} icon={<FileText className="w-4 h-4" />} />
-                <InfoField label="Ngày dự kiến" value={transferDate} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Ngày dự kiến" value={formatDateValue(transferDate)} icon={<Calendar className="w-4 h-4" />} />
                 <InfoField label="Hình thức chuyển" value={transferType} icon={<ArrowRightLeft className="w-4 h-4" />} />
                 <InfoField label="Người chuyển" value={currentHolder} icon={<User className="w-4 h-4" />} />
                 <InfoField label="Holder phòng cũ được đề cử" value={targetHolder} icon={<User className="w-4 h-4" />} />
@@ -315,7 +326,7 @@ export function MoveoutRequestDetail({ payload }) {
     return (
         <div className="grid grid-cols-2 gap-4">
             <InfoField label="Phòng" value={payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
-            <InfoField label="Ngày dự kiến trả" value={payload.moveOutDate || payload.move_out_date || payload.expectedDate || payload.expected_date} icon={<Calendar className="w-4 h-4" />} />
+            <InfoField label="Ngày dự kiến trả" value={formatDateValue(payload.moveOutDate || payload.move_out_date || payload.expectedDate || payload.expected_date)} icon={<Calendar className="w-4 h-4" />} />
             {(payload.reason || payload.moveOutReason || payload.move_out_reason) && (
                 <div className="col-span-2 rounded-xl bg-green-50 p-4">
                     <p className="text-sm font-semibold text-green-700 mb-1">Lý do trả phòng</p>
@@ -337,7 +348,7 @@ export function RenewalRequestDetail({ payload }) {
                 {renewalTermMonths && (
                     <InfoField label="Thời hạn gia hạn" value={`${renewalTermMonths} tháng`} icon={<Calendar className="w-4 h-4" />} />
                 )}
-                <InfoField label="Ngày kết thúc sau gia hạn" value={payload.newEndDate || payload.new_end_date || payload.endDate || payload.end_date} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Ngày kết thúc sau gia hạn" value={formatDateValue(payload.newEndDate || payload.new_end_date || payload.endDate || payload.end_date)} icon={<Calendar className="w-4 h-4" />} />
                 {(payload.newRent || payload.new_rent || payload.monthlyRent || payload.monthly_rent) && (
                     <InfoField label="Giá thuê mới" value={formatMoney(payload.newRent || payload.new_rent || payload.monthlyRent || payload.monthly_rent)} icon={<DollarSign className="w-4 h-4" />} />
                 )}
@@ -362,7 +373,7 @@ export function TerminationRequestDetail({ payload }) {
         <div className="grid grid-cols-2 gap-4">
             <InfoField label="Phòng" value={payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
             {effectiveDate && (
-                <InfoField label="Ngày thanh lý" value={effectiveDate} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Ngày thanh lý" value={formatDateValue(effectiveDate)} icon={<Calendar className="w-4 h-4" />} />
             )}
             {reason && (
                 <div className="col-span-2 rounded-xl bg-red-50 p-4">
@@ -387,7 +398,7 @@ export function ExpenseApprovalRequestDetail({ payload }) {
                 <InfoField label="Mã khoản chi" value={firstValue(payload.expenseCode, payload.expense_code)} icon={<FileText className="w-4 h-4" />} />
                 <InfoField label="Phòng" value={firstValue(payload.roomCode, payload.room_code)} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Hợp đồng" value={firstValue(payload.contractCode, payload.contract_code)} icon={<FileText className="w-4 h-4" />} />
-                <InfoField label="Ngày thanh lý" value={firstValue(payload.liquidationDate, payload.liquidation_date)} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Ngày thanh lý" value={formatDateValue(firstValue(payload.liquidationDate, payload.liquidation_date))} icon={<Calendar className="w-4 h-4" />} />
             </div>
             {isLiquidationRefund && (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">

@@ -48,6 +48,7 @@ import { SidebarProvider, useSidebar } from "./_contexts/SidebarContext";
 import { ThemeProvider, useTheme } from "./_contexts/ThemeContext";
 import { PermissionGuard } from "./_components/PermissionGuard";
 import { ProtectedRoute } from "./_components/ProtectedRoute";
+import { AdvisorChatWidget } from "./_components/AdvisorChatWidget";
 import {
   ROLE_LABELS,
   ROLES,
@@ -60,6 +61,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "@/services/notificationsService";
+import { toDate } from "@/lib/dateFormat";
 
 const currentContractYear = new Date().getFullYear();
 const contractYearChildren = [
@@ -207,6 +209,11 @@ const specialRoutePermissions = [
     permissionKey: "roomTransferHistory",
     navigationPath: "/dashboard/requests",
   },
+  {
+    prefix: "/dashboard/ai-advisor",
+    permissionKey: "aiAdvisor",
+    navigationPath: "/dashboard",
+  },
 ];
 
 function getAllowedRoles(item) {
@@ -286,9 +293,10 @@ function getInitials(name) {
 
 function formatNotificationTime(value) {
   if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
+  const date = toDate(value);
+  if (!date) return "";
   return date.toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -1118,6 +1126,7 @@ function DashboardLayoutShell({ children }) {
               )}
             </div>
           </main>
+          {effectiveRole === ROLES.OWNER ? <AdvisorChatWidget /> : null}
         </div>
       </div>
     </DashboardLayoutProvider>

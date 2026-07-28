@@ -734,10 +734,6 @@ export default function AccountsPage() {
                         {group.propertyName || "Chưa có cơ sở"} · Hợp đồng{" "}
                         {group.contractCode || "#"}
                       </p>
-                      <p className="mt-1 text-xs font-semibold text-[#687184]">
-                        Email nhận thông tin:{" "}
-                        {group.recipientEmail || "Chưa có email người ký chính"}
-                      </p>
                     </div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <span className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#c8ceda] bg-white px-4 text-sm font-bold text-[#0f1d33]">
@@ -784,14 +780,10 @@ export default function AccountsPage() {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
                           <tr>
-                            <th className="px-5 py-4 text-center">
+                            <th className="px-5 py-4 text-left">
                               Khách thuê
                             </th>
                             <th className="px-5 py-4 text-center">Vai trò</th>
-                            <th className="px-5 py-4 text-center">SĐT</th>
-                            <th className="px-5 py-4 text-center">
-                              Email cá nhân
-                            </th>
                             <th className="px-5 py-4 text-center">Ngày ký</th>
                             <th className="px-5 py-4 text-center">
                               Trạng thái
@@ -824,8 +816,14 @@ export default function AccountsPage() {
                                       <p className="max-w-[220px] truncate font-extrabold text-[#0f1d33]">
                                         {item.fullName || "Chưa cập nhật"}
                                       </p>
-                                      <p className="mt-0.5 text-xs text-[#687184]">
-                                        Hồ sơ #{item.profileId || "chưa tạo"}
+                                      <p className="mt-1 text-xs font-semibold text-[#687184]">
+                                        <span>{item.phone || "Chưa có SĐT"}</span>
+                                      </p>
+                                      <p className="mt-1 inline-flex max-w-[220px] items-center gap-1 truncate text-xs font-semibold text-[#687184]">
+                                        <span className="inline-flex items-center gap-1">
+                                          <Mail className="h-3.5 w-3.5" />
+                                          {item.email || "Chưa có email"}
+                                        </span>
                                       </p>
                                     </div>
                                   </div>
@@ -836,18 +834,6 @@ export default function AccountsPage() {
                                   >
                                     {roleLabel(item.roomRole)}
                                   </span>
-                                </td>
-                                <td
-                                  data-label="SĐT"
-                                  className="px-5 py-4 font-semibold text-[#0f1d33]"
-                                >
-                                  {item.phone || "Chưa có"}
-                                </td>
-                                <td
-                                  data-label="Email cá nhân"
-                                  className="break-words px-5 py-4 font-semibold text-[#0f1d33]"
-                                >
-                                  {item.email || "Không có"}
                                 </td>
                                 <td
                                   data-label="Ngày ký"

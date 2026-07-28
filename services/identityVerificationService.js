@@ -18,9 +18,9 @@ const normalizeDateValue = (value) => {
     return text.slice(0, 10);
   }
 
-  const slashDate = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (slashDate) {
-    return `${slashDate[3]}-${slashDate[2]}-${slashDate[1]}`;
+  const separatedDate = text.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (separatedDate) {
+    return `${separatedDate[3]}-${separatedDate[2]}-${separatedDate[1]}`;
   }
 
   const compactDate = text.match(/^(\d{2})(\d{2})(\d{4})$/);
@@ -30,6 +30,13 @@ const normalizeDateValue = (value) => {
 
   return "";
 };
+
+const titleCaseName = (value) =>
+  String(value || "")
+    .trim()
+    .toLocaleLowerCase("vi-VN")
+    .replace(/\s+/g, " ")
+    .replace(/(^|\s)(\S)/gu, (match, prefix, char) => `${prefix}${char.toLocaleUpperCase("vi-VN")}`);
 
 export function normalizeCccdScanResult(payload = {}) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
@@ -47,20 +54,26 @@ export function normalizeCccdScanResult(payload = {}) {
     identity: {
       idNumber,
       oldIdNumber: String(readFirst(rawIdentity, ["oldIdNumber", "old_id_number"])).trim(),
-      fullName: String(readFirst(rawIdentity, ["fullName", "full_name", "name"])).trim(),
+      fullName: titleCaseName(readFirst(rawIdentity, ["fullName", "full_name", "name"])),
       dob: normalizeDateValue(readFirst(rawIdentity, ["dob", "birthDate", "dateOfBirth", "date_of_birth"])),
       gender: String(readFirst(rawIdentity, ["gender", "sex"])).trim(),
       address: String(readFirst(rawIdentity, ["address", "permanentAddress", "permanent_address"])).trim(),
       issuedDate: normalizeDateValue(readFirst(rawIdentity, ["issuedDate", "issued_date", "idIssueDate", "id_issue_date"])),
+      issuedPlace: String(readFirst(rawIdentity, ["issuedPlace", "issued_place", "idIssuePlace", "id_issue_place"])).trim(),
     },
   };
 }
 
-export async function scanCccdQrImage(cccdImage) {
+export async function extractCccdImages(frontImage, backImage) {
   const formData = new FormData();
-  formData.append("cccdImage", cccdImage);
+  formData.append("frontImage", frontImage);
+  formData.append("backImage", backImage);
 
-  const data = await authenticatedFetch("/identity-verification/cccd/qr/scan", {
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[identityVerification] POST /identity-verification/cccd/extract");
+  }
+
+  const data = await authenticatedFetch("/identity-verification/cccd/extract", {
     method: "POST",
     body: formData,
   });

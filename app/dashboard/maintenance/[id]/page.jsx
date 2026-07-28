@@ -33,12 +33,12 @@ import { getAuthToken } from "@/services/identityAccessService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 
 const STATUS_META = {
-  PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
-  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
-  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
-  WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
-  REJECTED: ["Từ chối", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
+  PENDING: ["Pending", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
+  ACCEPTED: ["Accepted", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  IN_PROGRESS: ["In progress", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
+  WAITING_CONFIRMATION: ["Waiting confirmation", "bg-violet-50 text-violet-800 ring-violet-200"],
+  COMPLETED: ["Completed", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
+  REJECTED: ["Rejected", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
 };
 
 const CATEGORY_LABELS = {
@@ -89,15 +89,21 @@ const BILLING_STATUS_LABELS = {
   VOIDED: "Đã hủy",
 };
 const ACTION_LABELS = {
-  CREATE: "Tạo phiếu",
-  ACCEPT: "Tiếp nhận",
-  START_PROGRESS: "Bắt đầu xử lý",
-  CONFIRM_COMPLETED: "Xác nhận hoàn tất",
-  COMPLETE: "Hoàn tất xử lý",
-  REJECT: "Từ chối",
-  DECLINE: "Từ chối",
-  REPORT_NOT_FIXED: "Báo chưa xử lý xong",
-  REVIEW: "Đánh giá",
+  CREATE: "Create",
+  SUBMIT: "Submit",
+  ACCEPT: "Accept",
+  START_PROGRESS: "Start progress",
+  CONFIRM_COMPLETED: "Confirm completed",
+  COMPLETE: "Complete",
+  REJECT: "Reject",
+  DECLINE: "Decline",
+  REPORT_NOT_FIXED: "Report not fixed",
+  REVIEW: "Review",
+};
+
+const TIMELINE_NOTE_LABELS = {
+  "Người thuê tạo phiếu": "Tenant submitted the ticket.",
+  "Khách thuê tạo phiếu": "Tenant submitted the ticket.",
 };
 
 function formatDateTime(value) {
@@ -131,11 +137,16 @@ function parseMoneyInput(value) {
 
 function formatActionLabel(action) {
   const normalized = String(action || "").trim().toUpperCase();
-  return ACTION_LABELS[normalized] || normalized.replaceAll("_", " ").toLowerCase().replace(/^\p{L}/u, (char) => char.toUpperCase()) || "Cập nhật trạng thái";
+  return ACTION_LABELS[normalized] || normalized.replaceAll("_", " ").toLowerCase().replace(/^\p{L}/u, (char) => char.toUpperCase()) || "Update status";
 }
 
 function statusMeta(status) {
-  return STATUS_META[status] || [status || "Không rõ", "bg-slate-100 text-slate-700 ring-slate-200"];
+  return STATUS_META[status] || [status || "Unknown", "bg-slate-100 text-slate-700 ring-slate-200"];
+}
+
+function formatTimelineNote(note) {
+  const text = String(note || "").trim();
+  return TIMELINE_NOTE_LABELS[text] || text || "No note.";
 }
 
 function formatBillingPeriod(value) {
@@ -317,30 +328,43 @@ function Timeline({ events }) {
   if (!events.length) {
     return (
       <div className="rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
-        Chưa có nhật ký xử lý.
+        No activity yet.
       </div>
     );
   }
 
   return (
     <ol className="grid gap-3">
-      {events.map((event) => (
-        <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-sm font-black text-slate-900 dark:text-white">{formatActionLabel(event.action)}</p>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{event.note || "Không có ghi chú."}</p>
+      {events.map((event) => {
+        const hasStatusChange =
+          event.fromStatus &&
+          event.toStatus &&
+          event.fromStatus !== event.toStatus;
+
+        return (
+          <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-black text-slate-900 dark:text-white">{formatActionLabel(event.action)}</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{formatTimelineNote(event.note)}</p>
+              </div>
+              <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">{formatDateTime(event.createdAt)}</span>
             </div>
-            <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">{formatDateTime(event.createdAt)}</span>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-            {event.fromStatus && <StatusBadge status={event.fromStatus} />}
-            {event.fromStatus && event.toStatus && <span>→</span>}
-            {event.toStatus && <StatusBadge status={event.toStatus} />}
-            {event.createdBy?.phone && <span className="ml-auto">{event.createdBy.phone}</span>}
-          </div>
-        </li>
-      ))}
+            {(hasStatusChange || event.createdBy?.phone) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                {hasStatusChange && (
+                  <>
+                    <StatusBadge status={event.fromStatus} />
+                    <span>→</span>
+                    <StatusBadge status={event.toStatus} />
+                  </>
+                )}
+                {event.createdBy?.phone && <span className="ml-auto">{event.createdBy.phone}</span>}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }

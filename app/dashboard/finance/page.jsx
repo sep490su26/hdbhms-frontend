@@ -2,17 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Download, TrendingUp } from "lucide-react";
+import { Download, TrendingUp } from "lucide-react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { MonthYearField } from "../_components/MonthYearField";
 import { fetchRevenueReport } from "@/services/revenueReportService";
 import { formatThousandVND } from "./_lib/formatters";
 
@@ -185,6 +187,10 @@ export default function FinancePage() {
   const sourceByKey = Object.fromEntries(
     sources.map((source) => [source.key, source]),
   );
+  const dominantSource = sources.reduce(
+    (best, source) => (source.value > (best?.value || 0) ? source : best),
+    null,
+  );
   const donutStops = useMemo(() => {
     if (totalRevenue <= 0) {
       return { parts: ["#e8edf7 0% 100%"], end: 100 };
@@ -253,15 +259,7 @@ export default function FinancePage() {
                 </button>
               ))}
             </div>
-            <label className="relative">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(event) => setSelectedMonth(event.target.value)}
-                className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]"
-              />
-            </label>
+            <MonthYearField value={selectedMonth} onChange={setSelectedMonth} label="Tháng/năm" />
             <button
               type="button"
               onClick={exportReport}
@@ -348,23 +346,35 @@ export default function FinancePage() {
         <div className="min-h-[330px] rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-base font-black">Xu hướng doanh thu</h2>
-            <div className="flex items-center gap-4 text-[10px] font-semibold text-[#5f6b7c]">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-semibold text-[#5f6b7c]">
               <span className="flex items-center gap-1.5">
                 <i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />
-                Năm nay
+                Tiền phòng
               </span>
               <span className="flex items-center gap-1.5">
-                <i className="h-2.5 w-2.5 rounded-full bg-[#e8edf7]" />
-                Năm ngoái
+                <i className="h-2.5 w-2.5 rounded-full bg-[#f8b91f]" />
+                Điện/nước
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-full bg-[#a865ef]" />
+                Dịch vụ
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i className="h-2.5 w-2.5 rounded-full bg-[#ef627f]" />
+                Phát sinh
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i className="h-0.5 w-5 rounded bg-[#0f1d33]" />
+                Tổng thu
               </span>
             </div>
           </div>
           <div className="mt-5 h-[255px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
+              <ComposedChart
                 data={chartData}
                 barGap={0}
-                margin={{ top: 8, right: 4, left: -24, bottom: 0 }}
+                margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
               >
                 <CartesianGrid vertical={false} stroke="#edf1f6" />
                 <XAxis
@@ -373,24 +383,64 @@ export default function FinancePage() {
                   tickLine={false}
                   tick={{ fontSize: 10, fill: "#5f6b7c", fontWeight: 700 }}
                 />
-                <YAxis hide />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={formatCompact}
+                  tick={{ fontSize: 10, fill: "#94a3b8", fontWeight: 700 }}
+                  width={50}
+                />
                 <Tooltip
                   content={<RevenueTooltip />}
                   cursor={{ fill: "#f7f9fc" }}
                 />
                 <Bar
-                  dataKey="previous"
-                  name="Năm ngoái"
-                  fill="#e8edf7"
+                  dataKey="room"
+                  name="Tiền phòng"
+                  stackId="revenue"
+                  fill={sourceColors.room}
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
-                  dataKey="current"
-                  name="Năm nay"
-                  fill="#3f5db5"
+                  dataKey="utilities"
+                  name="Điện/nước"
+                  stackId="revenue"
+                  fill={sourceColors.utilities}
                   radius={[4, 4, 0, 0]}
                 />
-              </BarChart>
+                <Bar
+                  dataKey="service"
+                  name="Dịch vụ"
+                  stackId="revenue"
+                  fill={sourceColors.service}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="extra"
+                  name="Phát sinh"
+                  stackId="revenue"
+                  fill={sourceColors.extra}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="current"
+                  name="Tổng thu"
+                  stroke="#0f1d33"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, strokeWidth: 2, fill: "#fff" }}
+                  activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="previous"
+                  name="Kỳ trước"
+                  stroke="#9aa3b2"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={false}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -405,9 +455,11 @@ export default function FinancePage() {
           >
             <div className="grid h-28 w-28 place-items-center bg-white text-center">
               <div>
-                <p className="text-2xl font-black">100%</p>
+                <p className="text-2xl font-black">
+                  {totalRevenue > 0 ? `${dominantSource?.percent ?? 0}%` : "0%"}
+                </p>
                 <p className="text-[10px] font-semibold text-[#5f6b7c]">
-                  Tổng thu
+                  {totalRevenue > 0 ? dominantSource?.label : "Chưa có thu"}
                 </p>
               </div>
             </div>
@@ -425,7 +477,18 @@ export default function FinancePage() {
                   />
                   {source.label}
                 </span>
-                <strong>{source.percent}%</strong>
+                <span className="flex min-w-[96px] items-center justify-end gap-2">
+                  <span className="inline-flex h-2 w-14 overflow-hidden rounded-full bg-[#edf1f6]">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, source.percent))}%`,
+                        backgroundColor: sourceColors[source.key],
+                      }}
+                    />
+                  </span>
+                  <strong>{source.percent}%</strong>
+                </span>
               </div>
             ))}
           </div>
@@ -435,12 +498,6 @@ export default function FinancePage() {
       <section className="overflow-hidden rounded-lg border border-[#dce2ec] bg-white shadow-sm">
         <header className="flex items-center justify-between border-b border-[#dce2ec] px-5 py-4">
           <h2 className="text-base font-black">Chi tiết theo thời gian</h2>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-xs font-bold text-[#3156b6]"
-          >
-            Xem tất cả <ChevronRight className="h-3.5 w-3.5" />
-          </button>
         </header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-xs">

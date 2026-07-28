@@ -19,18 +19,23 @@ import {
 } from "lucide-react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   PolarAngleAxis,
   RadialBar,
   RadialBarChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { AdvisorReportPanel } from "./_components/AdvisorReportPanel";
+import { useAuth } from "./_contexts/AuthContext";
+import { ROLES } from "./_lib/rbac";
 import { getDashboardOverview } from "@/services/dashboardService";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -160,22 +165,33 @@ function RevenueTooltip({ active, payload }) {
   }
 
   const item = payload[0].payload;
+  const amount = payload.find((entry) => entry.dataKey === "amount")?.value;
   return (
     <div className="rounded-lg border border-[#dfe5f0] bg-white px-3 py-2 text-xs shadow-lg">
       <p className="font-bold text-[#102039]">{item.label}</p>
       <p className="mt-1 font-semibold text-[#315ac8]">
-        {formatMoney(item.amount)} VNĐ
+        {formatMoney(amount)} VNĐ
       </p>
+      {item.average ? (
+        <p className="mt-1 font-semibold text-[#7c3aed]">
+          TB: {formatMoney(item.average)} VNĐ
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function RevenueChart({ items = [] }) {
+  const values = items.map((item) => Number(item.amount || 0));
+  const average = values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0;
   const chartItems = items.map((item, index) => {
     const amount = Number(item.amount || 0);
     return {
       ...item,
       amount,
+      average,
       fill:
         amount === 0
           ? chartMuted
@@ -204,10 +220,16 @@ function RevenueChart({ items = [] }) {
         aria-label="Biểu đồ doanh thu 6 tháng gần nhất"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
+          <ComposedChart
             data={chartItems}
             margin={{ top: 8, right: 8, bottom: 0, left: -18 }}
           >
+            <defs>
+              <linearGradient id="overviewRevenueBar" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#315ac8" stopOpacity="0.92" />
+                <stop offset="100%" stopColor="#6aa6ff" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
             <CartesianGrid
               stroke="#e5ebf4"
               strokeDasharray="4 4"
@@ -230,13 +252,42 @@ function RevenueChart({ items = [] }) {
               cursor={{ fill: "rgba(49, 90, 200, 0.08)" }}
               content={<RevenueTooltip />}
             />
+            {average > 0 ? (
+              <ReferenceLine
+                y={average}
+                stroke="#7c3aed"
+                strokeDasharray="5 5"
+                strokeWidth={1.5}
+              />
+            ) : null}
             <Bar dataKey="amount" radius={[6, 6, 0, 0]} barSize={34}>
               {chartItems.map((item) => (
-                <Cell key={item.period || item.label} fill={item.fill} />
+                <Cell
+                  key={item.period || item.label}
+                  fill={item.amount === 0 ? item.fill : "url(#overviewRevenueBar)"}
+                />
               ))}
             </Bar>
-          </BarChart>
+            <Line
+              type="monotone"
+              dataKey="amount"
+              stroke="#102039"
+              strokeWidth={2.5}
+              dot={{ r: 3, strokeWidth: 2, fill: "#fff" }}
+              activeDot={{ r: 5 }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-bold text-[#64748b]">
+        <span className="inline-flex items-center gap-1.5">
+          <i className="h-2.5 w-2.5 rounded-sm bg-[#315ac8]" />
+          Doanh thu
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="h-0.5 w-5 rounded bg-[#7c3aed]" />
+          Trung bình kỳ
+        </span>
       </div>
     </section>
   );
@@ -462,6 +513,7 @@ function DashboardNotice({ message, onRetry }) {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -493,6 +545,7 @@ export default function DashboardPage() {
   const revenueGrowth = overview?.revenueGrowthPercent ?? 0;
   const debtWarningRoomCount = overview?.debtWarningRoomCount ?? 0;
   const utilityUsage = overview?.utilityUsage ?? {};
+  const canUseAiReport = user?.role === ROLES.OWNER;
 
   return (
     <div className="w-full min-w-0 bg-[#f6f8fd] text-[#102039]">
@@ -503,6 +556,7 @@ export default function DashboardPage() {
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <UnitBadge />
+            {canUseAiReport ? <AdvisorReportPanel /> : null}
           </div>
         }
       />

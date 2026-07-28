@@ -2074,6 +2074,23 @@ export default function TenantsPage() {
                                       </span>
                                     </span>
                                   </div>
+                                  <div className="flex items-center gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ecf3ff] text-xs font-bold text-[#465fff]">
+                            {getInitials(account.fullName)}
+                          </span>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-[#0f1d33]">
+                                        {account.fullName}
+                                      </p>
+                                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[#687184]">
+                                        <span>{account.phone || "Chưa có SĐT"}</span>
+                                        <span className="inline-flex items-center gap-1">
+                                <Mail className="h-3.5 w-3.5" />
+                                          {account.email || "Chưa có email"}
+                              </span>
+                                      </p>
+                                    </div>
+                                  </div>
                                 </td>
                                 <td
                                   data-label="SĐT"

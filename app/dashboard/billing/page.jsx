@@ -9,6 +9,7 @@ import {
   Check,
   History,
   Loader2,
+  MoreVertical,
   RefreshCw,
   Save,
   Settings,
@@ -16,6 +17,12 @@ import {
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -213,6 +220,71 @@ function isExpiredInvoice(invoice) {
   if (!invoice.dueDate) return false;
   const dueDate = new Date(invoice.dueDate);
   return !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < Date.now();
+}
+
+const invoiceActionItemClass =
+  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white";
+
+function InvoiceActionsMenu({
+  invoice,
+  saving,
+  onAdjustPrice,
+  onConfirmPayment,
+  onSendWarning,
+}) {
+  const canConfirmPayment = isPendingInvoice(invoice);
+  const canSendWarning = isExpiredInvoice(invoice);
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#cbd3df] text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+          aria-label={`Thao tác hóa đơn ${invoice.invoiceCode || ""}`}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-64 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <button type="button" onClick={() => onAdjustPrice(invoice)} className={invoiceActionItemClass}>
+            <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Điều chỉnh giá
+          </button>
+        </DropdownMenuItem>
+        {canConfirmPayment ? (
+          <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+            <button type="button" onClick={() => onConfirmPayment(invoice)} className={invoiceActionItemClass}>
+              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+              Xác nhận thanh toán
+            </button>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <button
+            type="button"
+            disabled={!canSendWarning || saving === `warning-${invoice.id}`}
+            onClick={() => onSendWarning(invoice)}
+            title={canSendWarning ? "Gửi cảnh báo quá hạn" : "Chỉ gửi được khi hóa đơn quá hạn còn dư nợ"}
+            className={`${invoiceActionItemClass} disabled:cursor-not-allowed disabled:opacity-50`}
+          >
+            {saving === `warning-${invoice.id}` ? (
+              <Loader2 className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-300" />
+            ) : (
+              <Bell className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+            )}
+            Gửi cảnh báo
+          </button>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function roomKey(room) {
@@ -848,51 +920,13 @@ export default function BillingPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          title="Điều chỉnh giá"
-                          aria-label="Điều chỉnh giá"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openOverrideModal(invoice);
-                          }}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition-all duration-200 hover:scale-110 hover:bg-slate-100 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
-                        >
-                          <Settings className="h-4 w-4" />
-                        </button>
-                        {isPendingInvoice(invoice) && (
-                          <button
-                            type="button"
-                            title="Xác nhận thanh toán"
-                            aria-label="Xác nhận thanh toán"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openManualPayment(invoice);
-                            }}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 p-0 text-xs font-black text-white transition-all duration-200 hover:scale-110 hover:bg-emerald-700 active:scale-95"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {isExpiredInvoice(invoice) && (
-                          <button
-                            type="button"
-                            title="Gửi cảnh báo quá hạn"
-                            aria-label="Gửi cảnh báo quá hạn"
-                            disabled={saving === `warning-${invoice.id}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setWarningInvoice(invoice);
-                            }}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-0 text-xs font-black text-amber-700 transition-all duration-200 hover:scale-110 hover:bg-amber-100 active:scale-95 disabled:opacity-60 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
-                          >
-                            {saving === `warning-${invoice.id}` ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Bell className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        )}
+                        <InvoiceActionsMenu
+                          invoice={invoice}
+                          saving={saving}
+                          onAdjustPrice={openOverrideModal}
+                          onConfirmPayment={openManualPayment}
+                          onSendWarning={setWarningInvoice}
+                        />
                       </div>
                     </td>
                   </tr>

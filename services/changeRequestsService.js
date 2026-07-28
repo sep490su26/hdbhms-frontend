@@ -60,6 +60,10 @@ function parseRequestPayload(payload) {
     }
 }
 
+function firstText(...values) {
+    return values.find((value) => String(value || "").trim()) || "";
+}
+
 export async function fetchChangeRequests(filters = {}) {
     const { page = 0, size = 8, type = "all", status = "all", search = "" } = filters;
     const params = new URLSearchParams({
@@ -88,6 +92,21 @@ export async function fetchChangeRequests(filters = {}) {
         description: r.description,
         status: r.status,
         requesterId: r.requesterId,
+        requesterName: firstText(
+            r.requesterName,
+            r.requesterFullName,
+            r.requester?.fullName,
+            r.requester?.name,
+            r.tenantName,
+            r.fullName,
+            r.name,
+        ),
+        requesterPhone: firstText(
+            r.requesterPhone,
+            r.requester?.phone,
+            r.tenantPhone,
+            r.phone,
+        ),
         targetId: r.targetId,
         resolutionNote: r.resolutionNote,
         resolvedAt: r.resolvedAt,

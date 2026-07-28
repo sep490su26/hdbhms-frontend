@@ -48,6 +48,7 @@ import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
+import { extractCccdImages } from "../../../services/identityVerificationService";
 
 const DEPOSIT_PER_ROOM = 2000;
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
@@ -61,6 +62,20 @@ const CO_OCCUPANT_PHONE_PATTERN_MESSAGE = "Số điện thoại phải là số 
 const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng người đặt cọc chính.";
 const CO_OCCUPANT_DUPLICATE_PHONE_MESSAGE = "Số điện thoại người ở cùng trong phòng không được trùng nhau.";
 const EXISTING_PERSON_PROFILE_HINT = "Hồ sơ với số điện thoại này đã có trong hệ thống. Khi lập hợp đồng, hệ thống sẽ dùng lại hồ sơ phù hợp.";
+const IDENTITY_FIELD_DEFAULTS = {
+  fullName: "",
+  dob: "",
+  idNumber: "",
+  idIssueDate: "",
+  idIssuePlace: "",
+  permanentAddress: "",
+};
+const IDENTITY_FIELD_NAMES = Object.keys(IDENTITY_FIELD_DEFAULTS);
+
+const cccdFilesSignature = (frontFile, backFile) =>
+  [frontFile, backFile]
+    .map((file) => (file ? `${file.name || "cccd"}:${file.size || 0}:${file.lastModified || 0}` : ""))
+    .join("|");
 
 function todayValue(offsetDays = 0) {
   const date = new Date();
@@ -139,7 +154,7 @@ function validateField(name, value, form = {}) {
   return "";
 }
 
-function TextField({ label, required, error, helper, type, placeholder, ...props }) {
+function TextField({ label, required, error, helper, type, placeholder, disabled = false, ...props }) {
   const InputComponent = type === "date" ? DateInput : "input";
 
   return (
@@ -150,11 +165,12 @@ function TextField({ label, required, error, helper, type, placeholder, ...props
       </span>
       <InputComponent
         required={required}
+        disabled={disabled}
         type={type === "date" ? undefined : type}
         placeholder={type === "date" ? placeholder || "dd/mm/yyyy" : placeholder}
         {...props}
         aria-invalid={error ? "true" : "false"}
-        className={`h-12 w-full rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition ${error
+        className={`h-12 w-full rounded-lg border bg-white px-4 font-medium text-[#091426] outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${error
             ? "border-rose-500 focus:border-rose-500"
             : "border-[#c5c6cd] focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10"
           }`}
@@ -384,6 +400,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState(initialError);
   const [submitting, setSubmitting] = useState(false);
+  const [isCccdExtracting, setIsCccdExtracting] = useState(false);
   const [cancellingPayment, setCancellingPayment] = useState(false);
   const [remainingMs, setRemainingMs] = useState(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
@@ -391,6 +408,8 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const [contractReviews, setContractReviews] = useState({});
   const [activeContractRoomId, setActiveContractRoomId] = useState(null);
   const [previewingRoomId, setPreviewingRoomId] = useState(null);
+  const handleCccdExtractedRef = useRef(null);
+  const lastCccdExtractSignatureRef = useRef("");
   const dismissedConflictRef = useRef("");
   const didHandleExpiryRef = useRef(false);
 
@@ -875,32 +894,81 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     }));
   };
 
-  const handleCccdExtracted = ({ identity } = {}) => {
-    const extractedValues = {
-      fullName: identity?.fullName || "",
-      dob: identity?.dob || "",
-      idNumber: identity?.idNumber || "",
-      idIssueDate: identity?.issuedDate || "",
-      permanentAddress: identity?.address || "",
-    };
-    const nextForm = { ...form };
+  useEffect(() => {
+    handleCccdExtractedRef.current = ({ identity } = {}) => {
+      const extractedValues = {
+        fullName: identity?.fullName || "",
+        dob: identity?.dob || "",
+        idNumber: identity?.idNumber || "",
+        idIssueDate: identity?.issuedDate || "",
+        idIssuePlace: identity?.issuedPlace || "",
+        permanentAddress: identity?.address || "",
+      };
+      const nextForm = { ...form, ...extractedValues };
 
-    Object.entries(extractedValues).forEach(([name, value]) => {
-      if (value) nextForm[name] = value;
-    });
-
-    setForm(nextForm);
-    setFieldErrors((current) => {
-      const nextErrors = { ...current };
-      Object.entries(extractedValues).forEach(([name, value]) => {
-        if (value) nextErrors[name] = validateField(name, value, nextForm);
+      setForm(nextForm);
+      setFieldErrors((current) => {
+        const nextErrors = { ...current };
+        Object.entries(extractedValues).forEach(([name, value]) => {
+          nextErrors[name] = value ? validateField(name, value, nextForm) : "";
+        });
+        if (nextForm.dob && nextForm.idIssueDate) {
+          nextErrors.idIssueDate = validateField("idIssueDate", nextForm.idIssueDate, nextForm);
+        }
+        return nextErrors;
       });
-      if (nextForm.dob && nextForm.idIssueDate) {
-        nextErrors.idIssueDate = validateField("idIssueDate", nextForm.idIssueDate, nextForm);
-      }
-      return nextErrors;
-    });
+    };
+  });
+
+  const clearIdentityFieldsForCccdScan = () => {
+    setForm((current) => ({ ...current, ...IDENTITY_FIELD_DEFAULTS }));
+    setContractReviews({});
+    setError("");
+    setFieldErrors((current) => ({
+      ...current,
+      ...Object.fromEntries(IDENTITY_FIELD_NAMES.map((name) => [name, ""])),
+    }));
   };
+
+  useEffect(() => {
+    const frontImage = files.front;
+    const backImage = files.back;
+    if (!isCccdScanMode || !frontImage || !backImage) return;
+
+    const signature = cccdFilesSignature(frontImage, backImage);
+    if (!signature || lastCccdExtractSignatureRef.current === signature) return;
+    lastCccdExtractSignatureRef.current = signature;
+
+    let isCurrent = true;
+    const extract = async () => {
+      clearIdentityFieldsForCccdScan();
+      setIsCccdExtracting(true);
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[BatchDepositClient] extract CCCD", { front: frontImage.name, back: backImage.name });
+        }
+        const result = await extractCccdImages(frontImage, backImage);
+        if (!isCurrent) return;
+
+        if (result?.success) {
+          handleCccdExtractedRef.current?.(result);
+          return;
+        }
+
+        setError(result?.message || "Không trích xuất được thông tin CCCD từ ảnh đã chọn.");
+      } catch (error) {
+        if (!isCurrent) return;
+        setError(error?.message || "Không thể trích xuất thông tin CCCD lúc này.");
+      } finally {
+        if (isCurrent) setIsCccdExtracting(false);
+      }
+    };
+
+    void extract();
+    return () => {
+      isCurrent = false;
+    };
+  }, [files.front, files.back, isCccdScanMode]);
 
   const validateForm = () => {
     const nextErrors = {};
@@ -1672,9 +1740,9 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                     },
                   }}
                   onFilesChange={handleCccdFilesChange}
-                  onExtract={handleCccdExtracted}
                   disabled={submitting}
                   scanEnabled
+                  isExtracting={isCccdExtracting}
                   errors={{
                     citizenIdFront: fieldErrors.front,
                     citizenIdBack: fieldErrors.back,
@@ -1686,16 +1754,16 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <TextField label="Họ và tên" required error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
+                  <TextField label="Họ và tên" required disabled={isCccdExtracting} error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
                 </div>
-                <TextField label="Ngày sinh" required type="date" error={fieldErrors.dob} value={form.dob} max={todayValue()} onChange={(event) => updateFormField("dob", event.target.value)} onBlur={(event) => updateFormField("dob", event.target.value)} />
+                <TextField label="Ngày sinh" required disabled={isCccdExtracting} type="date" error={fieldErrors.dob} value={form.dob} max={todayValue()} onChange={(event) => updateFormField("dob", event.target.value)} onBlur={(event) => updateFormField("dob", event.target.value)} />
                 <TextField label="Số điện thoại" required type="tel" error={fieldErrors.phone} value={form.phone} onChange={(event) => updateFormField("phone", event.target.value)} onBlur={(event) => updateFormField("phone", event.target.value)} />
                 <TextField label="Email (không bắt buộc)" type="email" error={fieldErrors.email} value={form.email} onChange={(event) => updateFormField("email", event.target.value)} onBlur={(event) => updateFormField("email", event.target.value)} />
-                <TextField label="Số CCCD" required inputMode="numeric" error={fieldErrors.idNumber} value={form.idNumber} onChange={(event) => updateFormField("idNumber", event.target.value)} onBlur={(event) => updateFormField("idNumber", event.target.value)} />
-                <TextField label="Ngày cấp CCCD" required type="date" error={fieldErrors.idIssueDate} value={form.idIssueDate} max={todayValue()} onChange={(event) => updateFormField("idIssueDate", event.target.value)} onBlur={(event) => updateFormField("idIssueDate", event.target.value)} />
-                <TextField label="Nơi cấp CCCD" required error={fieldErrors.idIssuePlace} value={form.idIssuePlace} onChange={(event) => updateFormField("idIssuePlace", event.target.value)} onBlur={(event) => updateFormField("idIssuePlace", event.target.value)} />
+                <TextField label="Số CCCD" required disabled={isCccdExtracting} inputMode="numeric" error={fieldErrors.idNumber} value={form.idNumber} onChange={(event) => updateFormField("idNumber", event.target.value)} onBlur={(event) => updateFormField("idNumber", event.target.value)} />
+                <TextField label="Ngày cấp CCCD" required disabled={isCccdExtracting} type="date" error={fieldErrors.idIssueDate} value={form.idIssueDate} max={todayValue()} onChange={(event) => updateFormField("idIssueDate", event.target.value)} onBlur={(event) => updateFormField("idIssueDate", event.target.value)} />
+                <TextField label="Nơi cấp CCCD" required disabled={isCccdExtracting} error={fieldErrors.idIssuePlace} value={form.idIssuePlace} onChange={(event) => updateFormField("idIssuePlace", event.target.value)} onBlur={(event) => updateFormField("idIssuePlace", event.target.value)} />
                 <div className="sm:col-span-2">
-                  <TextField label="Địa chỉ thường trú" required error={fieldErrors.permanentAddress} value={form.permanentAddress} onChange={(event) => updateFormField("permanentAddress", event.target.value)} onBlur={(event) => updateFormField("permanentAddress", event.target.value)} />
+                  <TextField label="Địa chỉ thường trú" required disabled={isCccdExtracting} error={fieldErrors.permanentAddress} value={form.permanentAddress} onChange={(event) => updateFormField("permanentAddress", event.target.value)} onBlur={(event) => updateFormField("permanentAddress", event.target.value)} />
                 </div>
                 <TextField label="Ngày dự kiến vào ở" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedMoveInDate} value={form.expectedMoveInDate} onChange={(event) => updateFormField("expectedMoveInDate", event.target.value)} onBlur={(event) => updateFormField("expectedMoveInDate", event.target.value)} />
                 <TextField label="Ngày hẹn ký hợp đồng" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedLeaseSignDate} value={form.expectedLeaseSignDate} onChange={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} onBlur={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} />
@@ -1915,7 +1983,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
             <button
               type="submit"
-              disabled={submitting || rooms.length < 1 || unavailableRooms.length > 0 || !allContractsAccepted}
+              disabled={submitting || isCccdExtracting || rooms.length < 1 || unavailableRooms.length > 0 || !allContractsAccepted}
               className="flex h-14 w-full items-center justify-center gap-3 rounded-lg bg-[#091426] px-5 text-base font-black text-white shadow-sm transition hover:bg-[#16253a] disabled:cursor-not-allowed disabled:bg-[#8f9398]"
             >
               {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : null}

@@ -33,6 +33,7 @@ export const SECTION_PERMISSIONS = {
   contract: [ROLES.OWNER, ROLES.MANAGER],
   roomTransferHistory: [ROLES.OWNER, ROLES.MANAGER],
   finance: [ROLES.OWNER, ROLES.ACCOUNTANT],
+  aiAdvisor: [ROLES.OWNER],
   settings: [ROLES.OWNER],
   notificationTemplates: [ROLES.OWNER],
   requests: [ROLES.OWNER, ROLES.MANAGER],

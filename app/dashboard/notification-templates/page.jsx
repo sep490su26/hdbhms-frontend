@@ -1583,7 +1583,6 @@ export default function NotificationTemplatesPage() {
   return (
     <div className="grid gap-6 text-slate-900">
       <DashboardPageHeader
-        eyebrow="Thông báo"
         title="Quản lý thông báo"
         description="Chỉnh mẫu thông báo hệ thống và gửi thông báo hàng loạt theo vai trò, cơ sở, tầng hoặc phòng."
         actions={
@@ -2288,11 +2287,6 @@ export default function NotificationTemplatesPage() {
                 Chọn đủ phạm vi và kênh gửi để hệ thống tự ước tính người nhận.
               </div>
             )}
-
-            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-800">
-              Tính năng này tạo thông báo trực tiếp vào hàng đợi gửi. Với kênh
-              Push/Email/SMS, bộ xử lý backend sẽ tiếp tục gửi theo cấu hình hệ thống.
-            </div>
           </aside>
         </div>
       )}

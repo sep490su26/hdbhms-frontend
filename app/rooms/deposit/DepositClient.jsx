@@ -61,6 +61,7 @@ import DateInput from "../../../components/DateInput";
 import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
+import { extractCccdImages } from "../../../services/identityVerificationService";
 
 function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
@@ -209,6 +210,11 @@ const DATE_TOO_FAR_ERROR_MESSAGE =
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
+
+const cccdFilesSignature = (frontFile, backFile) =>
+  [frontFile, backFile]
+    .map((file) => (file ? `${file.name || "cccd"}:${file.size || 0}:${file.lastModified || 0}` : ""))
+    .join("|");
 
 const toLocalDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -563,6 +569,15 @@ const DEPOSIT_DRAFT_FIELDS = [
   "coOccupant2FullName",
   "coOccupant2Phone",
 ];
+const IDENTITY_FIELD_DEFAULTS = {
+  fullName: "",
+  birthDate: "",
+  citizenId: "",
+  idIssueDate: "",
+  idIssuePlace: "",
+  permanentAddress: "",
+};
+const IDENTITY_FIELD_NAMES = Object.keys(IDENTITY_FIELD_DEFAULTS);
 const DEPOSIT_DATE_FIELDS = new Set([
   "birthDate",
   "idIssueDate",
@@ -909,6 +924,8 @@ function Field({
   error,
   onChange,
   onBlur,
+  disabled = false,
+  value,
   defaultValue = "",
   validateValue = validateDepositValue,
 }) {
@@ -916,6 +933,7 @@ function Field({
   const [localError, setLocalError] = useState("");
   const displayError = error || formErrors[name] || localError;
   const isDateInput = type === "date";
+  const valueProps = value === undefined ? { defaultValue } : { value };
 
   const handleChange = (event) => {
     const message = validateValue(name, event.target.value);
@@ -943,12 +961,13 @@ function Field({
           min={min}
           max={max}
           required={required}
-          defaultValue={defaultValue}
+          disabled={disabled}
+          {...valueProps}
           onChange={handleChange}
           onBlur={handleBlur}
           placeholder="dd/mm/yyyy"
           aria-invalid={displayError ? "true" : "false"}
-          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
             displayError
               ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
               : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
@@ -962,11 +981,12 @@ function Field({
           required={required}
           min={min}
           max={max}
-          defaultValue={defaultValue}
+          {...valueProps}
+          disabled={disabled}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={displayError ? "true" : "false"}
-          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 ${
+          className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition placeholder:text-[#6b7280] focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
             displayError
               ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
               : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
@@ -1173,8 +1193,11 @@ function DepositInfoForm({
     scheduleWindow.expectedVacantDate,
   );
   const formRef = useRef(null);
+  const handleCccdExtractedRef = useRef(null);
+  const lastCccdExtractSignatureRef = useRef("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [savedDraft, setSavedDraft] = useState({});
+  const [identityValues, setIdentityValues] = useState(IDENTITY_FIELD_DEFAULTS);
   const [draftVersion, setDraftVersion] = useState(0);
   const [imagePreviews, setImagePreviews] = useState({
     citizenIdFront: "",
@@ -1187,6 +1210,7 @@ function DepositInfoForm({
     portraitImage: null,
   });
   const [identityEntryMode, setIdentityEntryMode] = useState("scan");
+  const [isCccdExtracting, setIsCccdExtracting] = useState(false);
   const [isPortraitCameraOpen, setIsPortraitCameraOpen] = useState(false);
   const [contractPreview, setContractPreview] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -1310,6 +1334,14 @@ function DepositInfoForm({
 
       if (isMounted) {
         setSavedDraft(draft);
+        setIdentityValues({
+          fullName: draft.fullName || "",
+          birthDate: draft.birthDate || "",
+          citizenId: draft.citizenId || "",
+          idIssueDate: draft.idIssueDate || "",
+          idIssuePlace: draft.idIssuePlace || "",
+          permanentAddress: draft.permanentAddress || "",
+        });
         setMainPhoneValue(draft.phone || "");
         setOccupantCount(
           ["1", "2", "3"].includes(draft.occupantCount)
@@ -1467,6 +1499,14 @@ function DepositInfoForm({
     }
   };
 
+  const handleIdentityFieldChange = (event) => {
+    const { name, value } = event.target;
+    setIdentityValues((currentValues) => ({
+      ...currentValues,
+      [name]: value,
+    }));
+  };
+
   const handleFieldBlur = (event) => {
     const { name, value } = event.target;
     validateAndSetDepositField(name, value);
@@ -1607,31 +1647,28 @@ function DepositInfoForm({
     setDepositFile("portraitImage", file, previewUrl);
   };
 
-  const updateFormControlValue = (name, value) => {
-    const form = formRef.current;
-    const field = form?.elements?.namedItem(name);
-    if (!field || typeof value !== "string" || !value.trim()) return;
+  const writeDraftWithIdentityValues = useCallback((values) => {
+    if (!formRef.current) return;
+    writeDepositDraftCookie({
+      ...buildDepositDraftFromForm(formRef.current),
+      ...values,
+    });
+  }, []);
 
-    const prototype =
-      field instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype
-        : field instanceof HTMLSelectElement
-          ? HTMLSelectElement.prototype
-          : HTMLInputElement.prototype;
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      prototype,
-      "value",
-    )?.set;
-
-    if (valueSetter) {
-      valueSetter.call(field, value);
-    } else {
-      field.value = value;
-    }
-
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    field.dispatchEvent(new Event("change", { bubbles: true }));
-  };
+  const clearIdentityFieldsForCccdScan = useCallback(() => {
+    setIdentityValues(IDENTITY_FIELD_DEFAULTS);
+    setSavedDraft((currentDraft) => ({
+      ...currentDraft,
+      ...IDENTITY_FIELD_DEFAULTS,
+    }));
+    setAcceptedContract(false);
+    writeDraftWithIdentityValues(IDENTITY_FIELD_DEFAULTS);
+    setFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      _form: "",
+      ...Object.fromEntries(IDENTITY_FIELD_NAMES.map((name) => [name, ""])),
+    }));
+  }, [writeDraftWithIdentityValues]);
 
   const applyExtractedCccdIdentity = (identity = {}) => {
     const extractedValues = {
@@ -1639,22 +1676,16 @@ function DepositInfoForm({
       birthDate: identity.dob || "",
       citizenId: identity.idNumber || "",
       idIssueDate: identity.issuedDate || "",
+      idIssuePlace: identity.issuedPlace || "",
       permanentAddress: identity.address || "",
     };
 
-    Object.entries(extractedValues).forEach(([name, value]) => {
-      updateFormControlValue(name, value);
-    });
-
-    if (formRef.current) {
-      writeDepositDraftCookie(buildDepositDraftFromForm(formRef.current));
-    }
+    setIdentityValues(extractedValues);
+    writeDraftWithIdentityValues(extractedValues);
 
     setSavedDraft((currentDraft) => ({
       ...currentDraft,
-      ...Object.fromEntries(
-        Object.entries(extractedValues).filter(([, value]) => value),
-      ),
+      ...extractedValues,
     }));
     setAcceptedContract(false);
 
@@ -1722,9 +1753,57 @@ function DepositInfoForm({
     }));
   };
 
-  const handleCccdExtracted = ({ identity }) => {
-    applyExtractedCccdIdentity(identity);
-  };
+  useEffect(() => {
+    handleCccdExtractedRef.current = ({ identity }) => {
+      applyExtractedCccdIdentity(identity);
+    };
+  });
+
+  useEffect(() => {
+    const frontImage = selectedFiles.citizenIdFront;
+    const backImage = selectedFiles.citizenIdBack;
+    if (!isCccdScanMode || !frontImage || !backImage) return;
+
+    const signature = cccdFilesSignature(frontImage, backImage);
+    if (!signature || lastCccdExtractSignatureRef.current === signature) return;
+    lastCccdExtractSignatureRef.current = signature;
+
+    let isCurrent = true;
+    const extract = async () => {
+      clearIdentityFieldsForCccdScan();
+      setIsCccdExtracting(true);
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[DepositClient] extract CCCD", { front: frontImage.name, back: backImage.name });
+        }
+        const result = await extractCccdImages(frontImage, backImage);
+        if (!isCurrent) return;
+
+        if (result?.success) {
+          handleCccdExtractedRef.current?.(result);
+          return;
+        }
+
+        setFieldErrors((currentErrors) => ({
+          ...currentErrors,
+          _form: result?.message || "Không trích xuất được thông tin CCCD từ ảnh đã chọn.",
+        }));
+      } catch (error) {
+        if (!isCurrent) return;
+        setFieldErrors((currentErrors) => ({
+          ...currentErrors,
+          _form: error?.message || "Không thể trích xuất thông tin CCCD lúc này.",
+        }));
+      } finally {
+        if (isCurrent) setIsCccdExtracting(false);
+      }
+    };
+
+    void extract();
+    return () => {
+      isCurrent = false;
+    };
+  }, [clearIdentityFieldsForCccdScan, isCccdScanMode, selectedFiles.citizenIdFront, selectedFiles.citizenIdBack]);
 
   const validateFormData = (
     data,
@@ -1879,9 +1958,9 @@ function DepositInfoForm({
             <CccdUploadFlow
               value={{ files: selectedFiles, previews: imagePreviews }}
               onFilesChange={handleCccdFilesChange}
-              onExtract={handleCccdExtracted}
               disabled={isSubmitting}
               scanEnabled
+              isExtracting={isCccdExtracting}
               errors={{
                 citizenIdFront: fieldErrors.citizenIdFront,
                 citizenIdBack: fieldErrors.citizenIdBack,
@@ -1897,7 +1976,10 @@ function DepositInfoForm({
                 label="Họ và tên"
                 name="fullName"
                 placeholder="Phạm Thèng C"
+                value={identityValues.fullName}
                 defaultValue={savedDraft.fullName}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
               <Field
                 label="Ngày sinh"
@@ -1905,13 +1987,19 @@ function DepositInfoForm({
                 type="date"
                 placeholder="dd/MM/yyyy"
                 max={todayDate}
+                value={identityValues.birthDate}
                 defaultValue={savedDraft.birthDate}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
               <Field
                 label="Số CCCD"
                 name="citizenId"
                 placeholder="Số căn cước công dân"
+                value={identityValues.citizenId}
                 defaultValue={savedDraft.citizenId}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
               <Field
                 label="Ngày cấp"
@@ -1919,20 +2007,29 @@ function DepositInfoForm({
                 type="date"
                 placeholder="dd/MM/yyyy"
                 max={todayDate}
+                value={identityValues.idIssueDate}
                 defaultValue={savedDraft.idIssueDate}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
               <Field
                 label="Nơi cấp"
                 name="idIssuePlace"
                 placeholder="Cục CS QLHC về TTXH"
+                value={identityValues.idIssuePlace}
                 defaultValue={savedDraft.idIssuePlace}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
               <Field
                 className="sm:col-span-2"
                 label="Địa chỉ thường trú"
                 name="permanentAddress"
                 placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP"
+                value={identityValues.permanentAddress}
                 defaultValue={savedDraft.permanentAddress}
+                disabled={isCccdExtracting}
+                onChange={handleIdentityFieldChange}
               />
             </div>
           </FormSection>
@@ -2262,7 +2359,9 @@ function DepositInfoForm({
           <button
             type="submit"
             disabled={
-              isSubmitting || (blockingStatus && !blockingStatus.canBook)
+              isSubmitting ||
+              isCccdExtracting ||
+              (blockingStatus && !blockingStatus.canBook)
             }
             className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75 sm:col-span-2"
           >

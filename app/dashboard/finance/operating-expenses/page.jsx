@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  CalendarDays,
   Download,
   Droplets,
   Filter,
@@ -28,6 +27,7 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { MonthYearField } from "../../_components/MonthYearField";
 import { compareByNewest } from "@/lib/sortByNewest.mjs";
 import { fetchAllExpenseRequests } from "@/services/expenseReportService";
 import { formatThousandVND } from "../_lib/formatters";
@@ -533,17 +533,7 @@ export default function OperatingExpensesPage() {
                 </button>
               ))}
             </div>
-            <label className="relative">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5f6b7c]" />
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(event) =>
-                  handleSelectedMonthChange(event.target.value)
-                }
-                className="h-10 rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-xs font-bold outline-none focus:border-[#3f5db5]"
-              />
-            </label>
+            <MonthYearField value={selectedMonth} onChange={handleSelectedMonthChange} label="Tháng/năm" />
             <button
               type="button"
               onClick={exportReport}

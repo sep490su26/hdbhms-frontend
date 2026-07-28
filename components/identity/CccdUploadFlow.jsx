@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AlertCircle, Camera, CheckCircle2, IdCard, Loader2, ScanLine, Upload, X } from "lucide-react";
 import CameraCapture from "@/components/CameraCapture";
-import { scanCccdQrImage } from "@/services/identityVerificationService";
 
 const SIDE_COPY = {
   front: {
@@ -23,12 +22,6 @@ const EMPTY_SLOTS = {
 };
 const SUPPORTED_CCCD_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const SUPPORTED_CCCD_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
-
-const hasExtractedIdentity = (identity) =>
-  Boolean(identity?.idNumber || identity?.fullName || identity?.dob || identity?.address || identity?.issuedDate);
-
-const isSuccessfulScanResult = (result) =>
-  Boolean(result?.success && hasExtractedIdentity(result.identity));
 
 const toSlotsFromValue = (value = {}) => ({
   front: {
@@ -51,9 +44,6 @@ const toPayload = (slots) => ({
     citizenIdBack: slots.back.previewUrl,
   },
 });
-
-const fileSignature = (file) =>
-  file ? `${file.name || "cccd"}:${file.size || 0}:${file.lastModified || 0}` : "";
 
 function EmptyCccdPreview({ side }) {
   return (
@@ -154,95 +144,35 @@ function CccdSideCard({ side, slot, disabled, isScanning, error = "", onPickFile
 export default function CccdUploadFlow({
   value,
   onFilesChange,
-  onExtract,
   disabled = false,
   scanEnabled = true,
+  isExtracting = false,
   errors = {},
   maxFileSize = 10 * 1024 * 1024,
   className = "",
 }) {
   const inputRef = useRef(null);
   const activeSideRef = useRef("front");
-  const lastScanSignatureRef = useRef("");
-  const scanEnabledRef = useRef(scanEnabled);
-  const isMountedRef = useRef(true);
+  const slotsRef = useRef(EMPTY_SLOTS);
   const [cameraSide, setCameraSide] = useState(null);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
-  const slots = toSlotsFromValue(value);
-  const isScanning = scanEnabled && status === "scanning";
+  const slots = useMemo(() => toSlotsFromValue(value), [value]);
+  const isScanning = scanEnabled && (status === "scanning" || isExtracting);
   const StatusIcon = scanEnabled
-    ? status === "success"
+    ? isExtracting
+      ? Loader2
+      : status === "success"
       ? CheckCircle2
       : status === "error"
         ? AlertCircle
         : ScanLine
     : IdCard;
 
-  const canApplyScanResult = () => isMountedRef.current && scanEnabledRef.current;
-
   useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    scanEnabledRef.current = scanEnabled;
-    if (!scanEnabled) {
-      lastScanSignatureRef.current = "";
-    }
-  }, [scanEnabled]);
-
-  const extractIdentity = async (nextSlots) => {
-    if (!canApplyScanResult()) return;
-
-    const signature = `${fileSignature(nextSlots.front.file)}|${fileSignature(nextSlots.back.file)}`;
-    if (!nextSlots.front.file || !nextSlots.back.file || lastScanSignatureRef.current === signature) return;
-
-    lastScanSignatureRef.current = signature;
-    setStatus("scanning");
-    setMessage("Đang đọc QR từ CCCD...");
-
-    try {
-      let result = await scanCccdQrImage(nextSlots.front.file);
-      if (!canApplyScanResult()) return;
-
-      let sourceSide = "front";
-      if (!isSuccessfulScanResult(result) && nextSlots.back.file) {
-        setMessage("Không đọc được ảnh đầu, đang thử ảnh còn lại...");
-        result = await scanCccdQrImage(nextSlots.back.file);
-        if (!canApplyScanResult()) return;
-
-        sourceSide = "back";
-      }
-
-      if (!isSuccessfulScanResult(result)) {
-        setStatus("error");
-        setMessage(result.message || "Không đọc được QR CCCD từ ảnh đã chọn.");
-        return;
-      }
-
-      setStatus("success");
-      setMessage(
-        result.extractionMethod === "OCR"
-          ? "Đã trích xuất bằng OCR fallback."
-          : sourceSide === "front"
-            ? "Đã quét QR CCCD."
-            : "Đã quét QR CCCD từ ảnh còn lại."
-      );
-      onExtract?.({
-        ...result,
-        ...toPayload(nextSlots),
-      });
-    } catch (error) {
-      if (!isMountedRef.current) return;
-
-      setStatus("error");
-      setMessage(error?.message || "Không thể trích xuất thông tin CCCD lúc này.");
-    }
-  };
+    slotsRef.current = slots;
+  }, [slots]);
 
   const updateSideFile = async (side, file, previewUrl = "") => {
     if (!file || disabled || isScanning) return;
@@ -260,17 +190,19 @@ export default function CccdUploadFlow({
     }
 
     const nextSlots = {
-      ...slots,
+      ...slotsRef.current,
       [side]: {
         file,
         previewUrl: previewUrl || URL.createObjectURL(file),
       },
     };
+    slotsRef.current = nextSlots;
 
     onFilesChange?.(toPayload(nextSlots));
 
     if (scanEnabled && nextSlots.front.file && nextSlots.back.file) {
-      await extractIdentity(nextSlots);
+      setStatus("ready");
+      setMessage("Đã chọn đủ 2 mặt CCCD, đang gửi trích xuất thông tin.");
       return;
     }
 
@@ -284,10 +216,10 @@ export default function CccdUploadFlow({
 
   const removeSideFile = (side) => {
     const nextSlots = {
-      ...slots,
+      ...slotsRef.current,
       [side]: EMPTY_SLOTS[side],
     };
-    lastScanSignatureRef.current = "";
+    slotsRef.current = nextSlots;
     setStatus(nextSlots.front.file || nextSlots.back.file ? "ready" : "idle");
     setMessage(nextSlots.front.file || nextSlots.back.file ? "Chọn tiếp mặt còn lại của CCCD." : "");
     onFilesChange?.(toPayload(nextSlots));
@@ -320,7 +252,7 @@ export default function CccdUploadFlow({
         <div>
           <h2 className="text-base font-bold text-[#091426]">{scanEnabled ? "Quét CCCD" : "Upload CCCD"}</h2>
           <p className="mt-1 text-sm leading-6 text-[#5a6678]">
-            {message || (scanEnabled
+            {isExtracting ? "Đang quét CCCD và trích xuất thông tin, vui lòng chờ..." : message || (scanEnabled
               ? "Chụp hoặc tải đủ 2 mặt CCCD để tự điền thông tin."
               : "Tải ảnh 2 mặt CCCD để lưu hồ sơ. Chức năng quét đang tắt."
             )}

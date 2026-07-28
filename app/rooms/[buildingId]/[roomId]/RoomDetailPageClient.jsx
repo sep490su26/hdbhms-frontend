@@ -31,21 +31,28 @@ import {
   combineAppointmentParts,
   publicCreateViewingCustomer,
 } from "../../../../services/viewingCustomersService";
-import { formatHoldCountdown, getActiveRoomHolds } from "../../../../lib/roomHoldStorage";
+import {
+  formatHoldCountdown,
+  getActiveRoomHolds,
+} from "../../../../lib/roomHoldStorage";
 import { formatDate } from "../../../../lib/dateFormat";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DateInput } from "@/components/DateInput";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
-  const remainingSeconds = Number(status.remainingSeconds ?? status.remaining_seconds ?? 0);
+  const remainingSeconds = Number(
+    status.remainingSeconds ?? status.remaining_seconds ?? 0,
+  );
 
   return {
     canBook: Boolean(status.canBook ?? status.can_book),
     roomStatus: status.roomStatus ?? status.room_status ?? "",
     holdStatus: status.holdStatus ?? status.hold_status ?? null,
     holdExpiresAt: status.holdExpiresAt ?? status.hold_expires_at ?? null,
-    remainingMs: Number.isFinite(remainingSeconds) ? Math.max(0, remainingSeconds * 1000) : 0,
+    remainingMs: Number.isFinite(remainingSeconds)
+      ? Math.max(0, remainingSeconds * 1000)
+      : 0,
     message: status.message ?? "",
   };
 };
@@ -93,9 +100,11 @@ const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 
 function DetailSection({ title, children }) {
   return (
-    <section className="rounded-[20px] border border-slate-100 bg-white p-6 text-[#091426] sm:p-8">
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-6 text-slate-900 shadow-2xs sm:p-8">
       <h2 className="text-xl font-bold">{title}</h2>
-      <div className="mt-5 text-sm leading-relaxed text-slate-600">{children}</div>
+      <div className="mt-5 text-sm leading-relaxed text-slate-600">
+        {children}
+      </div>
     </section>
   );
 }
@@ -153,7 +162,7 @@ function ContactInfoRow({ icon: Icon, label, value }) {
 
 function ContactCard() {
   return (
-    <div className="mt-5 rounded-[24px] border border-slate-100 bg-white p-6 text-[#091426] shadow-xl shadow-slate-100/50 ring-1 ring-slate-100/80">
+    <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-6 text-slate-900 shadow-2xs">
       <h2 className="text-xl font-black">Thông Tin Liên Hệ</h2>
 
       <div className="mt-5">
@@ -162,11 +171,7 @@ function ContactCard() {
           label="Số điện thoại quản lý"
           value={formatContactPhone(LANDLORD_CONTACT_PHONE)}
         />
-        <ContactInfoRow
-          icon={Clock3}
-          label="Thời gian hỗ trợ"
-          value="24/7"
-        />
+        <ContactInfoRow icon={Clock3} label="Thời gian hỗ trợ" value="24/7" />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -188,17 +193,19 @@ function ContactCard() {
       </div>
 
       <p className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-xs font-medium leading-5 text-slate-500">
-        Quản lý sẽ hỗ trợ tư vấn phòng, lịch xem phòng, đặt cọc và ký hợp đồng thuê.
+        Quản lý sẽ hỗ trợ tư vấn phòng, lịch xem phòng, đặt cọc và ký hợp đồng
+        thuê.
       </p>
     </div>
   );
 }
 
 function viewingInputClass(error) {
-  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${error
-    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
-    : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
-    }`;
+  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+    error
+      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+  }`;
 }
 
 function withDetailDefaults(room) {
@@ -206,21 +213,30 @@ function withDetailDefaults(room) {
     ...room,
     buildingId: room.buildingId ?? "hai-dang-house",
     ownerName: room.ownerName ?? "Hải Đăng House",
-    ownerNote: room.ownerNote ?? "Chủ nhà hỗ trợ xem phòng và phản hồi yêu cầu đặt cọc trong giờ hành chính.",
+    ownerNote:
+      room.ownerNote ??
+      "Chủ nhà hỗ trợ xem phòng và phản hồi yêu cầu đặt cọc trong giờ hành chính.",
     houseRules: room.houseRules ?? [
       "Giữ yên tĩnh sau 22:00.",
       "Không tự ý cải tạo kết cấu phòng.",
       "Thông báo trước khi nuôi thú cưng hoặc ở thêm người.",
     ],
-    amenities: room.amenities?.length ? room.amenities : ["Wifi tốc độ cao", "Điều hòa", "Bình nóng lạnh", "Máy giặt"],
-    buildingFacilities: room.buildingFacilities?.length ? room.buildingFacilities : ["An ninh 24/7", "Camera giám sát", "Bãi xe"],
+    amenities: room.amenities?.length
+      ? room.amenities
+      : ["Wifi tốc độ cao", "Điều hòa", "Bình nóng lạnh", "Máy giặt"],
+    buildingFacilities: room.buildingFacilities?.length
+      ? room.buildingFacilities
+      : ["An ninh 24/7", "Camera giám sát", "Bãi xe"],
   };
 }
 
 function BookingCard({ room }) {
-  const [remainingMs, setRemainingMs] = useState(Math.max(0, room.holdRemainingMs ?? 0));
+  const [remainingMs, setRemainingMs] = useState(
+    Math.max(0, room.holdRemainingMs ?? 0),
+  );
   const hasActiveHold = room.status === "onHold" && remainingMs > 0;
-  const effectiveStatus = room.status === "onHold" && !hasActiveHold ? "available" : room.status;
+  const effectiveStatus =
+    room.status === "onHold" && !hasActiveHold ? "available" : room.status;
   const isAvailable = effectiveStatus === "available";
   const isSoonVacant = effectiveStatus === "soonVacant";
   const isBookable = isAvailable || isSoonVacant;
@@ -233,11 +249,16 @@ function BookingCard({ room }) {
   const roomLabel = room.roomCode || room.name || room.id;
   const vacantDateLabel = formatShortDate(room.expectedVacantDate);
   const tomorrowDate = getTomorrowDateString();
-  const soonVacantViewingDate = isSoonVacant ? addDaysToDateString(room.expectedVacantDate, 1) : "";
-  const minViewingDate = isSoonVacant ? getLatestDateString(tomorrowDate, soonVacantViewingDate) : tomorrowDate;
-  const viewingDateErrorMessage = isSoonVacant && soonVacantViewingDate
-    ? `Phòng sắp trống chỉ nhận lịch xem từ ${formatShortDate(minViewingDate)} trở đi.`
-    : VIEWING_DATE_ERROR_MESSAGE;
+  const soonVacantViewingDate = isSoonVacant
+    ? addDaysToDateString(room.expectedVacantDate, 1)
+    : "";
+  const minViewingDate = isSoonVacant
+    ? getLatestDateString(tomorrowDate, soonVacantViewingDate)
+    : tomorrowDate;
+  const viewingDateErrorMessage =
+    isSoonVacant && soonVacantViewingDate
+      ? `Phòng sắp trống chỉ nhận lịch xem từ ${formatShortDate(minViewingDate)} trở đi.`
+      : VIEWING_DATE_ERROR_MESSAGE;
   const [isViewingModalOpen, setIsViewingModalOpen] = useState(false);
   const [viewingForm, setViewingForm] = useState({
     fullName: "",
@@ -264,7 +285,9 @@ function BookingCard({ room }) {
     }
 
     const countdownTimer = window.setInterval(() => {
-      setRemainingMs((currentRemainingMs) => Math.max(0, currentRemainingMs - 1000));
+      setRemainingMs((currentRemainingMs) =>
+        Math.max(0, currentRemainingMs - 1000),
+      );
     }, 1000);
 
     return () => window.clearInterval(countdownTimer);
@@ -348,13 +371,17 @@ function BookingCard({ room }) {
     setIsSubmittingViewing(true);
     setViewingNotice({ type: "", message: "" });
     try {
-      const appointmentAt = combineAppointmentParts(viewingForm.viewingDate, viewingForm.viewingTime);
+      const appointmentAt = combineAppointmentParts(
+        viewingForm.viewingDate,
+        viewingForm.viewingTime,
+      );
       const propertyId = room.propertyId ?? room.buildingId;
       const apiRoomId = room.roomId;
       if (!propertyId || !apiRoomId) {
         setViewingNotice({
           type: "error",
-          message: "Không xác định được cơ sở hoặc phòng. Vui lòng quay lại danh sách phòng và thử lại.",
+          message:
+            "Không xác định được cơ sở hoặc phòng. Vui lòng quay lại danh sách phòng và thử lại.",
         });
         return;
       }
@@ -369,7 +396,12 @@ function BookingCard({ room }) {
       };
 
       await publicCreateViewingCustomer(payload);
-      setViewingForm({ fullName: "", phone: "", viewingDate: "", viewingTime: "" });
+      setViewingForm({
+        fullName: "",
+        phone: "",
+        viewingDate: "",
+        viewingTime: "",
+      });
       setViewingNotice({
         type: "success",
         message: "Đã gửi lịch xem phòng. Chủ nhà sẽ liên hệ xác nhận sớm nhất.",
@@ -377,7 +409,8 @@ function BookingCard({ room }) {
     } catch (error) {
       setViewingNotice({
         type: "error",
-        message: error.message || "Không thể gửi yêu cầu xem phòng. Vui lòng thử lại.",
+        message:
+          error.message || "Không thể gửi yêu cầu xem phòng. Vui lòng thử lại.",
       });
     } finally {
       setIsSubmittingViewing(false);
@@ -386,9 +419,11 @@ function BookingCard({ room }) {
 
   return (
     <aside className="h-fit lg:sticky lg:top-28">
-      <div className="rounded-[24px] border border-slate-100 bg-white p-6 text-[#091426] shadow-xl shadow-slate-100/50 ring-1 ring-slate-100/80 sm:p-8">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-6 text-slate-900 shadow-2xs sm:p-8">
         <div className="border-b border-slate-100 pb-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Giá thuê</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Giá thuê
+          </p>
           <div className="flex flex-col">
             <p className="text-3xl font-black text-[#006c49]">
               {room.priceLabel}
@@ -398,10 +433,15 @@ function BookingCard({ room }) {
 
         <div className="mt-6">
           {/* Thanh trạng thái động */}
-          <div className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}>
-            <span className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`} />
+          <div
+            className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`}
+            />
             {isAvailable && "Còn trống - Sẵn sàng vào ở"}
-            {isSoonVacant && `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
+            {isSoonVacant &&
+              `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
             {isOnHold && "Đang giữ chỗ"}
             {isDraft && "Bản nháp - Chưa mở cho thuê"}
             {isOccupied && "Đã thuê - Không còn trống"}
@@ -418,8 +458,15 @@ function BookingCard({ room }) {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <div className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${isOnHold ? "border-amber-200 bg-amber-50 text-amber-800" : isDeposited ? "border-orange-200 bg-orange-50 text-orange-700" : "border-slate-200 bg-slate-50 text-slate-500"
-                }`}>
+              <div
+                className={`rounded-[16px] border px-4 py-4 text-center text-sm font-bold leading-relaxed ${
+                  isOnHold
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : isDeposited
+                      ? "border-orange-200 bg-orange-50 text-orange-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                }`}
+              >
                 {isOnHold
                   ? `Phòng đang được giữ chỗ, vui lòng chờ ${holdCountdownLabel}.`
                   : isDraft
@@ -477,8 +524,13 @@ function BookingCard({ room }) {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Xem phòng</p>
-                <h2 id="viewing-modal-title" className="mt-2 text-2xl font-bold tracking-tight">
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                  Xem phòng
+                </p>
+                <h2
+                  id="viewing-modal-title"
+                  className="mt-2 text-2xl font-bold tracking-tight"
+                >
                   Điền thông tin khách đến xem phòng
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -497,16 +549,21 @@ function BookingCard({ room }) {
 
             {viewingNotice.message && (
               <div
-                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${viewingNotice.type === "success"
+                className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                  viewingNotice.type === "success"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-rose-200 bg-rose-50 text-rose-700"
-                  }`}
+                }`}
               >
                 {viewingNotice.message}
               </div>
             )}
 
-            <form className="mt-7 grid gap-5" onSubmit={handleViewingSubmit} noValidate>
+            <form
+              className="mt-7 grid gap-5"
+              onSubmit={handleViewingSubmit}
+              noValidate
+            >
               <div className="grid gap-2">
                 <RequiredLabel htmlFor="viewing-full-name">
                   Họ và tên
@@ -519,12 +576,21 @@ function BookingCard({ room }) {
                   onChange={handleViewingFormChange}
                   onBlur={handleViewingFieldBlur}
                   aria-invalid={viewingErrors.fullName ? "true" : "false"}
-                  aria-describedby={viewingErrors.fullName ? "viewing-full-name-error" : undefined}
+                  aria-describedby={
+                    viewingErrors.fullName
+                      ? "viewing-full-name-error"
+                      : undefined
+                  }
                   className={viewingInputClass(viewingErrors.fullName)}
                   placeholder="Nhập họ và tên"
                 />
                 {viewingErrors.fullName && (
-                  <p id="viewing-full-name-error" className="text-xs font-medium text-rose-600">{viewingErrors.fullName}</p>
+                  <p
+                    id="viewing-full-name-error"
+                    className="text-xs font-medium text-rose-600"
+                  >
+                    {viewingErrors.fullName}
+                  </p>
                 )}
               </div>
 
@@ -542,17 +608,27 @@ function BookingCard({ room }) {
                   inputMode="numeric"
                   maxLength={10}
                   aria-invalid={viewingErrors.phone ? "true" : "false"}
-                  aria-describedby={viewingErrors.phone ? "viewing-phone-error" : undefined}
+                  aria-describedby={
+                    viewingErrors.phone ? "viewing-phone-error" : undefined
+                  }
                   className={viewingInputClass(viewingErrors.phone)}
                   placeholder="Nhập số điện thoại"
                 />
                 {viewingErrors.phone && (
-                  <p id="viewing-phone-error" className="text-xs font-medium text-rose-600">{viewingErrors.phone}</p>
+                  <p
+                    id="viewing-phone-error"
+                    className="text-xs font-medium text-rose-600"
+                  >
+                    {viewingErrors.phone}
+                  </p>
                 )}
               </div>
 
               <div className="grid gap-2">
-                <label htmlFor="viewing-room" className="text-sm font-medium text-slate-700">
+                <label
+                  htmlFor="viewing-room"
+                  className="text-sm font-medium text-slate-700"
+                >
                   Số phòng
                 </label>
                 <input
@@ -577,11 +653,20 @@ function BookingCard({ room }) {
                     onChange={handleViewingFormChange}
                     onBlur={handleViewingFieldBlur}
                     aria-invalid={viewingErrors.viewingDate ? "true" : "false"}
-                    aria-describedby={viewingErrors.viewingDate ? "viewing-date-error" : undefined}
+                    aria-describedby={
+                      viewingErrors.viewingDate
+                        ? "viewing-date-error"
+                        : undefined
+                    }
                     className={viewingInputClass(viewingErrors.viewingDate)}
                   />
                   {viewingErrors.viewingDate && (
-                    <p id="viewing-date-error" className="text-xs font-medium text-rose-600">{viewingErrors.viewingDate}</p>
+                    <p
+                      id="viewing-date-error"
+                      className="text-xs font-medium text-rose-600"
+                    >
+                      {viewingErrors.viewingDate}
+                    </p>
                   )}
                 </div>
 
@@ -597,11 +682,20 @@ function BookingCard({ room }) {
                     onChange={handleViewingFormChange}
                     onBlur={handleViewingFieldBlur}
                     aria-invalid={viewingErrors.viewingTime ? "true" : "false"}
-                    aria-describedby={viewingErrors.viewingTime ? "viewing-time-error" : undefined}
+                    aria-describedby={
+                      viewingErrors.viewingTime
+                        ? "viewing-time-error"
+                        : undefined
+                    }
                     className={viewingInputClass(viewingErrors.viewingTime)}
                   />
                   {viewingErrors.viewingTime && (
-                    <p id="viewing-time-error" className="text-xs font-medium text-rose-600">{viewingErrors.viewingTime}</p>
+                    <p
+                      id="viewing-time-error"
+                      className="text-xs font-medium text-rose-600"
+                    >
+                      {viewingErrors.viewingTime}
+                    </p>
                   )}
                 </div>
               </div>
@@ -635,7 +729,9 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
   const [room, setRoom] = useState(null);
   const [activeImage, setActiveImage] = useState("");
   const galleryImages = useMemo(() => normalizeRoomImages(room ?? {}), [room]);
-  const displayActiveImage = galleryImages.includes(activeImage) ? activeImage : (galleryImages[0] ?? ROOM_PLACEHOLDER_IMAGE);
+  const displayActiveImage = galleryImages.includes(activeImage)
+    ? activeImage
+    : (galleryImages[0] ?? ROOM_PLACEHOLDER_IMAGE);
   const [roomHolds, setRoomHolds] = useState(() => getActiveRoomHolds());
   const [serverHoldStatus, setServerHoldStatus] = useState(null);
   const [nowMs, setNowMs] = useState(0);
@@ -712,7 +808,11 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
   }, [room]);
 
   useEffect(() => {
-    if (!serverHoldStatus || serverHoldStatus.canBook || serverHoldStatus.remainingMs <= 0) {
+    if (
+      !serverHoldStatus ||
+      serverHoldStatus.canBook ||
+      serverHoldStatus.remainingMs <= 0
+    ) {
       return undefined;
     }
 
@@ -734,16 +834,27 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
   const displayRoom = useMemo(() => {
     if (!room) return null;
     const localHold = roomHolds[room.id];
-    const serverRoomStatus = String(serverHoldStatus?.roomStatus || "").toUpperCase();
-    const hasServerHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs > 0;
+    const serverRoomStatus = String(
+      serverHoldStatus?.roomStatus || "",
+    ).toUpperCase();
+    const hasServerHold =
+      serverHoldStatus &&
+      !serverHoldStatus.canBook &&
+      serverHoldStatus.remainingMs > 0;
     const isServerDraft = serverRoomStatus === "DRAFT";
     const isServerReserved = serverRoomStatus === "RESERVED";
     const isServerOccupied = serverRoomStatus === "OCCUPIED";
     const isServerVacant = serverRoomStatus === "VACANT";
     const isServerSoonVacant = serverRoomStatus === "SOON_VACANT";
-    const isServerBookable = serverHoldStatus?.canBook === true && (isServerVacant || isServerSoonVacant);
-    const isExpiredHold = serverHoldStatus && !serverHoldStatus.canBook && serverHoldStatus.remainingMs <= 0;
-    const localRemainingMs = localHold && nowMs ? Math.max(0, Number(localHold.expiresAt) - nowMs) : 0;
+    const isServerBookable =
+      serverHoldStatus?.canBook === true &&
+      (isServerVacant || isServerSoonVacant);
+    const isExpiredHold =
+      serverHoldStatus &&
+      !serverHoldStatus.canBook &&
+      serverHoldStatus.remainingMs <= 0;
+    const localRemainingMs =
+      localHold && nowMs ? Math.max(0, Number(localHold.expiresAt) - nowMs) : 0;
     const hasLocalHold = Boolean(localHold && localRemainingMs > 0);
 
     return {
@@ -751,27 +862,34 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
       status: isServerDraft
         ? "draft"
         : isServerReserved || room.status === "deposited"
-        ? "deposited"
-        : isServerOccupied || room.status === "occupied"
-          ? "occupied"
-          : isServerBookable || (isExpiredHold && isServerVacant)
-            ? (isServerSoonVacant ? "soonVacant" : "available")
-            : hasServerHold || (hasLocalHold && (room.status === "available" || room.status === "soonVacant"))
-              ? "onHold"
-              : isServerSoonVacant
+          ? "deposited"
+          : isServerOccupied || room.status === "occupied"
+            ? "occupied"
+            : isServerBookable || (isExpiredHold && isServerVacant)
+              ? isServerSoonVacant
                 ? "soonVacant"
-                : room.status,
+                : "available"
+              : hasServerHold ||
+                  (hasLocalHold &&
+                    (room.status === "available" ||
+                      room.status === "soonVacant"))
+                ? "onHold"
+                : isServerSoonVacant
+                  ? "soonVacant"
+                  : room.status,
       holdExpiresAt: serverHoldStatus?.holdExpiresAt ?? localHold?.expiresAt,
-      holdRemainingMs: hasServerHold ? serverHoldStatus.remainingMs : localRemainingMs,
+      holdRemainingMs: hasServerHold
+        ? serverHoldStatus.remainingMs
+        : localRemainingMs,
     };
   }, [nowMs, room, roomHolds, serverHoldStatus]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#091426] px-4 pb-12 pt-28 text-white sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-slate-50 px-4 pb-12 pt-24 text-slate-900 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[7fr_3fr]">
-          <div className="h-[460px] animate-pulse rounded-[2rem] bg-white/10" />
-          <div className="h-[520px] animate-pulse rounded-[20px] bg-white/10" />
+          <div className="h-[460px] animate-pulse rounded-2xl border border-slate-200/80 bg-white shadow-2xs" />
+          <div className="h-[520px] animate-pulse rounded-2xl border border-slate-200/80 bg-white shadow-2xs" />
         </div>
       </div>
     );
@@ -779,33 +897,34 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
 
   if (isError || !displayRoom) {
     return (
-      <div className="min-h-screen bg-[#091426] px-4 pb-12 pt-28 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl rounded-[1.5rem] border border-rose-300/20 bg-rose-400/10 p-6 text-center text-rose-100">
-          Không thể tải thông tin phòng. Vui lòng quay lại danh sách phòng và thử lại.
+      <div className="min-h-screen bg-slate-50 px-4 pb-12 pt-24 text-slate-900 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-sm font-semibold text-rose-800 shadow-2xs">
+          Không thể tải thông tin phòng. Vui lòng quay lại danh sách phòng và
+          thử lại.
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#091426] px-4 pb-16 pt-28 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <Link href="/rooms" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-slate-300 transition hover:text-white">
+    <main className="min-h-screen bg-slate-50 px-4 pb-12 pt-24 text-slate-900 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
+      <div className="mx-auto w-full max-w-[1440px]">
+        <Link
+          href="/rooms"
+          className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-slate-700 transition hover:text-slate-900"
+        >
           <ArrowLeft className="h-4 w-4" />
           Quay lại danh sách phòng
         </Link>
 
-        {/* Khối nền trắng bao bọc toàn bộ nội dung */}
-        <div className="rounded-[32px] bg-white p-4 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
-
+        {/* Layout nội dung đồng bộ với trang danh sách phòng */}
+        <div className="contents">
           {/* Chia layout 2 cột: 70% - 30% */}
           <div className="grid gap-8 lg:grid-cols-[7fr_3fr]">
-
             {/* Cột trái (70%) */}
             <div className="min-w-0 space-y-8">
-
               {/* Box Ảnh */}
-              <section className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm">
+              <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
                 <div className="relative aspect-[16/10] min-h-[280px] bg-slate-900">
                   <Image
                     src={displayActiveImage || ROOM_PLACEHOLDER_IMAGE}
@@ -821,7 +940,9 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
                       <Home className="h-4 w-4" />
                       Hải Đăng House
                     </p>
-                    <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Phòng {displayRoom.id}</h1>
+                    <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                      Phòng {displayRoom.id}
+                    </h1>
                   </div>
                 </div>
 
@@ -832,10 +953,19 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
                       type="button"
                       onClick={() => setActiveImage(image)}
                       aria-label={`Xem ảnh phòng ${index + 1}`}
-                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${displayActiveImage === image ? "border-blue-500 ring-2 ring-blue-500/30" : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
-                        }`}
+                      className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition ${
+                        displayActiveImage === image
+                          ? "border-blue-500 ring-2 ring-blue-500/30"
+                          : "border-slate-200 opacity-75 hover:opacity-100 hover:border-slate-300"
+                      }`}
                     >
-                      <Image src={image} alt={`Ảnh ${index + 1} phòng ${displayRoom.id}`} fill sizes="160px" className="object-cover" />
+                      <Image
+                        src={image}
+                        alt={`Ảnh ${index + 1} phòng ${displayRoom.id}`}
+                        fill
+                        sizes="160px"
+                        className="object-cover"
+                      />
                     </button>
                   ))}
                 </div>
@@ -843,9 +973,34 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
 
               {/* 3 Khối Thông số */}
               <div className="grid gap-4 sm:grid-cols-3">
-                <DashboardStatCard icon={Maximize2} label="Diện tích" value={displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"} tone="blue" />
-                <DashboardStatCard icon={Users} label="Tối đa" value={displayRoom.maxPeople ? `${displayRoom.maxPeople} người` : "Chưa cập nhật"} tone="blue" />
-                <DashboardStatCard icon={Building2} label="Tầng" value={displayRoom.floorNumber ? `T${displayRoom.floorNumber}` : "Chưa cập nhật"} tone="blue" />
+                <DashboardStatCard
+                  icon={Maximize2}
+                  label="Diện tích"
+                  value={
+                    displayRoom.area ? `${displayRoom.area}m²` : "Chưa cập nhật"
+                  }
+                  tone="blue"
+                />
+                <DashboardStatCard
+                  icon={Users}
+                  label="Tối đa"
+                  value={
+                    displayRoom.maxPeople
+                      ? `${displayRoom.maxPeople} người`
+                      : "Chưa cập nhật"
+                  }
+                  tone="blue"
+                />
+                <DashboardStatCard
+                  icon={Building2}
+                  label="Tầng"
+                  value={
+                    displayRoom.floorNumber
+                      ? `T${displayRoom.floorNumber}`
+                      : "Chưa cập nhật"
+                  }
+                  tone="blue"
+                />
               </div>
 
               {/* Các thông tin chi tiết */}
@@ -857,12 +1012,20 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
                 <DetailSection title="Thông tin chủ nhà">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-[16px] border border-slate-100 bg-slate-50 p-5">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Đơn vị quản lý</p>
-                      <p className="mt-1 font-bold text-[#091426]">{displayRoom.ownerName}</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Đơn vị quản lý
+                      </p>
+                      <p className="mt-1 font-bold text-[#091426]">
+                        {displayRoom.ownerName}
+                      </p>
                     </div>
                     <div className="rounded-[16px] border border-slate-100 bg-slate-50 p-5">
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Hỗ trợ</p>
-                      <p className="mt-1 font-bold text-[#091426]">Xem phòng và đặt cọc</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Hỗ trợ
+                      </p>
+                      <p className="mt-1 font-bold text-[#091426]">
+                        Xem phòng và đặt cọc
+                      </p>
                     </div>
                   </div>
                   <p className="mt-5">{displayRoom.ownerNote}</p>
@@ -871,7 +1034,10 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
                 <DetailSection title="Nội quy phòng">
                   <div className="grid gap-3">
                     {displayRoom.houseRules.map((rule) => (
-                      <div key={rule} className="flex items-start gap-3 rounded-[16px] border border-slate-100 bg-slate-50 px-5 py-4">
+                      <div
+                        key={rule}
+                        className="flex items-start gap-3 rounded-[16px] border border-slate-100 bg-slate-50 px-5 py-4"
+                      >
                         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" />
                         <span className="text-slate-700">{rule}</span>
                       </div>
@@ -882,13 +1048,19 @@ export function RoomDetailPageClient({ buildingId, roomId }) {
                 <DetailSection title="Tiện ích đi kèm">
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {displayRoom.amenities.map((amenity) => (
-                      <div key={amenity} className="flex min-h-14 items-center gap-3 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                      <div
+                        key={amenity}
+                        className="flex min-h-14 items-center gap-3 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700"
+                      >
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-blue-500" />
                         {amenity}
                       </div>
                     ))}
                     {displayRoom.buildingFacilities.map((facility) => (
-                      <div key={facility} className="flex min-h-14 items-center gap-3 rounded-[16px] border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                      <div
+                        key={facility}
+                        className="flex min-h-14 items-center gap-3 rounded-[16px] border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700"
+                      >
                         <Wifi className="h-5 w-5 shrink-0 text-blue-500" />
                         {facility}
                       </div>

@@ -148,8 +148,7 @@ function publicStatusClass(status) {
     return "border-purple-200 bg-purple-50 text-purple-700";
   if (status === "onHold" || status === "deposited")
     return "border-amber-200 bg-amber-50 text-amber-700";
-  if (status === "draft")
-    return "border-slate-200 bg-slate-100 text-slate-600";
+  if (status === "draft") return "border-slate-200 bg-slate-100 text-slate-600";
   return "border-slate-200 bg-slate-100 text-slate-600";
 }
 
@@ -226,9 +225,20 @@ function getFloorPlanStatus(room) {
 
   if (!normalized || normalized === "draft") return "DRAFT";
   if (normalized === "available" || normalized === "vacant") return "VACANT";
-  if (normalized === "soonvacant" || normalized === "soon_vacant") return "SOON_VACANT";
-  if (normalized === "onhold" || normalized === "on_hold" || normalized === "holding") return "HOLDING";
-  if (normalized === "reserved" || normalized === "deposited" || normalized === "reserved_for_transfer") return "HOLDING";
+  if (normalized === "soonvacant" || normalized === "soon_vacant")
+    return "SOON_VACANT";
+  if (
+    normalized === "onhold" ||
+    normalized === "on_hold" ||
+    normalized === "holding"
+  )
+    return "HOLDING";
+  if (
+    normalized === "reserved" ||
+    normalized === "deposited" ||
+    normalized === "reserved_for_transfer"
+  )
+    return "HOLDING";
   return "OCCUPIED";
 }
 
@@ -1235,22 +1245,21 @@ function SavedMiniFloorOverview({
             const room = roomsById.get(
               String(planValue(item, "roomId", "room_id")),
             );
-            const statusSource =
-              room ??
-              {
-                publicStatus: planValue(
-                  item,
-                  "publicStatus",
-                  "public_status",
-                  "currentStatus",
-                  "current_status",
-                ),
-              };
+            const statusSource = room ?? {
+              publicStatus: planValue(
+                item,
+                "publicStatus",
+                "public_status",
+                "currentStatus",
+                "current_status",
+              ),
+            };
             const statusKey = getFloorPlanStatus(statusSource);
             if (statusKey === "DRAFT") return null;
 
             const meta =
-              FLOOR_PLAN_STATUS_META[statusKey] ?? FLOOR_PLAN_STATUS_META.OCCUPIED;
+              FLOOR_PLAN_STATUS_META[statusKey] ??
+              FLOOR_PLAN_STATUS_META.OCCUPIED;
             const code = room
               ? getMiniRoomLabel(room)
               : (planValue(item, "roomCode", "room_code") ?? label);
@@ -1503,7 +1512,9 @@ function RoomListingCard({
   priority = false,
 }) {
   const selectable = room.status === "available";
-  const formattedPrice = room.price ? formatMoney(room.price) : room.priceLabel || "Liên hệ";
+  const formattedPrice = room.price
+    ? formatMoney(room.price)
+    : room.priceLabel || "Liên hệ";
 
   return (
     <div
@@ -1544,7 +1555,7 @@ function RoomListingCard({
             className="object-cover transition duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent opacity-80" />
-          
+
           <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold shadow-2xs backdrop-blur-md bg-white/90">
             <span
               className={`h-2 w-2 rounded-full ${
@@ -1557,7 +1568,9 @@ function RoomListingCard({
                       : "bg-slate-400"
               }`}
             />
-            <span className="text-slate-800 font-semibold">{guestStatusCopy(room.status)}</span>
+            <span className="text-slate-800 font-semibold">
+              {guestStatusCopy(room.status)}
+            </span>
           </div>
 
           {multiSelect && (
@@ -1581,7 +1594,7 @@ function RoomListingCard({
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 {room.floor}
               </span>
-              <h3 className="mt-0.5 text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+              <h3 className="mt-0.5 text-xl font-bold text-slate-900 group-hover:text-[#091426] transition-colors">
                 Phòng {room.id}
               </h3>
             </div>
@@ -1589,7 +1602,11 @@ function RoomListingCard({
               <span className="text-base font-extrabold text-emerald-600">
                 {formattedPrice}
               </span>
-              {room.price ? <span className="block text-[11px] font-medium text-slate-400">/ tháng</span> : null}
+              {room.price ? (
+                <span className="block text-[11px] font-medium text-slate-400">
+                  / tháng
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -1609,7 +1626,7 @@ function RoomListingCard({
         </div>
       </div>
 
-      <div className="px-5 pb-5 pt-1 border-t border-slate-100 mt-2 flex items-center justify-between text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">
+      <div className="px-5 pb-5 pt-1 border-t border-slate-100 mt-2 flex items-center justify-between text-xs font-bold text-slate-600 group-hover:text-[#091426] transition-colors">
         <span>
           {multiSelect
             ? selectable
@@ -1923,7 +1940,9 @@ function MobileFilterDrawer({ isOpen, onClose, children }) {
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xs bg-white p-6 shadow-2xl overflow-y-auto flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Bộ lọc tìm kiếm</h3>
+            <h3 className="text-lg font-bold text-slate-900">
+              Bộ lọc tìm kiếm
+            </h3>
             <button
               type="button"
               onClick={onClose}
@@ -2266,9 +2285,7 @@ export default function RoomsClient({
       setShowEmptyOnly={setShowEmptyOnly}
       selectedFloor={selectedFloor}
       setSelectedFloor={setSelectedFloor}
-      floors={floorPlanData.floors
-        .map((floor) => floor.name)
-        .filter(Boolean)}
+      floors={floorPlanData.floors.map((floor) => floor.name).filter(Boolean)}
       propertyName={property?.name}
     />
   );

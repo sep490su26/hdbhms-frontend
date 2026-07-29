@@ -780,9 +780,7 @@ export default function AccountsPage() {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
                           <tr>
-                            <th className="px-5 py-4 text-left">
-                              Khách thuê
-                            </th>
+                            <th className="px-5 py-4 text-left">Khách thuê</th>
                             <th className="px-5 py-4 text-center">Vai trò</th>
                             <th className="px-5 py-4 text-center">Ngày ký</th>
                             <th className="px-5 py-4 text-center">
@@ -817,7 +815,9 @@ export default function AccountsPage() {
                                         {item.fullName || "Chưa cập nhật"}
                                       </p>
                                       <p className="mt-1 text-xs font-semibold text-[#687184]">
-                                        <span>{item.phone || "Chưa có SĐT"}</span>
+                                        <span>
+                                          {item.phone || "Chưa có SĐT"}
+                                        </span>
                                       </p>
                                       <p className="mt-1 inline-flex max-w-[220px] items-center gap-1 truncate text-xs font-semibold text-[#687184]">
                                         <span className="inline-flex items-center gap-1">
@@ -828,16 +828,19 @@ export default function AccountsPage() {
                                     </div>
                                   </div>
                                 </td>
-                                <td data-label="Vai trò" className="px-5 py-4">
+                                <td
+                                  data-label="Vai trò"
+                                  className="px-5 py-4 justify-center text-center"
+                                >
                                   <span
-                                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}
+                                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold justify-center ${roleClass(item.roomRole)}`}
                                   >
                                     {roleLabel(item.roomRole)}
                                   </span>
                                 </td>
                                 <td
                                   data-label="Ngày ký"
-                                  className="px-5 py-4 font-semibold text-[#0f1d33]"
+                                  className="px-5 py-4 font-semibold text-[#0f1d33] justify-center text-center"
                                 >
                                   {formatDate(item.signedAt)}
                                 </td>

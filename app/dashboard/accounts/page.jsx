@@ -617,7 +617,7 @@ export default function AccountsPage() {
                               </td>
                               <td data-label="Vai trò" className="px-5 py-4">
                                 <span
-                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${roleClass(item.roomRole)}`}
+                                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold text-center ${roleClass(item.roomRole)}`}
                                 >
                                   {roleLabel(item.roomRole)}
                                 </span>

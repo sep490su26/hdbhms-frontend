@@ -61,7 +61,7 @@ import DateInput from "../../../components/DateInput";
 import PortraitUploadZone from "../../../components/deposit/PortraitUploadZone";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
-import { extractCccdImages } from "../../../services/identityVerificationService";
+import { extractCccdImages, normalizeGenderLabel } from "../../../services/identityVerificationService";
 
 function formatMoney(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
@@ -301,6 +301,7 @@ const buildDepositScheduleWindow = (room) => {
 const REQUIRED_DEPOSIT_MESSAGES = {
   fullName: "Vui lòng nhập họ và tên.",
   birthDate: "Vui lòng chọn ngày sinh.",
+  gender: "Vui lòng chọn giới tính.",
   phone: "Vui lòng nhập số điện thoại.",
   citizenId: "Vui lòng nhập số CCCD.",
   idIssueDate: "Vui lòng chọn ngày cấp CCCD.",
@@ -327,6 +328,7 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
   full_name: "fullName",
   dob: "birthDate",
   birthDate: "birthDate",
+  gender: "gender",
   phone: "phone",
   email: "email",
   idNumber: "citizenId",
@@ -366,6 +368,7 @@ const API_ERROR_HINTS = [
     field: "fullName",
   },
   { pattern: /dob|birth|ngày\s*sinh|age|tuổi/i, field: "birthDate" },
+  { pattern: /gender|sex|giới\s*tính/i, field: "gender" },
   { pattern: /phone|số\s*điện\s*thoại/i, field: "phone" },
   { pattern: /email/i, field: "email" },
   {
@@ -417,6 +420,7 @@ const API_ERROR_HINTS = [
 const DEPOSIT_FIELD_LABELS = {
   fullName: "họ và tên",
   birthDate: "ngày sinh",
+  gender: "giới tính",
   phone: "số điện thoại",
   email: "email",
   citizenId: "số CCCD",
@@ -547,12 +551,14 @@ const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const GENDER_OPTIONS = ["Nam", "Nữ", "Khác"];
 const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhmsDepositFormDraft";
 const LEGACY_DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
 const DEPOSIT_DRAFT_MAX_AGE_SECONDS = 30 * 60;
 const DEPOSIT_DRAFT_FIELDS = [
   "fullName",
   "birthDate",
+  "gender",
   "phone",
   "email",
   "citizenId",
@@ -572,6 +578,7 @@ const DEPOSIT_DRAFT_FIELDS = [
 const IDENTITY_FIELD_DEFAULTS = {
   fullName: "",
   birthDate: "",
+  gender: "",
   citizenId: "",
   idIssueDate: "",
   idIssuePlace: "",
@@ -766,6 +773,10 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
     return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
   }
 
+  if (name === "gender" && !GENDER_OPTIONS.includes(normalizedValue)) {
+    return REQUIRED_DEPOSIT_MESSAGES.gender;
+  }
+
   if (
     CO_OCCUPANT_PHONE_FIELDS.has(name) &&
     !VIETNAM_PHONE_PATTERN.test(normalizePhoneValue(normalizedValue))
@@ -890,6 +901,7 @@ const buildDepositMetadata = (room, data) => ({
   roomId: room.roomId || "",
   fullName: String(data.fullName || "").trim(),
   dob: data.birthDate || null,
+  gender: normalizeGenderLabel(data.gender),
   phone: String(data.phone || "").trim(),
   email: String(data.email || "").trim(),
   idNumber: String(data.citizenId || "").trim(),
@@ -1245,6 +1257,10 @@ function DepositInfoForm({
                 draft.fullName ||
                 "",
               birthDate: profile.person?.dob || draft.birthDate || "",
+              gender:
+                normalizeGenderLabel(profile.person?.gender) ||
+                normalizeGenderLabel(draft.gender) ||
+                "",
               phone: profile.person?.phone || draft.phone || "",
               email: profile.person?.email || draft.email || "",
               permanentAddress:
@@ -1337,6 +1353,7 @@ function DepositInfoForm({
         setIdentityValues({
           fullName: draft.fullName || "",
           birthDate: draft.birthDate || "",
+          gender: normalizeGenderLabel(draft.gender),
           citizenId: draft.citizenId || "",
           idIssueDate: draft.idIssueDate || "",
           idIssuePlace: draft.idIssuePlace || "",
@@ -1674,6 +1691,7 @@ function DepositInfoForm({
     const extractedValues = {
       fullName: identity.fullName || "",
       birthDate: identity.dob || "",
+      gender: normalizeGenderLabel(identity.gender),
       citizenId: identity.idNumber || "",
       idIssueDate: identity.issuedDate || "",
       idIssuePlace: identity.issuedPlace || "",
@@ -1749,7 +1767,9 @@ function DepositInfoForm({
         : currentErrors.citizenIdFront,
       citizenIdBack: nextSelectedFiles.citizenIdBack
         ? ""
-        : currentErrors.citizenIdBack,
+        : nextSelectedFiles.citizenIdFront
+          ? REQUIRED_DEPOSIT_MESSAGES.citizenIdBack
+          : currentErrors.citizenIdBack,
     }));
   };
 
@@ -1812,6 +1832,7 @@ function DepositInfoForm({
     const requiredFields = [
       "fullName",
       "birthDate",
+      "gender",
       "phone",
       "citizenId",
       "idIssueDate",
@@ -1958,7 +1979,7 @@ function DepositInfoForm({
             <CccdUploadFlow
               value={{ files: selectedFiles, previews: imagePreviews }}
               onFilesChange={handleCccdFilesChange}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isCccdExtracting}
               scanEnabled
               isExtracting={isCccdExtracting}
               errors={{
@@ -1992,6 +2013,40 @@ function DepositInfoForm({
                 disabled={isCccdExtracting}
                 onChange={handleIdentityFieldChange}
               />
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
+                  Giới tính <span className="text-rose-600">*</span>
+                </span>
+                <select
+                  name="gender"
+                  value={identityValues.gender}
+                  required
+                  disabled={isCccdExtracting}
+                  aria-invalid={fieldErrors.gender ? "true" : "false"}
+                  onChange={(event) => {
+                    handleIdentityFieldChange(event);
+                    validateAndSetDepositField("gender", event.target.value);
+                  }}
+                  onBlur={(event) => validateAndSetDepositField("gender", event.target.value)}
+                  className={`h-[58px] w-full rounded-lg border bg-white px-4 text-sm text-[#091426] outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
+                    fieldErrors.gender
+                      ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
+                      : "border-[#c5c6cd] focus:border-[#091426] focus:ring-[#091426]/10"
+                  }`}
+                >
+                  <option value="">Chọn giới tính</option>
+                  {GENDER_OPTIONS.map((gender) => (
+                    <option key={gender} value={gender}>
+                      {gender}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.gender && (
+                  <span className="text-xs font-medium text-rose-600">
+                    {fieldErrors.gender}
+                  </span>
+                )}
+              </label>
               <Field
                 label="Số CCCD"
                 name="citizenId"
@@ -2013,6 +2068,7 @@ function DepositInfoForm({
                 onChange={handleIdentityFieldChange}
               />
               <Field
+                className="sm:col-span-2"
                 label="Nơi cấp"
                 name="idIssuePlace"
                 placeholder="Cục CS QLHC về TTXH"
@@ -2265,7 +2321,7 @@ function DepositInfoForm({
                 <CccdUploadFlow
                   value={{ files: selectedFiles, previews: imagePreviews }}
                   onFilesChange={handleCccdFilesChange}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isCccdExtracting}
                   scanEnabled={false}
                   errors={{
                     citizenIdFront: fieldErrors.citizenIdFront,

@@ -7,8 +7,9 @@ import {
   dedupeTenantProfiles,
 } from "../lib/tenantProfileDedupe.mjs";
 
-test("dedupeTenantProfiles keeps one row per tenant profile", () => {
+test("dedupeTenantProfiles keeps one row per tenant profile per contract context", () => {
   const rows = dedupeTenantProfiles([
+    { id: 101, contractId: 1, roomCode: "A1" },
     { id: 101, contractId: 1, roomCode: "A1" },
     { id: 101, contractId: 2, roomCode: "A1" },
     { id: 102, contractId: 3, roomCode: "A1" },
@@ -16,7 +17,7 @@ test("dedupeTenantProfiles keeps one row per tenant profile", () => {
 
   assert.deepEqual(
     rows.map((row) => row.contractId),
-    [1, 3],
+    [1, 2, 3],
   );
 });
 

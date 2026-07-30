@@ -396,11 +396,11 @@ function ActivityFeed({ items = [] }) {
       </div>
       {items.length ? (
         <div className="space-y-7">
-          {items.map((activity) => {
+          {items.map((activity, index) => {
             const Icon = iconByType[activity.type] || CheckCircle2;
             return (
               <div
-                key={`${activity.type}-${activity.occurredAt}-${activity.title}`}
+                key={activity.id || `${activity.type}-${activity.occurredAt}-${activity.title}-${index}`}
                 className="flex items-center gap-4"
               >
                 <span

@@ -19,6 +19,7 @@ import {
 import DateInput from "@/components/DateInput";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import { toDate } from "@/lib/dateFormat";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -57,9 +58,10 @@ function formatMoney(value) {
 
 function formatDateTime(value) {
   if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
+  const date = toDate(value);
+  if (!date) return "Chưa có";
   return date.toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit",
     minute: "2-digit",
     day: "2-digit",

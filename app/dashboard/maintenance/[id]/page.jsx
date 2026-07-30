@@ -10,6 +10,7 @@ import {
   Clock3,
   ImagePlus,
   Loader2,
+  Mail,
   Phone,
   ShieldAlert,
   Star,
@@ -31,6 +32,7 @@ import {
 } from "@/services/maintenanceService";
 import { getAuthToken } from "@/services/identityAccessService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import { toDate } from "@/lib/dateFormat";
 
 const STATUS_META = {
   PENDING: ["Pending", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
@@ -108,9 +110,10 @@ const TIMELINE_NOTE_LABELS = {
 
 function formatDateTime(value) {
   if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
+  const date = toDate(value);
+  if (!date) return "Chưa có";
   return date.toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit",
     minute: "2-digit",
     day: "2-digit",
@@ -230,6 +233,45 @@ function InfoItem({ label, value }) {
     <div className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 p-4">
       <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 break-words text-sm font-bold text-slate-900 dark:text-white">{value || "Chưa có"}</p>
+    </div>
+  );
+}
+
+function userContactName(user) {
+  return [user?.fullName, user?.email, user?.phone].find((value) => String(value || "").trim()) || "Chưa có";
+}
+
+function userInitial(user) {
+  const value = [user?.fullName, user?.email, user?.phone].find((item) => String(item || "").trim()) || "";
+  return value ? value.charAt(0).toUpperCase() : "?";
+}
+
+function ContactItem({ label, user }) {
+  const name = userContactName(user);
+  const hasContact = Boolean(user?.phone || user?.email);
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 dark:border-white/10 dark:bg-white/5">
+      <p className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400">{label}</p>
+      <div className="mt-3 flex min-w-0 items-center gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-black text-slate-900 dark:text-white">{name}</p>
+          {user?.phone && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <Phone className="h-3.5 w-3.5 shrink-0" />
+              <span className="break-all">{user.phone}</span>
+            </p>
+          )}
+          {user?.email && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              <span className="break-all">{user.email}</span>
+            </p>
+          )}
+          {!hasContact && (
+            <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">Chưa có thông tin liên hệ</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -652,7 +694,7 @@ export default function MaintenanceTicketDetailPage() {
         <h2 className="text-lg font-black text-slate-900 dark:text-white">Thông tin sự cố</h2>
         <p className="rounded-lg bg-[#f8fafc] dark:bg-white/5 p-4 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{ticket.description}</p>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <InfoItem label="Người tạo" value={ticket.createdBy?.phone || ticket.createdBy?.email || "Chưa có"} />
+          <ContactItem label="Người gửi" user={ticket.createdBy} />
           <InfoItem label="Người xử lý" value={ticket.workerName || ticket.assignedTo?.phone || ticket.assignedTo?.email || "Chưa phân công"} />
           <InfoItem label="SĐT thợ" value={ticket.repairmanPhone || "Chưa có"} />
           <InfoItem label="Cập nhật cuối" value={formatDateTime(ticket.updatedAt || ticket.createdAt)} />

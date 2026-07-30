@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import {useState, useEffect, useCallback, useRef} from "react";
+import {useRouter, useSearchParams} from "next/navigation";
 import {
     confirmBatch as confirmMeterReadingBatch,
     fetchBatchMeterReadingsStatus,
@@ -18,21 +18,21 @@ import {
     queueMeterReadingForSync,
     syncQueuedMeterReadings,
 } from "@/services/meterReadingOfflineSync";
-import { toast } from "sonner";
+import {toast} from "sonner";
 import {
     Accordion,
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Breadcrumb, BreadcrumbList } from "@/components/ui/breadcrumb";
+import {Breadcrumb, BreadcrumbList} from "@/components/ui/breadcrumb";
 import {
     BreadcrumbItem,
     BreadcrumbLink,
     BreadcrumbPage,
     BreadcrumbSeparator
 } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
+import {Button} from "@/components/ui/button";
 import {
     AlertTriangle,
     ArrowRight,
@@ -50,7 +50,7 @@ import {
     X,
     Zap,
 } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {
     Dialog,
     DialogContent,
@@ -59,20 +59,21 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { PhotoGallery } from "../../../../components/image-gallery";
+import {PhotoGallery} from "../../../../components/image-gallery";
 import CameraCapture from "@/components/CameraCapture";
 import Image from "next/image";
-import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
-import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
+import {DashboardPageHeader} from "@/components/dashboard/DashboardPageHeader";
+import {DashboardStatCard} from "@/components/dashboard/DashboardStatCard";
 import {
     calculateUtilityCharge,
     DEFAULT_UTILITY_TARIFFS,
     formatVnd,
     normalizeUtilityTariff,
 } from "@/lib/meterReadingCost.mjs";
-import { useAuth } from "@/app/dashboard/_contexts/AuthContext";
-import { fetchSimpleProperties } from "@/services/identityAccessService";
-import { UtilityBillingRunsPanel } from "../_components/UtilityBillingRunsPanel";
+import {formatDateTime} from "@/lib/dateFormat";
+import {useAuth} from "@/app/dashboard/_contexts/AuthContext";
+import {fetchSimpleProperties} from "@/services/identityAccessService";
+import {UtilityBillingRunsPanel} from "../_components/UtilityBillingRunsPanel";
 
 const SAMPLE_PHOTOS = [
     {
@@ -145,11 +146,11 @@ const MOCK_PHOTOS = [
 ];
 
 const STATUS_CONFIG = {
-    warning: { label: "Cần kiểm tra", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" },
-    synced: { label: "Đã lưu", color: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-500" },
-    local: { label: "Chưa đồng bộ", color: "text-orange-500 dark:text-orange-300", dot: "bg-orange-400" },
-    error: { label: "Lỗi chỉ số", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500" },
-    pending: { label: "Chưa nhập", color: "text-slate-500 dark:text-slate-400", dot: "bg-gray-300" },
+    warning: {label: "Cần kiểm tra", color: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500"},
+    synced: {label: "Đã lưu", color: "text-emerald-600 dark:text-emerald-300", dot: "bg-emerald-500"},
+    local: {label: "Chưa đồng bộ", color: "text-orange-500 dark:text-orange-300", dot: "bg-orange-400"},
+    error: {label: "Lỗi chỉ số", color: "text-red-500 dark:text-rose-300", dot: "bg-red-500"},
+    pending: {label: "Chưa nhập", color: "text-slate-500 dark:text-slate-400", dot: "bg-gray-300"},
 };
 
 
@@ -158,10 +159,10 @@ const LOCKED_BATCH_STATUSES = new Set(["CONFIRMED"]);
 function getPeriodParts(value) {
     const text = String(value || "").trim();
     const canonical = text.match(/^(\d{4})-(\d{1,2})$/);
-    if (canonical) return { year: canonical[1], month: canonical[2].padStart(2, "0") };
+    if (canonical) return {year: canonical[1], month: canonical[2].padStart(2, "0")};
 
     const legacy = text.match(/^(\d{1,2})\/(\d{4})$/);
-    if (legacy) return { year: legacy[2], month: legacy[1].padStart(2, "0") };
+    if (legacy) return {year: legacy[2], month: legacy[1].padStart(2, "0")};
 
     return null;
 }
@@ -291,16 +292,16 @@ function getBillingHref(propertyId, meterPeriod) {
     return `/dashboard/billing${query ? `?${query}` : ""}`;
 }
 
-function MeterPhoto({ src }) {
+function MeterPhoto({src}) {
     return (
         <div
             className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative group">
             {src ? (
-                <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized />
+                <Image src={src} alt="thumbnail" fill sizes="40px" className="object-cover" unoptimized/>
             ) : (
-                <ImageIcon className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                <ImageIcon className="w-5 h-5 text-slate-400 dark:text-slate-500"/>
             )}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"/>
         </div>
     );
 }
@@ -331,7 +332,7 @@ export default function MeterReadings() {
     const syncingOfflineRef = useRef(false);
 
     const router = useRouter();
-    const { user } = useAuth();
+    const {user} = useAuth();
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
     const queryBatchId = normalizePropertyId(searchParams.get("batchId"));
@@ -405,12 +406,12 @@ export default function MeterReadings() {
                     offlineQueuedAt: null,
                     offlineSyncError: "",
                     status: readField(r, "status") || "pending",
-                    syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
+                    syncTime: formatDateTime(syncTime, null),
                     photos: numberOrZero(readField(r, "photosCount", "photos_count")),
                 };
             });
             const queuedItems = fetchedBatchId
-                ? await getQueuedMeterReadings({ batchId: fetchedBatchId })
+                ? await getQueuedMeterReadings({batchId: fetchedBatchId})
                 : [];
             setRooms(applyOfflineQueueToRooms(mappedRooms, queuedItems));
         }
@@ -461,12 +462,12 @@ export default function MeterReadings() {
                             offlineQueuedAt: null,
                             offlineSyncError: "",
                             status: readField(r, "status") || "pending",
-                            syncTime: syncTime ? new Date(syncTime).toLocaleString() : null,
+                            syncTime: formatDateTime(syncTime, null),
                             photos: numberOrZero(readField(r, "photosCount", "photos_count")),
                         };
                     });
                     const queuedItems = fetchedBatchId
-                        ? await getQueuedMeterReadings({ batchId: fetchedBatchId })
+                        ? await getQueuedMeterReadings({batchId: fetchedBatchId})
                         : [];
                     setRooms(applyOfflineQueueToRooms(mappedRooms, queuedItems));
                 }
@@ -481,8 +482,8 @@ export default function MeterReadings() {
                     toast.error("Chưa có dữ liệu offline cho kỳ này. Vui lòng mở màn này một lần khi có mạng.");
                 }
             } else {
-            toast.error("Lỗi khi tải dữ liệu");
-            console.error(error);
+                toast.error("Lỗi khi tải dữ liệu");
+                console.error(error);
             }
         } finally {
             setLoading(false);
@@ -497,11 +498,11 @@ export default function MeterReadings() {
     }, [loadData]);
 
     const refreshQueuedRooms = useCallback(async () => {
-        const queuedItems = await getQueuedMeterReadings(batchId ? { batchId } : {});
+        const queuedItems = await getQueuedMeterReadings(batchId ? {batchId} : {});
         setRooms((prev) => applyOfflineQueueToRooms(prev, queuedItems));
     }, [batchId]);
 
-    const runOfflineSync = useCallback(async ({ silent = false } = {}) => {
+    const runOfflineSync = useCallback(async ({silent = false} = {}) => {
         if (syncingOfflineRef.current) return;
         if (typeof navigator !== "undefined" && navigator.onLine === false) return;
 
@@ -539,7 +540,7 @@ export default function MeterReadings() {
         const handleQueueChanged = () => {
             void refreshQueuedRooms();
             if (typeof navigator === "undefined" || navigator.onLine) {
-                void runOfflineSync({ silent: true });
+                void runOfflineSync({silent: true});
             }
         };
 
@@ -547,7 +548,7 @@ export default function MeterReadings() {
         window.addEventListener("offline", handleOffline);
         window.addEventListener(OFFLINE_METER_READING_QUEUE_EVENT, handleQueueChanged);
         const syncTimer = window.setTimeout(() => {
-            void runOfflineSync({ silent: true });
+            void runOfflineSync({silent: true});
         }, 0);
 
         return () => {
@@ -604,7 +605,7 @@ export default function MeterReadings() {
 
         setRooms((prev) =>
             prev.map((r) =>
-                r.id === roomId ? { ...r, [field]: numVal } : r
+                r.id === roomId ? {...r, [field]: numVal} : r
             )
         );
     };
@@ -620,8 +621,8 @@ export default function MeterReadings() {
 
     const removeCapturedPhoto = (roomId, type) => {
         setCapturedPhotos((prev) => {
-            const next = { ...prev };
-            const roomPhotos = { ...(next[roomId] || {}) };
+            const next = {...prev};
+            const roomPhotos = {...(next[roomId] || {})};
             delete roomPhotos[type];
             if (Object.keys(roomPhotos).length > 0) {
                 next[roomId] = roomPhotos;
@@ -673,12 +674,16 @@ export default function MeterReadings() {
         return fileId;
     };
 
-    const queueRoomForOfflineSync = async (room, { electricityPhotoId = null, waterPhotoId = null, targetBatchId = batchId } = {}) => {
+    const queueRoomForOfflineSync = async (room, {
+        electricityPhotoId = null,
+        waterPhotoId = null,
+        targetBatchId = batchId
+    } = {}) => {
         const electricityPhoto = getCapturedPhoto(room.id, "electricity");
         const waterPhoto = getCapturedPhoto(room.id, "water");
         const queuedElectricityPhotoId = electricityPhotoId ?? getExistingPhotoId(room, "electricity") ?? null;
         const queuedWaterPhotoId = waterPhotoId ?? getExistingPhotoId(room, "water") ?? null;
-        const existingQueuedItems = await getQueuedMeterReadings(targetBatchId ? { batchId: targetBatchId } : {});
+        const existingQueuedItems = await getQueuedMeterReadings(targetBatchId ? {batchId: targetBatchId} : {});
         const existingQueuedRoom = existingQueuedItems.find(
             (item) => String(item.roomId) === String(room.roomId),
         );
@@ -720,31 +725,34 @@ export default function MeterReadings() {
                 <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</span>
                     {existingPhotoId && !photo ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        <span
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
                             Đã có ảnh
                         </span>
                     ) : null}
                 </div>
                 {photo ? (
-                    <div className="relative h-28 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
-                        <Image src={photo.previewUrl} alt={label} fill sizes="(max-width: 768px) 100vw, 320px" className="object-cover" unoptimized />
+                    <div
+                        className="relative h-28 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
+                        <Image src={photo.previewUrl} alt={label} fill sizes="(max-width: 768px) 100vw, 320px"
+                               className="object-cover" unoptimized/>
                         <button
                             type="button"
                             onClick={() => removeCapturedPhoto(room.id, type)}
                             disabled={isBatchLocked}
                             className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
                         >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4"/>
                         </button>
                     </div>
                 ) : (
                     <Button
                         variant="primary"
-                        onClick={() => setCameraTarget({ roomId: room.id, type })}
+                        onClick={() => setCameraTarget({roomId: room.id, type})}
                         disabled={isBatchLocked}
                         className="flex w-full items-center justify-center gap-2"
                     >
-                        <Camera className="h-4 w-4" />
+                        <Camera className="h-4 w-4"/>
                         {existingPhotoId ? "Chụp lại" : "Chụp ảnh minh chứng"}
                     </Button>
                 )}
@@ -889,11 +897,11 @@ export default function MeterReadings() {
     };
 
     const tabs = [
-        { id: "pending", label: `Chưa nhập (${pending})` },
-        { id: "error", label: `Lỗi (${errors})` },
-        { id: "completed", label: `Đã hoàn thành (${completed})` },
-        { id: "unsynced", label: `Chưa lưu (${unsynced})` },
-        { id: "all", label: `Tất cả (${total})` }
+        {id: "pending", label: `Chưa nhập (${pending})`},
+        {id: "error", label: `Lỗi (${errors})`},
+        {id: "completed", label: `Đã hoàn thành (${completed})`},
+        {id: "unsynced", label: `Chưa lưu (${unsynced})`},
+        {id: "all", label: `Tất cả (${total})`}
     ];
 
     const filtered = rooms.filter((r) => {
@@ -932,13 +940,13 @@ export default function MeterReadings() {
                             <BreadcrumbItem>
                                 <BreadcrumbLink href="/dashboard/facilities">Quản lý cơ sở</BreadcrumbLink>
                             </BreadcrumbItem>
-                            <BreadcrumbSeparator />
+                            <BreadcrumbSeparator/>
                             {facilityName ? (
                                 <>
                                     <BreadcrumbItem>
                                         <BreadcrumbLink href={meterReadingsHref}>{facilityName}</BreadcrumbLink>
                                     </BreadcrumbItem>
-                                    <BreadcrumbSeparator />
+                                    <BreadcrumbSeparator/>
                                 </>
                             ) : null}
                         </>
@@ -946,7 +954,7 @@ export default function MeterReadings() {
                     <BreadcrumbItem>
                         <BreadcrumbLink href={meterReadingsHref}>Quản lý điện nước</BreadcrumbLink>
                     </BreadcrumbItem>
-                    <BreadcrumbSeparator />
+                    <BreadcrumbSeparator/>
                     <BreadcrumbItem>
                         <BreadcrumbPage>Nhập điện nước</BreadcrumbPage>
                     </BreadcrumbItem>
@@ -963,23 +971,27 @@ export default function MeterReadings() {
                     actions={
                         <div className="mt-1 flex w-full flex-col items-start gap-3 2xl:items-end">
                             <div className="flex flex-wrap items-center gap-3">
-                                <span className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${isOnline ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"}`}>
-                                    <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`} />
+                                <span
+                                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${isOnline ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"}`}>
+                                    <RefreshCw className={`h-4 w-4 ${syncingOffline ? "animate-spin" : ""}`}/>
                                     {syncingOffline ? "Đang đồng bộ offline" : isOnline ? "Online" : "Offline - sẽ tự đồng bộ"}
                                 </span>
                                 {isBatchLocked ? (
-                                    <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                        <CheckCircle2 className="h-4 w-4" />
+                                    <span
+                                        className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4"/>
                                         Kỳ đã chốt, chỉ có thể xem lại
                                     </span>
                                 ) : (pending > 0 || errors > 0) ? (
-                                    <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
-                                        <AlertTriangle className="h-4 w-4" />
+                                    <span
+                                        className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
+                                        <AlertTriangle className="h-4 w-4"/>
                                         {pending + errors} phòng chưa hoàn thành. Chưa thể chốt kỳ.
                                     </span>
                                 ) : (
-                                    <span className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                        <CheckCircle2 className="h-4 w-4" />
+                                    <span
+                                        className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4"/>
                                         Đã đủ điều kiện chốt kỳ
                                     </span>
                                 )}
@@ -997,7 +1009,7 @@ export default function MeterReadings() {
                                     disabled={isBatchLocked}
                                     variant={"default"}
                                     className="flex items-center gap-2 border bg-white dark:bg-[#0f172a] hover:bg-gray-50 dark:hover:bg-white/5 text-slate-800 dark:text-slate-100 border-gray-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-                                    <Edit3 className="h-4 w-4" />
+                                    <Edit3 className="h-4 w-4"/>
                                     Bắt đầu nhập
                                 </Button>
                                 <Button
@@ -1005,7 +1017,7 @@ export default function MeterReadings() {
                                     disabled={!canConfirmBatch || confirming}
                                     className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    <CheckCircle2 className="h-4 w-4"/>
                                     {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
                                 </Button>
                             </div>
@@ -1016,11 +1028,11 @@ export default function MeterReadings() {
 
             {/* Stat cards */}
             <div className="my-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <DashboardStatCard icon={Home} label="Tổng số phòng" value={total} tone="blue" subtitle="Trong kỳ ghi chỉ số" />
-                <DashboardStatCard icon={CheckCircle2} label="Đã nhập" value={completed} tone="emerald" subtitle={`${total > 0 ? Math.round((completed / total) * 100) : 0}% hoàn thành`} />
-                <DashboardStatCard icon={CircleDashed} label="Chưa nhập" value={pending} tone="orange" subtitle={`${total > 0 ? Math.round((pending / total) * 100) : 0}% còn lại`} />
-                <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber" subtitle="Thay đổi đang chờ lưu" />
-                <DashboardStatCard icon={RefreshCw} label="Cập nhật" value={syncingOffline ? "Đang sync" : "Vừa tải"} tone="slate" subtitle={lastOfflineSyncAt ? `Sync offline ${lastOfflineSyncAt.toLocaleTimeString()}` : "Theo dữ liệu backend"} />
+                <DashboardStatCard icon={Home} label="Tổng số phòng" value={total} tone="blue"/>
+                <DashboardStatCard icon={CheckCircle2} label="Đã nhập" value={completed} tone="emerald"/>
+                <DashboardStatCard icon={CircleDashed} label="Chưa nhập" value={pending} tone="orange"/>
+                <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber"/>
+                <DashboardStatCard icon={RefreshCw} label="Cập nhật" value={syncingOffline ? "Đang sync" : "Vừa tải"}/>
             </div>
 
             {isBatchLocked ? (
@@ -1034,19 +1046,22 @@ export default function MeterReadings() {
             ) : null}
 
             {/* Overall progress */}
-            <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+            <div
+                className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Tiến độ nhập</span>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{completed} / {total} phòng đã nhập</span>
+                    <span
+                        className="text-sm text-slate-500 dark:text-slate-400">{completed} / {total} phòng đã nhập</span>
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-white/5 rounded-full h-3">
                     <div className="bg-blue-600 h-3 rounded-full transition-all"
-                        style={{ width: `${progress}%` }}></div>
+                         style={{width: `${progress}%`}}></div>
                 </div>
             </div>
 
             {/* Tabs + search */}
-            <div className="flex w-full min-w-0 flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
+            <div
+                className="flex w-full min-w-0 flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
                 <div
                     className="flex flex-wrap items-center gap-1 md:gap-0 w-full md:w-auto pb-1 md:pb-0 border-b md:border-none border-gray-100 dark:border-white/10">
                     {tabs.map((tab) => (
@@ -1061,7 +1076,8 @@ export default function MeterReadings() {
                 </div>
                 <div className="flex w-full min-w-0 items-center gap-2 md:w-auto">
                     <div className="relative w-full min-w-0 md:w-auto">
-                        <Search className={"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4"} />
+                        <Search
+                            className={"absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4"}/>
                         <input
                             className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-[#0f172a] dark:text-white md:w-64"
                             placeholder="Tìm phòng..."
@@ -1078,322 +1094,335 @@ export default function MeterReadings() {
             <div className="mb-4">
                 {defaultAccordionValues.length > 0 && (
                     <Accordion type="multiple" defaultValue={defaultAccordionValues} className="w-full space-y-4">
-                    {Object.entries(groupedByFloor).map(([floor, floorRooms]) => (
-                        <AccordionItem key={floor} value={floor}
-                            className="rounded-lg border border-gray-200 bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-                            <AccordionTrigger
-                                className="px-5 py-4 hover:no-underline hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{floor}</h3>
-                                    <span
-                                        className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{floorRooms.length} phòng</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-0 pb-0">
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block w-full overflow-x-auto pb-4">
-                                    <Table className="w-full text-sm min-w-[1040px]">
-                                        <TableHeader>
-                                            <TableRow className="bg-gray-50 dark:bg-[#020817] border-y border-gray-200 dark:border-white/10">
-                                                <TableHead
-                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 w-16"
-                                                >Phòng
-                                                </TableHead>
-                                                <TableHead
-                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
-                                                >Điện (kWh)
-                                                </TableHead>
-                                                <TableHead
-                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10 border-l border-gray-200 dark:border-white/10"
-                                                >Nước (m³)
-                                                </TableHead>
-                                                <TableHead
-                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
-                                                >Ảnh
-                                                </TableHead>
-                                                <TableHead
-                                                    className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
-                                                >
+                        {Object.entries(groupedByFloor).map(([floor, floorRooms]) => (
+                            <AccordionItem key={floor} value={floor}
+                                           className="rounded-lg border border-gray-200 bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+                                <AccordionTrigger
+                                    className="px-5 py-4 hover:no-underline hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{floor}</h3>
+                                        <span
+                                            className="rounded-md border border-gray-200 bg-gray-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">{floorRooms.length} phòng</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-0 pb-0">
+                                    {/* Desktop Table View */}
+                                    <div className="hidden md:block w-full overflow-x-auto pb-4">
+                                        <Table className="w-full text-sm min-w-[1040px]">
+                                            <TableHeader>
+                                                <TableRow
+                                                    className="bg-gray-50 dark:bg-[#020817] border-y border-gray-200 dark:border-white/10">
+                                                    <TableHead
+                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 w-16"
+                                                    >Phòng
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
+                                                    >Điện (kWh)
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10 border-l border-gray-200 dark:border-white/10"
+                                                    >Nước (m³)
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
+                                                    >Ảnh
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
+                                                    >
                                                     <span className="flex items-center gap-1">
                                                         Trạng thái
-                                                        <Info className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                                                        <Info
+                                                            className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500"/>
                                                     </span>
-                                                </TableHead>
-                                                <TableHead
-                                                    className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
-                                                >Thao tác
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {floorRooms.map((room) => {
-                                                const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
-                                                const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
-                                                const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
-                                                const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
-                                                const isElecError = elecUsage !== null && elecUsage < 0;
-                                                const isWaterError = waterUsage !== null && waterUsage < 0;
-                                                const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
+                                                    >Thao tác
+                                                    </TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {floorRooms.map((room) => {
+                                                    const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
+                                                    const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                                    const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                                    const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
+                                                    const isElecError = elecUsage !== null && elecUsage < 0;
+                                                    const isWaterError = waterUsage !== null && waterUsage < 0;
+                                                    const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
 
-                                                return (
-                                                    <TableRow key={room.id}
-                                                        className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                                                        <TableCell
-                                                            className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
+                                                    return (
+                                                        <TableRow key={room.id}
+                                                                  className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                                            <TableCell
+                                                                className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
 
-                                                        {/* Electricity Compact */}
-                                                        <TableCell className="px-4 py-3">
-                                                            <div className="flex items-center gap-2">
+                                                            {/* Electricity Compact */}
+                                                            <TableCell className="px-4 py-3">
+                                                                <div className="flex items-center gap-2">
                                                                 <span
                                                                     className="text-slate-500 dark:text-slate-400 w-12 text-right">{room.elecPrev.toLocaleString()}</span>
-                                                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
-                                                                    value={room.elecCurr ?? ""}
-                                                                    disabled={isBatchLocked}
-                                                                    onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
-                                                                    placeholder="—"
-                                                                />
-                                                                <span
-                                                                    className={`w-28 text-left text-xs font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    <ArrowRight
+                                                                        className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500"/>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className={`w-20 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
+                                                                        value={room.elecCurr ?? ""}
+                                                                        disabled={isBatchLocked}
+                                                                        onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
+                                                                        placeholder="—"
+                                                                    />
+                                                                    <span
+                                                                        className={`w-28 text-left text-xs font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {elecCharge === null ? "" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
-                                                            </div>
-                                                        </TableCell>
+                                                                </div>
+                                                            </TableCell>
 
-                                                        {/* Water Compact */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
-                                                            <div className="flex items-center gap-2">
+                                                            {/* Water Compact */}
+                                                            <TableCell
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
+                                                                <div className="flex items-center gap-2">
                                                                 <span
                                                                     className="text-slate-500 dark:text-slate-400 w-10 text-right">{room.waterPrev}</span>
-                                                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
-                                                                    value={room.waterCurr ?? ""}
-                                                                    disabled={isBatchLocked}
-                                                                    onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
-                                                                    placeholder="—"
-                                                                />
-                                                                <span
-                                                                    className={`w-28 text-left text-xs font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    <ArrowRight
+                                                                        className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500"/>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className={`w-16 text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
+                                                                        value={room.waterCurr ?? ""}
+                                                                        disabled={isBatchLocked}
+                                                                        onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
+                                                                        placeholder="—"
+                                                                    />
+                                                                    <span
+                                                                        className={`w-28 text-left text-xs font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
                                                                     {waterCharge === null ? "" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
                                                                 </span>
-                                                            </div>
-                                                        </TableCell>
+                                                                </div>
+                                                            </TableCell>
 
-                                                        {/* Photos */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
+                                                            {/* Photos */}
+                                                            <TableCell
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
+                                                                <PhotoGallery
+                                                                    photos={MOCK_PHOTOS.slice(0, room.photos)}
+                                                                    renderTrigger={(openPhoto) => (
+                                                                        <div
+                                                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white dark:bg-[#0f172a] border-gray-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer shadow-sm" : "bg-gray-50 dark:bg-[#020817] border-transparent text-slate-400 dark:text-slate-500"}`}
+                                                                            onClick={() => room.photos > 0 && openPhoto(0)}
+                                                                        >
+                                                                            <Camera className="h-4 w-4"/>
+                                                                            <span
+                                                                                className="whitespace-nowrap text-xs font-medium">{room.photos > 0 ? `${room.photos} ảnh` : "Không có"}</span>
+                                                                        </div>
+                                                                    )}
+                                                                />
+                                                            </TableCell>
+
+                                                            {/* Status */}
+                                                            <TableCell
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
+                                                                <div className="flex items-start gap-1.5">
+                                                                <span
+                                                                    className={`w-2 h-2 rounded-full mt-1 shrink-0 ${st.dot}`}></span>
+                                                                    <div>
+                                                                        <p className={`text-sm font-semibold ${st.color}`}>{st.label}</p>
+                                                                        {room.syncTime &&
+                                                                            <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
+                                                                        {room.status === "error" &&
+                                                                            <p className="text-xs text-red-400">Kiểm tra
+                                                                                lại chỉ số</p>}
+                                                                        {room.status === "local" &&
+                                                                            <p className="text-xs text-slate-400 dark:text-slate-500">Chưa
+                                                                                đồng bộ</p>}
+                                                                    </div>
+                                                                </div>
+                                                            </TableCell>
+
+                                                            {/* Actions */}
+                                                            <TableCell
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
+                                                                <button
+                                                                    onClick={() => setFocusRoomId(room.id)}
+                                                                    disabled={isBatchLocked}
+                                                                    className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
+                                                                    <Edit3 size={16}/>
+                                                                </button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    {/* Mobile Card List View */}
+                                    <div className="flex flex-col gap-4 p-2 md:hidden w-full overflow-x-auto pb-4">
+                                        {floorRooms.map((room) => {
+                                            const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
+                                            const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
+                                            const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
+                                            const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
+                                            const isElecError = elecUsage !== null && elecUsage < 0;
+                                            const isWaterError = waterUsage !== null && waterUsage < 0;
+                                            const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
+
+                                            return (
+                                                <div key={room.id}
+                                                     className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm relative">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div>
+                                                            <h4 className="font-bold text-slate-900 dark:text-white text-lg">{room.id}</h4>
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                            <span
+                                                                className={`w-2 h-2 rounded-full ${st.dot}`}></span>
+                                                                <span
+                                                                    className={`text-xs font-semibold ${st.color}`}>{st.label}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setFocusRoomId(room.id)}
+                                                            disabled={isBatchLocked}
+                                                            className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
+                                                            <Edit3 size={18}/>
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-3">
+                                                        {/* Electricity */}
+                                                        <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
+                                                            <div
+                                                                className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Điện
+                                                                (kWh)
+                                                            </div>
+                                                            <div
+                                                                className="grid grid-cols-3 gap-2 text-sm items-center">
+                                                                <div className="flex flex-col">
+                                                                <span
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
+                                                                    <span
+                                                                        className="font-medium text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-center">
+                                                                <span
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
+                                                                        value={room.elecCurr ?? ""}
+                                                                        disabled={isBatchLocked}
+                                                                        onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
+                                                                        placeholder="—"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col items-end">
+                                                                    <span
+                                                                        className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
+                                                                    <span
+                                                                        className={`font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {elecCharge === null ? "—" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
+                                                                </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Water */}
+                                                        <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
+                                                            <div
+                                                                className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Nước
+                                                                (m³)
+                                                            </div>
+                                                            <div
+                                                                className="grid grid-cols-3 gap-2 text-sm items-center">
+                                                                <div className="flex flex-col">
+                                                                <span
+                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
+                                                                    <span
+                                                                        className="font-medium text-slate-700 dark:text-slate-200">{room.waterPrev}</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-center">
+                                                                <span
+                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
+                                                                        value={room.waterCurr ?? ""}
+                                                                        disabled={isBatchLocked}
+                                                                        onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
+                                                                        placeholder="—"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col items-end">
+                                                                    <span
+                                                                        className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
+                                                                    <span
+                                                                        className={`font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
+                                                                    {waterCharge === null ? "—" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
+                                                                </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div
+                                                        className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
+                                                        <div>
+                                                        <span
+                                                            className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Ảnh</span>
                                                             <PhotoGallery
                                                                 photos={MOCK_PHOTOS.slice(0, room.photos)}
                                                                 renderTrigger={(openPhoto) => (
                                                                     <div
-                                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors ${room.photos > 0 ? "bg-white dark:bg-[#0f172a] border-gray-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer shadow-sm" : "bg-gray-50 dark:bg-[#020817] border-transparent text-slate-400 dark:text-slate-500"}`}
+                                                                        className={`flex items-center gap-1 ${room.photos > 0 ? "cursor-pointer" : ""}`}
                                                                         onClick={() => room.photos > 0 && openPhoto(0)}
                                                                     >
-                                                                        <Camera className="h-4 w-4" />
-                                                                        <span
-                                                                            className="whitespace-nowrap text-xs font-medium">{room.photos > 0 ? `${room.photos} ảnh` : "Không có"}</span>
+                                                                        {room.photos > 0 ? (
+                                                                            <>
+                                                                                <MeterPhoto src={MOCK_PHOTOS[0].src}/>
+                                                                                {room.photos > 1 &&
+                                                                                    <MeterPhoto
+                                                                                        src={MOCK_PHOTOS[1].src}/>}
+                                                                                {room.photos > 2 && (
+                                                                                    <div
+                                                                                        className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-gray-200 transition-colors">
+                                                                                        +{room.photos - 2}
+                                                                                    </div>
+                                                                                )}
+                                                                            </>
+                                                                        ) : (
+                                                                            <span
+                                                                                className="text-slate-400 dark:text-slate-500 text-xs italic">Không có</span>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             />
-                                                        </TableCell>
-
-                                                        {/* Status */}
-                                                        <TableCell className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
-                                                            <div className="flex items-start gap-1.5">
-                                                                <span
-                                                                    className={`w-2 h-2 rounded-full mt-1 shrink-0 ${st.dot}`}></span>
-                                                                <div>
-                                                                    <p className={`text-sm font-semibold ${st.color}`}>{st.label}</p>
-                                                                    {room.syncTime &&
-                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
-                                                                    {room.status === "error" &&
-                                                                        <p className="text-xs text-red-400">Kiểm tra lại chỉ số</p>}
-                                                                    {room.status === "local" &&
-                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Chưa đồng bộ</p>}
-                                                                </div>
-                                                            </div>
-                                                        </TableCell>
-
-                                                        {/* Actions */}
-                                                        <TableCell
-                                                            className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
-                                                            <button
-                                                                onClick={() => setFocusRoomId(room.id)}
-                                                                disabled={isBatchLocked}
-                                                                className="text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-300 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
-                                                                <Edit3 size={16} />
-                                                            </button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-
-                                {/* Mobile Card List View */}
-                                <div className="flex flex-col gap-4 p-2 md:hidden w-full overflow-x-auto pb-4">
-                                    {floorRooms.map((room) => {
-                                        const elecUsage = room.elecCurr !== null ? room.elecCurr - room.elecPrev : null;
-                                        const waterUsage = room.waterCurr !== null ? room.waterCurr - room.waterPrev : null;
-                                        const elecCharge = calculateUtilityCharge(elecUsage, tariffs.electricity);
-                                        const waterCharge = calculateUtilityCharge(waterUsage, tariffs.water);
-                                        const isElecError = elecUsage !== null && elecUsage < 0;
-                                        const isWaterError = waterUsage !== null && waterUsage < 0;
-                                        const st = STATUS_CONFIG[room.status] || STATUS_CONFIG.pending;
-
-                                        return (
-                                            <div key={room.id}
-                                                className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-xl p-4 shadow-sm relative">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <h4 className="font-bold text-slate-900 dark:text-white text-lg">{room.id}</h4>
-                                                        <div className="flex items-center gap-1.5 mt-1">
-                                                            <span
-                                                                className={`w-2 h-2 rounded-full ${st.dot}`}></span>
-                                                            <span
-                                                                className={`text-xs font-semibold ${st.color}`}>{st.label}</span>
                                                         </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setFocusRoomId(room.id)}
-                                                        disabled={isBatchLocked}
-                                                        className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:cursor-not-allowed disabled:opacity-40">
-                                                        <Edit3 size={18} />
-                                                    </button>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    {/* Electricity */}
-                                                    <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
-                                                        <div
-                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Điện
-                                                            (kWh)
-                                                        </div>
-                                                        <div
-                                                            className="grid grid-cols-3 gap-2 text-sm items-center">
-                                                            <div className="flex flex-col">
-                                                                <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
-                                                                <span
-                                                                    className="font-medium text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</span>
-                                                            </div>
-                                                            <div className="flex flex-col items-center">
-                                                                <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isElecError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
-                                                                    value={room.elecCurr ?? ""}
-                                                                    disabled={isBatchLocked}
-                                                                    onChange={(e) => handleCurrChange(room.id, "elecCurr", e.target.value)}
-                                                                    placeholder="—"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
-                                                                <span
-                                                                    className={`font-semibold ${elecCharge === null ? "text-gray-300" : elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : elecCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {elecCharge === null ? "—" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Water */}
-                                                    <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
-                                                        <div
-                                                            className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Nước
-                                                            (m³)
-                                                        </div>
-                                                        <div
-                                                            className="grid grid-cols-3 gap-2 text-sm items-center">
-                                                            <div className="flex flex-col">
-                                                                <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500">Số cũ</span>
-                                                                <span
-                                                                    className="font-medium text-slate-700 dark:text-slate-200">{room.waterPrev}</span>
-                                                            </div>
-                                                            <div className="flex flex-col items-center">
-                                                                <span
-                                                                    className="text-xs text-slate-400 dark:text-slate-500 mb-1">Số mới</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className={`w-full max-w-[80px] text-center text-sm border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-colors ${isWaterError ? "border-red-400 bg-red-50 dark:bg-rose-500/10 text-red-600 dark:text-rose-300 focus:ring-red-100" : "border-gray-200 dark:border-white/10 focus:ring-blue-100 text-slate-800 dark:text-slate-100"}`}
-                                                                    value={room.waterCurr ?? ""}
-                                                                    disabled={isBatchLocked}
-                                                                    onChange={(e) => handleCurrChange(room.id, "waterCurr", e.target.value)}
-                                                                    placeholder="—"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="text-xs text-slate-400 dark:text-slate-500">Chi phí</span>
-                                                                <span
-                                                                    className={`font-semibold ${waterCharge === null ? "text-gray-300" : waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : waterCharge.amount === 0 ? "text-slate-400 dark:text-slate-500" : "text-green-500 dark:text-green-300"}`}>
-                                                                    {waterCharge === null ? "—" : waterCharge.isInvalid ? "Lỗi" : formatVnd(waterCharge.amount)}
-                                                                </span>
-                                                            </div>
+                                                        <div className="text-right">
+                                                            {room.syncTime &&
+                                                                <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
+                                                            {room.status === "error" &&
+                                                                <p className="text-xs text-red-400">Kiểm tra lại chỉ
+                                                                    số</p>}
+                                                            {room.status === "local" &&
+                                                                <p className="text-xs text-slate-400 dark:text-slate-500">Chưa
+                                                                    đồng bộ</p>}
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                <div
-                                                    className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100 dark:border-white/10">
-                                                    <div>
-                                                        <span
-                                                            className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block">Ảnh</span>
-                                                        <PhotoGallery
-                                                            photos={MOCK_PHOTOS.slice(0, room.photos)}
-                                                            renderTrigger={(openPhoto) => (
-                                                                <div
-                                                                    className={`flex items-center gap-1 ${room.photos > 0 ? "cursor-pointer" : ""}`}
-                                                                    onClick={() => room.photos > 0 && openPhoto(0)}
-                                                                >
-                                                                    {room.photos > 0 ? (
-                                                                        <>
-                                                                            <MeterPhoto src={MOCK_PHOTOS[0].src} />
-                                                                            {room.photos > 1 &&
-                                                                                <MeterPhoto
-                                                                                    src={MOCK_PHOTOS[1].src} />}
-                                                                            {room.photos > 2 && (
-                                                                                <div
-                                                                                    className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-gray-200 transition-colors">
-                                                                                    +{room.photos - 2}
-                                                                                </div>
-                                                                            )}
-                                                                        </>
-                                                                    ) : (
-                                                                        <span
-                                                                            className="text-slate-400 dark:text-slate-500 text-xs italic">Không có</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        />
-                                                    </div>
-                                                    <div className="text-right">
-                                                        {room.syncTime &&
-                                                            <p className="text-xs text-slate-400 dark:text-slate-500">{room.syncTime}</p>}
-                                                        {room.status === "error" &&
-                                                            <p className="text-xs text-red-400">Kiểm tra lại chỉ số</p>}
-                                                        {room.status === "local" &&
-                                                            <p className="text-xs text-slate-400 dark:text-slate-500">Chưa đồng bộ</p>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                </Accordion>
+                                            );
+                                        })}
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
                 )}
             </div>
 
@@ -1414,7 +1443,7 @@ export default function MeterReadings() {
                     disabled={!canConfirmBatch || confirming}
                     className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
                 >
-                    <CheckCircle2 className="h-4 w-4" />
+                    <CheckCircle2 className="h-4 w-4"/>
                     {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
                 </Button>
             </div>
@@ -1436,7 +1465,8 @@ export default function MeterReadings() {
                                 <DialogHeader className="shrink-0">
                                     <DialogTitle className="text-xl">Phòng {room.id}</DialogTitle>
                                 </DialogHeader>
-                                <div className="mt-4 flex w-full shrink-0 touch-pan-x items-center gap-2 overflow-x-auto border-b border-gray-100 pb-3 pr-8 dark:border-white/10">
+                                <div
+                                    className="mt-4 flex w-full shrink-0 touch-pan-x items-center gap-2 overflow-x-auto border-b border-gray-100 pb-3 pr-8 dark:border-white/10">
                                     {filtered.map((item) => (
                                         <button
                                             key={item.id}
@@ -1453,24 +1483,27 @@ export default function MeterReadings() {
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                                <Zap className="h-4 w-4 text-amber-500" />
+                                                <Zap className="h-4 w-4 text-amber-500"/>
                                                 Điện (kWh)
                                             </h4>
                                             {elecUsage !== null && elecUsage < 0 && (
                                                 <span
                                                     className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-500 dark:bg-rose-500/10 dark:text-rose-300">
-                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                    <AlertTriangle className="h-3.5 w-3.5"/>
                                                     Không hợp lệ
                                                 </span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
+                                            <div
+                                                className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Số cũ</p>
                                                 <p className="font-semibold text-slate-700 dark:text-slate-200">{room.elecPrev.toLocaleString()}</p>
                                             </div>
-                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
-                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
+                                            <div
+                                                className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
+                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số
+                                                    mới</p>
                                                 <input
                                                     type="number"
                                                     min="0"
@@ -1483,16 +1516,20 @@ export default function MeterReadings() {
                                             </div>
                                         </div>
                                         {elecCharge ? (
-                                            <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
+                                            <div
+                                                className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
-                                                    <span className={`text-sm font-semibold ${elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                    <span
+                                                        className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span
+                                                        className={`text-sm font-semibold ${elecCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
                                                         {elecCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(elecCharge.amount)}
                                                     </span>
                                                 </div>
                                                 {!elecCharge.isInvalid ? (
                                                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                        {elecCharge.billableUsage} kWh x {formatVnd(elecCharge.unitPrice)}
+                                                        {elecCharge.billableUsage} kWh
+                                                        x {formatVnd(elecCharge.unitPrice)}
                                                     </p>
                                                 ) : null}
                                             </div>
@@ -1504,24 +1541,27 @@ export default function MeterReadings() {
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <h4 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                                <Droplets className="h-4 w-4 text-blue-500" />
+                                                <Droplets className="h-4 w-4 text-blue-500"/>
                                                 Nước (m³)
                                             </h4>
                                             {waterUsage !== null && waterUsage < 0 && (
                                                 <span
                                                     className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-500 dark:bg-rose-500/10 dark:text-rose-300">
-                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                    <AlertTriangle className="h-3.5 w-3.5"/>
                                                     Không hợp lệ
                                                 </span>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
+                                            <div
+                                                className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3 border border-gray-100 dark:border-white/10">
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Số cũ</p>
                                                 <p className="font-semibold text-slate-700 dark:text-slate-200">{room.waterPrev}</p>
                                             </div>
-                                            <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
-                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số mới</p>
+                                            <div
+                                                className="bg-blue-50/50 rounded-lg p-3 border border-blue-100 dark:border-blue-500/20">
+                                                <p className="text-xs text-blue-600 dark:text-blue-300 mb-1 font-medium">Số
+                                                    mới</p>
                                                 <input
                                                     type="number"
                                                     min="0"
@@ -1534,16 +1574,21 @@ export default function MeterReadings() {
                                             </div>
                                         </div>
                                         {waterCharge ? (
-                                            <div className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 dark:border-blue-500/20 dark:bg-blue-500/10">
+                                            <div
+                                                className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 dark:border-blue-500/20 dark:bg-blue-500/10">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
-                                                    <span className={`text-sm font-semibold ${waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
+                                                    <span
+                                                        className="text-xs font-medium text-slate-500 dark:text-slate-400">Chi phí chênh lệch</span>
+                                                    <span
+                                                        className={`text-sm font-semibold ${waterCharge.isInvalid ? "text-red-500 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}>
                                                         {waterCharge.isInvalid ? "Lỗi chỉ số" : formatVnd(waterCharge.amount)}
                                                     </span>
                                                 </div>
                                                 {!waterCharge.isInvalid ? (
                                                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                        {waterCharge.billableUsage} m³ tính phí sau miễn {waterCharge.freeAllowance} m³ x {formatVnd(waterCharge.unitPrice)}
+                                                        {waterCharge.billableUsage} m³ tính phí sau
+                                                        miễn {waterCharge.freeAllowance} m³
+                                                        x {formatVnd(waterCharge.unitPrice)}
                                                     </p>
                                                 ) : null}
                                             </div>
@@ -1552,14 +1597,15 @@ export default function MeterReadings() {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
+                                <div
+                                    className="mt-4 flex shrink-0 items-center gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
                                     <Button variant="primary" onClick={() => setFocusRoomId(null)}
-                                        className="w-1/3">
+                                            className="w-1/3">
                                         Đóng
                                     </Button>
                                     <Button onClick={handleSaveAndNext}
-                                        disabled={saving || isBatchLocked}
-                                        className="w-2/3 bg-blue-600 hover:bg-blue-700">
+                                            disabled={saving || isBatchLocked}
+                                            className="w-2/3 bg-blue-600 hover:bg-blue-700">
                                         {saving ? "Đang lưu..." : "Lưu & Tiếp theo"}
                                     </Button>
                                 </div>
@@ -1569,15 +1615,18 @@ export default function MeterReadings() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={confirmBatchDialogOpen} onOpenChange={(open) => !confirming && setConfirmBatchDialogOpen(open)}>
+            <Dialog open={confirmBatchDialogOpen}
+                    onOpenChange={(open) => !confirming && setConfirmBatchDialogOpen(open)}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Xác nhận chốt kỳ điện nước</DialogTitle>
                         <DialogDescription>
-                            Sau khi chốt, kỳ ghi chỉ số sẽ bị khóa và hệ thống sẽ mở batch hóa đơn nháp để review trước khi phát hành.
+                            Sau khi chốt, kỳ ghi chỉ số sẽ bị khóa và hệ thống sẽ mở batch hóa đơn nháp để review trước
+                            khi phát hành.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                    <div
+                        className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                         <div className="flex items-center justify-between gap-3">
                             <span>Kỳ nhập</span>
                             <span className="font-black">{formatPeriodLabel(period)}</span>

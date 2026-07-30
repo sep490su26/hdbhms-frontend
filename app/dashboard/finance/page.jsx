@@ -30,7 +30,7 @@ const sourceLabels = {
   room: "Tiền phòng",
   utilities: "Điện/Nước",
   service: "Dịch vụ",
-  extra: "Khác",
+  extra: "Thu khác",
 };
 
 const emptyPeriod = {
@@ -214,7 +214,7 @@ export default function FinancePage() {
       "Doanh thu phòng",
       "Tiền điện nước",
       "Phí dịch vụ",
-      "Phát sinh",
+      "Thu khác",
       "Tổng cộng",
     ];
     const rows = reports.map((item) => {
@@ -335,7 +335,7 @@ export default function FinancePage() {
           color="#a865ef"
         />
         <SummaryCard
-          label="Phát sinh"
+          label="Thu khác"
           value={sourceByKey.extra?.value ?? 0}
           note={`${sourceByKey.extra?.percent ?? 0}% tổng thu`}
           color="#ef627f"
@@ -361,7 +361,7 @@ export default function FinancePage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <i className="h-2.5 w-2.5 rounded-full bg-[#ef627f]" />
-                Phát sinh
+                Thu khác
               </span>
               <span className="flex items-center gap-1.5">
                 <i className="h-0.5 w-5 rounded bg-[#0f1d33]" />
@@ -417,7 +417,7 @@ export default function FinancePage() {
                 />
                 <Bar
                   dataKey="extra"
-                  name="Phát sinh"
+                  name="Thu khác"
                   stackId="revenue"
                   fill={sourceColors.extra}
                   radius={[4, 4, 0, 0]}
@@ -507,7 +507,7 @@ export default function FinancePage() {
                 <th className="px-5 py-3.5">Doanh thu phòng</th>
                 <th className="px-5 py-3.5">Tiền điện/nước</th>
                 <th className="px-5 py-3.5">Phí dịch vụ</th>
-                <th className="px-5 py-3.5">Phát sinh</th>
+                <th className="px-5 py-3.5">Thu khác</th>
                 <th className="px-5 py-3.5 text-right">Tổng cộng</th>
               </tr>
             </thead>

@@ -38,6 +38,20 @@ const titleCaseName = (value) =>
     .replace(/\s+/g, " ")
     .replace(/(^|\s)(\S)/gu, (match, prefix, char) => `${prefix}${char.toLocaleUpperCase("vi-VN")}`);
 
+export function normalizeGenderLabel(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("vi-VN");
+  if (["male", "m", "nam"].includes(normalized)) return "Nam";
+  if (["female", "f", "nu"].includes(normalized)) return "Nữ";
+  if (["other", "o", "khac"].includes(normalized)) return "Khác";
+  return "";
+}
+
 export function normalizeCccdScanResult(payload = {}) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
   const rawIdentity = data?.extractedIdentity || data?.identity || {};
@@ -56,7 +70,7 @@ export function normalizeCccdScanResult(payload = {}) {
       oldIdNumber: String(readFirst(rawIdentity, ["oldIdNumber", "old_id_number"])).trim(),
       fullName: titleCaseName(readFirst(rawIdentity, ["fullName", "full_name", "name"])),
       dob: normalizeDateValue(readFirst(rawIdentity, ["dob", "birthDate", "dateOfBirth", "date_of_birth"])),
-      gender: String(readFirst(rawIdentity, ["gender", "sex"])).trim(),
+      gender: normalizeGenderLabel(readFirst(rawIdentity, ["gender", "sex"])),
       address: String(readFirst(rawIdentity, ["address", "permanentAddress", "permanent_address"])).trim(),
       issuedDate: normalizeDateValue(readFirst(rawIdentity, ["issuedDate", "issued_date", "idIssueDate", "id_issue_date"])),
       issuedPlace: String(readFirst(rawIdentity, ["issuedPlace", "issued_place", "idIssuePlace", "id_issue_place"])).trim(),

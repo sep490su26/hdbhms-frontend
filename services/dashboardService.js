@@ -20,6 +20,7 @@ function normalizeRevenuePoint(item = {}) {
 
 function normalizeRecentActivity(item = {}) {
   return {
+    id: item.id ?? item.activityId ?? item.activity_id ?? null,
     type: textValue(item.type),
     title: textValue(item.title),
     time: textValue(item.time),

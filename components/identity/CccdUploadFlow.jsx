@@ -189,12 +189,14 @@ export default function CccdUploadFlow({
       return;
     }
 
+    const shouldRefreshBackSide = side === "front";
     const nextSlots = {
       ...slotsRef.current,
       [side]: {
         file,
         previewUrl: previewUrl || URL.createObjectURL(file),
       },
+      ...(shouldRefreshBackSide ? { back: EMPTY_SLOTS.back } : {}),
     };
     slotsRef.current = nextSlots;
 
@@ -209,7 +211,9 @@ export default function CccdUploadFlow({
     setStatus("ready");
     setMessage(
       scanEnabled
-        ? `Đã chọn ${SIDE_COPY[side].title.toLowerCase()}, chọn tiếp mặt còn lại.`
+        ? shouldRefreshBackSide
+          ? "Đã chọn mặt trước CCCD, vui lòng tải lại mặt sau."
+          : `Đã chọn ${SIDE_COPY[side].title.toLowerCase()}, chọn tiếp mặt còn lại.`
         : "Đã lưu ảnh CCCD. Thông tin định danh được nhập thủ công ở form."
     );
   };

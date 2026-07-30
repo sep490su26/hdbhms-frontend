@@ -54,6 +54,7 @@ function normalizeUser(raw = {}) {
   if (!raw) return null;
   return {
     id: readField(raw, "id"),
+    fullName: readField(raw, "fullName", "full_name", "displayName", "display_name", "name") || "",
     email: readField(raw, "email") || "",
     phone: readField(raw, "phone") || "",
     role: readField(raw, "role") || "",

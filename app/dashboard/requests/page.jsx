@@ -93,6 +93,7 @@ const translateType = (type) => {
   const map = {
     ROOM_TRANSFER: "Chuyển phòng",
     MOVE_OUT: "Trả phòng",
+    CONTRACT_RENEWAL: "Gia hạn HĐ",
     PERMISSION_ACCESS: "Quyền truy cập",
     TENANT_PROFILE_ACCESS: "Xem hồ sơ khách thuê",
     METER_READING_CORRECTION: "Điều chỉnh chỉ số",
@@ -187,7 +188,7 @@ function formatRequestTime(value) {
 }
 
 function requesterName(request) {
-  return String(request?.requesterName || "").trim() || "Người gửi";
+  return String(request?.requesterName || "").trim() || "Chưa có tên";
 }
 
 function requesterSecondaryText(request) {
@@ -200,6 +201,7 @@ function requesterSecondaryText(request) {
 
 function requesterInitials(request) {
   const name = requesterName(request);
+  if (name === "Chưa có tên") return "?";
   const words = name.split(/\s+/).filter(Boolean);
   if (words.length > 1) return `${words[0][0]}${words.at(-1)[0]}`.toUpperCase();
   return name.slice(0, 2).toUpperCase();
@@ -1362,28 +1364,28 @@ export default function ApprovalCenter() {
                 <Table className="w-full table-fixed">
                   <TableHeader>
                     <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-                      <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[16%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[14%]">
                         Người gửi
                       </TableHead>
-                      <TableHead className="h-12 w-[17%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[12%]">
                         Loại yêu cầu
                       </TableHead>
-                      <TableHead className="h-12 w-[25%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[42%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[37%] min-[1700px]:w-[25%]">
                         Tiêu đề
                       </TableHead>
                       <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell">
                         Mã yêu cầu
                       </TableHead>
-                      <TableHead className="h-12 w-[11%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[11%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[10%]">
                         Ngày tạo
                       </TableHead>
-                      <TableHead className="h-12 w-[10%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[9%]">
                         Trạng thái
                       </TableHead>
-                      <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell">
+                      <TableHead className="hidden h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell">
                         Hạn xử lý
                       </TableHead>
-                      <TableHead className="h-12 w-[8%] px-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <TableHead className="h-12 w-[6%] px-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[5%]">
                         Thao tác
                       </TableHead>
                     </TableRow>
@@ -1504,7 +1506,7 @@ export default function ApprovalCenter() {
                               </p>
                             </TableCell>
                             <TableCell className="px-3 py-3 align-top">
-                              <div className="flex items-center justify-end gap-1.5">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <Button
                                   size="icon"
                                   variant="outline"
@@ -1512,13 +1514,6 @@ export default function ApprovalCenter() {
                                   className="h-8 w-8 rounded-xl border-slate-200 text-slate-500"
                                 >
                                   <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-8 w-8 rounded-xl border-slate-200 text-slate-500"
-                                >
-                                  <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>

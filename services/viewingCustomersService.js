@@ -3,7 +3,9 @@ import {
     authenticatedFetch,
     parseEnvelope,
 } from "./identityAccessService";
-import { formatDate } from "@/lib/dateFormat";
+import { toDate } from "@/lib/dateFormat";
+
+const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 export const VIEWING_STATUSES = {
     NOT_VIEWED: "Chờ xem",
@@ -66,25 +68,37 @@ export function isFutureAppointment(appointmentDate, appointmentTime) {
     const value = combineAppointmentParts(appointmentDate, appointmentTime);
     if (!value) return false;
 
-    const appointment = new Date(value);
-    if (Number.isNaN(appointment.getTime())) return false;
+    const appointment = toDate(value);
+    if (!appointment) return false;
     return appointment > new Date();
 }
 
 export function formatAppointment(value) {
     if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
+    const date = toDate(value);
+    if (!date) return "";
 
     const now = new Date();
-    const sameDay =
-        date.getFullYear() === now.getFullYear() &&
-        date.getMonth() === now.getMonth() &&
-        date.getDate() === now.getDate();
-    const time = date.toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"});
+    const dateLabel = date.toLocaleDateString("vi-VN", {
+        timeZone: VIETNAM_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
+    const todayLabel = now.toLocaleDateString("vi-VN", {
+        timeZone: VIETNAM_TIME_ZONE,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
+    const time = date.toLocaleTimeString("vi-VN", {
+        timeZone: VIETNAM_TIME_ZONE,
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 
-    if (sameDay) return `Hôm nay ${time}`;
-    return `${formatDate(date, "")} ${time}`;
+    if (dateLabel === todayLabel) return `Hôm nay ${time}`;
+    return `${dateLabel} ${time}`;
 }
 
 export function normalizePhone(value) {

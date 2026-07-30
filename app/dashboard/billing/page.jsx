@@ -48,7 +48,7 @@ const STATUS_LABELS = {
 const TYPE_LABELS = {
   RENT: "Tiền phòng",
   UTILITY: "Điện nước",
-  OTHER: "Phát sinh",
+  OTHER: "Khác",
   DEPOSIT: "Đặt cọc",
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
 };

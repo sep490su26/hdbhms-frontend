@@ -11,7 +11,7 @@ function loadIdentityVerificationService(authenticatedFetch = async () => ({})) 
   const factory = new Function(
     "authenticatedFetch",
     `${source}
-return { extractCccdImages, normalizeCccdScanResult };`,
+return { extractCccdImages, normalizeCccdScanResult, normalizeGenderLabel };`,
   );
 
   return factory(authenticatedFetch);
@@ -63,4 +63,12 @@ test("normalizeCccdScanResult formats Vietnamese names and flexible dates", () =
   assert.equal(result.identity.fullName, "Nguyễn Văn A");
   assert.equal(result.identity.dob, "2003-08-25");
   assert.equal(result.identity.issuedDate, "2021-03-01");
+});
+
+test("normalizeGenderLabel maps enum and Vietnamese variants", () => {
+  const { normalizeGenderLabel } = loadIdentityVerificationService();
+
+  assert.equal(normalizeGenderLabel("MALE"), "Nam");
+  assert.equal(normalizeGenderLabel("nữ"), "Nữ");
+  assert.equal(normalizeGenderLabel("khac"), "Khác");
 });

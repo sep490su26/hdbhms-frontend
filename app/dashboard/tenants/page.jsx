@@ -95,6 +95,12 @@ const normalizeText = (value) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+const getInitials = (value) => {
+  const words = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
+};
+
 const formatDate = (value) => {
   return formatDisplayDate(value);
 };
@@ -1337,10 +1343,10 @@ function PoliceReportExportModal({
             </span>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#64748b] dark:text-slate-400">
-                Báo công an
+                Hồ sơ khách thuê
               </p>
               <h2 className="mt-1 text-xl font-black text-[#091426] dark:text-white">
-                Xuất báo công an
+                Xuất hồ sơ khách thuê
               </h2>
             </div>
           </div>
@@ -1843,7 +1849,7 @@ export default function TenantsPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                Xuất báo công an
+                Xuất hồ sơ khách thuê
               </button>
             )}
           </div>
@@ -2076,17 +2082,17 @@ export default function TenantsPage() {
                                   </div>
                                   <div className="flex items-center gap-3">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ecf3ff] text-xs font-bold text-[#465fff]">
-                            {getInitials(account.fullName)}
+                            {getInitials(valueOf(profile, "fullName", "full_name"))}
                           </span>
                                     <div className="min-w-0">
                                       <p className="font-bold text-[#0f1d33]">
-                                        {account.fullName}
+                                        {valueOf(profile, "fullName", "full_name")}
                                       </p>
                                       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[#687184]">
-                                        <span>{account.phone || "Chưa có SĐT"}</span>
+                                        <span>{valueOf(profile, "phone") || "Chưa có SĐT"}</span>
                                         <span className="inline-flex items-center gap-1">
                                 <Mail className="h-3.5 w-3.5" />
-                                          {account.email || "Chưa có email"}
+                                          {valueOf(profile, "email") || "Chưa có email"}
                               </span>
                                       </p>
                                     </div>

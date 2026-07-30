@@ -48,7 +48,7 @@ import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
 import IdentityEntryModeSelector from "../../../components/identity/IdentityEntryModeSelector";
-import { extractCccdImages } from "../../../services/identityVerificationService";
+import { extractCccdImages, normalizeGenderLabel } from "../../../services/identityVerificationService";
 
 const DEPOSIT_PER_ROOM = 2000;
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
@@ -57,6 +57,7 @@ const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
 const VIETNAM_PHONE_PATTERN = /^0\d{9}$/;
 const CITIZEN_ID_PATTERN = /^(?:\d{9}|\d{10}|\d{12})$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const GENDER_OPTIONS = ["Nam", "Nữ", "Khác"];
 const CO_OCCUPANT_NAME_PATTERN_MESSAGE = "Họ tên người ở cùng chỉ được chứa chữ cái và khoảng trắng.";
 const CO_OCCUPANT_PHONE_PATTERN_MESSAGE = "Số điện thoại phải là số Việt Nam gồm 10 chữ số và bắt đầu bằng 0.";
 const CO_OCCUPANT_DUPLICATE_MAIN_PHONE_MESSAGE = "Số điện thoại người ở cùng không được trùng người đặt cọc chính.";
@@ -65,6 +66,7 @@ const EXISTING_PERSON_PROFILE_HINT = "Hồ sơ với số điện thoại này �
 const IDENTITY_FIELD_DEFAULTS = {
   fullName: "",
   dob: "",
+  gender: "",
   idNumber: "",
   idIssueDate: "",
   idIssuePlace: "",
@@ -114,6 +116,7 @@ function validateField(name, value, form = {}) {
   const requiredMessages = {
     fullName: "Vui lòng nhập họ và tên.",
     dob: "Vui lòng chọn ngày sinh.",
+    gender: "Vui lòng chọn giới tính.",
     phone: "Vui lòng nhập số điện thoại.",
     idNumber: "Vui lòng nhập số CCCD.",
     idIssueDate: "Vui lòng chọn ngày cấp CCCD.",
@@ -138,6 +141,9 @@ function validateField(name, value, form = {}) {
   }
   if (name === "dob" && normalized > today) {
     return "Ngày sinh không được lớn hơn ngày hiện tại.";
+  }
+  if (name === "gender" && !GENDER_OPTIONS.includes(normalized)) {
+    return requiredMessages.gender;
   }
   if (name === "idIssueDate" && normalized > today) {
     return "Ngày cấp CCCD không được lớn hơn ngày hiện tại.";
@@ -378,6 +384,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const [form, setForm] = useState({
     fullName: "",
     dob: "",
+    gender: "",
     phone: "",
     email: "",
     idNumber: "",
@@ -545,6 +552,10 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       const mappedForm = {
         fullName: profileData?.person?.fullName || savedForm.fullName || "",
         dob: profileData?.person?.dob || savedForm.dob || "",
+        gender:
+          normalizeGenderLabel(profileData?.person?.gender) ||
+          normalizeGenderLabel(savedForm.gender) ||
+          "",
         phone: profileData?.person?.phone || savedForm.phone || "",
         email: profileData?.person?.email || savedForm.email || "",
         idNumber: profileData?.identityDocument?.docNumber || savedForm.idNumber || "",
@@ -890,7 +901,11 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     setFieldErrors((current) => ({
       ...current,
       front: nextFront ? "" : current.front,
-      back: nextBack ? "" : current.back,
+      back: nextBack
+        ? ""
+        : nextFront
+          ? "Vui lòng tải lên ảnh mặt sau CCCD."
+          : current.back,
     }));
   };
 
@@ -899,6 +914,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       const extractedValues = {
         fullName: identity?.fullName || "",
         dob: identity?.dob || "",
+        gender: normalizeGenderLabel(identity?.gender),
         idNumber: identity?.idNumber || "",
         idIssueDate: identity?.issuedDate || "",
         idIssuePlace: identity?.issuedPlace || "",
@@ -975,6 +991,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     [
       "fullName",
       "dob",
+      "gender",
       "phone",
       "email",
       "idNumber",
@@ -1048,6 +1065,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     [
       "fullName",
       "dob",
+      "gender",
       "phone",
       "email",
       "idNumber",
@@ -1182,6 +1200,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
   const metadata = useMemo(() => ({
     ...form,
+    gender: normalizeGenderLabel(form.gender),
     dob: form.dob || null,
     idIssueDate: form.idIssueDate || null,
     depositMonths: 1,
@@ -1740,7 +1759,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                     },
                   }}
                   onFilesChange={handleCccdFilesChange}
-                  disabled={submitting}
+                  disabled={submitting || isCccdExtracting}
                   scanEnabled
                   isExtracting={isCccdExtracting}
                   errors={{
@@ -1757,11 +1776,37 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                   <TextField label="Họ và tên" required disabled={isCccdExtracting} error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
                 </div>
                 <TextField label="Ngày sinh" required disabled={isCccdExtracting} type="date" error={fieldErrors.dob} value={form.dob} max={todayValue()} onChange={(event) => updateFormField("dob", event.target.value)} onBlur={(event) => updateFormField("dob", event.target.value)} />
+                <label className="grid gap-2 text-sm font-bold text-slate-700">
+                  <span>
+                    Giới tính <span className="text-rose-600">*</span>
+                  </span>
+                  <select
+                    value={form.gender}
+                    required
+                    disabled={isCccdExtracting}
+                    aria-invalid={fieldErrors.gender ? "true" : "false"}
+                    onChange={(event) => updateFormField("gender", event.target.value)}
+                    onBlur={(event) => updateFormField("gender", event.target.value)}
+                    className={`h-12 w-full rounded-lg border bg-white px-4 text-[#091426] outline-none focus:border-[#091426] focus:ring-2 focus:ring-[#091426]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
+                      fieldErrors.gender ? "border-rose-500" : "border-[#c5c6cd]"
+                    }`}
+                  >
+                    <option value="">Chọn giới tính</option>
+                    {GENDER_OPTIONS.map((gender) => (
+                      <option key={gender} value={gender}>
+                        {gender}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.gender ? <span className="text-xs font-medium text-rose-600">{fieldErrors.gender}</span> : null}
+                </label>
                 <TextField label="Số điện thoại" required type="tel" error={fieldErrors.phone} value={form.phone} onChange={(event) => updateFormField("phone", event.target.value)} onBlur={(event) => updateFormField("phone", event.target.value)} />
                 <TextField label="Email (không bắt buộc)" type="email" error={fieldErrors.email} value={form.email} onChange={(event) => updateFormField("email", event.target.value)} onBlur={(event) => updateFormField("email", event.target.value)} />
                 <TextField label="Số CCCD" required disabled={isCccdExtracting} inputMode="numeric" error={fieldErrors.idNumber} value={form.idNumber} onChange={(event) => updateFormField("idNumber", event.target.value)} onBlur={(event) => updateFormField("idNumber", event.target.value)} />
                 <TextField label="Ngày cấp CCCD" required disabled={isCccdExtracting} type="date" error={fieldErrors.idIssueDate} value={form.idIssueDate} max={todayValue()} onChange={(event) => updateFormField("idIssueDate", event.target.value)} onBlur={(event) => updateFormField("idIssueDate", event.target.value)} />
-                <TextField label="Nơi cấp CCCD" required disabled={isCccdExtracting} error={fieldErrors.idIssuePlace} value={form.idIssuePlace} onChange={(event) => updateFormField("idIssuePlace", event.target.value)} onBlur={(event) => updateFormField("idIssuePlace", event.target.value)} />
+                <div className="sm:col-span-2">
+                  <TextField label="Nơi cấp CCCD" required disabled={isCccdExtracting} error={fieldErrors.idIssuePlace} value={form.idIssuePlace} onChange={(event) => updateFormField("idIssuePlace", event.target.value)} onBlur={(event) => updateFormField("idIssuePlace", event.target.value)} />
+                </div>
                 <div className="sm:col-span-2">
                   <TextField label="Địa chỉ thường trú" required disabled={isCccdExtracting} error={fieldErrors.permanentAddress} value={form.permanentAddress} onChange={(event) => updateFormField("permanentAddress", event.target.value)} onBlur={(event) => updateFormField("permanentAddress", event.target.value)} />
                 </div>
@@ -1916,7 +1961,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                         },
                       }}
                       onFilesChange={handleCccdFilesChange}
-                      disabled={submitting}
+                      disabled={submitting || isCccdExtracting}
                       scanEnabled={false}
                       errors={{
                         citizenIdFront: fieldErrors.front,

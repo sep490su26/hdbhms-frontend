@@ -1,3 +1,5 @@
+import { formatDateTime } from "../../../../lib/dateFormat.js";
+
 const hasOwn = (value, key) =>
   Object.prototype.hasOwnProperty.call(value, key);
 
@@ -26,7 +28,6 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
   const roomId = readField(room, "roomId", "room_id");
   const roomCode = readField(room, "roomCode", "room_code");
   const syncTimeValue = readField(room, "syncTime", "sync_time");
-  const syncDate = syncTimeValue ? new Date(syncTimeValue) : null;
   const electricityPrevious = toFiniteNumber(
     readField(room, "electricityPrevious", "electricity_previous"),
     0,
@@ -57,10 +58,7 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
       waterPrevious,
     ),
     status: readField(room, "status", "status") || "pending",
-    syncTime:
-      syncDate && Number.isFinite(syncDate.getTime())
-        ? syncDate.toLocaleString()
-        : null,
+    syncTime: formatDateTime(syncTimeValue, null),
     photos: Math.max(
       0,
       toFiniteNumber(readField(room, "photosCount", "photos_count"), 0),

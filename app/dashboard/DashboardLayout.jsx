@@ -12,6 +12,7 @@ import {
   CheckCheck,
   ChevronDown,
   FileCheck2,
+  FileText,
   Gauge,
   Home,
   LayoutDashboard,
@@ -59,6 +60,14 @@ import {
   markNotificationAsRead,
 } from "@/services/notificationsService";
 import { toDate } from "@/lib/dateFormat";
+
+const currentContractYear = new Date().getFullYear();
+const contractYearChildren = [
+  ...[currentContractYear, currentContractYear - 1].map((year) => ({
+    path: `/dashboard/contract-management?year=${year}`,
+    label: `Năm ${year}`,
+  })),
+];
 
 const navigation = [
   {
@@ -140,6 +149,13 @@ const navigation = [
     permissionKey: "deposits",
   },
   {
+    path: "/dashboard/contract-management",
+    label: "Quản lý hợp đồng",
+    icon: FileText,
+    permissionKey: "contract",
+    children: contractYearChildren,
+  },
+  {
     path: "/dashboard/requests",
     label: "Quản lý yêu cầu",
     icon: Inbox,
@@ -184,6 +200,11 @@ const specialRoutePermissions = [
     prefix: "/dashboard/room-transfer-history",
     permissionKey: "roomTransferHistory",
     navigationPath: "/dashboard/requests",
+  },
+  {
+    prefix: "/dashboard/contract-template",
+    permissionKey: "contract",
+    navigationPath: "/dashboard/contract-management",
   },
   {
     prefix: "/dashboard/ai-advisor",

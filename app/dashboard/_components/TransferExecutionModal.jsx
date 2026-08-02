@@ -4,7 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {CheckCircle2, CircleDollarSign, Loader2, X} from "lucide-react";
 import {toast} from "sonner";
 
-import ContractHandoverSection from "@/app/dashboard/contract-template/ContractHandoverSection";
+import ContractHandoverSection from "@/app/dashboard/contract-management/ContractHandoverSection";
 import {fetchContractHandover} from "@/services/contractHandoverService";
 import {
     completeTransfer,

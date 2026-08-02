@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/apiConfig";
+import { authenticatedFetch } from "@/services/identityAccessService";
 
 function readField(source, ...keys) {
   for (const key of keys) {
@@ -89,4 +90,56 @@ export async function fetchPropertyRulesCatalog({ propertyId } = {}) {
 
   const rules = await fetchPropertyRules(property.id);
   return { properties, property, rules };
+}
+
+function propertyRulePayload(rule = {}) {
+  return {
+    ruleCode: String(rule.ruleCode || "").trim(),
+    title: String(rule.title || "").trim(),
+    description: String(rule.description || "").trim(),
+    defaultFineAmount:
+      rule.defaultFineAmount === "" || rule.defaultFineAmount === null || rule.defaultFineAmount === undefined
+        ? null
+        : Number(rule.defaultFineAmount),
+    sortOrder:
+      rule.sortOrder === "" || rule.sortOrder === null || rule.sortOrder === undefined
+        ? 9999
+        : Number(rule.sortOrder),
+    status: rule.status || "ACTIVE",
+  };
+}
+
+export async function createPropertyRule(propertyId, rule) {
+  if (!propertyId) throw new Error("Chưa chọn cơ sở.");
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/rules`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(propertyRulePayload(rule)),
+    },
+  );
+  return normalizePropertyRule(data);
+}
+
+export async function updatePropertyRule(propertyId, ruleId, rule) {
+  if (!propertyId || !ruleId) throw new Error("Chưa chọn nội quy.");
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(propertyRulePayload(rule)),
+    },
+  );
+  return normalizePropertyRule(data);
+}
+
+export async function deletePropertyRule(propertyId, ruleId) {
+  if (!propertyId || !ruleId) throw new Error("Chưa chọn nội quy.");
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE" },
+  );
+  return normalizePropertyRule(data);
 }

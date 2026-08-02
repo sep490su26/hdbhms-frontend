@@ -12,12 +12,19 @@ import {
   ImageIcon,
   Loader2,
   LockKeyhole,
+  MoreVertical,
   Upload,
   Search,
   UserRound,
   WalletCards,
   X,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   downloadDepositContractPdf,
   fetchDepositAgreementDetails,
@@ -88,6 +95,8 @@ const MANAGEMENT_INFO_EDITABLE_STATUSES = new Set([
   "CONFIRMED",
   "EXTENDED",
 ]);
+const depositActionItemClass =
+  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#eef4ff] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white";
 const STATUS_LABELS = {
   PAID: STATUS_OPTIONS[0],
   CONFIRMED: STATUS_OPTIONS[0],
@@ -1532,11 +1541,22 @@ export default function DepositsPage() {
                     </td>
                   </tr>
                 ) : (
-                  pagedAgreements.map((agreement) => (
-                    <tr
-                      key={agreement.id}
-                      className="border-b border-[#edf0f5] dark:border-white/10 last:border-0"
-                    >
+                  pagedAgreements.map((agreement) => {
+                    const forfeiting = updatingId === `forfeit-${agreement.id}`;
+                    const uploadDisabled =
+                      agreement.canUploadSignedFile === false ||
+                      uploadingSignedId === agreement.id;
+                    const uploadLabel =
+                      agreement.signatureStatus === "SIGNED"
+                        ? "Thay file đã ký"
+                        : "Upload bản đã ký";
+                    const signedFileInputId = `signed-deposit-file-${agreement.id}`;
+
+                    return (
+                      <tr
+                        key={agreement.id}
+                        className="border-b border-[#edf0f5] dark:border-white/10 last:border-0"
+                      >
                       <td
                         data-label="Phòng"
                         className="px-5 py-4 text-base font-extrabold text-slate-900 dark:text-white"
@@ -1617,94 +1637,112 @@ export default function DepositsPage() {
                               : "Chờ ký")}
                         </span>
                       </td>
-                      <td data-label="Hành động" className="px-5 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openDetails(agreement)}
-                            className="rounded-full p-2 text-[#1e40af] dark:text-[#93c5fd] hover:bg-[#eef4ff]"
-                            aria-label={`Xem chi tiết ${agreement.depositCode}`}
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenContract(agreement)}
-                            className="rounded-full p-2 text-slate-900 dark:text-white hover:bg-[#eef4ff]"
-                            aria-label={`Xem hợp đồng cọc ${agreement.depositCode}`}
-                          >
-                            <FileText className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openExtensionModal(agreement)}
-                            disabled={!canExtendSigningDeadline(agreement)}
-                            className="rounded-full p-2 text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10 dark:disabled:text-slate-600"
-                            aria-label={`Gia hạn ngày ký ${agreement.depositCode}`}
-                            title={
-                              canExtendSigningDeadline(agreement)
-                                ? "Gia hạn ngày ký"
-                                : "Chỉ gia hạn được hợp đồng cọc còn chờ ký"
+                        <td data-label="Hành động" className="px-5 py-4 text-center">
+                          <input
+                            id={signedFileInputId}
+                            type="file"
+                            accept="application/pdf,image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            disabled={uploadDisabled}
+                            onChange={(event) =>
+                              handleTableSignedFileChange(agreement, event)
                             }
-                          >
-                            <CalendarDays className="h-5 w-5" />
-                          </button>
-                          {canForfeitDeposit(agreement) && (
-                            <button
-                              type="button"
-                              onClick={() => handleForfeitDeposit(agreement)}
-                              disabled={updatingId === `forfeit-${agreement.id}`}
-                              className="rounded-full p-2 text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                              aria-label={`Mất cọc ${agreement.depositCode}`}
-                              title={`Mất cọc khi quá hạn từ ${FORFEIT_OVERDUE_DAYS} ngày`}
+                          />
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#cbd3df] text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+                                aria-label={`Mở tùy chọn ${agreement.depositCode}`}
+                                title="Tùy chọn"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              sideOffset={8}
+                              className="w-56 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
                             >
-                              {updatingId === `forfeit-${agreement.id}` ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Ban className="h-5 w-5" />
-                              )}
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadContract(agreement)}
-                            className="hidden"
-                            aria-label={`Tải hợp đồng cọc ${agreement.depositCode}`}
-                          >
-                            <Download className="h-5 w-5" />
-                          </button>
-                          <label
-                            className={`rounded-full p-2 ${
-                              agreement.canUploadSignedFile === false ||
-                              uploadingSignedId === agreement.id
-                                ? "cursor-not-allowed text-slate-400"
-                                : "cursor-pointer text-slate-900 dark:text-white hover:bg-[#eef4ff]"
-                            }`}
-                            title={
-                              agreement.signatureStatus === "SIGNED"
-                                ? "Thay file đã ký"
-                                : "Upload bản đã ký"
-                            }
-                            aria-label={`${agreement.signatureStatus === "SIGNED" ? "Thay file đã ký" : "Upload bản đã ký"} ${agreement.depositCode}`}
-                          >
-                            <Upload className="h-5 w-5" />
-                            <input
-                              type="file"
-                              accept="application/pdf,image/jpeg,image/png,image/webp"
-                              className="sr-only"
-                              disabled={
-                                agreement.canUploadSignedFile === false ||
-                                uploadingSignedId === agreement.id
-                              }
-                              onChange={(event) =>
-                                handleTableSignedFileChange(agreement, event)
-                              }
-                            />
-                          </label>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                              <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+                                <button
+                                  type="button"
+                                  onClick={() => openDetails(agreement)}
+                                  className={depositActionItemClass}
+                                >
+                                  <Eye className="h-4 w-4 text-[#1e40af] dark:text-[#93c5fd]" />
+                                  Xem chi tiết
+                                </button>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenContract(agreement)}
+                                  className={depositActionItemClass}
+                                >
+                                  <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                  Xem bản nháp
+                                </button>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+                                <button
+                                  type="button"
+                                  onClick={() => openExtensionModal(agreement)}
+                                  disabled={!canExtendSigningDeadline(agreement)}
+                                  title={
+                                    canExtendSigningDeadline(agreement)
+                                      ? "Gia hạn ngày ký"
+                                      : "Chỉ gia hạn được hợp đồng cọc còn chờ ký"
+                                  }
+                                  className={`${depositActionItemClass} disabled:cursor-not-allowed disabled:opacity-50`}
+                                >
+                                  <CalendarDays className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+                                  Gia hạn ngày ký
+                                </button>
+                              </DropdownMenuItem>
+                              {canForfeitDeposit(agreement) ? (
+                                <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleForfeitDeposit(agreement)}
+                                    disabled={forfeiting}
+                                    title={`Mất cọc khi quá hạn từ ${FORFEIT_OVERDUE_DAYS} ngày`}
+                                    className={`${depositActionItemClass} text-rose-700 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-rose-300 dark:hover:text-rose-200`}
+                                  >
+                                    {forfeiting ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Ban className="h-4 w-4" />
+                                    )}
+                                    Mất cọc
+                                  </button>
+                                </DropdownMenuItem>
+                              ) : null}
+                              <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+                                <label
+                                  htmlFor={signedFileInputId}
+                                  className={`${depositActionItemClass} ${
+                                    uploadDisabled
+                                      ? "cursor-not-allowed opacity-50"
+                                      : "cursor-pointer"
+                                  }`}
+                                  title={uploadLabel}
+                                  aria-label={`${uploadLabel} ${agreement.depositCode}`}
+                                >
+                                  {uploadingSignedId === agreement.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-slate-500 dark:text-slate-400" />
+                                  ) : (
+                                    <Upload className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                  )}
+                                  <span>{uploadLabel}</span>
+                                </label>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

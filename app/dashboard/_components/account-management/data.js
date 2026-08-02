@@ -1,7 +1,6 @@
 export const accountTypeOptions = [
   { value: "all", label: "Tất cả loại tài khoản" },
   { value: "manager", label: "Quản lý" },
-  { value: "accountant", label: "Kế toán" },
 ];
 
 export const accountStatusOptions = [
@@ -13,7 +12,6 @@ export const accountStatusOptions = [
 
 export const accountTypeLabels = {
   manager: "Quản lý",
-  accountant: "Kế toán",
 };
 
 export const accountStatusMeta = {
@@ -51,17 +49,6 @@ export const initialEmployeeAccounts = [
     assignedFacility: "CS-TP",
   },
   {
-    id: "EMP-002",
-    fullName: "Trần Minh Phương",
-    accountType: "accountant",
-    phone: "0918 222 016",
-    email: "phuong.tran@haidang.vn",
-    status: "active",
-    createdAt: "04/05/2026",
-    lastLoginAt: "18/05/2026 17:22",
-    assignedFacility: "",
-  },
-  {
     id: "EMP-003",
     fullName: "Lê Gia Bảo",
     accountType: "manager",
@@ -69,17 +56,6 @@ export const initialEmployeeAccounts = [
     email: "bao.le@haidang.vn",
     status: "pending",
     createdAt: "17/05/2026",
-    lastLoginAt: "Chưa đăng nhập",
-    assignedFacility: "",
-  },
-  {
-    id: "EMP-004",
-    fullName: "Phạm Thùy Linh",
-    accountType: "accountant",
-    phone: "0981 533 228",
-    email: "linh.pham@haidang.vn",
-    status: "pending",
-    createdAt: "18/05/2026",
     lastLoginAt: "Chưa đăng nhập",
     assignedFacility: "",
   },

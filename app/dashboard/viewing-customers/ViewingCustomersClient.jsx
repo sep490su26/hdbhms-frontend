@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   CalendarDays,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
-  Loader2,
+  Eye,
+  MoreVertical,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -35,6 +39,18 @@ import {
 import { DateInput } from "@/components/DateInput";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
 const emptyForm = {
@@ -48,6 +64,12 @@ const emptyForm = {
   status: "NOT_VIEWED",
 };
 
+const filterControlClassName =
+  "h-10 w-full rounded-md border border-[#cfd5de] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:cursor-not-allowed disabled:bg-[#f1f3f5] disabled:text-slate-400 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:disabled:bg-white/5 dark:disabled:text-slate-500";
+
+const actionMenuItemClassName =
+  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#f1f3f5] dark:text-slate-200 dark:hover:bg-white/5";
+
 function StatusSelect({ status, onChange }) {
   const styles = {
     NOT_VIEWED:
@@ -57,19 +79,60 @@ function StatusSelect({ status, onChange }) {
     DISMISSED:
       "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#020817] text-slate-600 dark:text-slate-300",
   };
+  const dotStyles = {
+    NOT_VIEWED: "bg-amber-500",
+    VIEWED: "bg-emerald-500",
+    DISMISSED: "bg-slate-400",
+  };
+  const currentStatus = STATUS_OPTIONS.find((option) => option.value === status);
 
   return (
-    <select
-      value={status}
-      onChange={(event) => onChange(event.target.value)}
-      className={`h-8 rounded-full border px-3 text-xs font-bold outline-none ${styles[status] || styles.NOT_VIEWED}`}
-    >
-      {STATUS_OPTIONS.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={`inline-flex h-8 w-full max-w-[132px] items-center justify-between gap-2 rounded-full border px-3 text-xs font-bold outline-none transition hover:brightness-95 ${styles[status] || styles.NOT_VIEWED}`}
+        >
+          <span className="truncate">
+            {currentStatus?.label || VIEWING_STATUSES[status] || status}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        className="w-40 rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        {STATUS_OPTIONS.map((option) => {
+          const selected = option.value === status;
+
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              asChild
+              className="rounded-md p-0 focus:bg-transparent"
+            >
+              <button
+                type="button"
+                onClick={() => !selected && onChange(option.value)}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#f1f3f5] dark:text-slate-200 dark:hover:bg-white/5 ${
+                  selected ? "bg-[#f1f3f5] dark:bg-white/5" : ""
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    dotStyles[option.value] || dotStyles.NOT_VIEWED
+                  }`}
+                />
+                <span className="flex-1 text-left">{option.label}</span>
+                {selected && <Check className="h-4 w-4" />}
+              </button>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -101,16 +164,17 @@ function ViewingModal({
     : safeRooms;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-lg bg-white dark:bg-[#0f172a] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        lockScroll={false}
+        overlayClassName="bg-[#091426]/60 backdrop-blur-sm"
+        className="max-h-[92vh] gap-0 overflow-hidden rounded-lg bg-white p-0 shadow-2xl sm:max-w-2xl dark:bg-[#0f172a]"
+      >
+        <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b border-[#e2e8f0] px-6 py-4 text-left dark:border-white/10">
+          <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
             {mode === "edit" ? "Sửa khách xem" : "Thêm khách xem"}
-          </h2>
+          </DialogTitle>
           <button
             type="button"
             onClick={onClose}
@@ -119,7 +183,7 @@ function ViewingModal({
           >
             <X className="h-5 w-5" />
           </button>
-        </div>
+        </DialogHeader>
 
         <form
           onSubmit={onSubmit}
@@ -227,8 +291,8 @@ function ViewingModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -389,21 +453,87 @@ function TrashModal({
   );
 }
 
-function NoteModal({ customer, onClose }) {
+function CustomerActionsMenu({ customer, onView, onEdit, onDelete }) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Thao tác với ${customer.fullName}`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#cfd5de] text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-44 rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+          <button
+            type="button"
+            onClick={() => onView(customer)}
+            className={actionMenuItemClassName}
+          >
+            <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Xem chi tiết
+          </button>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+          <button
+            type="button"
+            onClick={() => onEdit(customer)}
+            className={actionMenuItemClassName}
+          >
+            <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Sửa
+          </button>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+          <button
+            type="button"
+            onClick={() => onDelete(customer)}
+            className={`${actionMenuItemClassName} text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200`}
+          >
+            <Trash2 className="h-4 w-4" />
+            Xóa
+          </button>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div className="grid gap-1 border-b border-[#e2e8f0] py-3 last:border-b-0 dark:border-white/10">
+      <span className="text-xs font-bold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      <span className="break-words text-sm font-semibold text-slate-900 dark:text-white">
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
+
+function CustomerDetailModal({ customer, onClose }) {
   if (!customer) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="w-full max-w-xl overflow-hidden rounded-lg bg-white dark:bg-[#0f172a] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-4">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        lockScroll={false}
+        overlayClassName="bg-[#091426]/60 backdrop-blur-sm"
+        className="max-h-[92vh] gap-0 overflow-hidden rounded-lg bg-white p-0 shadow-2xl sm:max-w-xl dark:bg-[#0f172a]"
+      >
+        <DialogHeader className="flex flex-row items-start justify-between gap-4 border-b border-[#e2e8f0] px-6 py-4 text-left dark:border-white/10">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Ghi chú khách xem phòng
-            </h2>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
+              Chi tiết khách xem phòng
+            </DialogTitle>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {customer.fullName} ·{" "}
               {customer.interestedRoomName || "Chưa chọn phòng"}
@@ -417,10 +547,30 @@ function NoteModal({ customer, onClose }) {
           >
             <X className="h-5 w-5" />
           </button>
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          <div className="rounded-lg border border-[#d9dde5] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 p-4 text-sm leading-6 text-slate-900 dark:text-white">
-            <p className="whitespace-pre-wrap break-words">
+        </DialogHeader>
+        <div className="max-h-[68vh] overflow-y-auto px-6 py-3">
+          <div className="grid gap-x-6 sm:grid-cols-2">
+            <DetailItem label="Tên khách" value={customer.fullName} />
+            <DetailItem label="Số điện thoại" value={customer.phone} />
+            <DetailItem label="Cơ sở" value={customer.propertyName} />
+            <DetailItem
+              label="Phòng quan tâm"
+              value={customer.interestedRoomName || "Chưa chọn phòng"}
+            />
+            <DetailItem
+              label="Ngày giờ xem"
+              value={customer.appointmentLabel}
+            />
+            <DetailItem
+              label="Trạng thái"
+              value={VIEWING_STATUSES[customer.status] || customer.status}
+            />
+          </div>
+          <div className="py-3">
+            <span className="text-xs font-bold uppercase tracking-[0.04em] text-slate-500 dark:text-slate-400">
+              Ghi chú
+            </span>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 dark:text-white">
               {customer.note || "Không có ghi chú."}
             </p>
           </div>
@@ -434,8 +584,8 @@ function NoteModal({ customer, onClose }) {
             Đóng
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -476,7 +626,7 @@ export default function ViewingCustomersClient() {
   const [errorMessage, setErrorMessage] = useState("");
   const [modalMode, setModalMode] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [noteCustomer, setNoteCustomer] = useState(null);
+  const [detailCustomer, setDetailCustomer] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [minDateTime, setMinDateTime] = useState("");
@@ -754,25 +904,11 @@ export default function ViewingCustomersClient() {
                 Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center ">
-              <select
-                value={filters.propertyId}
-                onChange={(event) =>
-                  updateFilter("propertyId", event.target.value)
-                }
-                className="h-11 w-full min-w-0 rounded-md border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-900 dark:text-white shadow-sm outline-none focus:border-[#1e40af] sm:w-auto"
-              >
-                <option value="all">Tất cả cơ sở</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.name}
-                  </option>
-                ))}
-              </select>
+            <div className="flex justify-start sm:justify-end">
               <button
                 type="button"
                 onClick={openCreate}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8]"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
               >
                 <Plus className="h-4 w-4" />
                 Thêm khách xem
@@ -801,88 +937,128 @@ export default function ViewingCustomersClient() {
             />
           </section>
 
-          <section className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_1px_rgba(9,20,38,0.03)]">
-            <div className="flex flex-wrap items-center gap-3 border-b border-[#d9dde5] dark:border-white/10 px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-              <div className="flex w-full sm:w-auto items-center">
-                <input
-                  type="text"
-                  placeholder="Tìm tên, SĐT, Email..."
-                  value={filters.keyword}
-                  onChange={(event) =>
-                    updateFilter("keyword", event.target.value)
-                  }
-                  className="h-9 w-full rounded border border-[#cfd5de] dark:border-white/10 px-3 text-xs focus:border-[#1e40af] focus:outline-none"
-                />
+          <section className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
+            <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="grid gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="relative w-full sm:max-w-xl lg:max-w-2xl">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm tên hoặc SĐT"
+                      value={filters.keyword}
+                      onChange={(event) =>
+                        updateFilter("keyword", event.target.value)
+                      }
+                      aria-label="Tìm khách xem phòng"
+                      className={`${filterControlClassName} pl-9`}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={openTrash}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#cfd5de] bg-white px-3 text-sm font-bold text-slate-700 transition hover:bg-[#f1f3f5] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Thùng rác
+                  </button>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                  <select
+                    value={filters.propertyId}
+                    onChange={(event) =>
+                      updateFilter("propertyId", event.target.value)
+                    }
+                    className={filterControlClassName}
+                  >
+                    <option value="all">Tất cả cơ sở</option>
+                    {properties.map((property) => (
+                      <option key={property.id} value={property.id}>
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={filters.roomId}
+                    onChange={(event) =>
+                      updateFilter("roomId", event.target.value)
+                    }
+                    disabled={filters.propertyId === "all"}
+                    className={filterControlClassName}
+                  >
+                    <option value="all">
+                      {filters.propertyId === "all"
+                        ? "Chọn cơ sở trước"
+                        : "Tất cả phòng"}
+                    </option>
+                    {filterRooms.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={filters.status}
+                    onChange={(event) =>
+                      updateFilter("status", event.target.value)
+                    }
+                    className={filterControlClassName}
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                  <DateInput
+                    value={filters.fromDate}
+                    onChange={(event) =>
+                      updateFilter("fromDate", event.target.value)
+                    }
+                    max={filters.toDate || undefined}
+                    placeholder="Từ ngày"
+                    wrapperClassName="min-w-0"
+                    className={filterControlClassName}
+                  />
+                  <DateInput
+                    value={filters.toDate}
+                    onChange={(event) =>
+                      updateFilter("toDate", event.target.value)
+                    }
+                    min={filters.fromDate || undefined}
+                    placeholder="Đến ngày"
+                    wrapperClassName="min-w-0"
+                    className={filterControlClassName}
+                  />
+                </div>
               </div>
-              {/*<span className="font-semibold text-slate-900 dark:text-white">Lọc theo:</span>*/}
-              {/*<select*/}
-              {/*    value={filters.roomId}*/}
-              {/*    onChange={(event) => updateFilter("roomId", event.target.value)}*/}
-              {/*    disabled={filters.propertyId === "all"}*/}
-              {/*    className="h-9 rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-xs font-medium text-slate-900 dark:text-white disabled:cursor-not-allowed disabled:bg-[#f1f3f5] disabled:text-slate-400 dark:text-slate-500"*/}
-              {/*>*/}
-              {/*    <option*/}
-              {/*        value="all">{filters.propertyId === "all" ? "Chọn cơ sở trước" : "Tất cả phòng"}</option>*/}
-              {/*    {filterRooms.map((room) => (*/}
-              {/*        <option key={room.id} value={room.id}>{room.name}</option>*/}
-              {/*    ))}*/}
-              {/*</select>*/}
-              <select
-                value={filters.status}
-                onChange={(event) => updateFilter("status", event.target.value)}
-                className="h-9 rounded border border-[#cfd5de] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-xs font-medium text-slate-900 dark:text-white"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-              <span className="font-semibold text-slate-900 dark:text-white">
-                Thời gian:
-              </span>
-              <DateInput
-                value={filters.fromDate}
-                onChange={(event) =>
-                  updateFilter("fromDate", event.target.value)
-                }
-                max={filters.toDate || undefined}
-                placeholder="Từ ngày"
-                wrapperClassName="w-full sm:w-40"
-                className="h-9 rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10"
-              />
-              <span>đến</span>
-              <DateInput
-                value={filters.toDate}
-                onChange={(event) => updateFilter("toDate", event.target.value)}
-                min={filters.fromDate || undefined}
-                placeholder="Đến ngày"
-                wrapperClassName="w-full sm:w-40"
-                className="h-9 rounded border border-[#cfd5de] px-3 text-xs dark:border-white/10"
-              />
-              <button
-                type="button"
-                onClick={openTrash}
-                className="ml-auto inline-flex h-9 items-center gap-2 rounded px-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-              >
-                <Trash2 className="h-4 w-4" />
-                Thùng rác
-              </button>
             </div>
 
             <div className="dashboard-table">
-              <table className="w-full text-left">
+              <table
+                className="w-full min-w-[1040px] text-left"
+                style={{ tableLayout: "fixed" }}
+              >
+                <colgroup>
+                  <col style={{ width: 180 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 210 }} />
+                  <col style={{ width: 150 }} />
+                  <col style={{ width: 160 }} />
+                  <col style={{ width: 124 }} />
+                  <col style={{ width: 80 }} />
+                </colgroup>
                 <thead className="bg-[#f1f3f5] dark:bg-white/5 text-[11px] font-bold uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
                   <tr>
-                    <th className="px-5 py-4">Tên khách</th>
-                    <th className="px-5 py-4">Số điện thoại</th>
-                    <th className="px-5 py-4">Cơ sở</th>
-                    <th className="px-5 py-4">Phòng quan tâm</th>
-                    <th className="px-5 py-4">Ghi chú</th>
-                    <th className="px-5 py-4">Ngày giờ xem</th>
-                    <th className="px-5 py-4">Trạng thái</th>
-                    <th className="px-5 py-4">Thao tác</th>
+                    <th className="px-5 py-3.5">Tên khách</th>
+                    <th className="px-5 py-3.5">Số điện thoại</th>
+                    <th className="px-5 py-3.5">Cơ sở</th>
+                    <th className="px-5 py-3.5">Phòng quan tâm</th>
+                    <th className="px-5 py-3.5">Ngày giờ xem</th>
+                    <th className="px-5 py-3.5">Trạng thái</th>
+                    <th className="px-4 py-3.5 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -891,89 +1067,85 @@ export default function ViewingCustomersClient() {
                       key={
                         customer.id != null ? customer.id : `fallback-${idx}`
                       }
-                      className="border-t border-[#d9dde5] dark:border-white/10 text-sm"
+                      className="border-t border-[#d9dde5] text-sm transition hover:bg-[#f8fafc] dark:border-white/10 dark:hover:bg-white/[0.03]"
                     >
-                      <td data-label="Tên khách" className="px-5 py-4">
+                      <td
+                        data-label="Tên khách"
+                        className="px-5 py-3.5 align-middle"
+                      >
                         <div className="min-w-0">
-                          <span className="block max-w-[180px] truncate font-bold leading-5 text-slate-900 dark:text-white">
+                          <span
+                            className="block truncate font-bold leading-5 text-slate-900 dark:text-white"
+                            title={customer.fullName}
+                          >
                             {customer.fullName}
                           </span>
                         </div>
                       </td>
                       <td
                         data-label="Số điện thoại"
-                        className="px-5 py-4 text-slate-700 dark:text-slate-200"
+                        className="whitespace-nowrap px-5 py-3.5 align-middle font-semibold text-slate-700 dark:text-slate-200"
                       >
                         {customer.phone}
                       </td>
                       <td
                         data-label="Cơ sở"
-                        className="px-5 py-4 text-slate-700 dark:text-slate-200"
+                        className="px-5 py-3.5 align-middle text-slate-700 dark:text-slate-200"
                       >
-                        {customer.propertyName}
+                        <span
+                          className="block truncate font-semibold leading-5"
+                          title={customer.propertyName || undefined}
+                        >
+                          {customer.propertyName || "—"}
+                        </span>
                       </td>
                       <td
                         data-label="Phòng quan tâm"
-                        className="px-5 py-4 text-center"
+                        className="px-5 py-3.5 align-middle"
                       >
                         <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[11px] font-bold uppercase ${
+                          className={`inline-flex max-w-full items-center overflow-hidden rounded-md px-2.5 py-1 text-[11px] font-bold ${
                             customer.interestedRoomId
                               ? "bg-[#dbeafe] text-[#335a91]"
                               : "bg-[#f1f3f5] dark:bg-white/5 text-slate-500 dark:text-slate-400"
                           }`}
+                          title={
+                            customer.interestedRoomName || "Chưa chọn phòng"
+                          }
                         >
-                          {customer.interestedRoomName || "Chưa chọn phòng"}
+                          <span className="truncate">
+                            {customer.interestedRoomName || "Chưa chọn phòng"}
+                          </span>
                         </span>
                       </td>
-                      <td data-label="Ghi chú" className="px-5 py-4">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            customer.note && setNoteCustomer(customer)
-                          }
-                          disabled={!customer.note}
-                          className={`note-preview block max-w-[260px] text-left text-sm font-medium leading-5 ${
-                            customer.note
-                              ? "cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline"
-                              : "cursor-default text-slate-400 dark:text-slate-500"
-                          }`}
-                          title={
-                            customer.note ? "Xem đầy đủ ghi chú" : undefined
-                          }
-                        >
-                          {customer.note || "—"}
-                        </button>
-                      </td>
-                      <td data-label="Ngày giờ xem" className="px-5 py-4">
-                        <span className="block font-bold text-slate-900 dark:text-white">
+                      <td
+                        data-label="Ngày giờ xem"
+                        className="px-5 py-3.5 align-middle"
+                      >
+                        <span className="block whitespace-nowrap font-bold text-slate-900 dark:text-white">
                           {customer.appointmentLabel || "—"}
                         </span>
                       </td>
-                      <td data-label="Trạng thái" className="px-5 py-4">
+                      <td
+                        data-label="Trạng thái"
+                        className="px-5 py-3.5 align-middle"
+                      >
                         <StatusSelect
                           status={customer.status}
                           onChange={(status) => changeStatus(customer, status)}
                         />
                       </td>
-                      <td data-label="Thao tác" className="px-5 py-4">
-                        <div className="flex flex-wrap items-center gap-2 justify-center">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(customer)}
-                            aria-label="Sửa"
-                            className="rounded p-1.5 text-slate-700 dark:text-slate-200 hover:bg-[#f1f3f5] dark:hover:bg-white/5"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteCustomer(customer)}
-                            aria-label="Xóa"
-                            className="rounded p-1.5 text-red-500 dark:text-rose-300 hover:bg-red-50 dark:hover:bg-rose-500/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                      <td
+                        data-label="Thao tác"
+                        className="px-4 py-3.5 align-middle"
+                      >
+                        <div className="flex justify-start xl:justify-center">
+                          <CustomerActionsMenu
+                            customer={customer}
+                            onView={setDetailCustomer}
+                            onEdit={openEdit}
+                            onDelete={deleteCustomer}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -981,7 +1153,7 @@ export default function ViewingCustomersClient() {
                   {customers.length === 0 && (
                     <tr key="empty-customers-row">
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
                       >
                         Không có khách xem phòng phù hợp với bộ lọc.
@@ -1037,10 +1209,10 @@ export default function ViewingCustomersClient() {
         />
       )}
 
-      {noteCustomer && (
-        <NoteModal
-          customer={noteCustomer}
-          onClose={() => setNoteCustomer(null)}
+      {detailCustomer && (
+        <CustomerDetailModal
+          customer={detailCustomer}
+          onClose={() => setDetailCustomer(null)}
         />
       )}
     </>

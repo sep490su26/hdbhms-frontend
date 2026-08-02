@@ -49,6 +49,12 @@ import {
 } from "@/lib/tenantProfileDedupe.mjs";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
 const TENANT_PROFILE_FETCH_SIZE = 1000;
@@ -1330,13 +1336,14 @@ function PoliceReportExportModal({
   const selectedCount = selectedColumns.length;
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-[#091426]/70 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white dark:bg-[#0f172a] shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 px-6 py-5">
+    <Dialog open onOpenChange={(open) => !open && !exporting && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        lockScroll={false}
+        overlayClassName="bg-[#091426]/70"
+        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden rounded-xl bg-white p-0 shadow-2xl sm:max-w-lg dark:bg-[#0f172a]"
+      >
+        <DialogHeader className="flex flex-row items-start justify-between gap-4 border-b border-[#d8dee8] px-6 py-5 text-left dark:border-white/10">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
               <FileSpreadsheet className="h-5 w-5" />
@@ -1345,9 +1352,9 @@ function PoliceReportExportModal({
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#64748b] dark:text-slate-400">
                 Hồ sơ khách thuê
               </p>
-              <h2 className="mt-1 text-xl font-black text-[#091426] dark:text-white">
+              <DialogTitle className="mt-1 text-xl font-black text-[#091426] dark:text-white">
                 Xuất hồ sơ khách thuê
-              </h2>
+              </DialogTitle>
             </div>
           </div>
           <button
@@ -1358,7 +1365,7 @@ function PoliceReportExportModal({
           >
             <X className="h-5 w-5" />
           </button>
-        </header>
+        </DialogHeader>
 
         <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1410,7 +1417,7 @@ function PoliceReportExportModal({
           )}
         </div>
 
-        <footer className="flex flex-wrap justify-end gap-3 border-t border-[#d8dee8] dark:border-white/10 bg-[#fbfcfe] dark:bg-white/5 px-6 py-4">
+        <div className="flex flex-wrap justify-end gap-3 border-t border-[#d8dee8] bg-[#fbfcfe] px-6 py-4 dark:border-white/10 dark:bg-white/5">
           <button
             type="button"
             onClick={onClose}
@@ -1437,9 +1444,9 @@ function PoliceReportExportModal({
             <Archive className="h-4 w-4" />
             {exporting ? "Đang xuất..." : "Xuất ZIP hồ sơ"}
           </button>
-        </footer>
-      </section>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

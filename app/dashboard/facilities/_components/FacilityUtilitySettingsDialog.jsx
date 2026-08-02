@@ -1,6 +1,14 @@
 "use client";
 
 import { Check, Droplets, Zap, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { VietnameseMoneyInput } from "@/components/ui/vietnamese-money-input";
 
 function UtilityNumberInput({
   label,
@@ -15,19 +23,39 @@ function UtilityNumberInput({
       <span>{label}</span>
       <div className="relative">
         <input
-          type="number"
-          min={0}
-          step={1}
+          type="text"
           inputMode="numeric"
           value={value}
           disabled={disabled}
-          onChange={(event) => onChange(name, event.target.value)}
-          className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 pr-24 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-white/10 dark:bg-[#0b1220] dark:text-white dark:focus:ring-blue-500/10"
+          onChange={(event) => onChange(name, event.target.value.replace(/\D/g, ""))}
+          className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 pr-14 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-white/10 dark:bg-[#0b1220] dark:text-white dark:focus:ring-blue-500/10"
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
           {suffix}
         </span>
       </div>
+    </label>
+  );
+}
+
+function UtilityMoneyInput({
+  label,
+  name,
+  value,
+  suffix,
+  disabled,
+  onChange,
+}) {
+  return (
+    <label className="grid gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      <span>{label}</span>
+      <VietnameseMoneyInput
+        value={value}
+        disabled={disabled}
+        suffix={suffix}
+        onValueChange={(nextValue) => onChange(name, nextValue)}
+        className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-white/10 dark:bg-[#0b1220] dark:text-white dark:focus:ring-blue-500/10"
+      />
     </label>
   );
 }
@@ -43,22 +71,33 @@ export function FacilityUtilitySettingsDialog({
   const disabled = state.loading || state.saving;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Cài đặt giá điện nước"
+    <Dialog
+      open={state.isOpen}
+      onOpenChange={(open) => {
+        if (!open && !state.saving) onClose();
+      }}
     >
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-[#0f172a]">
+      <DialogContent
+        lockScroll={false}
+        showCloseButton={false}
+        overlayClassName="bg-[#091426]/60 backdrop-blur-sm"
+        overlayProps={{
+          "aria-hidden": true,
+          onClick: () => (state.saving ? null : onClose()),
+          onTouchMove: (event) => event.preventDefault(),
+          onWheel: (event) => event.preventDefault(),
+        }}
+        className="max-h-[90vh] w-full max-w-3xl gap-0 overflow-hidden rounded-xl bg-white p-0 shadow-2xl dark:bg-[#0f172a] sm:max-w-3xl"
+      >
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          <DialogHeader className="gap-1 text-left">
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
               Giá điện nước
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+            </DialogTitle>
+            <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
               {state.facility?.name || "Cơ sở"}
-            </p>
-          </div>
+            </DialogDescription>
+          </DialogHeader>
           <button
             type="button"
             onClick={onClose}
@@ -92,12 +131,12 @@ export function FacilityUtilitySettingsDialog({
                       <h3 className="text-base font-bold text-slate-900 dark:text-white">
                         Điện
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         Áp dụng cho toàn bộ phòng trong cơ sở này.
                       </p>
                     </div>
                   </div>
-                  <UtilityNumberInput
+                  <UtilityMoneyInput
                     label="Đơn giá điện"
                     name="electricityUnitPrice"
                     suffix="VNĐ/kWh"
@@ -124,12 +163,12 @@ export function FacilityUtilitySettingsDialog({
                       <h3 className="text-base font-bold text-slate-900 dark:text-white">
                         Nước
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         Áp dụng cho toàn bộ phòng trong cơ sở này.
                       </p>
                     </div>
                   </div>
-                  <UtilityNumberInput
+                  <UtilityMoneyInput
                     label="Đơn giá nước"
                     name="waterUnitPrice"
                     suffix="VNĐ/m³"
@@ -170,7 +209,7 @@ export function FacilityUtilitySettingsDialog({
             {state.saving ? "Đang lưu..." : "Lưu giá"}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

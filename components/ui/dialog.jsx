@@ -50,11 +50,26 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  lockScroll = true,
+  overlayClassName,
+  overlayProps,
   ...props
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      {lockScroll ? (
+        <DialogOverlay className={overlayClassName} {...overlayProps} />
+      ) : (
+        <div
+          data-slot="dialog-overlay"
+          className={cn(
+            "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+            overlayClassName
+          )}
+          {...overlayProps}
+          style={{ pointerEvents: "auto", ...overlayProps?.style }}
+        />
+      )}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
@@ -24,6 +24,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   FACILITY_STATUS,
   facilityStatusOptions,
@@ -362,11 +368,11 @@ export function FacilityList({
   onUtilitySettings,
 }) {
   const [expandedIds, setExpandedIds] = useState(
-    () => new Set([facilities[0]?.id].filter(Boolean)),
+    () => new Set([facilities[0]?.id].filter(Boolean).map(String)),
   );
 
   const visibleIds = useMemo(
-    () => new Set(facilities.map((facility) => facility.id)),
+    () => new Set(facilities.map((facility) => String(facility.id))),
     [facilities],
   );
   const activeExpandedIds = useMemo(() => {
@@ -374,10 +380,11 @@ export function FacilityList({
     if (!firstFacilityId) return new Set();
     if (expandedIds.size === 0) return expandedIds;
     if ([...expandedIds].some((id) => visibleIds.has(id))) return expandedIds;
-    return new Set([firstFacilityId]);
+    return new Set([String(firstFacilityId)]);
   }, [expandedIds, facilities, visibleIds]);
 
   const toggleFacility = (id) => {
+    const targetId = String(id);
     setExpandedIds((current) => {
       const currentVisible = [...current].some((itemId) =>
         visibleIds.has(itemId),
@@ -385,8 +392,8 @@ export function FacilityList({
         ? current
         : activeExpandedIds;
       const next = new Set(currentVisible);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(targetId)) next.delete(targetId);
+      else next.add(targetId);
       return next;
     });
   };
@@ -412,7 +419,7 @@ export function FacilityList({
           <MobileFacilityCard
             key={facility.id}
             facility={facility}
-            expanded={activeExpandedIds.has(facility.id)}
+            expanded={activeExpandedIds.has(String(facility.id))}
             onToggle={() => toggleFacility(facility.id)}
             onEdit={onEdit}
             onStatusChange={onStatusChange}
@@ -424,108 +431,96 @@ export function FacilityList({
 
       <div className="hidden overflow-hidden rounded-2xl border border-[#dbe1ea] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)] md:block">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] border-collapse text-left">
-            <thead className="bg-[#f2f4f6] dark:bg-white/5">
-              <tr className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#647089]">
-                <th className="w-12 px-4 py-4" aria-label="Mở rộng" />
-                <th className="px-4 py-4">Tên cơ sở</th>
-                <th className="px-4 py-4">Địa chỉ</th>
-                <th className="px-4 py-4 text-center">Số tầng</th>
-                <th className="px-4 py-4 text-center">Số phòng</th>
-                <th className="px-4 py-4">Trạng thái</th>
-                <th className="px-4 py-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="min-w-[1080px]">
+            <div className="grid grid-cols-[40px_minmax(260px,1.2fr)_minmax(240px,1.4fr)_88px_88px_150px_72px] gap-4 bg-[#f2f4f6] px-4 py-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[#647089] dark:bg-white/5">
+              <span aria-label="Mở rộng" />
+              <span>Tên cơ sở</span>
+              <span>Địa chỉ</span>
+              <span className="text-center">Số tầng</span>
+              <span className="text-center">Số phòng</span>
+              <span>Trạng thái</span>
+              <span className="text-right">Thao tác</span>
+            </div>
+            <Accordion
+              type="multiple"
+              value={[...activeExpandedIds]}
+              onValueChange={(values) => setExpandedIds(new Set(values))}
+              className="min-w-[1080px]"
+            >
               {facilities.map((facility) => {
                 const counts = getFacilityCounts(facility);
-                const expanded = activeExpandedIds.has(facility.id);
 
                 return (
-                  <Fragment key={facility.id}>
-                    <tr className="border-t border-[#e2e8f0] dark:border-white/10 transition hover:bg-[#fbfcfd] dark:hover:bg-white/5">
-                      <td className="px-4 py-4">
-                        <button
-                          type="button"
-                          onClick={() => toggleFacility(facility.id)}
-                          className="rounded-lg p-2 text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5"
-                          aria-label={
-                            expanded
-                              ? `Thu gọn ${facility.name}`
-                              : `Mở chi tiết ${facility.name}`
-                          }
-                        >
-                          {expanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300">
-                            <Building2 className="h-5 w-5" />
+                  <AccordionItem
+                    key={facility.id}
+                    value={String(facility.id)}
+                    className="border-t border-[#e2e8f0] dark:border-white/10"
+                  >
+                    <div className="grid grid-cols-[minmax(0,1fr)_72px] items-center transition hover:bg-[#fbfcfd] dark:hover:bg-white/5">
+                      <AccordionTrigger className="rounded-none px-4 py-4 hover:no-underline [&>[data-slot=accordion-trigger-icon]]:hidden">
+                        <div className="grid flex-1 grid-cols-[40px_minmax(260px,1.2fr)_minmax(240px,1.4fr)_88px_88px_150px] items-center gap-4">
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition group-aria-expanded/accordion-trigger:bg-[#eef3fb] group-aria-expanded/accordion-trigger:text-[#1e40af] dark:text-slate-300 dark:group-aria-expanded/accordion-trigger:bg-white/10">
+                            <ChevronRight className="h-4 w-4 group-aria-expanded/accordion-trigger:hidden" />
+                            <ChevronDown className="hidden h-4 w-4 group-aria-expanded/accordion-trigger:block" />
                           </span>
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
+                              <Building2 className="h-5 w-5" />
+                            </span>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white">
+                                {facility.name}
+                              </p>
+                              <p className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
+                                {facility.code}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="max-w-64 text-sm leading-5 text-slate-600 dark:text-slate-300">
+                            {facility.address}
+                          </div>
+                          <div className="text-center font-bold text-slate-900 dark:text-white">
+                            {counts.floors}
+                          </div>
+                          <div className="text-center font-bold text-slate-900 dark:text-white">
+                            {counts.rooms}
+                          </div>
                           <div>
-                            <p className="font-bold text-slate-900 dark:text-white">
-                              {facility.name}
-                            </p>
-                            <p className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
-                              {facility.code}
-                            </p>
+                            <StatusBadge status={facility.status} />
                           </div>
                         </div>
-                      </td>
-                      <td className="max-w-64 px-4 py-4 text-sm leading-5 text-slate-600 dark:text-slate-300">
-                        {facility.address}
-                      </td>
-                      <td className="px-4 py-4 text-center font-bold text-slate-900 dark:text-white">
-                        {counts.floors}
-                      </td>
-                      <td className="px-4 py-4 text-center font-bold text-slate-900 dark:text-white">
-                        {counts.rooms}
-                      </td>
-                      <td className="px-4 py-4">
-                        <StatusBadge status={facility.status} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-end">
-                          <FacilityActionsMenu
-                            facility={facility}
-                            showMeterReadingsAction={showMeterReadingsAction}
-                            onEdit={onEdit}
-                            onUtilitySettings={onUtilitySettings}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                    {expanded && (
-                      <tr className="border-t border-[#e2e8f0] dark:border-white/10 bg-[#f7f9fb] dark:bg-white/5">
-                        <td colSpan={7} className="px-6 py-5">
-                          <div className="mb-4 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-600 dark:text-slate-300">
-                            <span className="inline-flex items-center gap-2">
-                              <Layers3 className="h-4 w-4" />
-                              {counts.floors} tầng
-                            </span>
-                            <span className="inline-flex items-center gap-2">
-                              <DoorOpen className="h-4 w-4" />
-                              {counts.rooms} phòng
-                            </span>
-                            <span className="inline-flex items-center gap-2">
-                              <BedDouble className="h-4 w-4" />
-                              {counts.occupied} phòng đang thuê
-                            </span>
-                          </div>
-                          <FacilityTree facility={facility} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                      </AccordionTrigger>
+                      <div className="flex justify-end px-4 py-4">
+                        <FacilityActionsMenu
+                          facility={facility}
+                          showMeterReadingsAction={showMeterReadingsAction}
+                          onEdit={onEdit}
+                          onUtilitySettings={onUtilitySettings}
+                        />
+                      </div>
+                    </div>
+                    <AccordionContent className="border-t border-[#e2e8f0] bg-[#f7f9fb] px-6 py-5 dark:border-white/10 dark:bg-white/5">
+                      <div className="mb-4 flex flex-wrap items-center gap-4 text-xs font-bold text-slate-600 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-2">
+                          <Layers3 className="h-4 w-4" />
+                          {counts.floors} tầng
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                          <DoorOpen className="h-4 w-4" />
+                          {counts.rooms} phòng
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                          <BedDouble className="h-4 w-4" />
+                          {counts.occupied} phòng đang thuê
+                        </span>
+                      </div>
+                      <FacilityTree facility={facility} />
+                    </AccordionContent>
+                  </AccordionItem>
                 );
               })}
-            </tbody>
-          </table>
+            </Accordion>
+          </div>
         </div>
       </div>
     </>

@@ -119,7 +119,17 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
         </button>
       </div>
 
-      <DialogContent showCloseButton={false} className="flex max-h-[86vh] w-full max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent
+        lockScroll={false}
+        showCloseButton={false}
+        overlayProps={{
+          "aria-hidden": true,
+          onClick: () => setDialogOpen(false),
+          onTouchMove: (event) => event.preventDefault(),
+          onWheel: (event) => event.preventDefault(),
+        }}
+        className="flex max-h-[86vh] w-full max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
         <div className="flex flex-col gap-3 border-b border-[#dce2ec] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
           <DialogHeader className="min-w-0 gap-1">
             <div className="flex items-center gap-2">

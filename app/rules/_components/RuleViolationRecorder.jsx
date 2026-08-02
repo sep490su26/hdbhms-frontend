@@ -8,8 +8,7 @@ import {
 } from "@/services/maintenanceService";
 import {fetchViewingRooms} from "@/services/viewingCustomersService";
 import DateInput from "../../../components/DateInput";
-
-const money = new Intl.NumberFormat("vi-VN");
+import {VietnameseMoneyInput} from "@/components/ui/vietnamese-money-input";
 
 function nextBillingPeriod() {
     const date = new Date();
@@ -17,21 +16,28 @@ function nextBillingPeriod() {
     return date.toISOString().slice(0, 7);
 }
 
-function formatMoneyInput(value) {
-    const digits = String(value ?? "").replace(/\D/g, "");
-    if (!digits) return "";
-    return money.format(Number(digits));
+function billingPeriodLabel(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})$/);
+    if (!match) return value || "";
+    return `Tháng ${Number(match[2])}/${match[1]}`;
 }
 
-function buildDefaultForm(propertyId = "") {
+function ruleFineAmount(rule) {
+    return Number(rule?.defaultFineAmount || 0);
+}
+
+function defaultViolationDescription(rule) {
+    return rule?.title ? `Khách vi phạm nội quy: ${rule.title}.` : "";
+}
+
+function buildDefaultForm(propertyId = "", rule = null) {
     return {
         propertyId: propertyId ? String(propertyId) : "",
         roomId: "",
         occupantId: "",
-        violationType: "RESET_WIFI_PASSWORD",
-        amount: formatMoneyInput("200000"),
-        description:
-            "Khách tự ý reset mật khẩu modem/wifi, vi phạm nội quy phòng trọ.",
+        violationType: rule?.ruleCode || "",
+        amount: ruleFineAmount(rule) > 0 ? String(ruleFineAmount(rule)) : "",
+        description: defaultViolationDescription(rule),
         collectionMethod: "MONTHLY_SCHEDULED",
         billingPeriod: nextBillingPeriod(),
         occurredAt: new Date().toISOString().slice(0, 10),
@@ -69,14 +75,37 @@ function InlineNotice({type = "info", children}) {
     );
 }
 
-export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}) {
+export function RuleViolationRecorder({
+    propertyId,
+    propertyName = "",
+    rules = [],
+    onCreated,
+    embedded = false,
+    showHeader = true,
+}) {
+    const initialRule = rules.find((rule) => rule?.ruleCode && ruleFineAmount(rule) > 0) || null;
     const [rooms, setRooms] = useState([]);
     const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-    const [form, setForm] = useState(() => buildDefaultForm(propertyId));
+    const [form, setForm] = useState(() => buildDefaultForm(propertyId, initialRule));
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const ruleOptions = useMemo(
+        () =>
+            rules
+                .filter((rule) => rule?.ruleCode && ruleFineAmount(rule) > 0)
+                .map((rule) => ({
+                    ...rule,
+                    id: String(rule.id || rule.ruleCode),
+                    ruleCode: String(rule.ruleCode),
+                })),
+        [rules],
+    );
+    const selectedRule = useMemo(
+        () => ruleOptions.find((rule) => rule.ruleCode === form.violationType) || null,
+        [form.violationType, ruleOptions],
+    );
     const roomOptions = useMemo(
         () =>
             rooms
@@ -114,12 +143,20 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
     }, [propertyId]);
 
     function updateForm(name, value) {
-        const nextValue = name === "amount" ? formatMoneyInput(value) : value;
         setForm((current) => ({
             ...current,
-            [name]: nextValue,
-            ...(name === "violationType" && value === "RESET_WIFI_PASSWORD"
-                ? {amount: formatMoneyInput("200000")}
+            [name]: value,
+            ...(name === "violationType"
+                ? (() => {
+                    const rule = ruleOptions.find((item) => item.ruleCode === value);
+                    return {
+                        amount: ruleFineAmount(rule) > 0 ? String(ruleFineAmount(rule)) : "",
+                        description: defaultViolationDescription(rule),
+                    };
+                })()
+                : {}),
+            ...(name === "collectionMethod" && value === "MONTHLY_SCHEDULED"
+                ? {billingPeriod: nextBillingPeriod()}
                 : {}),
         }));
     }
@@ -141,7 +178,7 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
 
         const numericPropertyId = Number(propertyId || form.propertyId);
         const roomId = Number(form.roomId);
-        const amount = Number(String(form.amount).replace(/[^\d]/g, ""));
+        const amount = Number(form.amount);
 
         if (!Number.isFinite(numericPropertyId) || numericPropertyId <= 0) {
             setError("Vui lòng chọn cơ sở trước khi ghi nhận vi phạm.");
@@ -149,6 +186,10 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
         }
         if (!Number.isFinite(roomId) || roomId <= 0) {
             setError("Vui lòng chọn phòng.");
+            return;
+        }
+        if (!form.violationType || !selectedRule) {
+            setError("Vui lòng chọn nội quy bị vi phạm.");
             return;
         }
         if (!Number.isFinite(amount) || amount <= 0) {
@@ -184,11 +225,11 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
 
             setSuccess(
                 form.collectionMethod === "MONTHLY_SCHEDULED"
-                    ? `Đã lên lịch gộp vào hóa đơn đầu tháng kỳ ${form.billingPeriod}.`
+                    ? `Đã ghi nhận "${selectedRule.title}" và lên lịch gộp vào hóa đơn đầu tháng kỳ ${billingPeriodLabel(form.billingPeriod)}.`
                     : result?.message ||
                     "Đã tạo hóa đơn nháp. Khách thuê chỉ thấy sau khi phát hành.",
             );
-            setForm(buildDefaultForm(String(numericPropertyId)));
+            setForm(buildDefaultForm(String(numericPropertyId), ruleOptions[0] || null));
             onCreated?.(result);
         } catch (submitError) {
             setError(submitError?.message || "Không ghi nhận được vi phạm nội quy.");
@@ -200,22 +241,28 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
     return (
         <form
             onSubmit={handleSubmit}
-            className="grid gap-5 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]"
+            className={
+                embedded
+                    ? "grid gap-5 p-5"
+                    : "grid gap-5 rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]"
+            }
         >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                        Ghi nhận vi phạm nội quy
-                    </h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        Ghi nhận khoản phạt theo cơ sở/phòng và chọn cách thu tiền cho khách thuê.
-                    </p>
+            {showHeader ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                            Ghi nhận vi phạm nội quy
+                        </h2>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            Ghi nhận khoản phạt theo cơ sở/phòng và chọn cách thu tiền cho khách thuê.
+                        </p>
+                    </div>
+                    <span
+                        className="w-fit rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20">
+              Phạt vi phạm nội quy
+            </span>
                 </div>
-                <span
-                    className="w-fit rounded-full bg-rose-50 px-3 py-1 text-xs font-black uppercase text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20">
-          Phạt vi phạm nội quy
-        </span>
-            </div>
+            ) : null}
 
             {success ? <InlineNotice>{success}</InlineNotice> : null}
             {error ? <InlineNotice type="error">{error}</InlineNotice> : null}
@@ -252,33 +299,39 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
                 <Field label="Người vi phạm">
                     <input value="Ghi nhận ở cấp phòng" disabled className={inputClassName()}/>
                 </Field>
-                <DateInput
-                    name={"Ngày ghi nhận"}
-                    value={form.occurredAt}
-                    onChange={(event) => updateForm("occurredAt", event.target.value)}
-                    className={inputClassName()}
-                />
+                <Field label="Ngày ghi nhận *">
+                    <DateInput
+                        name="occurredAt"
+                        value={form.occurredAt}
+                        onChange={(event) => updateForm("occurredAt", event.target.value)}
+                        className={inputClassName()}
+                    />
+                </Field>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-                <Field label="Loại vi phạm *">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_240px]">
+                <Field label="Nội quy vi phạm *">
                     <select
                         value={form.violationType}
                         onChange={(event) => updateForm("violationType", event.target.value)}
                         className={inputClassName()}
                     >
-                        <option value="RESET_WIFI_PASSWORD">
-                            Tự ý reset mật khẩu modem/wifi
-                        </option>
+                        {ruleOptions.length === 0 ? (
+                            <option value="">Chưa có nội quy phạt</option>
+                        ) : null}
+                        {ruleOptions.map((rule) => (
+                            <option key={rule.id} value={rule.ruleCode}>
+                                {rule.title}
+                            </option>
+                        ))}
                     </select>
                 </Field>
                 <Field label="Số tiền phạt *">
-                    <input
+                    <VietnameseMoneyInput
                         value={form.amount}
-                        onChange={(event) => updateForm("amount", event.target.value)}
+                        onValueChange={(value) => updateForm("amount", value)}
+                        suffix="VNĐ"
                         className={inputClassName()}
-                        inputMode="numeric"
-                        placeholder="200000"
                     />
                 </Field>
                 <Field label="Cách thu tiền *">
@@ -287,26 +340,15 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
                         onChange={(event) => updateForm("collectionMethod", event.target.value)}
                         className={inputClassName()}
                     >
-                        <option value="BILL_NOW">Thanh toán hóa đơn ngay</option>
-                        <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
+                        <option value="BILL_NOW">Tạo hóa đơn ngay</option>
+                        <option value="MONTHLY_SCHEDULED">Gộp hóa đơn đầu tháng</option>
                     </select>
                 </Field>
             </div>
 
-            {form.collectionMethod === "MONTHLY_SCHEDULED" ? (
-                <Field label="Kỳ hóa đơn gộp *">
-                    <input
-                        type="month"
-                        value={form.billingPeriod}
-                        onChange={(event) => updateForm("billingPeriod", event.target.value)}
-                        className={inputClassName()}
-                    />
-                </Field>
-            ) : null}
-
             <InlineNotice>
                 {form.collectionMethod === "MONTHLY_SCHEDULED"
-                    ? "Khoản phạt sẽ chờ gộp vào hóa đơn đầu tháng. Khách thuê chưa thấy khoản này cho đến khi hóa đơn được phát hành."
+                    ? `Khoản phạt sẽ tự gộp vào hóa đơn kỳ sau (${billingPeriodLabel(form.billingPeriod)}). Khách thuê chưa thấy khoản này cho đến khi hóa đơn được phát hành.`
                     : "Hóa đơn nháp sẽ được tạo ngay. Khách thuê chỉ thấy hóa đơn và QR sau khi bạn phát hành."}
             </InlineNotice>
 
@@ -359,7 +401,7 @@ export function RuleViolationRecorder({propertyId, propertyName = "", onCreated}
                 </div>
                 <button
                     type="submit"
-                    disabled={isSubmitting || !propertyId}
+                    disabled={isSubmitting || !propertyId || !selectedRule}
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#b42318] px-5 text-sm font-bold text-white transition hover:bg-[#971b12] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                     {isSubmitting ? (

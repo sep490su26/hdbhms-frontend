@@ -33,6 +33,12 @@ import {
 } from "@/services/viewingCustomersService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { toDate } from "@/lib/dateFormat";
 
@@ -621,6 +627,7 @@ export default function MaintenancePage() {
               <button
                 type="button"
                 onClick={() => {
+                  setInternalError("");
                   setInternalForm((current) => ({
                     ...current,
                     propertyId:
@@ -629,16 +636,12 @@ export default function MaintenancePage() {
                       propertyOptions[0]?.id ||
                       "",
                   }));
-                  setIsInternalOpen((value) => !value);
+                  setIsInternalOpen(true);
                 }}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white hover:bg-[#115e59]"
               >
-                {isInternalOpen ? (
-                  <X className="h-4 w-4" />
-                ) : (
-                  <Wrench className="h-4 w-4" />
-                )}
-                {isInternalOpen ? "Đóng phiếu nội bộ" : "Tạo phiếu nội bộ"}
+                <Wrench className="h-4 w-4" />
+                Tạo phiếu bảo trì nội bộ
               </button>
             )}
           </div>
@@ -653,21 +656,40 @@ export default function MaintenancePage() {
 
       {internalSuccess && <InlineNotice>{internalSuccess}</InlineNotice>}
 
-      {isInternalOpen && (
+      <Dialog
+        open={isInternalOpen}
+        onOpenChange={(open) => {
+          if (isCreatingInternal) return;
+          setIsInternalOpen(open);
+          if (!open) setInternalError("");
+        }}
+      >
+        <DialogContent
+          lockScroll={false}
+          showCloseButton={!isCreatingInternal}
+          overlayClassName="bg-slate-950/55 supports-backdrop-filter:backdrop-blur-sm"
+          overlayProps={{
+            "aria-hidden": true,
+            onClick: () => (isCreatingInternal ? null : setIsInternalOpen(false)),
+            onTouchMove: (event) => event.preventDefault(),
+            onWheel: (event) => event.preventDefault(),
+          }}
+          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        >
         <form
           onSubmit={handleCreateInternalTicket}
-          className="grid gap-5 rounded-xl border border-teal-200 bg-white dark:bg-[#0f172a] p-5 shadow-[0_8px_30px_rgba(15,118,110,0.08)]"
+          className="grid gap-5 overflow-y-auto p-5"
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">
+            <DialogHeader className="gap-1 text-left">
+              <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
                 Tạo phiếu bảo trì nội bộ
-              </h2>
+              </DialogTitle>
               <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và
                 không phát sinh hóa đơn tenant.
               </p>
-            </div>
+            </DialogHeader>
             <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
               Chi phí nội bộ
             </span>
@@ -845,7 +867,8 @@ export default function MaintenancePage() {
             </button>
           </div>
         </form>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
         {/* NHÓM LỌC CHÍNH */}

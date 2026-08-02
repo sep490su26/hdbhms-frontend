@@ -17,6 +17,7 @@ function loadIdentityAccessService() {
 return {
   ApiError,
   authenticatedFetch,
+  normalizeUserAccount,
   parseEnvelope,
 };`,
   );
@@ -138,4 +139,34 @@ test("authenticatedFetch requests JSON responses", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("normalizeUserAccount preserves assigned property shapes used by staff accounts", () => {
+  const { normalizeUserAccount } = loadIdentityAccessService();
+
+  const assignedArray = normalizeUserAccount({
+    id: 10,
+    role: "MANAGER",
+    assigned_properties: [{ property_id: 7, property_name: "Cơ sở A", property_code: "CSA" }],
+  });
+  assert.equal(assignedArray.assignedProperties[0].id, 7);
+  assert.equal(assignedArray.assignedProperties[0].name, "Cơ sở A");
+  assert.equal(assignedArray.assignedProperties[0].code, "CSA");
+
+  const assignedObject = normalizeUserAccount({
+    id: 11,
+    role: "MANAGER",
+    assignedProperty: { id: 8, name: "Cơ sở B", code: "CSB" },
+  });
+  assert.equal(assignedObject.assignedProperties[0].id, 8);
+  assert.equal(assignedObject.assignedProperties[0].name, "Cơ sở B");
+
+  const flatProperty = normalizeUserAccount({
+    id: 12,
+    role: "MANAGER",
+    propertyId: 9,
+    propertyName: "Cơ sở C",
+  });
+  assert.equal(flatProperty.assignedProperties[0].id, 9);
+  assert.equal(flatProperty.assignedProperties[0].name, "Cơ sở C");
 });

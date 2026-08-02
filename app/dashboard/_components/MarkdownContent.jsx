@@ -17,7 +17,7 @@ function inlineParts(text, inverted = false) {
       parts.push(
         <code
           key={key}
-          className={`rounded px-1 py-0.5 text-[0.92em] font-bold ${inverted ? "bg-white/15" : "bg-slate-200"}`}
+          className={`rounded px-1 py-0.5 text-[0.92em] font-bold ${inverted ? "bg-white/15" : "bg-slate-200 dark:bg-white/10"}`}
         >
           {token.slice(1, -1)}
         </code>,
@@ -133,7 +133,7 @@ export function MarkdownContent({ content, className = "", inverted = false }) {
         index += 1;
       }
       blocks.push(
-        <blockquote key={`quote-${index}`} className="border-l-4 border-[#cbd5e1] pl-3 font-semibold opacity-85">
+        <blockquote key={`quote-${index}`} className="border-l-4 border-[#cbd5e1] pl-3 font-semibold opacity-85 dark:border-slate-600">
           {quote.map((item, itemIndex) => renderInline(item, itemIndex, inverted))}
         </blockquote>,
       );

@@ -278,6 +278,8 @@ function normalizeUserAccount(item = {}) {
         phone ||
         `Nhân viên #${id || ""}`.trim();
 
+    const assignedProperties = normalizeAssignedProperties(item);
+
     return {
         ...item,
         id,
@@ -293,12 +295,52 @@ function normalizeUserAccount(item = {}) {
         createdAt: item.createdAt ?? item.created_at ?? null,
         updatedAt: item.updatedAt ?? item.updated_at ?? null,
         deletedAt: item.deletedAt ?? item.deleted_at ?? null,
-        assignedProperties: item.assignedProperties ?? item.assigned_properties ?? [],
+        assignedProperties,
     };
 }
 
 function normalizeUserAccounts(data) {
     return readPageItems(data).map(normalizeUserAccount);
+}
+
+function normalizeAssignedProperties(item = {}) {
+    const candidates =
+        item.assignedProperties ??
+        item.assigned_properties ??
+        item.managedProperties ??
+        item.managed_properties ??
+        item.managerProperties ??
+        item.manager_properties ??
+        item.properties ??
+        [];
+    const source = Array.isArray(candidates) ? candidates : [candidates];
+    const mapped = source
+        .filter(Boolean)
+        .map(normalizeSimpleProperty)
+        .filter((property) => property.id);
+
+    if (mapped.length) return mapped;
+
+    const assignedProperty =
+        item.assignedProperty ??
+        item.assigned_property ??
+        item.property ??
+        null;
+    if (assignedProperty) {
+        const property = normalizeSimpleProperty(assignedProperty);
+        return property.id ? [property] : [];
+    }
+
+    const flatPropertyId = item.propertyId ?? item.property_id ?? null;
+    const flatPropertyName = item.propertyName ?? item.property_name ?? "";
+    if (!flatPropertyId || !flatPropertyName) return [];
+    return [
+        {
+            id: flatPropertyId,
+            name: flatPropertyName,
+            code: item.propertyCode ?? item.property_code ?? "",
+        },
+    ];
 }
 
 function normalizeSimpleProperty(item = {}) {

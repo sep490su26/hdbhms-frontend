@@ -43,12 +43,20 @@ export function FacilityFormDialog({
     <Dialog
       open={formState.isOpen}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && !formState.isSubmitting) onClose();
       }}
     >
       <DialogContent
+        lockScroll={false}
         showCloseButton={false}
-        className="max-h-[calc(100vh-2rem)] max-w-xl overflow-y-auto p-0"
+        overlayClassName="bg-black/10 supports-backdrop-filter:backdrop-blur-xs"
+        overlayProps={{
+          "aria-hidden": true,
+          onClick: () => (formState.isSubmitting ? null : onClose()),
+          onTouchMove: (event) => event.preventDefault(),
+          onWheel: (event) => event.preventDefault(),
+        }}
+        className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto p-0 sm:max-w-xl"
       >
         <DialogHeader className="flex-row items-start justify-between border-b border-[#e2e8f0] dark:border-white/10 px-6 py-5 text-left">
           <div>
@@ -78,7 +86,7 @@ export function FacilityFormDialog({
             onSubmit();
           }}
         >
-          <div className="grid gap-5 px-6 py-6">
+          <div className="grid gap-5 px-6 pb-8">
             <label className="grid gap-2">
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                 Tên cơ sở <span className="text-rose-600 dark:text-rose-300">*</span>

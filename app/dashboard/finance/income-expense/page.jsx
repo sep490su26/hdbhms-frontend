@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { MonthYearField } from "../../_components/MonthYearField";
+import { useTheme } from "../../_contexts/ThemeContext";
 import { fetchPaidExpenseRequests } from "@/services/expenseReportService";
 import { fetchRevenueReport } from "@/services/revenueReportService";
 import { formatThousandVND } from "../_lib/formatters";
@@ -240,21 +241,21 @@ function MetricCard({
 }) {
   const themes = {
     blue: {
-      card: "border-[#dfe5ef] bg-white text-[#0f1d33]",
-      icon: "bg-[#e9efff] text-[#3f5db5]",
-      badge: "bg-emerald-50 text-emerald-600",
-      note: "text-[#64748b]",
+      card: "border-[#dfe5ef] bg-white text-[#0f1d33] dark:border-white/10 dark:bg-[#0f172a] dark:text-white",
+      icon: "bg-[#e9efff] text-[#3f5db5] dark:bg-blue-500/15 dark:text-blue-200",
+      badge: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300",
+      note: "text-[#64748b] dark:text-slate-400",
     },
     red: {
-      card: "border-[#dfe5ef] bg-white text-[#0f1d33]",
-      icon: "bg-rose-50 text-rose-600",
-      badge: "bg-rose-50 text-rose-600",
-      note: "text-[#64748b]",
+      card: "border-[#dfe5ef] bg-white text-[#0f1d33] dark:border-white/10 dark:bg-[#0f172a] dark:text-white",
+      icon: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300",
+      badge: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300",
+      note: "text-[#64748b] dark:text-slate-400",
     },
     dark: {
-      card: "border-[#172744] bg-[#0d1b31] text-white",
-      icon: "bg-[#5773d7] text-white",
-      badge: "bg-[#233555] text-slate-200",
+      card: "border-[#172744] bg-[#0d1b31] text-white dark:border-white/10 dark:bg-[#111827]",
+      icon: "bg-[#5773d7] text-white dark:bg-blue-500/25",
+      badge: "bg-[#233555] text-slate-200 dark:bg-white/10 dark:text-slate-200",
       note: "text-slate-400",
     },
   };
@@ -282,7 +283,7 @@ function MetricCard({
         </span>
       </div>
       <p
-        className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b]"}`}
+        className={`mt-4 text-xs font-semibold ${tone === "dark" ? "text-slate-300" : "text-[#64748b] dark:text-slate-400"}`}
       >
         {label}
       </p>
@@ -301,8 +302,8 @@ function MetricCard({
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-[#dce2ec] bg-white px-3 py-2 text-xs shadow-lg">
-      <p className="font-bold text-[#0f1d33]">{label}</p>
+    <div className="rounded-lg border border-[#dce2ec] bg-white px-3 py-2 text-xs shadow-lg dark:border-white/10 dark:bg-[#0f172a]">
+      <p className="font-bold text-[#0f1d33] dark:text-white">{label}</p>
       {payload.map((item) => (
         <p key={item.dataKey} className="mt-1" style={{ color: item.color }}>
           {item.name}: <strong>{formatCurrency(item.value)}</strong>
@@ -313,6 +314,7 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 export default function IncomeExpenseReportPage() {
+  const { theme } = useTheme();
   const [periodType, setPeriodType] = useState("month");
   const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
   const [reports, setReports] = useState(() =>
@@ -364,6 +366,11 @@ export default function IncomeExpenseReportPage() {
     current.income > 0
       ? Math.round((current.profit / current.income) * 1000) / 10
       : 0;
+  const isDark = theme === "dark";
+  const chartGridColor = isDark ? "rgba(148, 163, 184, 0.2)" : "#edf1f6";
+  const chartAxisColor = isDark ? "#cbd5e1" : "#64748b";
+  const chartMutedAxisColor = isDark ? "#94a3b8" : "#94a3b8";
+  const chartCursorFill = isDark ? "rgba(96, 165, 250, 0.12)" : "#f8faff";
 
   const beginReload = () => {
     setIsLoading(true);
@@ -411,19 +418,19 @@ export default function IncomeExpenseReportPage() {
   };
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-5 text-[#0f1d33]">
+    <div className="flex w-full min-w-0 flex-col gap-5 text-[#0f1d33] dark:text-white">
       <DashboardPageHeader
         title="Báo cáo thu chi tổng hợp"
         description="Đối chiếu doanh thu, chi phí và lợi nhuận theo kỳ báo cáo."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-10 rounded-lg bg-[#edf2fb] p-1">
+            <div className="inline-flex h-10 rounded-lg border border-[#d7deea] bg-[#edf2fb] p-1 dark:border-white/10 dark:bg-white/5">
               {Object.entries(periodOptions).map(([key, item]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => handlePeriodTypeChange(key)}
-                  className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm" : "text-[#5f6b7c]"}`}
+                  className={`min-w-14 rounded-md px-3 text-xs font-bold transition ${periodType === key ? "bg-[#3f5db5] text-white shadow-sm dark:bg-blue-500/20 dark:text-blue-200" : "text-[#5f6b7c] dark:text-slate-300 dark:hover:text-white"}`}
                 >
                   {item.label}
                 </button>
@@ -434,36 +441,36 @@ export default function IncomeExpenseReportPage() {
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold sm:w-fit">
+        <nav className="flex flex-wrap items-center gap-1 rounded-lg bg-[#edf2fb] p-1 text-xs font-bold dark:bg-white/5 sm:w-fit">
           <Link
             href="/dashboard/finance"
-            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           >
             Doanh thu
           </Link>
-          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm">
+          <span className="rounded-md bg-white px-3 py-2 text-[#3156b6] shadow-sm dark:bg-blue-500/20 dark:text-blue-200">
             Thu chi tổng hợp
           </span>
           <Link
             href="/dashboard/finance/operating-expenses"
-            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70"
+            className="rounded-md px-3 py-2 text-[#5f6b7c] hover:bg-white/70 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           >
             Chi phí vận hành
           </Link>
         </nav>
-        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
+        <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300">
           Đơn vị: Nghìn VND
         </p>
       </div>
 
       {errorMessage && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300">
           {errorMessage}
         </div>
       )}
 
       {isLoading && (
-        <div className="rounded-lg border border-[#dce2ec] bg-white px-4 py-3 text-xs font-semibold text-[#5f6b7c]">
+        <div className="rounded-lg border border-[#dce2ec] bg-white px-4 py-3 text-xs font-semibold text-[#5f6b7c] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300">
           Đang tải báo cáo thu chi...
         </div>
       )}
@@ -495,15 +502,15 @@ export default function IncomeExpenseReportPage() {
         />
       </section>
 
-      <section className="min-h-[360px] rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm">
+      <section className="min-h-[360px] rounded-lg border border-[#dce2ec] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-black">Biểu đồ so sánh Thu - Chi</h2>
-            <p className="mt-1 text-xs text-[#64748b]">
+            <p className="mt-1 text-xs text-[#64748b] dark:text-slate-400">
               Thống kê 6 kỳ gần nhất
             </p>
           </div>
-          <div className="flex items-center gap-4 text-[10px] font-semibold text-[#64748b]">
+          <div className="flex items-center gap-4 text-[10px] font-semibold text-[#64748b] dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <i className="h-2.5 w-2.5 rounded-full bg-[#3f5db5]" />
               Doanh thu
@@ -521,23 +528,23 @@ export default function IncomeExpenseReportPage() {
               barGap={4}
               margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid vertical={false} stroke="#edf1f6" />
+              <CartesianGrid vertical={false} stroke={chartGridColor} />
               <XAxis
                 dataKey="label"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }}
+                tick={{ fontSize: 10, fill: chartAxisColor, fontWeight: 700 }}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
                 width={42}
-                tick={{ fontSize: 9, fill: "#94a3b8" }}
+                tick={{ fontSize: 9, fill: chartMutedAxisColor }}
                 tickFormatter={formatChartTick}
               />
               <Tooltip
                 content={<ChartTooltip />}
-                cursor={{ fill: "#f8faff" }}
+                cursor={{ fill: chartCursorFill }}
               />
               <Bar
                 dataKey="income"
@@ -558,13 +565,13 @@ export default function IncomeExpenseReportPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-[#dce2ec] bg-white shadow-sm">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dce2ec] px-5 py-4">
+      <section className="overflow-hidden rounded-lg border border-[#dce2ec] bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dce2ec] px-5 py-4 dark:border-white/10">
           <h2 className="text-sm font-black">Chi tiết theo thời gian</h2>
           <button
             type="button"
             onClick={exportReport}
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#3156b6] hover:text-[#233f91]"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#3156b6] hover:text-[#233f91] dark:text-blue-300 dark:hover:text-blue-200"
           >
             <Download className="h-3.5 w-3.5" />
             Xuất báo cáo (CSV)
@@ -572,7 +579,7 @@ export default function IncomeExpenseReportPage() {
         </header>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-xs">
-            <thead className="bg-[#eef3fb] text-[10px] font-black uppercase text-[#5f6b7c]">
+            <thead className="bg-[#eef3fb] text-[10px] font-black uppercase text-[#5f6b7c] dark:bg-white/5 dark:text-slate-400">
               <tr>
                 <th className="px-5 py-3.5">Thời gian</th>
                 <th className="px-5 py-3.5">Doanh thu</th>
@@ -585,24 +592,24 @@ export default function IncomeExpenseReportPage() {
               {[...reports].reverse().map((item, index) => (
                 <tr
                   key={item.periodKey}
-                  className="border-t border-[#e7ebf2] hover:bg-[#f8faff]"
+                  className="border-t border-[#e7ebf2] hover:bg-[#f8faff] dark:border-white/10 dark:hover:bg-white/5"
                 >
                   <td
                     className={`px-5 py-4 ${index < 3 ? "font-black" : "font-semibold"}`}
                   >
                     {item.period}
                   </td>
-                  <td className="px-5 py-4 font-semibold text-[#3156b6]">
+                  <td className="px-5 py-4 font-semibold text-[#3156b6] dark:text-blue-300">
                     {formatCurrency(item.income)}
                   </td>
-                  <td className="px-5 py-4 font-semibold text-rose-600">
+                  <td className="px-5 py-4 font-semibold text-rose-600 dark:text-rose-300">
                     {formatCurrency(item.expense)}
                   </td>
                   <td className="px-5 py-4 font-black">
                     {formatCurrency(item.profit)}
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
                       <i className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       Đã chốt
                     </span>

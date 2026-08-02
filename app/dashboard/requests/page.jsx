@@ -220,95 +220,95 @@ const STATUS_FILTERS = [
 
 const statusBadgeClass = (status) => {
   if (status === "PENDING")
-    return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-yellow-600 bg-yellow-50 border-yellow-200 dark:border-yellow-400/30 dark:bg-yellow-500/10 dark:text-yellow-300";
   if (status === "APPROVED" || status === "COMPLETED")
-    return "text-green-600 bg-green-50 border-green-200";
+    return "text-green-600 bg-green-50 border-green-200 dark:border-green-400/30 dark:bg-green-500/10 dark:text-green-300";
   if (status === "PROCESSING")
-    return "text-blue-600 bg-blue-50 border-blue-200";
+    return "text-blue-600 bg-blue-50 border-blue-200 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300";
   if (status === "REJECTED" || status === "CANCELLED")
-    return "text-red-600 bg-red-50 border-red-200";
-  return "text-gray-600 bg-gray-50 border-gray-200";
+    return "text-red-600 bg-red-50 border-red-200 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300";
+  return "text-gray-600 bg-gray-50 border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300";
 };
 
 const TYPE_CONFIG = {
   TRANSFER: {
-    color: "bg-violet-50",
-    icon: <ArrowRightLeft className="w-5 h-5 text-violet-500" />,
+    color: "bg-violet-50 dark:bg-violet-500/10",
+    icon: <ArrowRightLeft className="w-5 h-5 text-violet-500 dark:text-violet-300" />,
     accent: "violet",
   },
   MOVEOUT: {
-    color: "bg-green-50",
-    icon: <LogOut className="w-5 h-5 text-green-500" />,
+    color: "bg-green-50 dark:bg-green-500/10",
+    icon: <LogOut className="w-5 h-5 text-green-500 dark:text-green-300" />,
     accent: "green",
   },
   RENEWAL: {
-    color: "bg-indigo-50",
-    icon: <FileText className="w-5 h-5 text-indigo-500" />,
+    color: "bg-indigo-50 dark:bg-indigo-500/10",
+    icon: <FileText className="w-5 h-5 text-indigo-500 dark:text-indigo-300" />,
     accent: "indigo",
   },
   TERMINATION: {
-    color: "bg-red-50",
-    icon: <XCircle className="w-5 h-5 text-red-500" />,
+    color: "bg-red-50 dark:bg-red-500/10",
+    icon: <XCircle className="w-5 h-5 text-red-500 dark:text-red-300" />,
     accent: "red",
   },
   CONTRACT_LIQUIDATION: {
-    color: "bg-red-50",
-    icon: <XCircle className="w-5 h-5 text-red-500" />,
+    color: "bg-red-50 dark:bg-red-500/10",
+    icon: <XCircle className="w-5 h-5 text-red-500 dark:text-red-300" />,
     accent: "red",
   },
   ADD_CO_OCCUPANT: {
-    color: "bg-orange-50",
-    icon: <UserPlus className="w-5 h-5 text-orange-500" />,
+    color: "bg-orange-50 dark:bg-orange-500/10",
+    icon: <UserPlus className="w-5 h-5 text-orange-500 dark:text-orange-300" />,
     accent: "orange",
   },
   MAINTENANCE: {
-    color: "bg-emerald-50",
-    icon: <Wrench className="w-5 h-5 text-emerald-500" />,
+    color: "bg-emerald-50 dark:bg-emerald-500/10",
+    icon: <Wrench className="w-5 h-5 text-emerald-500 dark:text-emerald-300" />,
     accent: "emerald",
   },
   COMPLAINT: {
-    color: "bg-blue-50",
-    icon: <MessageSquareWarning className="w-5 h-5 text-blue-500" />,
+    color: "bg-blue-50 dark:bg-blue-500/10",
+    icon: <MessageSquareWarning className="w-5 h-5 text-blue-500 dark:text-blue-300" />,
     accent: "blue",
   },
   ACCESS: {
-    color: "bg-orange-50",
-    icon: <Key className="w-5 h-5 text-orange-500" />,
+    color: "bg-orange-50 dark:bg-orange-500/10",
+    icon: <Key className="w-5 h-5 text-orange-500 dark:text-orange-300" />,
     accent: "orange",
   },
   PERMISSION_ACCESS: {
-    color: "bg-gray-50",
-    icon: <Key className="w-5 h-5 text-gray-500" />,
+    color: "bg-gray-50 dark:bg-white/5",
+    icon: <Key className="w-5 h-5 text-gray-500 dark:text-slate-300" />,
     accent: "gray",
   },
   TENANT_PROFILE_ACCESS: {
-    color: "bg-gray-50",
-    icon: <Key className="w-5 h-5 text-gray-500" />,
+    color: "bg-gray-50 dark:bg-white/5",
+    icon: <Key className="w-5 h-5 text-gray-500 dark:text-slate-300" />,
     accent: "gray",
   },
   METER_READING_CORRECTION: {
-    color: "bg-cyan-50",
-    icon: <Wrench className="w-5 h-5 text-cyan-500" />,
+    color: "bg-cyan-50 dark:bg-cyan-500/10",
+    icon: <Wrench className="w-5 h-5 text-cyan-500 dark:text-cyan-300" />,
     accent: "cyan",
   },
   INVOICE_ADJUSTMENT: {
-    color: "bg-indigo-50",
-    icon: <FileText className="w-5 h-5 text-indigo-500" />,
+    color: "bg-indigo-50 dark:bg-indigo-500/10",
+    icon: <FileText className="w-5 h-5 text-indigo-500 dark:text-indigo-300" />,
     accent: "indigo",
   },
   RENT_PRICE_ADJUSTMENT: {
-    color: "bg-indigo-50",
-    icon: <FileText className="w-5 h-5 text-indigo-500" />,
+    color: "bg-indigo-50 dark:bg-indigo-500/10",
+    icon: <FileText className="w-5 h-5 text-indigo-500 dark:text-indigo-300" />,
     accent: "indigo",
   },
   DEPOSIT_REFUND_REQUEST: {
-    color: "bg-green-50",
-    icon: <FileCheck2 className="w-5 h-5 text-green-500" />,
+    color: "bg-green-50 dark:bg-green-500/10",
+    icon: <FileCheck2 className="w-5 h-5 text-green-500 dark:text-green-300" />,
     accent: "green",
   },
   EXPENSE_APPROVAL: {
-    color: "bg-emerald-50",
-    icon: <Wallet className="w-5 h-5 text-emerald-500" />,
+    color: "bg-emerald-50 dark:bg-emerald-500/10",
+    icon: <Wallet className="w-5 h-5 text-emerald-500 dark:text-emerald-300" />,
     accent: "emerald",
   },
 };
@@ -338,21 +338,21 @@ const translateTransferStatus = (status) => {
 const getTransferStatusTone = (status) => {
   switch (status) {
     case "WAITING_PAYMENT":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300";
     case "WAITING_CONTRACT_CONFIRMATION":
-      return "border-blue-200 bg-blue-50 text-blue-700";
+      return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300";
     case "WAITING_SIGNING":
     case "WAITING_CONTRACT_SIGNING":
-      return "border-violet-200 bg-violet-50 text-violet-700";
+      return "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-300";
     case "WAITING_TRANSFER_DATE":
-      return "border-cyan-200 bg-cyan-50 text-cyan-700";
+      return "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-500/10 dark:text-cyan-300";
     case "READY_FOR_HANDOVER":
     case "WAITING_EXECUTION":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300";
     case "EXECUTED":
-      return "border-green-200 bg-green-50 text-green-700";
+      return "border-green-200 bg-green-50 text-green-700 dark:border-green-400/30 dark:bg-green-500/10 dark:text-green-300";
     default:
-      return "border-gray-200 bg-gray-50 text-gray-700";
+      return "border-gray-200 bg-gray-50 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300";
   }
 };
 
@@ -672,17 +672,17 @@ function RequestDetailContent({ req, detailTransfer }) {
       {/* Header info */}
       <div className="flex items-start gap-4">
         <div
-          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${TYPE_CONFIG[mappedType]?.color || "bg-gray-50"}`}
+          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${TYPE_CONFIG[mappedType]?.color || "bg-gray-50 dark:bg-white/5"}`}
         >
           {TYPE_CONFIG[mappedType]?.icon || (
-            <FileCheck2 className="w-6 h-6 text-gray-500" />
+            <FileCheck2 className="w-6 h-6 text-gray-500 dark:text-slate-300" />
           )}
         </div>
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
             {req.title || translateType(mappedType)}
           </h3>
-          <p className="text-sm text-gray-500 mt-0.5 font-mono">
+          <p className="text-sm text-gray-500 mt-0.5 font-mono dark:text-slate-400">
             {req.requestCode || `#${req.id}`}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -691,7 +691,7 @@ function RequestDetailContent({ req, detailTransfer }) {
             </Badge>
             <Badge
               variant="outline"
-              className="bg-white text-gray-600 border-gray-200"
+              className="bg-white text-gray-600 border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
             >
               {translateType(mappedType)}
             </Badge>
@@ -701,9 +701,9 @@ function RequestDetailContent({ req, detailTransfer }) {
 
       {/* Description */}
       {req.description && (
-        <div className="rounded-xl bg-gray-50 p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-1">Mô tả</p>
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">
+        <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/5">
+          <p className="text-sm font-semibold text-gray-700 mb-1 dark:text-slate-200">Mô tả</p>
+          <p className="text-sm text-gray-600 whitespace-pre-wrap dark:text-slate-300">
             {req.description}
           </p>
         </div>
@@ -745,7 +745,7 @@ function RequestDetailContent({ req, detailTransfer }) {
       )}
 
       {/* Meta */}
-      <div className="flex items-center gap-4 text-xs text-gray-400 pt-2 border-t border-gray-100">
+      <div className="flex items-center gap-4 text-xs text-gray-400 pt-2 border-t border-gray-100 dark:border-white/10 dark:text-slate-500">
         <span>
           Tạo:{" "}
           {formatRequestDateTime(req.createdAt)}
@@ -753,9 +753,9 @@ function RequestDetailContent({ req, detailTransfer }) {
       </div>
 
       {!payload && req.requestType && req.requestType !== "ROOM_TRANSFER" && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex items-start gap-3">
-          <AlertCircle className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-          <div className="text-xs text-gray-600">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex items-start gap-3 dark:border-white/10 dark:bg-white/5">
+          <AlertCircle className="w-4 h-4 text-gray-500 mt-0.5 shrink-0 dark:text-slate-400" />
+          <div className="text-xs text-gray-600 dark:text-slate-300">
             <p className="font-semibold mb-1">Không có chi tiết bổ sung</p>
             <p>Yêu cầu này không có thông tin chi tiết bổ sung.</p>
           </div>
@@ -1221,7 +1221,7 @@ export default function ApprovalCenter() {
   );
 
   return (
-    <div className="bg-[#f8fafc] font-sans">
+    <div className="bg-[#f8fafc] font-sans dark:bg-[#020817]">
       <div className="mx-auto w-full space-y-6">
         <DashboardPageHeader
           title={
@@ -1247,7 +1247,7 @@ export default function ApprovalCenter() {
                 return (
                   <div
                     key={card.label}
-                    className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                    className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-[#0f172a]"
                   >
                     <div className="flex items-start gap-3">
                       <div
@@ -1256,13 +1256,13 @@ export default function ApprovalCenter() {
                         <Icon className={`h-4 w-4 ${card.iconColor}`} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium leading-5 text-slate-500">
+                        <p className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">
                           {card.label}
                         </p>
-                        <p className="mt-1 text-2xl font-bold leading-none text-slate-900">
+                        <p className="mt-1 text-2xl font-bold leading-none text-slate-900 dark:text-white">
                           {card.value}
                         </p>
-                        <p className="mt-1 text-xs leading-4 text-slate-400">
+                        <p className="mt-1 text-xs leading-4 text-slate-400 dark:text-slate-500">
                           {card.sub}
                         </p>
                       </div>
@@ -1272,14 +1272,14 @@ export default function ApprovalCenter() {
               })}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
               <div className="relative min-w-0">
-                <p className="mb-2 text-sm font-medium text-slate-500">
+                <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                   Tìm kiếm
                 </p>
                 <Search className="absolute left-4 top-[calc(50%+14px)] h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
-                  className="h-12 rounded-2xl border-slate-200 bg-background pl-11 text-sm"
+                  className="h-12 rounded-2xl border-slate-200 bg-background pl-11 text-sm dark:border-white/10 dark:bg-[#020817]"
                   placeholder="Tìm theo mã yêu cầu, tiêu đề, người tạo..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -1289,11 +1289,11 @@ export default function ApprovalCenter() {
               <div className="mt-5 flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
                 <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500">
+                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                       Loại yêu cầu
                     </p>
                     <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:ring-blue-400/20"
                       value={typeFilter}
                       onChange={(e) => {
                         setTypeFilter(e.target.value);
@@ -1310,11 +1310,11 @@ export default function ApprovalCenter() {
                   </div>
 
                   <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500">
+                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                       Trạng thái
                     </p>
                     <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:ring-blue-400/20"
                       value={statusFilter}
                       onChange={(e) => {
                         setStatusFilter(e.target.value);
@@ -1330,10 +1330,10 @@ export default function ApprovalCenter() {
                   </div>
 
                   <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500">
+                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
                       Thời gian tạo
                     </p>
-                    <button className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-background px-4 text-left text-sm text-slate-400 hover:bg-muted">
+                    <button className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-background px-4 text-left text-sm text-slate-400 hover:bg-muted dark:border-white/10 dark:bg-[#020817] dark:hover:bg-white/10">
                       <CalendarDays className="mr-3 h-4 w-4 shrink-0" />
                       <span className="truncate">Chọn khoảng thời gian</span>
                     </button>
@@ -1343,7 +1343,7 @@ export default function ApprovalCenter() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap 2xl:justify-end">
                   <Button
                     variant="outline"
-                    className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted sm:min-w-[140px]"
+                    className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted dark:border-white/10 dark:bg-[#020817] dark:text-slate-300 dark:hover:bg-white/10 sm:min-w-[140px]"
                     onClick={() => {
                       setTypeFilter("All Types");
                       setStatusFilter("PENDING");
@@ -1359,18 +1359,18 @@ export default function ApprovalCenter() {
             </div>
 
             {/* Table */}
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
               <div className="hidden min-[1536px]:block">
                 <Table className="w-full table-fixed">
                   <TableHeader>
-                    <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+                    <TableRow className="bg-gray-50/50 hover:bg-gray-50/50 dark:bg-white/5 dark:hover:bg-white/5">
                       <TableHead className="h-12 w-[16%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[14%]">
                         Người gửi
                       </TableHead>
                       <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[12%]">
                         Loại yêu cầu
                       </TableHead>
-                      <TableHead className="h-12 w-[42%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[37%] min-[1700px]:w-[25%]">
+                      <TableHead className="h-12 w-[40%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[35%] min-[1700px]:w-[23%]">
                         Tiêu đề
                       </TableHead>
                       <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell">
@@ -1385,7 +1385,7 @@ export default function ApprovalCenter() {
                       <TableHead className="hidden h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell">
                         Hạn xử lý
                       </TableHead>
-                      <TableHead className="h-12 w-[6%] px-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[5%]">
+                      <TableHead className="h-12 w-[8%] whitespace-nowrap px-2 text-center text-xs font-semibold uppercase tracking-normal text-slate-400 min-[1650px]:w-[7%]">
                         Thao tác
                       </TableHead>
                     </TableRow>
@@ -1395,7 +1395,7 @@ export default function ApprovalCenter() {
                       <TableRow>
                         <TableCell
                           colSpan={8}
-                          className="py-12 text-center text-slate-500"
+                          className="py-12 text-center text-slate-500 dark:text-slate-400"
                         >
                           <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
                           Đang tải dữ liệu...
@@ -1405,7 +1405,7 @@ export default function ApprovalCenter() {
                       <TableRow>
                         <TableCell
                           colSpan={8}
-                          className="py-12 text-center text-slate-500"
+                          className="py-12 text-center text-slate-500 dark:text-slate-400"
                         >
                           Không tìm thấy yêu cầu nào.
                         </TableCell>
@@ -1418,18 +1418,18 @@ export default function ApprovalCenter() {
                         return (
                           <TableRow
                             key={req.id}
-                            className="border-slate-100 transition-colors hover:bg-slate-50/60"
+                            className="border-slate-100 transition-colors hover:bg-slate-50/60 dark:border-white/10 dark:hover:bg-white/5"
                           >
                             <TableCell className="px-3 py-3 align-top">
                               <div className="flex min-w-0 items-center gap-2">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-700">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-700 dark:bg-white/10 dark:text-slate-300">
                                   {requesterInitials(req)}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900" title={requesterName(req)}>
+                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white" title={requesterName(req)}>
                                     {requesterName(req)}
                                   </p>
-                                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={requesterSecondaryText(req)}>
+                                  <p className="mt-1 truncate text-xs font-semibold text-slate-500 dark:text-slate-400" title={requesterSecondaryText(req)}>
                                     {requesterSecondaryText(req) || "--"}
                                   </p>
                                 </div>
@@ -1443,7 +1443,7 @@ export default function ApprovalCenter() {
                                   {tc.icon}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900">
+                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                                     {translateType(req.requestType)}
                                   </p>
                                 </div>
@@ -1451,13 +1451,13 @@ export default function ApprovalCenter() {
                             </TableCell>
                             <TableCell className="min-w-0 max-w-0 px-3 py-3 align-top">
                               <p
-                                className="truncate text-sm font-semibold leading-5 text-slate-900"
+                                className="truncate text-sm font-semibold leading-5 text-slate-900 dark:text-white"
                                 title={req.title || "--"}
                               >
                                 {req.title || "--"}
                               </p>
                               <p
-                                className="mt-1 truncate text-sm leading-5 text-slate-500"
+                                className="mt-1 truncate text-sm leading-5 text-slate-500 dark:text-slate-400"
                                 title={
                                   req.description || "Không có mô tả bổ sung"
                                 }
@@ -1466,18 +1466,18 @@ export default function ApprovalCenter() {
                               </p>
                             </TableCell>
                             <TableCell className="hidden min-[1700px]:table-cell px-3 py-3 align-top">
-                              <p className="break-all font-mono text-xs font-semibold text-slate-900">
+                              <p className="break-all font-mono text-xs font-semibold text-slate-900 dark:text-white">
                                 {req.requestCode || `#${req.id}`}
                               </p>
-                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                              <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 Ưu tiên: Thường
                               </p>
                             </TableCell>
-                            <TableCell className="px-3 py-3 align-top text-sm text-slate-700">
+                            <TableCell className="px-3 py-3 align-top text-sm text-slate-700 dark:text-slate-300">
                               <p>
                                 {formatRequestDate(req.createdAt)}
                               </p>
-                              <p className="mt-2 text-slate-400">
+                              <p className="mt-2 text-slate-400 dark:text-slate-500">
                                 {formatRequestTime(req.createdAt)}
                               </p>
                             </TableCell>
@@ -1491,12 +1491,12 @@ export default function ApprovalCenter() {
                             </TableCell>
                             <TableCell className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm">
                               <p
-                                className={`${req.status === "REJECTED" ? "text-red-500" : "text-slate-900"}`}
+                                className={`${req.status === "REJECTED" ? "text-red-500 dark:text-red-300" : "text-slate-900 dark:text-white"}`}
                               >
                                 {formatRequestDate(req.createdAt)}
                               </p>
                               <p
-                                className={`mt-2 ${req.status === "PENDING" ? "text-orange-500" : req.status === "REJECTED" ? "text-red-500" : "text-slate-400"}`}
+                                className={`mt-2 ${req.status === "PENDING" ? "text-orange-500 dark:text-orange-300" : req.status === "REJECTED" ? "text-red-500 dark:text-red-300" : "text-slate-400 dark:text-slate-500"}`}
                               >
                                 {req.status === "PENDING"
                                   ? "Còn 1 ngày"
@@ -1505,13 +1505,13 @@ export default function ApprovalCenter() {
                                     : "Đúng hạn"}
                               </p>
                             </TableCell>
-                            <TableCell className="px-3 py-3 align-top">
+                            <TableCell className="px-2 py-3 align-top">
                               <div className="flex items-center justify-center gap-1.5">
                                 <Button
                                   size="icon"
                                   variant="outline"
                                   onClick={() => openDetailModal(req)}
-                                  className="h-8 w-8 rounded-xl border-slate-200 text-slate-500"
+                                  className="h-8 w-8 rounded-xl border-slate-200 text-slate-500 dark:border-white/10 dark:text-slate-300"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
@@ -1525,14 +1525,14 @@ export default function ApprovalCenter() {
                 </Table>
               </div>
 
-              <div className="divide-y divide-slate-100 min-[1536px]:hidden">
+              <div className="divide-y divide-slate-100 dark:divide-white/10 min-[1536px]:hidden">
                 {loading ? (
-                  <div className="py-10 text-center text-gray-500">
+                  <div className="py-10 text-center text-gray-500 dark:text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
                     Đang tải dữ liệu...
                   </div>
                 ) : data.length === 0 ? (
-                  <div className="py-10 text-center text-gray-500">
+                  <div className="py-10 text-center text-gray-500 dark:text-slate-400">
                     Không tìm thấy yêu cầu nào.
                   </div>
                 ) : (
@@ -1544,13 +1544,13 @@ export default function ApprovalCenter() {
                       <div key={req.id} className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate font-sans text-sm font-semibold text-gray-900" title={requesterName(req)}>
+                            <p className="truncate font-sans text-sm font-semibold text-gray-900 dark:text-white" title={requesterName(req)}>
                               {requesterName(req)}
                             </p>
-                            <p className="mt-0.5 truncate text-xs font-semibold text-gray-500" title={requesterSecondaryText(req)}>
+                            <p className="mt-0.5 truncate text-xs font-semibold text-gray-500 dark:text-slate-400" title={requesterSecondaryText(req)}>
                               {requesterSecondaryText(req) || req.requestCode || `#${req.id}`}
                             </p>
-                            <p className="mt-1 text-sm font-medium text-gray-900">
+                            <p className="mt-1 text-sm font-medium text-gray-900 dark:text-slate-200">
                               {req.title || "--"}
                             </p>
                           </div>
@@ -1569,11 +1569,11 @@ export default function ApprovalCenter() {
                           </Badge>
                           <Badge
                             variant="outline"
-                            className="bg-white text-gray-600 border-gray-200"
+                            className="bg-white text-gray-600 border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
                           >
                             {translateType(req.requestType)}
                           </Badge>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-slate-400">
                             {formatRequestDate(req.createdAt)}
                           </span>
                         </div>
@@ -1582,7 +1582,7 @@ export default function ApprovalCenter() {
                             size="sm"
                             variant="outline"
                             onClick={() => openDetailModal(req)}
-                            className="rounded-lg h-8 px-3 text-gray-600 hover:text-gray-900"
+                            className="rounded-lg h-8 px-3 text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-white"
                           >
                             <Eye className="w-3.5 h-3.5 mr-1" />
                             Xem
@@ -1615,7 +1615,7 @@ export default function ApprovalCenter() {
                                   actionLoading?.startsWith("approve") ||
                                   actionLoading?.startsWith("reject")
                                 }
-                                className="rounded-lg h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-60"
+                                className="rounded-lg h-8 px-3 text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-60 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/10"
                               >
                                 Từ chối
                               </Button>
@@ -1664,11 +1664,11 @@ export default function ApprovalCenter() {
           onClick={closeDetailModal}
         >
           <div
-            className="w-full max-w-4xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-4xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl dark:border dark:border-white/10 dark:bg-[#0f172a]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between z-10">
-              <h3 className="text-lg font-bold text-gray-900">
+            <div className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between z-10 dark:border-white/10 dark:bg-[#0f172a]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Chi tiết yêu cầu
               </h3>
               <Button
@@ -1691,7 +1691,7 @@ export default function ApprovalCenter() {
                 detailModal.status === "APPROVED") ||
               (detailModal.requestType === "ROOM_TRANSFER" &&
                 detailTransfer)) && (
-              <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 flex flex-wrap items-center justify-end gap-3">
+              <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 flex flex-wrap items-center justify-end gap-3 dark:border-white/10 dark:bg-[#0f172a]">
                 {canResolveRequest(detailModal, isOwner) && (
                   <>
                     <Button
@@ -1701,7 +1701,7 @@ export default function ApprovalCenter() {
                         setRejectNote("");
                         closeDetailModal();
                       }}
-                      className="rounded-lg text-red-600 border-red-200 hover:bg-red-50"
+                      className="rounded-lg text-red-600 border-red-200 hover:bg-red-50 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/10"
                     >
                       Từ chối
                     </Button>
@@ -1755,21 +1755,21 @@ export default function ApprovalCenter() {
                         (document) => (
                           <div
                             key={document.kind}
-                            className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"
+                            className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10 dark:bg-white/5"
                           >
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs font-semibold text-gray-700">
+                                <span className="text-xs font-semibold text-gray-700 dark:text-slate-200">
                                   {document.label}
                                 </span>
                                 <Badge
                                   variant="outline"
                                   className={
                                     isTransferSigningDocumentSigned(document)
-                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300"
                                       : document.signedFileId
-                                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                                        : "border-gray-200 bg-white text-gray-600"
+                                        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300"
+                                        : "border-gray-200 bg-white text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
                                   }
                                 >
                                   {isTransferSigningDocumentSigned(document)
@@ -1781,7 +1781,7 @@ export default function ApprovalCenter() {
                               </div>
                               {(document.signedFileName ||
                                 document.contractFileName) && (
-                                <p className="mt-1 max-w-[220px] truncate text-[11px] text-gray-500">
+                                <p className="mt-1 max-w-[220px] truncate text-[11px] text-gray-500 dark:text-slate-400">
                                   {document.signedFileName ||
                                     document.contractFileName}
                                 </p>
@@ -1924,20 +1924,20 @@ export default function ApprovalCenter() {
           onClick={() => setPaymentModal(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl dark:border dark:border-white/10 dark:bg-[#0f172a]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-white/10">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Ghi nhận đã hoàn tiền
               </h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                 {paymentModal.title || paymentModal.requestCode}
               </p>
             </div>
             <div className="space-y-4 p-6">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
                   Ngày hoàn tiền
                 </span>
                 <input
@@ -1949,11 +1949,11 @@ export default function ApprovalCenter() {
                       paymentDate: event.target.value,
                     }))
                   }
-                  className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-blue-500"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-[#020817] dark:text-white"
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
                   Mã giao dịch
                 </span>
                 <input
@@ -1965,11 +1965,11 @@ export default function ApprovalCenter() {
                     }))
                   }
                   placeholder="VD: mã giao dịch ngân hàng"
-                  className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-blue-500"
+                  className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500"
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
                   Ảnh minh chứng *
                 </span>
                 <input
@@ -1981,11 +1981,11 @@ export default function ApprovalCenter() {
                       proofFile: event.target.files?.[0] || null,
                     }))
                   }
-                  className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+                  className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-bold file:text-white dark:text-slate-300 dark:file:bg-blue-600"
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
                   Ghi chú
                 </span>
                 <textarea
@@ -1997,11 +1997,11 @@ export default function ApprovalCenter() {
                       note: event.target.value,
                     }))
                   }
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500 dark:border-white/10 dark:bg-[#020817] dark:text-white"
                 />
               </label>
             </div>
-            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-white/10">
               <Button
                 variant="outline"
                 onClick={() => setPaymentModal(null)}
@@ -2047,30 +2047,30 @@ export default function ApprovalCenter() {
           onClick={() => setRejectModal(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl dark:border dark:border-white/10 dark:bg-[#0f172a]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">
+            <div className="border-b border-gray-200 px-6 py-4 dark:border-white/10">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Từ chối yêu cầu
               </h3>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1 dark:text-slate-400">
                 {rejectModal.title || rejectModal.requestCode}
               </p>
             </div>
             <div className="p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-slate-200">
                 Lý do từ chối
               </label>
               <textarea
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500"
                 rows={4}
                 value={rejectNote}
                 onChange={(e) => setRejectNote(e.target.value)}
                 placeholder="Nhập lý do từ chối..."
               />
             </div>
-            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 dark:border-white/10">
               <Button
                 variant="outline"
                 onClick={() => setRejectModal(null)}

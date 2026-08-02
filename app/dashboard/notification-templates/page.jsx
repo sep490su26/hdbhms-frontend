@@ -378,7 +378,7 @@ function tokenChip(token) {
   chip.dataset.templateToken = token;
   chip.title = token;
   chip.className =
-    "mx-0.5 inline-flex max-w-full items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 align-baseline text-[1.02em] font-medium leading-5 text-sky-900";
+    "mx-0.5 inline-flex max-w-full items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 align-baseline text-[1.02em] font-medium leading-5 text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-200";
 
   const label = document.createElement("span");
   label.className = "truncate";
@@ -391,7 +391,7 @@ function tokenChip(token) {
   remove.dataset.templateTokenRemove = "true";
   remove.ariaLabel = `Xóa ${variableLabel(variableName)}`;
   remove.className =
-    "grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full text-[11px] font-medium leading-none text-sky-700 hover:bg-sky-200";
+    "grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded-full text-[11px] font-medium leading-none text-sky-700 hover:bg-sky-200 dark:text-sky-300 dark:hover:bg-sky-500/20";
   remove.textContent = "x";
   chip.appendChild(remove);
 
@@ -553,8 +553,8 @@ function StatusBadge({ status }) {
     <span
       className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-bold ${
         active
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-slate-100 text-slate-600"
+          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+          : "bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300"
       }`}
     >
       {active ? "Đang bật" : "Tạm tắt"}
@@ -567,7 +567,9 @@ function SourceBadge({ source }) {
   return (
     <span
       className={`inline-flex h-7 items-center rounded-full px-3 text-xs font-bold ${
-        custom ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
+        custom
+          ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+          : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
       }`}
     >
       {custom ? "Đã tùy chỉnh" : "Mặc định"}
@@ -584,8 +586,8 @@ function TogglePill({ active, disabled = false, multi = false, children, onClick
       onClick={onClick}
       className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
         active
-          ? "border-[#1e40af] bg-[#1e40af] text-white"
-          : "border-slate-200 bg-white text-slate-700 hover:border-[#1e40af] hover:text-[#1e40af]"
+          ? "border-[#1e40af] bg-[#1e40af] text-white dark:border-blue-400 dark:bg-blue-600"
+          : "border-slate-200 bg-white text-slate-700 hover:border-[#1e40af] hover:text-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:border-blue-400 dark:hover:text-blue-300"
       }`}
     >
       {multi && active ? <Check className="h-4 w-4" /> : null}
@@ -797,7 +799,7 @@ const TemplateTokenEditor = forwardRef(function TemplateTokenEditor(
           event.preventDefault();
           insertPlainText(event.clipboardData.getData("text/plain"));
         }}
-        className={`relative z-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 ${
+        className={`relative z-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20 ${
           multiline
             ? "min-h-[12rem] whitespace-pre-wrap break-words py-3 leading-6"
             : "min-h-11 overflow-x-auto whitespace-pre py-2.5"
@@ -812,7 +814,7 @@ function SelectionLabel({ children, note }) {
     <div className="flex flex-wrap items-center gap-2">
       <FieldLabel>{children}</FieldLabel>
       {note ? (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 dark:bg-white/5 dark:text-slate-400">
           {note}
         </span>
       ) : null}
@@ -1571,8 +1573,8 @@ export default function NotificationTemplatesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-slate-200 bg-white">
-        <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
+      <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex items-center gap-3 text-sm font-bold text-slate-600 dark:text-slate-300">
           <Loader2 className="h-5 w-5 animate-spin text-[#1e40af]" />
           Đang tải cấu hình thông báo...
         </div>
@@ -1581,19 +1583,19 @@ export default function NotificationTemplatesPage() {
   }
 
   return (
-    <div className="grid gap-6 text-slate-900">
+    <div className="grid gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
         title="Quản lý thông báo"
         description="Chỉnh mẫu thông báo hệ thống và gửi thông báo hàng loạt theo vai trò, cơ sở, tầng hoặc phòng."
         actions={
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-[#0f172a]">
             <button
               type="button"
               onClick={() => setActiveTab("templates")}
               className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-bold ${
                 activeTab === "templates"
                   ? "bg-[#1e40af] text-white"
-                  : "text-slate-600 hover:bg-slate-50"
+                  : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               }`}
             >
               <BellRing className="h-4 w-4" />
@@ -1605,7 +1607,7 @@ export default function NotificationTemplatesPage() {
               className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-bold ${
                 activeTab === "broadcast"
                   ? "bg-[#1e40af] text-white"
-                  : "text-slate-600 hover:bg-slate-50"
+                  : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               }`}
             >
               <Send className="h-4 w-4" />
@@ -1616,13 +1618,13 @@ export default function NotificationTemplatesPage() {
       />
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300">
           {error}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
           <CheckCircle2 className="h-4 w-4" />
           {notice}
         </div>
@@ -1631,16 +1633,16 @@ export default function NotificationTemplatesPage() {
       {activeTab === "templates" ? (
         <div className="grid min-w-0 items-start gap-4 xl:flex">
           <aside
-            className="flex min-h-[420px] w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-slate-900 shadow-sm max-xl:max-h-[70vh] xl:h-[calc(100vh-220px)] xl:w-[var(--template-sidebar-width)] xl:shrink-0"
+            className="flex min-h-[420px] w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-slate-900 shadow-sm dark:border-white/10 dark:bg-[#020817] dark:text-white max-xl:max-h-[70vh] xl:h-[calc(100vh-220px)] xl:w-[var(--template-sidebar-width)] xl:shrink-0"
             style={{ "--template-sidebar-width": `${templateSidebarWidth}px` }}
           >
-            <div className="border-b border-slate-200 bg-white/90 px-4 py-3">
+            <div className="border-b border-slate-200 bg-white/90 px-4 py-3 dark:border-white/10 dark:bg-[#0f172a]/90">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                     Thư viện mẫu
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-slate-950">
+                  <p className="mt-1 truncate text-sm font-black text-slate-950 dark:text-white">
                     {filteredDefinitions.length} mẫu thông báo
                   </p>
                 </div>
@@ -1651,7 +1653,7 @@ export default function NotificationTemplatesPage() {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Tìm mẫu thông báo..."
-                  className="h-10 w-full min-w-0 truncate rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                  className="h-10 w-full min-w-0 truncate rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                 />
               </div>
             </div>
@@ -1666,15 +1668,15 @@ export default function NotificationTemplatesPage() {
                     onClick={() => selectDefinition(definition)}
                     className={`block w-full min-w-0 !overflow-visible !whitespace-normal rounded-lg border px-3 py-3 text-left transition ${
                       active
-                        ? "border-[#1e40af] bg-blue-50 shadow-sm ring-1 ring-blue-100"
-                        : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40"
+                        ? "border-[#1e40af] bg-blue-50 shadow-sm ring-1 ring-blue-100 dark:border-blue-400 dark:bg-blue-500/10 dark:ring-blue-400/20"
+                        : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/40 dark:border-white/10 dark:bg-[#0f172a] dark:hover:border-blue-400/50 dark:hover:bg-blue-500/10"
                     }`}
                   >
                     <div className="grid min-w-0 gap-1.5">
-                      <p className="min-w-0 !whitespace-normal break-words text-sm font-bold leading-5 text-slate-950">
+                      <p className="min-w-0 !whitespace-normal break-words text-sm font-bold leading-5 text-slate-950 dark:text-white">
                         {definition.displayName}
                       </p>
-                      <span className="w-fit max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold leading-5 text-slate-600">
+                      <span className="w-fit max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold leading-5 text-slate-600 dark:bg-white/5 dark:text-slate-300">
                         {definition.targetLabel}
                       </span>
                     </div>
@@ -1701,15 +1703,15 @@ export default function NotificationTemplatesPage() {
             }}
             className={`group -ml-1 -mr-1 hidden h-[calc(100vh-220px)] w-6 touch-none cursor-col-resize items-center justify-center rounded-md outline-none transition xl:flex ${
               resizingTemplateSidebar
-                ? "bg-blue-50"
-                : "hover:bg-slate-100 focus-visible:bg-slate-100"
+                ? "bg-blue-50 dark:bg-blue-500/10"
+                : "hover:bg-slate-100 focus-visible:bg-slate-100 dark:hover:bg-white/10 dark:focus-visible:bg-white/10"
             }`}
           >
             <span
               className={`grid h-16 w-5 place-items-center rounded-md border transition ${
                 resizingTemplateSidebar
-                  ? "border-blue-200 bg-white text-[#1e40af] shadow-sm"
-                  : "border-slate-200 bg-white text-slate-400 shadow-sm group-hover:border-slate-300 group-hover:text-slate-600 group-focus-visible:border-blue-200 group-focus-visible:text-[#1e40af]"
+                  ? "border-blue-200 bg-white text-[#1e40af] shadow-sm dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-300"
+                  : "border-slate-200 bg-white text-slate-400 shadow-sm group-hover:border-slate-300 group-hover:text-slate-600 group-focus-visible:border-blue-200 group-focus-visible:text-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-500 dark:group-hover:border-white/20 dark:group-hover:text-slate-300 dark:group-focus-visible:border-blue-400 dark:group-focus-visible:text-blue-300"
               }`}
             >
               <GripVertical className="h-4 w-4" />
@@ -1717,8 +1719,8 @@ export default function NotificationTemplatesPage() {
           </button>
 
           <main className="grid min-w-0 gap-5 xl:flex-1">
-            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 xl:flex-row xl:items-start xl:justify-between">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 dark:border-white/10 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1e40af]">
                     {selectedDefinition?.targetLabel || "Thông báo"}
@@ -1726,7 +1728,7 @@ export default function NotificationTemplatesPage() {
                   <h2 className="mt-2 break-words text-xl font-black">
                     {selectedDefinition?.displayName || "Chọn mẫu thông báo"}
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
                     {selectedDefinition?.description}
                   </p>
                 </div>
@@ -1767,7 +1769,7 @@ export default function NotificationTemplatesPage() {
                         status: event.target.value,
                       })
                     }
-                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                   >
                     <option value="ACTIVE">Đang bật</option>
                     <option value="INACTIVE">Tạm tắt</option>
@@ -1776,14 +1778,14 @@ export default function NotificationTemplatesPage() {
               </div>
 
               {templatesLoading ? (
-                <div className="mt-5 flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
+                <div className="mt-5 flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600 dark:bg-white/5 dark:text-slate-300">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Đang tải template...
                 </div>
               ) : null}
 
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <p className="text-sm font-semibold leading-6 text-slate-600">
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
                   Biến được hiển thị bằng tên dễ đọc; hệ thống tự lưu đúng định dạng gửi backend.
                 </p>
                 <div className="flex items-center gap-2">
@@ -1792,7 +1794,7 @@ export default function NotificationTemplatesPage() {
                     title="Hoàn tác (Ctrl+Z)"
                     onClick={undoTemplateChange}
                     disabled={!canUndoTemplate}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:border-blue-400 dark:hover:text-blue-300"
                   >
                     <Undo2 className="h-4 w-4" />
                   </button>
@@ -1801,7 +1803,7 @@ export default function NotificationTemplatesPage() {
                     title="Làm lại (Ctrl+Y hoặc Ctrl+Shift+Z)"
                     onClick={redoTemplateChange}
                     disabled={!canRedoTemplate}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:border-blue-400 dark:hover:text-blue-300"
                   >
                     <Redo2 className="h-4 w-4" />
                   </button>
@@ -1858,9 +1860,9 @@ export default function NotificationTemplatesPage() {
                   </label>
                 </div>
 
-                <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
                   <h3 className="font-black">Chèn biến</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
                     Đang chèn vào {TEMPLATE_FIELD_LABELS[activeTemplateField]}. Bấm
                     một biến để thêm tên dữ liệu tương ứng.
                   </p>
@@ -1876,10 +1878,10 @@ export default function NotificationTemplatesPage() {
                             type="button"
                             onClick={() => insertTemplateVariable(variable.name)}
                             title={`Chèn ${variableLabel(variable.name)}`}
-                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[#1e40af] hover:bg-blue-50"
+                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[#1e40af] hover:bg-blue-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:border-blue-400 dark:hover:bg-blue-500/10"
                           >
                             <span className="flex min-w-0 items-center justify-between gap-2">
-                              <span className="min-w-0 truncate text-sm font-black text-slate-900">
+                              <span className="min-w-0 truncate text-sm font-black text-slate-900 dark:text-white">
                                 {variableLabel(variable.name)}
                               </span>
                               {variable.required ? (
@@ -1889,7 +1891,7 @@ export default function NotificationTemplatesPage() {
                               ) : null}
                             </span>
                             {sampleValue ? (
-                              <span className="mt-1 block truncate text-xs font-semibold text-slate-500">
+                              <span className="mt-1 block truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 Mẫu: {sampleValue}
                               </span>
                             ) : null}
@@ -1897,7 +1899,7 @@ export default function NotificationTemplatesPage() {
                         );
                       })
                     ) : (
-                      <p className="text-sm font-semibold text-slate-500">
+                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
                         Mẫu này không có biến.
                       </p>
                     )}
@@ -1937,9 +1939,9 @@ export default function NotificationTemplatesPage() {
             </section>
 
             <section className="grid gap-5 xl:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
                 <h3 className="font-black">Dữ liệu mẫu</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
                   Chỉnh giá trị ở đây để xem trước tiêu đề và nội dung ngay bên cạnh.
                 </p>
                 <div className="mt-3 grid max-h-[440px] gap-3 overflow-y-auto pr-1">
@@ -1950,7 +1952,7 @@ export default function NotificationTemplatesPage() {
                         textValue.length > 80 || textValue.includes("\n");
                       return (
                         <label key={key} className="grid gap-1.5">
-                          <span className="break-all font-mono text-[11px] font-black uppercase text-slate-500">
+                          <span className="break-all font-mono text-[11px] font-black uppercase text-slate-500 dark:text-slate-400">
                             {key}
                           </span>
                           {multiline ? (
@@ -1960,7 +1962,7 @@ export default function NotificationTemplatesPage() {
                                 updateSampleDataValue(key, event.target.value)
                               }
                               rows={3}
-                              className="min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                              className="min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold leading-6 text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                             />
                           ) : (
                             <input
@@ -1968,39 +1970,39 @@ export default function NotificationTemplatesPage() {
                               onChange={(event) =>
                                 updateSampleDataValue(key, event.target.value)
                               }
-                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                             />
                           )}
                         </label>
                       );
                     })
                   ) : (
-                    <div className="px-3 py-4 text-sm text-slate-500">
+                    <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
                       Không có dữ liệu mẫu.
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
                 <h3 className="font-black">Kết quả xem trước</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
                   Tự cập nhật theo mẫu tiêu đề, mẫu nội dung và dữ liệu mẫu đang nhập.
                 </p>
                 <div className="mt-4 grid gap-3">
-                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Tiêu đề
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap break-words font-bold text-slate-950">
+                    <p className="mt-2 whitespace-pre-wrap break-words font-bold text-slate-950 dark:text-white">
                       {preview.title || "Chưa có tiêu đề xem trước."}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Nội dung
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-slate-800">
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-slate-800 dark:text-slate-200">
                       {preview.body || "Chưa có nội dung xem trước."}
                     </p>
                   </div>
@@ -2011,8 +2013,8 @@ export default function NotificationTemplatesPage() {
         </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-white/10">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[#1e40af]">
                   Thông báo hàng loạt
@@ -2020,7 +2022,7 @@ export default function NotificationTemplatesPage() {
                 <h2 className="mt-2 text-xl font-black">
                   Gửi thông báo theo phạm vi
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
                   Tạo thông báo vào hàng đợi gửi theo vai trò, cơ sở, tầng hoặc phòng.
                 </p>
               </div>
@@ -2056,7 +2058,7 @@ export default function NotificationTemplatesPage() {
                           roomIds: [],
                         })
                       }
-                      className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                     >
                       <option value="">Chọn cơ sở</option>
                       {properties.map((property) => (
@@ -2079,7 +2081,7 @@ export default function NotificationTemplatesPage() {
                           })
                         }
                         disabled={!broadcastForm.propertyId || scopeLoading}
-                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:opacity-60"
+                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:opacity-60 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                       >
                         <option value="">Chọn tầng</option>
                         {floors.map((floor) => (
@@ -2102,7 +2104,7 @@ export default function NotificationTemplatesPage() {
                           }
                         }}
                         disabled={!broadcastForm.propertyId || scopeLoading}
-                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:opacity-60"
+                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:opacity-60 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                       >
                         <option value="">Thêm phòng</option>
                         {filteredRooms
@@ -2127,7 +2129,7 @@ export default function NotificationTemplatesPage() {
                         key={roomId}
                         type="button"
                         onClick={() => toggleBroadcastValue("roomIds", roomId)}
-                        className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#1e40af] hover:bg-blue-100"
+                        className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#1e40af] hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
                       >
                         {room?.name || room?.roomCode || `Phòng ${roomId}`} x
                       </button>
@@ -2177,7 +2179,7 @@ export default function NotificationTemplatesPage() {
                       </TogglePill>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                  <p className="mt-2 text-xs font-bold leading-5 text-slate-500 dark:text-slate-400">
                     Chỉ hiện các kênh phù hợp với vai trò nhận. In-app đã bỏ khỏi cấu hình gửi thủ công.
                   </p>
                 </div>
@@ -2193,7 +2195,7 @@ export default function NotificationTemplatesPage() {
                       updateBroadcastForm({ title: event.target.value })
                     }
                     placeholder="Ví dụ: Tạm ngưng cấp nước tối nay"
-                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                   />
                 </label>
 
@@ -2206,7 +2208,7 @@ export default function NotificationTemplatesPage() {
                     }
                     rows={7}
                     placeholder="Nhập nội dung cần gửi đến người nhận..."
-                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-6 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-6 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
                   />
                 </label>
               </div>
@@ -2229,11 +2231,11 @@ export default function NotificationTemplatesPage() {
             </div>
           </section>
 
-          <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
             <h3 className="font-black">Tóm tắt phạm vi</h3>
             <div className="mt-4 grid gap-3 text-sm">
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-xs font-black uppercase text-slate-500">
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
                   Phạm vi
                 </p>
                 <p className="mt-1 font-bold">
@@ -2241,8 +2243,8 @@ export default function NotificationTemplatesPage() {
                 </p>
               </div>
               {effectiveBroadcastRoles.length ? (
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-xs font-black uppercase text-slate-500">
+                <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                  <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
                     Vai trò
                   </p>
                   <p className="mt-1 font-bold">
@@ -2253,8 +2255,8 @@ export default function NotificationTemplatesPage() {
                   </p>
                 </div>
               ) : null}
-              <div className="rounded-lg bg-slate-50 p-3">
-                <p className="text-xs font-black uppercase text-slate-500">
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
                   Kênh
                 </p>
                 <p className="mt-1 font-bold">
@@ -2266,24 +2268,24 @@ export default function NotificationTemplatesPage() {
             </div>
 
             {previewingRecipients ? (
-              <div className="mt-5 flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-[#1e40af]">
+              <div className="mt-5 flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-[#1e40af] dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-300">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Đang tự ước tính người nhận...
               </div>
             ) : recipientPreview ? (
-              <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-[#1e40af]">
+              <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-400/20 dark:bg-blue-500/10">
+                <p className="text-xs font-black uppercase tracking-wide text-[#1e40af] dark:text-blue-300">
                   Ước tính gửi
                 </p>
-                <p className="mt-3 text-3xl font-black text-[#1e40af]">
+                <p className="mt-3 text-3xl font-black text-[#1e40af] dark:text-blue-200">
                   {recipientPreview.recipientCount}
                 </p>
-                <p className="mt-1 text-sm font-bold text-slate-700">
+                <p className="mt-1 text-sm font-bold text-slate-700 dark:text-slate-300">
                   người nhận, {recipientPreview.outboxCount} thông báo trong hàng đợi
                 </p>
               </div>
             ) : (
-              <div className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-500">
+              <div className="mt-5 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                 Chọn đủ phạm vi và kênh gửi để hệ thống tự ước tính người nhận.
               </div>
             )}

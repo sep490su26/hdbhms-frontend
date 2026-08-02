@@ -152,8 +152,8 @@ function roleLabel(role) {
 
 function roleClass(role) {
   return role === "PRIMARY"
-    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-    : "border-slate-200 bg-slate-50 text-slate-700";
+    ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-300"
+    : "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300";
 }
 
 function resolveAccountState(item) {
@@ -167,7 +167,8 @@ function resolveAccountState(item) {
       hint: item.disabledReason
         ? `Lý do: ${item.disabledReason}`
         : "Tenant không còn quyền truy cập phòng/hợp đồng này.",
-      className: "border-slate-300 bg-slate-100 text-slate-700",
+      className:
+        "border-slate-300 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
     };
   }
 
@@ -176,7 +177,8 @@ function resolveAccountState(item) {
       key: "PENDING",
       label: "Đang gửi",
       hint: "Hệ thống đang xử lý gửi tài khoản.",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
+      className:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300",
     };
   }
 
@@ -185,7 +187,8 @@ function resolveAccountState(item) {
       key: "FAILED",
       label: "Gửi thất bại",
       hint: item.failureReason || "Có thể thử gửi lại sau khi xác nhận.",
-      className: "border-rose-200 bg-rose-50 text-rose-700",
+      className:
+        "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300",
     };
   }
 
@@ -194,7 +197,8 @@ function resolveAccountState(item) {
       key: "NOT_SENT",
       label: "Chưa cấp",
       hint: "Chưa gửi tài khoản mobile.",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300",
     };
   }
 
@@ -203,7 +207,8 @@ function resolveAccountState(item) {
       key: "SENT",
       label: "Đã gửi",
       hint: "Chờ khách đổi mật khẩu và hoàn tất hồ sơ trên mobile.",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
+      className:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300",
     };
   }
 
@@ -211,31 +216,34 @@ function resolveAccountState(item) {
     key: "ACTIVATED",
     label: "Đã kích hoạt",
     hint: "Khách đã đổi mật khẩu lần đầu.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300",
   };
 }
 
 function MetricCard({ icon: Icon, label, value, tone }) {
   const toneClass = {
-    slate: "bg-slate-100 text-slate-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
+    slate: "bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300",
+    amber:
+      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+    blue: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+    emerald:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+    rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
   }[tone];
 
   return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
       <span
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
       >
         <Icon className="h-5 w-5" />
       </span>
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184] dark:text-slate-400">
           {label}
         </p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33]">
+        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33] dark:text-white">
           {value}
         </p>
       </div>
@@ -246,14 +254,14 @@ function MetricCard({ icon: Icon, label, value, tone }) {
 function SelectFilter({ value, options, onChange, label }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-[11px] font-semibold text-[#8490a5]">{label}</span>
+      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
       >
         {options.map((option) => (
-          <option key={option} value={option}>
+          <option key={option} value={option} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
             {option}
           </option>
         ))}
@@ -555,7 +563,7 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="grid gap-7 text-[#0f1d33]">
+    <div className="grid gap-7 text-[#0f1d33] dark:text-white">
       <DashboardPageHeader
         title="Quản lý tài khoản khách thuê"
         description="Cấp tài khoản mobile cho người thuê trong hợp đồng thuê đang ACTIVE."
@@ -588,10 +596,10 @@ export default function AccountsPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+      <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_190px_180px_180px] xl:items-end">
           <label className="relative block">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184]" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184] dark:text-slate-400" />
             <input
               value={query}
               onChange={(event) => {
@@ -599,7 +607,7 @@ export default function AccountsPage() {
                 setPage(1);
               }}
               placeholder="Tìm theo tên khách, SĐT, email, phòng hoặc mã hợp đồng"
-              className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+              className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
             />
           </label>
           <SelectFilter
@@ -641,38 +649,38 @@ export default function AccountsPage() {
       </section>
 
       {message ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
           <CheckCircle2 className="mr-2 inline h-4 w-4" />
           {message}
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300">
           {error}
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-        <div className="border-b border-[#d4dbe8] px-5 py-4">
-          <h2 className="text-lg font-extrabold text-[#0f1d33]">
+      <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="border-b border-[#d4dbe8] px-5 py-4 dark:border-white/10">
+          <h2 className="text-lg font-extrabold text-[#0f1d33] dark:text-white">
             Danh sách cấp tài khoản
           </h2>
-          <p className="mt-1 text-sm text-[#526179]">
+          <p className="mt-1 text-sm text-[#526179] dark:text-slate-400">
             Dữ liệu lấy từ hợp đồng thuê ACTIVE trong database. Một lần gửi sẽ
             cấp tài khoản cho người ký chính và người ở cùng.
           </p>
         </div>
 
         {loading ? (
-          <div className="flex min-h-[240px] items-center justify-center text-sm font-semibold text-[#526179]">
+          <div className="flex min-h-[240px] items-center justify-center text-sm font-semibold text-[#526179] dark:text-slate-400">
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             Đang tải dữ liệu từ backend...
           </div>
         ) : groupedContracts.length === 0 ? (
           <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
-            <UsersRound className="h-10 w-10 text-[#9aa3b2]" />
-            <p className="text-sm font-semibold text-[#526179]">
+            <UsersRound className="h-10 w-10 text-[#9aa3b2] dark:text-slate-500" />
+            <p className="text-sm font-semibold text-[#526179] dark:text-slate-400">
               Không có hợp đồng ACTIVE phù hợp.
             </p>
           </div>
@@ -702,10 +710,10 @@ export default function AccountsPage() {
               return (
                 <article
                   key={group.safeKey}
-                  className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#020817]"
                 >
                   <div
-                    className="flex cursor-pointer flex-col gap-4 bg-[#f7f9fc] p-4 transition hover:bg-[#f1f5fb] lg:flex-row lg:items-center lg:justify-between"
+                    className="flex cursor-pointer flex-col gap-4 bg-[#f7f9fc] p-4 transition hover:bg-[#f1f5fb] dark:bg-white/5 dark:hover:bg-white/10 lg:flex-row lg:items-center lg:justify-between"
                     onClick={() => toggleRoom(group.safeKey)}
                     role="button"
                     tabIndex={0}
@@ -717,12 +725,12 @@ export default function AccountsPage() {
                       }
                     }}
                   >
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-lg font-extrabold text-[#0f1d33]">
+                        <h3 className="text-lg font-extrabold text-[#0f1d33] dark:text-white">
                           Phòng {group.roomCode || "Chưa có"}
                         </h3>
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
                           {group.contractStatus === "EXPIRING_SOON"
                             ? "Hợp đồng sắp hết hạn"
                             : group.contractStatus === "TERMINATION_PENDING"
@@ -730,13 +738,13 @@ export default function AccountsPage() {
                               : "Hợp đồng ACTIVE"}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm font-semibold text-[#526179]">
+                      <p className="mt-1 text-sm font-semibold text-[#526179] dark:text-slate-400">
                         {group.propertyName || "Chưa có cơ sở"} · Hợp đồng{" "}
                         {group.contractCode || "#"}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <span className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#c8ceda] bg-white px-4 text-sm font-bold text-[#0f1d33]">
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[154px_224px_40px] sm:items-center lg:w-[442px]">
+                      <span className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-bold text-[#0f1d33] dark:border-white/10 dark:bg-[#0f172a] dark:text-white">
                         <UsersRound className="h-4 w-4 text-blue-600" />
                         {group.occupantCount}/{group.maxOccupants} người
                       </span>
@@ -748,24 +756,26 @@ export default function AccountsPage() {
                         }}
                         onKeyDown={(event) => event.stopPropagation()}
                         disabled={sendDisabled}
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2]"
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8] dark:disabled:bg-slate-700"
                       >
                         <Send className="h-4 w-4" />
-                        {!contractCanSend
-                          ? "Chỉ gửi khi ACTIVE"
-                          : isSending
-                            ? "Đang gửi..."
-                            : hasFailed
-                              ? "Thử gửi lại"
-                              : hasSent
-                                ? "Gửi bổ sung"
-                                : allActivated
-                                  ? "Đã hoàn tất"
-                                  : canSend
-                                    ? "Gửi tài khoản"
-                                    : "Đã gửi tài khoản"}
+                        <span className="whitespace-nowrap">
+                          {!contractCanSend
+                            ? "Chỉ gửi khi ACTIVE"
+                            : isSending
+                              ? "Đang gửi..."
+                              : hasFailed
+                                ? "Thử gửi lại"
+                                : hasSent
+                                  ? "Gửi bổ sung"
+                                  : allActivated
+                                    ? "Đã hoàn tất"
+                                    : canSend
+                                      ? "Gửi tài khoản"
+                                      : "Đã gửi tài khoản"}
+                        </span>
                       </button>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#526179]">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#526179] dark:text-slate-400">
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5" />
                         ) : (
@@ -776,9 +786,9 @@ export default function AccountsPage() {
                   </div>
 
                   {isExpanded ? (
-                    <div className="dashboard-table border-t border-slate-200">
+                    <div className="dashboard-table border-t border-slate-200 dark:border-white/10">
                       <table className="w-full text-left text-sm">
-                        <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179]">
+                        <thead className="bg-white text-[11px] font-bold uppercase tracking-[0.06em] text-[#526179] dark:bg-[#020817] dark:text-slate-400">
                           <tr>
                             <th className="px-5 py-4 text-left">Khách thuê</th>
                             <th className="px-5 py-4 text-center">Vai trò</th>
@@ -789,7 +799,7 @@ export default function AccountsPage() {
                             <th className="px-5 py-4 text-center">Thao tác</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#eef1f6]">
+                        <tbody className="divide-y divide-[#eef1f6] dark:divide-white/10">
                           {group.rows.map((item, index) => {
                             const state = resolveAccountState(item);
                             const isDisabled = state.key === "DISABLED";
@@ -807,19 +817,19 @@ export default function AccountsPage() {
                                   className="px-5 py-4"
                                 >
                                   <div className="flex items-center gap-3">
-                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dbe7ff] text-xs font-extrabold text-[#3157b7]">
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dbe7ff] text-xs font-extrabold text-[#3157b7] dark:bg-blue-500/10 dark:text-blue-300">
                                       {getInitials(item.fullName)}
                                     </span>
                                     <div className="min-w-0">
-                                      <p className="max-w-[220px] truncate font-extrabold text-[#0f1d33]">
+                                      <p className="max-w-[220px] truncate font-extrabold text-[#0f1d33] dark:text-white">
                                         {item.fullName || "Chưa cập nhật"}
                                       </p>
-                                      <p className="mt-1 text-xs font-semibold text-[#687184]">
+                                      <p className="mt-1 text-xs font-semibold text-[#687184] dark:text-slate-400">
                                         <span>
                                           {item.phone || "Chưa có SĐT"}
                                         </span>
                                       </p>
-                                      <p className="mt-1 inline-flex max-w-[220px] items-center gap-1 truncate text-xs font-semibold text-[#687184]">
+                                      <p className="mt-1 inline-flex max-w-[220px] items-center gap-1 truncate text-xs font-semibold text-[#687184] dark:text-slate-400">
                                         <span className="inline-flex items-center gap-1">
                                           <Mail className="h-3.5 w-3.5" />
                                           {item.email || "Chưa có email"}
@@ -840,7 +850,7 @@ export default function AccountsPage() {
                                 </td>
                                 <td
                                   data-label="Ngày ký"
-                                  className="px-5 py-4 font-semibold text-[#0f1d33] justify-center text-center"
+                                  className="px-5 py-4 font-semibold text-[#0f1d33] justify-center text-center dark:text-slate-200"
                                 >
                                   {formatDate(item.signedAt)}
                                 </td>
@@ -850,7 +860,7 @@ export default function AccountsPage() {
                                 >
                                   <div className="grid gap-1">
                                     <StatusBadge item={item} />
-                                    <span className="text-xs text-[#687184]">
+                                    <span className="text-xs text-[#687184] dark:text-slate-400">
                                       {state.hint}
                                     </span>
                                   </div>
@@ -861,7 +871,7 @@ export default function AccountsPage() {
                                       type="button"
                                       onClick={() => handleDisable(item)}
                                       disabled={disableActionDisabled}
-                                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
                                     >
                                       <Ban className="h-4 w-4" />
                                       {isDisabled

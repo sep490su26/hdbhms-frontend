@@ -33,18 +33,18 @@ export function MonthYearField({ value, onChange, label = "Kỳ báo cáo", clas
 
   return (
     <label
-      className={`inline-flex h-10 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-[#cbd5e1] bg-white px-3 ${className}`}
+      className={`inline-flex h-10 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-[#cbd5e1] bg-white px-3 dark:border-white/10 dark:bg-[#0f172a] ${className}`}
     >
-      <span className="shrink-0 whitespace-nowrap text-xs font-black text-[#475569]">{label}</span>
+      <span className="shrink-0 whitespace-nowrap text-xs font-black text-[#475569] dark:text-slate-300">{label}</span>
       <span className="flex min-w-0 items-center gap-1">
         <select
           value={month}
           onChange={(event) => updatePeriod(year, event.target.value)}
-          className="h-8 w-[5.75rem] bg-transparent text-sm font-semibold text-[#0f1d33] outline-none"
+          className="h-8 w-[5.75rem] bg-transparent text-sm font-semibold text-[#0f1d33] outline-none dark:text-white"
           aria-label="Chọn tháng"
         >
           {MONTHS.map((item) => (
-            <option key={item.value} value={item.value}>
+            <option key={item.value} value={item.value} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
               {item.label}
             </option>
           ))}
@@ -52,11 +52,11 @@ export function MonthYearField({ value, onChange, label = "Kỳ báo cáo", clas
         <select
           value={year}
           onChange={(event) => updatePeriod(event.target.value, month)}
-          className="h-8 w-[4.75rem] bg-transparent text-sm font-semibold text-[#0f1d33] outline-none"
+          className="h-8 w-[4.75rem] bg-transparent text-sm font-semibold text-[#0f1d33] outline-none dark:text-white"
           aria-label="Chọn năm"
         >
           {yearOptions(year).map((item) => (
-            <option key={item} value={item}>
+            <option key={item} value={item} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
               {item}
             </option>
           ))}

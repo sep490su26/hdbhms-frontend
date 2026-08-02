@@ -280,6 +280,7 @@ html,
 body {
   max-width: 100%;
   overflow-x: clip;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -579,6 +580,23 @@ body {
 
   .dashboard-table tbody td:last-child {
     border-bottom: 0;
+  }
+
+  .dark .dashboard-table.dashboard-table--scroll td {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .dashboard-table tbody tr {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: #0f172a;
+  }
+
+  .dark .dashboard-table tbody td {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .dashboard-table tbody td::before {
+    color: #94a3b8;
   }
 
   .dashboard-table tbody td[colspan] {

@@ -4,20 +4,32 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Building2,
+  Check,
   CheckCircle2,
+  ChevronDown,
   KeyRound,
   LockKeyhole,
   Mail,
-  Pencil,
   RefreshCw,
   Search,
   ShieldCheck,
   UserPlus,
   UsersRound,
-  X,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDateTime } from "@/lib/dateFormat";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import {
@@ -25,7 +37,6 @@ import {
   fetchSimpleProperties,
   fetchUsers,
   updateUserAssignedProperty,
-  updateUserRole,
   updateUserStatus,
 } from "@/services/identityAccessService";
 import { useAuth } from "../../_contexts/AuthContext";
@@ -33,7 +44,6 @@ import { useAuth } from "../../_contexts/AuthContext";
 const ALL_VALUE = "all";
 const ROLE_OPTIONS = [
   { value: "MANAGER", label: "Quản lý" },
-  { value: "ACCOUNTANT", label: "Kế toán" },
 ];
 const STAFF_ROLES = ROLE_OPTIONS.map((item) => item.value);
 
@@ -53,39 +63,39 @@ const blankForm = {
   propertyId: "",
 };
 
-function roleLabel(role) {
-  return (
-    ROLE_OPTIONS.find((item) => item.value === role)?.label || role || "Chưa rõ"
-  );
-}
-
 function statusMeta(status) {
   const map = {
     ACTIVE: {
       label: "Đang hoạt động",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      className:
+        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300",
     },
     INACTIVE: {
       label: "Tạm khóa",
-      className: "border-rose-200 bg-rose-50 text-rose-700",
+      className:
+        "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300",
     },
     PENDING_CONTRACT: {
       label: "Chờ hợp đồng",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300",
     },
     ARCHIVED: {
       label: "Lưu trữ",
-      className: "border-slate-200 bg-slate-50 text-slate-700",
+      className:
+        "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
     },
     CLOSED: {
       label: "Đã đóng",
-      className: "border-slate-300 bg-slate-100 text-slate-700",
+      className:
+        "border-slate-300 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
     },
   };
   return (
     map[status] || {
       label: status || "Chưa rõ",
-      className: "border-slate-200 bg-slate-50 text-slate-700",
+      className:
+        "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
     }
   );
 }
@@ -103,24 +113,26 @@ function getInitials(name) {
 
 function MetricCard({ icon: Icon, label, value, tone = "slate" }) {
   const toneClass = {
-    slate: "bg-slate-100 text-slate-700",
-    amber: "bg-amber-50 text-amber-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
+    slate: "bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300",
+    amber:
+      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+    emerald:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+    rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
   }[tone];
 
   return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
       <span
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
       >
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184]">
+        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184] dark:text-slate-400">
           {label}
         </p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33]">
+        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33] dark:text-white">
           {value}
         </p>
       </div>
@@ -143,8 +155,8 @@ function InlineAlert({ tone = "error", children }) {
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
   const className =
     tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : "border-rose-200 bg-rose-50 text-rose-700";
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+      : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-300";
 
   return (
     <div
@@ -159,14 +171,14 @@ function InlineAlert({ tone = "error", children }) {
 function SelectFilter({ label, value, onChange, options }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-[11px] font-semibold text-[#8490a5]">{label}</span>
+      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
             {option.label}
           </option>
         ))}
@@ -175,37 +187,184 @@ function SelectFilter({ label, value, onChange, options }) {
   );
 }
 
-function Modal({ title, onClose, children, footer }) {
+function getAssignedProperty(account) {
+  return Array.isArray(account.assignedProperties)
+    ? account.assignedProperties[0]
+    : null;
+}
+
+function AssignedPropertyDropdown({
+  account,
+  properties,
+  disabled,
+  saving,
+  onChange,
+}) {
+  const assignedProperty = getAssignedProperty(account);
+  const assignedPropertyId = assignedProperty?.id
+    ? String(assignedProperty.id)
+    : "";
+  const assignedPropertyName =
+    assignedProperty?.name || assignedProperty?.propertyName || "";
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="staff-account-modal-title"
-    >
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#d4dbe8] px-6 py-4">
-          <h2
-            id="staff-account-modal-title"
-            className="text-lg font-bold text-[#0f1d33]"
-          >
-            {title}
-          </h2>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled || saving}
+          className="inline-flex h-10 w-full min-w-[220px] max-w-[280px] items-center justify-between gap-2 rounded-lg border border-[#c8ceda] bg-white px-3 text-left text-sm font-semibold text-[#0f1d33] transition hover:bg-[#f6f8fc] disabled:cursor-not-allowed disabled:bg-[#eef2f7] disabled:text-[#8490a5] dark:border-white/10 dark:bg-[#020817] dark:text-white dark:hover:bg-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
+        >
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <Building2 className="h-4 w-4 shrink-0 text-[#687184] dark:text-slate-400" />
+            <span className="truncate">
+              {saving
+                ? "Đang lưu..."
+                : assignedPropertyName || "Chọn cơ sở phụ trách"}
+            </span>
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-[#687184] dark:text-slate-400" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        className="max-h-64 w-[280px] overflow-y-auto rounded-lg border border-[#d4dbe8] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        {properties.length === 0 ? (
+          <DropdownMenuItem disabled className="rounded-md px-3 py-2 text-sm">
+            Chưa có cơ sở
+          </DropdownMenuItem>
+        ) : (
+          properties.map((property) => {
+            const selected = String(property.id) === assignedPropertyId;
+
+            return (
+              <DropdownMenuItem
+                key={property.id}
+                asChild
+                className="rounded-md p-0 focus:bg-transparent"
+              >
+                <button
+                  type="button"
+                  onClick={() => !selected && onChange(account, property.id)}
+                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[#0f1d33] transition hover:bg-[#f3f6fb] dark:text-white dark:hover:bg-white/10 ${
+                    selected ? "bg-[#eef4ff] dark:bg-blue-500/10" : ""
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {property.name}
+                  </span>
+                  {selected ? <Check className="h-4 w-4 text-[#1e40af] dark:text-blue-300" /> : null}
+                </button>
+              </DropdownMenuItem>
+            );
+          })
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function CreateAccountDialog({
+  open,
+  form,
+  properties,
+  saving,
+  onClose,
+  onChange,
+  onSubmit,
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        lockScroll={false}
+        overlayClassName="bg-[#091426]/60 backdrop-blur-sm"
+        className="max-h-[92vh] gap-0 overflow-hidden rounded-xl bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-[#0f172a] sm:max-w-2xl"
+      >
+        <DialogHeader className="flex flex-row items-center justify-between gap-4 border-b border-[#d4dbe8] px-6 py-4 text-left dark:border-white/10">
+          <DialogTitle className="text-lg font-bold text-[#0f1d33] dark:text-white">
+            Tạo tài khoản quản lý
+          </DialogTitle>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-[#526179] hover:bg-[#f3f6fb] hover:text-[#0f1d33]"
+            className="rounded-lg p-2 text-[#526179] hover:bg-[#f3f6fb] hover:text-[#0f1d33] dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
             aria-label="Đóng"
           >
-            <X className="h-5 w-5" />
+            <span className="text-xl leading-none">×</span>
+          </button>
+        </DialogHeader>
+
+        <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 md:grid-cols-2">
+          <label className="grid gap-2 md:col-span-2">
+            <span className="text-sm font-bold text-[#0f1d33] dark:text-slate-200">Họ tên</span>
+            <input
+              value={form.fullName}
+              onChange={(event) => onChange("fullName", event.target.value)}
+              className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              placeholder="Nguyễn Văn A"
+            />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-[#0f1d33] dark:text-slate-200">
+              Số điện thoại
+            </span>
+            <input
+              value={form.phone}
+              onChange={(event) => onChange("phone", event.target.value)}
+              className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              placeholder="0901234567"
+            />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-bold text-[#0f1d33] dark:text-slate-200">Email</span>
+            <input
+              value={form.email}
+              onChange={(event) => onChange("email", event.target.value)}
+              className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+              placeholder="nhanvien@example.com"
+            />
+          </label>
+          <div className="rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] p-4 dark:border-white/10 dark:bg-white/5 md:col-span-2">
+            <p className="text-sm font-bold text-[#0f1d33] dark:text-slate-200">
+              Cơ sở phụ trách
+            </p>
+            <select
+              value={form.propertyId}
+              onChange={(event) => onChange("propertyId", event.target.value)}
+              className="mt-3 h-11 w-full rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
+            >
+              <option value="" className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">Chọn cơ sở phụ trách</option>
+              {properties.map((property) => (
+                <option key={property.id} value={property.id} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
+                  {property.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-[#d4dbe8] px-6 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-lg border border-[#c8ceda] px-4 text-sm font-bold text-[#0f1d33] hover:bg-[#f3f6fb] dark:border-white/10 dark:text-white dark:hover:bg-white/10"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={saving}
+            className="h-10 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
+          >
+            {saving ? "Đang tạo..." : "Tạo tài khoản"}
           </button>
         </div>
-        <div className="p-6">{children}</div>
-        {footer ? (
-          <div className="border-t border-[#d4dbe8] px-6 py-4">{footer}</div>
-        ) : null}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -215,7 +374,6 @@ export default function StaffAccountsPage() {
   const [items, setItems] = useState([]);
   const [properties, setProperties] = useState([]);
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState(ALL_VALUE);
   const [statusFilter, setStatusFilter] = useState(ALL_VALUE);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -227,12 +385,7 @@ export default function StaffAccountsPage() {
   const [message, setMessage] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(blankForm);
-  const [editTarget, setEditTarget] = useState(null);
-  const [editForm, setEditForm] = useState({
-    role: "MANAGER",
-    status: "ACTIVE",
-    propertyId: "",
-  });
+  const [propertySavingId, setPropertySavingId] = useState(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -241,7 +394,7 @@ export default function StaffAccountsPage() {
       const data = await fetchUsers({
         page: page - 1,
         size,
-        roles: roleFilter === ALL_VALUE ? STAFF_ROLES : [roleFilter],
+        roles: STAFF_ROLES,
         status: statusFilter,
         search: query,
       });
@@ -255,7 +408,7 @@ export default function StaffAccountsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, roleFilter, size, statusFilter]);
+  }, [page, query, size, statusFilter]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -291,20 +444,10 @@ export default function StaffAccountsPage() {
     [items, totalElements],
   );
 
-  const roleOptions = useMemo(
-    () => [{ value: ALL_VALUE, label: "Tất cả vai trò" }, ...ROLE_OPTIONS],
-    [],
-  );
-
   const statusOptions = useMemo(
     () => [{ value: ALL_VALUE, label: "Tất cả trạng thái" }, ...STATUS_OPTIONS],
     [],
   );
-
-  const propertyText = useMemo(() => {
-    if (!properties.length) return "Chưa có dữ liệu cơ sở";
-    return `${properties.length} cơ sở khả dụng`;
-  }, [properties.length]);
 
   const resetFiltersPage = (setter) => (value) => {
     setter(value);
@@ -352,73 +495,26 @@ export default function StaffAccountsPage() {
     }
   };
 
-  const openEdit = (account) => {
-    setError("");
-    setMessage("");
-    setEditTarget(account);
-    const assignedProperty = Array.isArray(account.assignedProperties)
-      ? account.assignedProperties[0]
-      : null;
-    setEditForm({
-      role: ROLE_OPTIONS.some((item) => item.value === account.role)
-        ? account.role
-        : "MANAGER",
-      status: account.status || "ACTIVE",
-      propertyId: assignedProperty?.id ? String(assignedProperty.id) : "",
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editTarget?.id || saving) return;
-    if (String(editTarget.id) === String(currentUserId)) {
-      setError(
-        "Không thể tự sửa role hoặc trạng thái tài khoản của chính mình.",
-      );
-      return;
-    }
-    if (!ROLE_OPTIONS.some((item) => item.value === editForm.role)) {
-      setError("Vai trò nhân viên không hợp lệ.");
-      return;
-    }
-    if (editForm.role === "MANAGER" && !editForm.propertyId) {
-      setError("Vui lòng chọn cơ sở phụ trách cho tài khoản quản lý.");
+  const handleChangeAssignedProperty = async (account, propertyId) => {
+    if (!account?.id || !propertyId || propertySavingId) return;
+    if (String(account.id) === String(currentUserId)) {
+      setError("Không thể tự sửa cơ sở phụ trách của chính mình.");
       return;
     }
 
-    setSaving(true);
+    setPropertySavingId(account.id);
     setError("");
     setMessage("");
     try {
-      if (editForm.role !== editTarget.role) {
-        await updateUserRole(editTarget.id, editForm.role);
-      }
-      if (
-        editForm.status !== editTarget.status &&
-        MUTABLE_STATUSES.has(editForm.status)
-      ) {
-        await updateUserStatus(editTarget.id, { status: editForm.status });
-      }
-      const currentAssignedPropertyId = Array.isArray(
-        editTarget.assignedProperties,
-      )
-        ? editTarget.assignedProperties[0]?.id
-        : "";
-      if (
-        editForm.role === "MANAGER" &&
-        editForm.propertyId &&
-        String(editForm.propertyId) !== String(currentAssignedPropertyId || "")
-      ) {
-        await updateUserAssignedProperty(editTarget.id, editForm.propertyId);
-      }
-      setMessage("Đã cập nhật tài khoản nhân viên.");
-      setEditTarget(null);
+      await updateUserAssignedProperty(account.id, propertyId);
+      setMessage("Đã cập nhật cơ sở phụ trách.");
       await loadUsers();
     } catch (saveError) {
       setError(
-        saveError?.message || "Không cập nhật được tài khoản nhân viên.",
+        saveError?.message || "Không cập nhật được cơ sở phụ trách.",
       );
     } finally {
-      setSaving(false);
+      setPropertySavingId(null);
     }
   };
 
@@ -462,10 +558,10 @@ export default function StaffAccountsPage() {
   };
 
   return (
-    <div className="grid gap-7 text-[#0f1d33]">
+    <div className="grid gap-7 text-[#0f1d33] dark:text-white">
       <DashboardPageHeader
         title="Quản lý tài khoản nhân viên"
-        description="Tạo tài khoản web cho quản lý; theo dõi role, trạng thái đăng nhập và cơ sở phụ trách của tài khoản nhân viên."
+        description="Tạo tài khoản web cho quản lý; theo dõi trạng thái đăng nhập và cơ sở phụ trách của tài khoản nhân viên."
         actions={
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
@@ -511,10 +607,10 @@ export default function StaffAccountsPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_190px_190px_220px] xl:items-end">
+      <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_220px] md:items-end">
           <label className="relative block">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184]" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184] dark:text-slate-400" />
             <input
               value={query}
               onChange={(event) => {
@@ -522,66 +618,47 @@ export default function StaffAccountsPage() {
                 setPage(1);
               }}
               placeholder="Tìm theo tên, email hoặc số điện thoại"
-              className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
+              className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
             />
           </label>
-          <SelectFilter
-            label="Vai trò"
-            value={roleFilter}
-            options={roleOptions}
-            onChange={resetFiltersPage(setRoleFilter)}
-          />
           <SelectFilter
             label="Trạng thái"
             value={statusFilter}
             options={statusOptions}
             onChange={resetFiltersPage(setStatusFilter)}
           />
-          <label className="grid gap-1.5">
-            <span className="text-[11px] font-semibold text-[#8490a5]">
-              Cơ sở phụ trách
-            </span>
-            <select
-              value={ALL_VALUE}
-              disabled
-              className="h-11 rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] px-3 text-sm font-semibold text-[#687184]"
-            >
-              <option>{propertyText}</option>
-            </select>
-          </label>
         </div>
-        <p className="mt-3 text-xs font-semibold text-[#687184]">
-          Cơ sở phụ trách lấy từ backend và được lưu qua API gán cơ sở cho tài
-          khoản quản lý.
+        <p className="mt-3 text-xs font-semibold text-[#687184] dark:text-slate-400">
+          Cơ sở phụ trách được sửa trực tiếp bằng dropdown trong từng dòng.
         </p>
       </section>
 
       {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 
-      <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-        <div className="border-b border-[#d4dbe8] px-5 py-4">
-          <h2 className="text-lg font-extrabold text-[#0f1d33]">
+      <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="border-b border-[#d4dbe8] px-5 py-4 dark:border-white/10">
+          <h2 className="text-lg font-extrabold text-[#0f1d33] dark:text-white">
             Danh sách tài khoản nhân viên
           </h2>
         </div>
 
         {loading ? (
-          <div className="flex min-h-[260px] items-center justify-center text-sm font-semibold text-[#526179]">
+          <div className="flex min-h-[260px] items-center justify-center text-sm font-semibold text-[#526179] dark:text-slate-400">
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             Đang tải danh sách nhân viên...
           </div>
         ) : items.length === 0 ? (
           <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 text-center">
-            <UsersRound className="h-10 w-10 text-[#9aa3b2]" />
-            <p className="text-sm font-semibold text-[#526179]">
+            <UsersRound className="h-10 w-10 text-[#9aa3b2] dark:text-slate-500" />
+            <p className="text-sm font-semibold text-[#526179] dark:text-slate-400">
               Không có tài khoản nhân viên phù hợp.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#687184]">
+              <thead className="bg-[#f7f9fb] text-xs font-bold uppercase tracking-[0.06em] text-[#687184] dark:bg-white/5 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-4">Nhân viên</th>
                   <th className="px-5 py-4">Trạng thái</th>
@@ -591,33 +668,26 @@ export default function StaffAccountsPage() {
                   <th className="px-5 py-4 text-center">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#d4dbe8]">
+              <tbody className="divide-y divide-[#d4dbe8] dark:divide-white/10">
                 {items.map((account) => {
                   const isSelf = String(account.id) === String(currentUserId);
                   const canToggle =
                     MUTABLE_STATUSES.has(account.status) && !isSelf;
-                  const assignedPropertyNames = Array.isArray(
-                    account.assignedProperties,
-                  )
-                    ? account.assignedProperties
-                        .map(
-                          (property) => property.name || property.propertyName,
-                        )
-                        .filter(Boolean)
-                    : [];
+                  const isPropertySaving =
+                    String(propertySavingId) === String(account.id);
 
                   return (
                     <tr key={account.id || account.email} className="align-top">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ecf3ff] text-xs font-bold text-[#465fff]">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ecf3ff] text-xs font-bold text-[#465fff] dark:bg-blue-500/10 dark:text-blue-300">
                             {getInitials(account.fullName)}
                           </span>
                           <div className="min-w-0">
-                            <p className="font-bold text-[#0f1d33]">
+                            <p className="font-bold text-[#0f1d33] dark:text-white">
                               {account.fullName}
                             </p>
-                            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[#687184]">
+                            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[#687184] dark:text-slate-400">
                               <span>{account.phone || "Chưa có SĐT"}</span>
                               <span className="inline-flex items-center gap-1">
                                 <Mail className="h-3.5 w-3.5" />
@@ -630,44 +700,38 @@ export default function StaffAccountsPage() {
                       <td className="px-5 py-4">
                         <StatusBadge status={account.status} />
                         {account.mustChangePassword ? (
-                          <p className="mt-2 text-xs font-semibold text-amber-700">
+                          <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
                             Chưa đổi mật khẩu lần đầu
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-5 py-4 text-[#526179]">
-                        <span className="inline-flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-[#687184]" />
-                          {assignedPropertyNames.length
-                            ? assignedPropertyNames.join(", ")
-                            : "Chưa gán"}
-                        </span>
+                      <td className="px-5 py-4 text-[#526179] dark:text-slate-400">
+                        <AssignedPropertyDropdown
+                          account={account}
+                          properties={properties}
+                          disabled={isSelf}
+                          saving={isPropertySaving}
+                          onChange={handleChangeAssignedProperty}
+                        />
                       </td>
-                      <td className="px-5 py-4 text-[#526179]">
+                      <td className="px-5 py-4 text-[#526179] dark:text-slate-400">
                         {formatDateTime(account.lastLoginAt, "Chưa đăng nhập")}
                       </td>
-                      <td className="px-5 py-4 text-[#526179]">
+                      <td className="px-5 py-4 text-[#526179] dark:text-slate-400">
                         {formatDateTime(account.createdAt, "Chưa cập nhật")}
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => openEdit(account)}
-                            disabled={isSelf}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#c8ceda] px-3 text-xs font-bold text-[#0f1d33] transition hover:bg-[#f6f8fc] disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleToggleStatus(account)}
-                            disabled={!canToggle || saving}
+                            disabled={
+                              !canToggle || saving || Boolean(propertySavingId)
+                            }
                             className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                               account.status === "ACTIVE"
-                                ? "border border-rose-200 text-rose-700 hover:bg-rose-50"
-                                : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                ? "border border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-400/30 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                : "border border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-400/30 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
                             }`}
                           >
                             {account.status === "ACTIVE" ? (
@@ -703,209 +767,17 @@ export default function StaffAccountsPage() {
         />
       </section>
 
-      {createOpen ? (
-        <Modal
-          title="Tạo tài khoản quản lý"
-          onClose={() => setCreateOpen(false)}
-          footer={
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setCreateOpen(false)}
-                className="h-10 rounded-lg border border-[#c8ceda] px-4 text-sm font-bold text-[#0f1d33]"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={saving}
-                className="h-10 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Đang tạo..." : "Tạo tài khoản"}
-              </button>
-            </div>
-          }
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-bold text-[#0f1d33]">Họ tên</span>
-              <input
-                value={createForm.fullName}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    fullName: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-                placeholder="Nguyễn Văn A"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#0f1d33]">
-                Số điện thoại
-              </span>
-              <input
-                value={createForm.phone}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    phone: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-                placeholder="0901234567"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#0f1d33]">Email</span>
-              <input
-                value={createForm.email}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-                placeholder="nhanvien@example.com"
-              />
-            </label>
-            <div className="rounded-lg border border-dashed border-[#c8ceda] bg-[#f8fafc] p-4 md:col-span-2">
-              <p className="text-sm font-bold text-[#0f1d33]">
-                Cơ sở phụ trách
-              </p>
-              <select
-                value={createForm.propertyId}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    propertyId: event.target.value,
-                  }))
-                }
-                className="mt-3 h-11 w-full rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-              >
-                <option value="">Chọn cơ sở phụ trách</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </Modal>
-      ) : null}
-
-      {editTarget ? (
-        <Modal
-          title={`Sửa tài khoản ${editTarget.fullName}`}
-          onClose={() => setEditTarget(null)}
-          footer={
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setEditTarget(null)}
-                className="h-10 rounded-lg border border-[#c8ceda] px-4 text-sm font-bold text-[#0f1d33]"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEdit}
-                disabled={saving}
-                className="h-10 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Đang lưu..." : "Lưu thay đổi"}
-              </button>
-            </div>
-          }
-        >
-          <div className="grid gap-4">
-            <div className="rounded-lg border border-[#d4dbe8] bg-[#f8fafc] p-4">
-              <p className="font-bold text-[#0f1d33]">{editTarget.fullName}</p>
-              <p className="mt-1 text-sm font-semibold text-[#687184]">
-                {editTarget.email || editTarget.phone}
-              </p>
-            </div>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#0f1d33]">Vai trò</span>
-              <select
-                value={editForm.role}
-                onChange={(event) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    role: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-              >
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#0f1d33]">
-                Trạng thái
-              </span>
-              <select
-                value={editForm.status}
-                onChange={(event) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    status: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10"
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option
-                    key={option.value}
-                    value={option.value}
-                    disabled={!MUTABLE_STATUSES.has(option.value)}
-                  >
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs font-semibold text-[#687184]">
-                Phase này chỉ cho đổi giữa đang hoạt động và tạm khóa.
-              </span>
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-bold text-[#0f1d33]">
-                Cơ sở phụ trách
-              </span>
-              <select
-                value={editForm.propertyId}
-                onChange={(event) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    propertyId: event.target.value,
-                  }))
-                }
-                disabled={editForm.role !== "MANAGER"}
-                className="h-11 rounded-lg border border-[#c8ceda] px-3 text-sm font-semibold outline-none focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 disabled:cursor-not-allowed disabled:bg-[#eef2f7] disabled:text-[#8490a5]"
-              >
-                <option value="">
-                  {editForm.role === "MANAGER"
-                    ? "Chọn cơ sở phụ trách"
-                    : "Chỉ áp dụng cho quản lý"}
-                </option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </Modal>
-      ) : null}
+      <CreateAccountDialog
+        open={createOpen}
+        form={createForm}
+        properties={properties}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+        onChange={(key, value) =>
+          setCreateForm((current) => ({ ...current, [key]: value }))
+        }
+        onSubmit={handleCreate}
+      />
     </div>
   );
 }

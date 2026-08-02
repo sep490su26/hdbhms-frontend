@@ -74,54 +74,54 @@ function RoomTransferEligibilitySummary({ transfer }) {
     const violation = transfer.violationSummary || {};
 
     return (
-        <div className="rounded-xl bg-white p-4 border border-blue-100">
+        <div className="rounded-xl bg-white p-4 border border-blue-100 dark:border-blue-400/20 dark:bg-[#0f172a]">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p className="text-sm font-semibold text-gray-900">Điều kiện chuyển phòng</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Điều kiện chuyển phòng</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                         Tóm tắt nợ, vi phạm và lịch sử chuyển phòng tại thời điểm tạo yêu cầu.
                     </p>
                 </div>
                 <Badge
                     variant="outline"
                     className={transfer.eligibleAtCreation === false
-                        ? "border-red-200 bg-red-50 text-red-700"
+                        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-300"
                         : transfer.eligibleAtCreation === true
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-gray-200 bg-gray-50 text-gray-600"}
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                            : "border-gray-200 bg-gray-50 text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"}
                 >
                     {formatEligibilityResult(transfer.eligibleAtCreation)}
                 </Badge>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-500">Kiểm tra lúc</p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">{formatDateTimeValue(transfer.eligibilityCheckedAt)}</p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Kiểm tra lúc</p>
+                    <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{formatDateTimeValue(transfer.eligibilityCheckedAt)}</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-500">Tổng nợ</p>
-                    <p className={debt.overLimit ? "mt-1 text-sm font-bold text-red-700" : "mt-1 text-sm font-bold text-gray-900"}>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Tổng nợ</p>
+                    <p className={debt.overLimit ? "mt-1 text-sm font-bold text-red-700 dark:text-red-300" : "mt-1 text-sm font-bold text-gray-900 dark:text-white"}>
                         {formatVnd(debt.totalDebtAmount)}
                     </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
                         Thuê {formatVnd(debt.rentDebtAmount)} · Điện/nước {formatVnd(debt.utilityDebtAmount)}
                     </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-500">Vi phạm</p>
-                    <p className={(violation.totalCount || 0) > 0 ? "mt-1 text-sm font-bold text-amber-700" : "mt-1 text-sm font-bold text-gray-900"}>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Vi phạm</p>
+                    <p className={(violation.totalCount || 0) > 0 ? "mt-1 text-sm font-bold text-amber-700 dark:text-amber-300" : "mt-1 text-sm font-bold text-gray-900 dark:text-white"}>
                         {violation.totalCount ?? 0} ghi nhận
                     </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
+                    <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
                         {Array.isArray(violation.latestDescriptions) && violation.latestDescriptions.length > 0
                             ? violation.latestDescriptions.slice(0, 2).join(" · ")
                             : "Không có vi phạm đang mở"}
                     </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold text-gray-500">Số lần chuyển năm nay</p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">{transfer.transferCountThisYear ?? 0}</p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-slate-400">Số lần chuyển năm nay</p>
+                    <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{transfer.transferCountThisYear ?? 0}</p>
                 </div>
             </div>
         </div>
@@ -183,19 +183,19 @@ function RenewalEligibilitySummary({ payload }) {
     const isBlocked = explicitCanRenew === false || Boolean(blockedReason) || hasInvalidTerm;
 
     return (
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-400/20 dark:bg-indigo-500/10">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p className="text-sm font-semibold text-indigo-950">Điều kiện gia hạn</p>
-                    <p className="mt-1 text-xs text-indigo-700">
+                    <p className="text-sm font-semibold text-indigo-950 dark:text-indigo-100">Điều kiện gia hạn</p>
+                    <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-300">
                         Kiểm tra terms trong yêu cầu; blocker phòng sẽ hiển thị nếu backend trả về.
                     </p>
                 </div>
                 <Badge
                     variant="outline"
                     className={isBlocked
-                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700"}
+                        ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300"}
                 >
                     {isBlocked ? "Cần kiểm tra" : "Hợp lệ theo payload"}
                 </Badge>
@@ -203,9 +203,9 @@ function RenewalEligibilitySummary({ payload }) {
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 {checks.map((check) => (
-                    <div key={check.label} className="rounded-lg border border-white/70 bg-white p-3">
-                        <p className="text-xs font-semibold text-slate-500">{check.label}</p>
-                        <p className={check.valid ? "mt-1 text-sm font-bold text-slate-900" : "mt-1 text-sm font-bold text-amber-700"}>
+                    <div key={check.label} className="rounded-lg border border-white/70 bg-white p-3 dark:border-white/10 dark:bg-[#0f172a]">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{check.label}</p>
+                        <p className={check.valid ? "mt-1 text-sm font-bold text-slate-900 dark:text-white" : "mt-1 text-sm font-bold text-amber-700 dark:text-amber-300"}>
                             {check.detail}
                         </p>
                     </div>
@@ -213,9 +213,9 @@ function RenewalEligibilitySummary({ payload }) {
             </div>
 
             {blockedReason && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <p className="text-xs font-bold text-amber-800">Lý do cần xử lý</p>
-                    <p className="mt-1 text-xs text-amber-700">{blockedReason}</p>
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-400/30 dark:bg-amber-500/10">
+                    <p className="text-xs font-bold text-amber-800 dark:text-amber-200">Lý do cần xử lý</p>
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{blockedReason}</p>
                 </div>
             )}
         </div>
@@ -302,16 +302,16 @@ export function TransferRequestDetail({ payload, transfer }) {
             </div>
 
             {reason && (
-                <div className="rounded-xl bg-blue-50 p-4">
-                    <p className="mb-1 text-sm font-semibold text-blue-700">Lý do chuyển</p>
-                    <p className="whitespace-pre-wrap text-sm text-blue-600">{reason}</p>
+                <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-500/10">
+                    <p className="mb-1 text-sm font-semibold text-blue-700 dark:text-blue-300">Lý do chuyển</p>
+                    <p className="whitespace-pre-wrap text-sm text-blue-600 dark:text-blue-200">{reason}</p>
                 </div>
             )}
 
             {note && (
-                <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="mb-1 text-sm font-semibold text-slate-700">Chi tiết bổ sung</p>
-                    <p className="whitespace-pre-wrap text-sm text-slate-600">{note}</p>
+                <div className="rounded-xl bg-slate-50 p-4 dark:bg-white/5">
+                    <p className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Chi tiết bổ sung</p>
+                    <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{note}</p>
                 </div>
             )}
 
@@ -328,9 +328,9 @@ export function MoveoutRequestDetail({ payload }) {
             <InfoField label="Phòng" value={payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
             <InfoField label="Ngày dự kiến trả" value={formatDateValue(payload.moveOutDate || payload.move_out_date || payload.expectedDate || payload.expected_date)} icon={<Calendar className="w-4 h-4" />} />
             {(payload.reason || payload.moveOutReason || payload.move_out_reason) && (
-                <div className="col-span-2 rounded-xl bg-green-50 p-4">
-                    <p className="text-sm font-semibold text-green-700 mb-1">Lý do trả phòng</p>
-                    <p className="text-sm text-green-600 whitespace-pre-wrap">{payload.reason || payload.moveOutReason || payload.move_out_reason}</p>
+                <div className="col-span-2 rounded-xl bg-green-50 p-4 dark:bg-green-500/10">
+                    <p className="text-sm font-semibold text-green-700 mb-1 dark:text-green-300">Lý do trả phòng</p>
+                    <p className="text-sm text-green-600 whitespace-pre-wrap dark:text-green-200">{payload.reason || payload.moveOutReason || payload.move_out_reason}</p>
                 </div>
             )}
         </div>
@@ -376,9 +376,9 @@ export function TerminationRequestDetail({ payload }) {
                 <InfoField label="Ngày thanh lý" value={formatDateValue(effectiveDate)} icon={<Calendar className="w-4 h-4" />} />
             )}
             {reason && (
-                <div className="col-span-2 rounded-xl bg-red-50 p-4">
-                    <p className="text-sm font-semibold text-red-700 mb-1">Lý do thanh lý</p>
-                    <p className="text-sm text-red-600 whitespace-pre-wrap">{reason}</p>
+                <div className="col-span-2 rounded-xl bg-red-50 p-4 dark:bg-red-500/10">
+                    <p className="text-sm font-semibold text-red-700 mb-1 dark:text-red-300">Lý do thanh lý</p>
+                    <p className="text-sm text-red-600 whitespace-pre-wrap dark:text-red-200">{reason}</p>
                 </div>
             )}
         </div>
@@ -401,9 +401,9 @@ export function ExpenseApprovalRequestDetail({ payload }) {
                 <InfoField label="Ngày thanh lý" value={formatDateValue(firstValue(payload.liquidationDate, payload.liquidation_date))} icon={<Calendar className="w-4 h-4" />} />
             </div>
             {isLiquidationRefund && (
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                    <p className="text-sm font-semibold text-emerald-800">Quy trình hoàn cọc</p>
-                    <p className="mt-1 text-sm text-emerald-700">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Quy trình hoàn cọc</p>
+                    <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
                         Sau khi chủ trọ duyệt, chủ trọ hoặc quản lý hoàn tiền ngoài hệ thống, upload minh chứng và hệ thống sẽ gửi thông báo để khách thuê xác nhận đã nhận tiền.
                     </p>
                 </div>
@@ -473,9 +473,9 @@ export function MeterReadingCorrectionRequestDetail({ payload }) {
             </div>
 
             {(payload.description || payload.reason) && (
-                <div className="rounded-xl bg-cyan-50 p-4">
-                    <p className="mb-1 text-sm font-semibold text-cyan-700">Nội dung khách gửi</p>
-                    <p className="whitespace-pre-wrap text-sm text-cyan-700">{payload.description || payload.reason}</p>
+                <div className="rounded-xl bg-cyan-50 p-4 dark:bg-cyan-500/10">
+                    <p className="mb-1 text-sm font-semibold text-cyan-700 dark:text-cyan-300">Nội dung khách gửi</p>
+                    <p className="whitespace-pre-wrap text-sm text-cyan-700 dark:text-cyan-200">{payload.description || payload.reason}</p>
                 </div>
             )}
         </div>
@@ -492,9 +492,9 @@ export function AccessRequestDetail({ payload }) {
                 <InfoField label="Số lượng" value={payload.quantity || payload.cardQuantity || payload.card_quantity} />
             )}
             {(payload.reason || payload.accessReason || payload.access_reason) && (
-                <div className="col-span-2 rounded-xl bg-gray-50 p-4">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">Lý do</p>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{payload.reason || payload.accessReason || payload.access_reason}</p>
+                <div className="col-span-2 rounded-xl bg-gray-50 p-4 dark:bg-white/5">
+                    <p className="text-sm font-semibold text-gray-700 mb-1 dark:text-slate-200">Lý do</p>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap dark:text-slate-300">{payload.reason || payload.accessReason || payload.access_reason}</p>
                 </div>
             )}
         </div>

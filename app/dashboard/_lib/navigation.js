@@ -2,12 +2,10 @@ import {
   BellRing,
   Building2,
   FileCheck2,
-  FileText,
   Gauge,
   Inbox,
   LayoutDashboard,
   ReceiptText,
-  Settings,
   UserRoundCog,
   UsersRound,
   WalletCards,
@@ -33,11 +31,6 @@ export const navigation = [
   },
   { path: "/dashboard/debt", label: "Công nợ", icon: WalletMinimal },
   { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2 },
-  {
-    path: "/dashboard/contract-management",
-    label: "Quản lý hợp đồng",
-    icon: FileText,
-  },
   { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
   {
     path: "/dashboard/notification-templates",
@@ -45,7 +38,6 @@ export const navigation = [
     icon: BellRing,
   },
   { path: "/dashboard/finance", label: "Báo cáo doanh thu", icon: WalletCards },
-  { path: "/dashboard/settings", label: "Cấu hình hệ thống", icon: Settings },
 ];
 
 export const navigationPermissionKeys = {
@@ -58,12 +50,10 @@ export const navigationPermissionKeys = {
   "/dashboard/billing": "billing",
   "/dashboard/debt": "debt",
   "/dashboard/deposits": "deposits",
-  "/dashboard/contract-management": "contract",
   "/dashboard/requests": "requests",
   "/dashboard/room-transfer-history": "roomTransferHistory",
   "/dashboard/notification-templates": "notificationTemplates",
   "/dashboard/finance": "finance",
-  "/dashboard/settings": "settings",
 };
 
 export function isNavigationPathActive(pathname, path) {

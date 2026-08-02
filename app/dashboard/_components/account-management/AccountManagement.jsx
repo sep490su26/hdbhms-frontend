@@ -179,7 +179,7 @@ export function AccountManagement() {
       <DashboardPageHeader
         eyebrow="Admin Dashboard"
         title="AccountManagement"
-        description="Quản lý tài khoản nhân sự cho vai trò Quản lý và Kế toán trong hệ thống nhà trọ."
+        description="Quản lý tài khoản nhân sự cho vai trò Quản lý trong hệ thống nhà trọ."
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

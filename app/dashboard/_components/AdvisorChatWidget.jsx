@@ -101,6 +101,7 @@ export function AdvisorChatWidget() {
   const [isSending, setSending] = useState(false);
   const [error, setError] = useState("");
   const bodyRef = useRef(null);
+  const questionRef = useRef(null);
   const conversationStartedRef = useRef(false);
 
   useEffect(() => {
@@ -165,6 +166,15 @@ export function AdvisorChatWidget() {
     if (!isOpen || !bodyRef.current) return;
     bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [isOpen, messages, isSending]);
+
+  useEffect(() => {
+    if (!questionRef.current) return;
+    const field = questionRef.current;
+    field.style.height = "auto";
+    const nextHeight = Math.min(Math.max(field.scrollHeight, 44), 144);
+    field.style.height = `${nextHeight}px`;
+    field.style.overflowY = field.scrollHeight > 144 ? "auto" : "hidden";
+  }, [question, isOpen]);
 
   const quickQuestions = useMemo(
     () => (suggestions.length ? suggestions : DEFAULT_QUESTIONS),
@@ -244,11 +254,17 @@ export function AdvisorChatWidget() {
     }
   }
 
+  function handleQuestionKeyDown(event) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    submit();
+  }
+
   return (
     <>
       {isOpen ? (
         <aside
-          className="fixed bottom-0 right-0 top-0 z-50 flex max-w-[calc(100vw-24px)] flex-col overflow-hidden border-l border-[#d7deea] bg-white shadow-2xl"
+          className="fixed bottom-0 right-0 top-0 z-50 flex max-w-[calc(100vw-24px)] flex-col overflow-hidden border-l border-[#d7deea] bg-white shadow-2xl dark:border-white/10 dark:bg-[#020817]"
           style={{ width: `${clampPanelWidth(panelWidth)}px` }}
           aria-label="Khung chat AI cố vấn tài chính"
         >
@@ -262,11 +278,11 @@ export function AdvisorChatWidget() {
             tabIndex={0}
             onPointerDown={startResize}
             onKeyDown={resizeWithKeyboard}
-            className="absolute inset-y-0 left-0 z-10 hidden w-2 cursor-col-resize touch-none items-center justify-center bg-transparent transition hover:bg-[#3156b6]/10 sm:flex"
+            className="absolute inset-y-0 left-0 z-10 hidden w-2 cursor-col-resize touch-none items-center justify-center bg-transparent transition hover:bg-[#3156b6]/10 dark:hover:bg-white/10 sm:flex"
           >
-            <span className="h-12 w-1 rounded-full bg-[#cbd5e1]" />
+            <span className="h-12 w-1 rounded-full bg-[#cbd5e1] dark:bg-slate-600" />
           </div>
-          <header className="flex items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#0f1d33] px-4 py-3 text-white">
+          <header className="flex items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#0f1d33] px-4 py-3 text-white dark:border-white/10 dark:bg-[#0b1220]">
             <div className="flex min-w-0 items-center gap-3">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/12">
                 <BotMessageSquare className="h-5 w-5" />
@@ -287,8 +303,8 @@ export function AdvisorChatWidget() {
             </button>
           </header>
 
-          <div className="flex items-center gap-2 border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-            <CalendarDays className="h-4 w-4 text-[#64748b]" />
+          <div className="flex items-center gap-2 border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 dark:border-white/10 dark:bg-[#0f172a]">
+            <CalendarDays className="h-4 w-4 text-[#64748b] dark:text-slate-400" />
             <MonthYearField
               value={period}
               onChange={(nextPeriod) => {
@@ -302,23 +318,23 @@ export function AdvisorChatWidget() {
               label="Kỳ"
               className="h-9"
             />
-            {isBooting ? <Loader2 className="h-4 w-4 animate-spin text-[#64748b]" /> : null}
+            {isBooting ? <Loader2 className="h-4 w-4 animate-spin text-[#64748b] dark:text-slate-400" /> : null}
           </div>
 
           {error ? (
-            <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700">
+            <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
               {error}
             </div>
           ) : null}
 
-          <div ref={bodyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-4 py-4">
+          <div ref={bodyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-4 py-4 dark:bg-[#020817]">
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[86%] rounded-lg px-3 py-2 text-sm leading-6 ${
                     message.role === "user"
-                      ? "bg-[#1f3f8f] text-white"
-                      : "border border-[#dce2ec] bg-[#f8fafc] text-[#0f1d33]"
+                      ? "bg-[#1f3f8f] text-white dark:bg-[#3156b6]"
+                      : "border border-[#dce2ec] bg-[#f8fafc] text-[#0f1d33] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-100"
                   }`}
                 >
                   <MarkdownContent content={message.content} inverted={message.role === "user"} />
@@ -327,7 +343,7 @@ export function AdvisorChatWidget() {
             ))}
             {isSending ? (
               <div className="flex justify-start">
-                <div className="inline-flex items-center gap-2 rounded-lg border border-[#dce2ec] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-[#64748b]">
+                <div className="inline-flex items-center gap-2 rounded-lg border border-[#dce2ec] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-[#64748b] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   AI đang phân tích...
                 </div>
@@ -335,7 +351,7 @@ export function AdvisorChatWidget() {
             ) : null}
           </div>
 
-          <div className="border-t border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+          <div className="border-t border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 dark:border-white/10 dark:bg-[#0f172a]">
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
               {quickQuestions.map((item) => (
                 <button
@@ -343,24 +359,27 @@ export function AdvisorChatWidget() {
                   type="button"
                   onClick={() => submit(item)}
                   disabled={isSending}
-                  className="shrink-0 rounded-lg border border-[#d7deea] bg-white px-3 py-2 text-left text-[11px] font-bold text-[#334155] hover:bg-[#eef3ff] disabled:opacity-50"
+                  className="max-w-[min(20rem,78vw)] shrink-0 whitespace-normal rounded-lg border border-[#d7deea] bg-white px-3 py-2 text-left text-[11px] font-bold leading-4 text-[#334155] hover:bg-[#eef3ff] disabled:opacity-50 dark:border-white/10 dark:bg-[#111c2e] dark:text-slate-200 dark:hover:bg-[#1f2a44]"
                 >
                   {item}
                 </button>
               ))}
             </div>
             <form
-              className="flex gap-2"
+              className="flex items-end gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 submit();
               }}
             >
-              <input
+              <textarea
+                ref={questionRef}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={handleQuestionKeyDown}
                 placeholder="Hỏi về doanh thu, công nợ, phòng trống..."
-                className="h-11 min-w-0 flex-1 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none focus:border-[#3156b6] disabled:opacity-60"
+                rows={1}
+                className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-semibold leading-5 text-[#0f1d33] outline-none placeholder:text-slate-400 focus:border-[#3156b6] disabled:opacity-60 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500"
               />
               <button
                 type="submit"

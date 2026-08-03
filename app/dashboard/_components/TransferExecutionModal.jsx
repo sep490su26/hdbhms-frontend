@@ -14,6 +14,7 @@ import {
 } from "@/services/roomTransferService";
 
 const EXECUTION_STATUSES = new Set(["WAITING_TRANSFER_DATE", "READY_FOR_HANDOVER", "WAITING_EXECUTION"]);
+const TERMINAL_STATUSES = new Set(["EXECUTED", "COMPLETED", "CANCELLED", "REJECTED", "EXPIRED"]);
 const CONFIRMED_STATUSES = new Set(["CONFIRMED", "CONFIRMED_BY_TENANT"]);
 
 const TRANSFER_STATUS_LABELS = {
@@ -24,8 +25,8 @@ const TRANSFER_STATUS_LABELS = {
     WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
     WAITING_PAYMENT: "Chờ thanh toán",
     WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
-    WAITING_SIGNING: "Chờ quản lý upload bản ký",
-    WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
+    WAITING_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
+    WAITING_CONTRACT_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
     WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
     READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
     WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
@@ -71,6 +72,22 @@ export function isTransferExecutionStatus(status) {
     return EXECUTION_STATUSES.has(status);
 }
 
+function getNonExecutionStatusMessage(status) {
+    if (status === "WAITING_SIGNING" || status === "WAITING_CONTRACT_SIGNING") {
+        return "Yêu cầu vẫn đang chờ xác nhận đủ bộ hợp đồng đã ký, chưa thể chốt chuyển phòng.";
+    }
+    if (status === "WAITING_CONTRACT_CONFIRMATION") {
+        return "Yêu cầu vẫn đang ở bước chuẩn bị/xác nhận hợp đồng, chưa thể chốt chuyển phòng.";
+    }
+    if (status === "WAITING_EXECUTION") {
+        return "";
+    }
+    if (TERMINAL_STATUSES.has(status)) {
+        return "Yêu cầu chuyển phòng đã kết thúc.";
+    }
+    return `Yêu cầu chưa tới bước vận hành chuyển phòng (${getStatusLabel(status)}).`;
+}
+
 export default function TransferExecutionModal({
     open,
     transferRequestId,
@@ -92,6 +109,11 @@ export default function TransferExecutionModal({
     const [oldRoomCompensationNote, setOldRoomCompensationNote] = useState("");
     const transferOutActionRef = useRef(null);
     const transferInActionRef = useRef(null);
+    const onCompletedRef = useRef(onCompleted);
+
+    useEffect(() => {
+        onCompletedRef.current = onCompleted;
+    }, [onCompleted]);
 
     useEffect(() => {
         if (!open) {
@@ -117,7 +139,15 @@ export default function TransferExecutionModal({
                     throw new Error("Không tải được chi tiết yêu cầu chuyển phòng.");
                 }
                 if (!isTransferExecutionStatus(transfer.status)) {
-                    throw new Error("Yêu cầu chưa tới bước vận hành chuyển phòng.");
+                    if (TERMINAL_STATUSES.has(transfer.status)) {
+                        toast.info(getNonExecutionStatusMessage(transfer.status));
+                        await onCompletedRef.current?.(transfer);
+                    } else {
+                        toast.warning(getNonExecutionStatusMessage(transfer.status));
+                        await onCompletedRef.current?.(transfer);
+                    }
+                    onClose?.();
+                    return;
                 }
 
                 const phase = transfer.status === "WAITING_EXECUTION" ? "COMPLETE_TRANSFER" : "MOVE_OUT";
@@ -133,7 +163,6 @@ export default function TransferExecutionModal({
                 if (cancelled) return;
                 setExecution({transfer, phase, transferOutReady, transferInReady});
             } catch (error) {
-                console.error(error);
                 toast.error(error?.message || "Không tải được chi tiết chuyển phòng.");
                 onClose?.();
             } finally {

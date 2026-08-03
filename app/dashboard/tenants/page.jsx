@@ -19,6 +19,7 @@ import {
   KeyRound,
   Mail,
   MapPin,
+  MoreVertical,
   Phone,
   RefreshCcw,
   Search,
@@ -55,6 +56,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
 const TENANT_PROFILE_FETCH_SIZE = 1000;
@@ -304,6 +311,107 @@ function Badge({ children, className = "" }) {
     >
       {children}
     </span>
+  );
+}
+
+function TenantProfileActionsMenu({
+  profile,
+  activeRole,
+  accessRequestingId,
+  onViewProfile,
+  onManageAccess,
+  onRequestAccess,
+}) {
+  const profileId = valueOf(profile, "id", "profileId", "profile_id");
+  const accessStatus = profileAccessStatus(profile);
+  const isRequesting = String(accessRequestingId) === String(profileId);
+  const viewAllowed = canViewProfile(profile);
+  const isOwner = String(activeRole).toLowerCase() === "owner";
+  const accessExpiresAt = valueOf(
+    profile,
+    "profileAccessExpiresAt",
+    "profile_access_expires_at",
+  );
+  const requestLabel = isRequesting
+    ? "Đang gửi..."
+    : accessStatus === "PENDING"
+      ? "Chờ duyệt"
+      : accessStatus === "REJECTED"
+        ? "Gửi lại yêu cầu"
+        : "Yêu cầu xem";
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:text-white"
+            aria-label={`Thao tác hồ sơ ${valueOf(profile, "fullName", "full_name") || ""}`}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          className="w-56 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
+        >
+          {viewAllowed ? (
+            <>
+              <DropdownMenuItem
+                asChild
+                className="rounded-lg p-0 focus:bg-transparent"
+              >
+                <button
+                  type="button"
+                  onClick={() => onViewProfile(profile)}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                >
+                  <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  Xem hồ sơ
+                </button>
+              </DropdownMenuItem>
+              {isOwner && (
+                <DropdownMenuItem
+                  asChild
+                  className="rounded-lg p-0 focus:bg-transparent"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onManageAccess(profile)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-[#1d4ed8] hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                  >
+                    <KeyRound className="h-4 w-4 text-[#2563eb] dark:text-blue-300" />
+                    Quản lý quyền
+                  </button>
+                </DropdownMenuItem>
+              )}
+            </>
+          ) : (
+            <DropdownMenuItem
+              asChild
+              className="rounded-lg p-0 focus:bg-transparent"
+            >
+              <button
+                type="button"
+                disabled={accessStatus === "PENDING" || isRequesting}
+                onClick={() => onRequestAccess(profile)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-[#1d4ed8] hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent dark:text-blue-300 dark:hover:bg-blue-500/10 dark:disabled:text-slate-500"
+              >
+                <KeyRound className="h-4 w-4" />
+                {requestLabel}
+              </button>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {accessExpiresAt && (
+        <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
+          Hiệu lực đến {formatDate(accessExpiresAt)}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -2077,17 +2185,6 @@ export default function TenantsPage() {
                               >
                                 <td data-label="Họ tên" className="px-6 py-5">
                                   <div className="flex items-center gap-3">
-                                    <span>
-                                      <span className="block font-black text-slate-900 dark:text-white">
-                                        {valueOf(
-                                          profile,
-                                          "fullName",
-                                          "full_name",
-                                        )}
-                                      </span>
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-3">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ecf3ff] text-xs font-bold text-[#465fff]">
                             {getInitials(valueOf(profile, "fullName", "full_name"))}
                           </span>
@@ -2159,86 +2256,14 @@ export default function TenantsPage() {
                                   data-label="Thao tác"
                                   className="px-6 py-5 text-left"
                                 >
-                                  {(() => {
-                                    const profileId = valueOf(
-                                      profile,
-                                      "id",
-                                      "profileId",
-                                      "profile_id",
-                                    );
-                                    const accessStatus =
-                                      profileAccessStatus(profile);
-                                    const isRequesting =
-                                      String(accessRequestingId) ===
-                                      String(profileId);
-                                    if (canViewProfile(profile)) {
-                                      return (
-                                        <div className="flex flex-col items-start gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              setSelectedProfile(profile)
-                                            }
-                                            className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#091426] hover:bg-[#f2f4f6] dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                            Xem hồ sơ
-                                          </button>
-                                          {String(activeRole).toLowerCase() ===
-                                            "owner" && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                openManageProfileAccess(profile)
-                                              }
-                                              className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
-                                            >
-                                              <KeyRound className="h-4 w-4" />
-                                              Quản lý quyền
-                                            </button>
-                                          )}
-                                          {valueOf(
-                                            profile,
-                                            "profileAccessExpiresAt",
-                                            "profile_access_expires_at",
-                                          ) && (
-                                            <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
-                                              Hiệu lực đến{" "}
-                                              {formatDate(
-                                                valueOf(
-                                                  profile,
-                                                  "profileAccessExpiresAt",
-                                                  "profile_access_expires_at",
-                                                ),
-                                              )}
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                    return (
-                                      <button
-                                        type="button"
-                                        disabled={
-                                          accessStatus === "PENDING" ||
-                                          isRequesting
-                                        }
-                                        onClick={() =>
-                                          handleRequestProfileAccess(profile)
-                                        }
-                                        className="inline-flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2 text-sm font-black text-[#1d4ed8] hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:border-[#e2e8f0] disabled:bg-[#f8fafc] disabled:text-[#94a3b8] dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:disabled:border-white/10 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
-                                      >
-                                        <KeyRound className="h-4 w-4" />
-                                        {isRequesting
-                                          ? "Đang gửi..."
-                                          : accessStatus === "PENDING"
-                                            ? "Chờ duyệt"
-                                            : accessStatus === "REJECTED"
-                                              ? "Gửi lại yêu cầu"
-                                              : "Yêu cầu xem"}
-                                      </button>
-                                    );
-                                  })()}
+                                  <TenantProfileActionsMenu
+                                    profile={profile}
+                                    activeRole={activeRole}
+                                    accessRequestingId={accessRequestingId}
+                                    onViewProfile={setSelectedProfile}
+                                    onManageAccess={openManageProfileAccess}
+                                    onRequestAccess={handleRequestProfileAccess}
+                                  />
                                 </td>
                               </tr>
                             ))}

@@ -708,18 +708,18 @@ export default function DashboardPage() {
               value={
                 loading
                   ? "..."
-                  : formatUsage(utilityUsage.electricityUsage, "kWh")
+                  : formatUsage(utilityUsage.electricityUsage < 0 ? utilityUsage.electricityUsage * -1 : utilityUsage.electricityUsage, "kWh")
               }
-              note={`Kỳ ${utilityUsage.period || "hiện tại"} từ backend`}
+              note={`Kỳ ${utilityUsage.period || "hiện tại"}`}
               dark
             />
             <UtilityCard
               icon={Droplets}
               label="Tiêu thụ nước"
               value={
-                loading ? "..." : formatUsage(utilityUsage.waterUsage, "m³")
+                loading ? "..." : formatUsage(utilityUsage.waterUsage < 0 ? utilityUsage.waterUsage * -1 : utilityUsage.waterUsage, "m³")
               }
-              note={`Kỳ ${utilityUsage.period || "hiện tại"} từ backend`}
+              note={`Kỳ ${utilityUsage.period || "hiện tại"}`}
             />
           </div>
           <ExpiringContractCard summary={overview?.expiringContractSummary} />

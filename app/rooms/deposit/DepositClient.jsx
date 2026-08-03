@@ -207,6 +207,8 @@ const DATE_IN_PAST_ERROR_MESSAGE =
   "Ngày chọn không được là ngày trong quá khứ.";
 const DATE_TOO_FAR_ERROR_MESSAGE =
   "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
+const MOVE_IN_BEFORE_LEASE_SIGN_DATE_ERROR_MESSAGE =
+  "Ngày dự kiến vào ở không được trước ngày hẹn ký hợp đồng.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
@@ -274,6 +276,13 @@ const formatDateForMessage = (value) => {
   const [year, month, day] = normalizedValue.split("-");
   return `${day}/${month}/${year}`;
 };
+
+const getLaterDateString = (...values) =>
+  values
+    .map((value) => normalizeDateInputString(value))
+    .filter(Boolean)
+    .sort()
+    .pop() || "";
 
 const buildDepositScheduleWindow = (room) => {
   const todayDate = getTodayDateString();
@@ -725,7 +734,12 @@ const normalizePhoneValue = (value) => {
   return String(value || "").replace(/[\s.\-()]/g, "");
 };
 
-const validateDepositValue = (name, value, scheduleWindow = null) => {
+const validateDepositValue = (
+  name,
+  value,
+  scheduleWindow = null,
+  relatedValues = {},
+) => {
   const rawValue = String(value || "").trim();
   const isDateField = DEPOSIT_DATE_FIELDS.has(name);
   const normalizedValue = isDateField
@@ -822,6 +836,19 @@ const validateDepositValue = (name, value, scheduleWindow = null) => {
       return `${DATE_FIELD_LABELS[name]} chỉ được tối đa 14 ngày kể từ ngày khách cũ trả phòng.`;
     }
     return DATE_TOO_FAR_ERROR_MESSAGE;
+  }
+
+  if (name === "moveInDate") {
+    const expectedLeaseSignDate = normalizeDateInputString(
+      relatedValues?.contractDate || relatedValues?.expectedLeaseSignDate,
+    );
+    if (
+      normalizedValue &&
+      expectedLeaseSignDate &&
+      normalizedValue < expectedLeaseSignDate
+    ) {
+      return MOVE_IN_BEFORE_LEASE_SIGN_DATE_ERROR_MESSAGE;
+    }
   }
 
   return "";
@@ -1229,6 +1256,10 @@ function DepositInfoForm({
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [acceptedContract, setAcceptedContract] = useState(false);
   const [acceptedSignature, setAcceptedSignature] = useState("");
+  const [scheduleDates, setScheduleDates] = useState({
+    contractDate: "",
+    moveInDate: "",
+  });
   const [occupantCount, setOccupantCount] = useState("1");
   const [coOccupants, setCoOccupants] = useState({
     1: { fullName: "", phone: "" },
@@ -1237,6 +1268,9 @@ function DepositInfoForm({
   const [mainPhoneValue, setMainPhoneValue] = useState("");
   const [coOccupantProfileHints, setCoOccupantProfileHints] = useState({});
   const isCccdScanMode = identityEntryMode === "scan";
+  const moveInMinDate =
+    getLaterDateString(minScheduleDate, scheduleDates.contractDate) ||
+    minScheduleDate;
 
   useEffect(() => {
     let isMounted = true;
@@ -1360,6 +1394,10 @@ function DepositInfoForm({
           permanentAddress: draft.permanentAddress || "",
         });
         setMainPhoneValue(draft.phone || "");
+        setScheduleDates({
+          contractDate: normalizeDateInputString(draft.contractDate) || "",
+          moveInDate: normalizeDateInputString(draft.moveInDate) || "",
+        });
         setOccupantCount(
           ["1", "2", "3"].includes(draft.occupantCount)
             ? draft.occupantCount
@@ -1468,8 +1506,44 @@ function DepositInfoForm({
     }));
   };
 
-  const validateDepositField = (name, value) => {
-    return validateDepositValue(name, value, scheduleWindow);
+  const getFormFieldValue = (name) =>
+    formRef.current?.elements?.namedItem(name)?.value || "";
+
+  const resolveScheduleDateValue = (name, overrides = {}) => {
+    if (Object.prototype.hasOwnProperty.call(overrides, name)) {
+      return (
+        normalizeDateInputString(overrides[name]) ||
+        String(overrides[name] || "").trim()
+      );
+    }
+    return (
+      normalizeDateInputString(scheduleDates[name]) ||
+      normalizeDateInputString(getFormFieldValue(name)) ||
+      normalizeDateInputString(savedDraft[name]) ||
+      ""
+    );
+  };
+
+  const getScheduleDateValues = (overrides = {}) => ({
+    contractDate: resolveScheduleDateValue("contractDate", overrides),
+    moveInDate: resolveScheduleDateValue("moveInDate", overrides),
+  });
+
+  const writeCurrentDraft = (overrides = {}) => {
+    if (!formRef.current) return;
+    writeDepositDraftCookie({
+      ...buildDepositDraftFromForm(formRef.current),
+      ...overrides,
+    });
+  };
+
+  const validateDepositField = (name, value, relatedValues = null) => {
+    return validateDepositValue(
+      name,
+      value,
+      scheduleWindow,
+      relatedValues || getScheduleDateValues({ [name]: value }),
+    );
   };
 
   const validateAndSetDepositField = (name, value) => {
@@ -1506,6 +1580,45 @@ function DepositInfoForm({
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
+    if (name === "contractDate" || name === "moveInDate") {
+      const normalizedValue = normalizeDateInputString(value);
+      const nextDates = getScheduleDateValues({
+        [name]: normalizedValue || String(value || "").trim(),
+      });
+
+      if (
+        name === "contractDate" &&
+        normalizedValue &&
+        nextDates.moveInDate &&
+        nextDates.moveInDate < normalizedValue
+      ) {
+        nextDates.moveInDate = normalizedValue;
+      }
+
+      setScheduleDates((currentDates) => ({
+        ...currentDates,
+        ...nextDates,
+      }));
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        contractDate:
+          name === "contractDate"
+            ? validateDepositField(
+                "contractDate",
+                nextDates.contractDate,
+                nextDates,
+              )
+            : currentErrors.contractDate,
+        moveInDate: validateDepositField(
+          "moveInDate",
+          nextDates.moveInDate,
+          nextDates,
+        ),
+      }));
+      writeCurrentDraft(nextDates);
+      return;
+    }
+
     validateAndSetDepositField(name, value);
     if (name === "phone") {
       setMainPhoneValue(value);
@@ -1577,6 +1690,7 @@ function DepositInfoForm({
   };
 
   const handleDraftChange = (event) => {
+    if (!event.target?.name) return;
     writeDepositDraftCookie(buildDepositDraftFromForm(event.currentTarget));
   };
 
@@ -1846,7 +1960,12 @@ function DepositInfoForm({
     const nextErrors = {};
 
     [...requiredFields, "email"].forEach((fieldName) => {
-      const message = validateDepositField(fieldName, data[fieldName]);
+      const message = validateDepositValue(
+        fieldName,
+        data[fieldName],
+        scheduleWindow,
+        data,
+      );
       if (message) nextErrors[fieldName] = message;
     });
 
@@ -2246,20 +2365,20 @@ function DepositInfoForm({
                 validateValue={validateDepositField}
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
-                defaultValue={savedDraft.contractDate}
+                value={scheduleDates.contractDate}
               />
               <Field
                 label="Ngày dự kiến vào ở"
                 name="moveInDate"
                 type="date"
                 placeholder="dd/MM/yyyy"
-                min={minScheduleDate}
+                min={moveInMinDate}
                 max={maxScheduleDate}
                 error={fieldErrors.moveInDate}
                 validateValue={validateDepositField}
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
-                defaultValue={savedDraft.moveInDate}
+                value={scheduleDates.moveInDate}
               />
               {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">

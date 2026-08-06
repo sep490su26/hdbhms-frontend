@@ -80,11 +80,10 @@ export function LocationSection() {
           </div>
           {/* Nút chỉ đường */}
           <a
-            // Sử dụng API dẫn đường của Google Maps (dir/?api=1&destination=...)
             href="https://www.google.com/maps/dir/?api=1&destination=Số+70A1,+Thôn+4,+xã+Thạch+Hoà,+Thạch+Thất,+Hà+Nội"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+            className="mt-2 w-full bg-[#232946] hover:bg-blue-700 text-white font-semibold py-3.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 group"
           >
             Chỉ đường
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

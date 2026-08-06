@@ -1,57 +1,49 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import Link from "next/link";
+import Image from "next/image";
+
 const features = [
   {
-    tagline: "Dành cho khách thuê",
-    title: "Tìm & Đặt phòng dễ dàng",
+    icon: "/icon-search.png",
+    title: "Tìm Kiếm Phòng Dễ Dàng",
     description:
-      "Xem sơ đồ tầng trực quan, kiểm tra phòng trống và tiến hành đặt cọc trực tuyến chỉ trong vài phút.",
-    actionText: "Xem phòng trống",
-    actionLink: "/rooms",
+      "Hệ thống giúp bạn tìm kiếm không gian sống phù hợp dựa trên vị trí, diện tích và mức giá mong muốn một cách nhanh chóng.",
   },
   {
-    tagline: "Dành cho ban quản lý",
-    title: "Vận hành hệ thống đơn giản",
+    icon: "/icon-booking.png",
+    title: "Đặt Chỗ Nhanh Chóng",
     description:
-      "Theo dõi trạng thái phòng, hợp đồng, và tự động hóa các quy trình thanh toán từ một bảng điều khiển duy nhất.",
-    actionText: "Tìm hiểu thêm",
-    actionLink: "/dashboard",
+      "Quy trình đặt phòng được số hóa hoàn toàn. Đặt cọc và xác nhận ngay lập tức, tiết kiệm tối đa thời gian chờ đợi.",
   },
   {
-    tagline: "Hỗ trợ 24/7",
-    title: "Kết nối & Hỗ trợ tận tâm",
+    icon: "/icon-contract.png",
+    title: "Quản Lý Hợp Đồng Thông Minh",
     description:
-      "Hệ thống ghi nhận mọi yêu cầu hỗ trợ từ người thuê, đảm bảo xử lý sự cố nhanh chóng và chuyên nghiệp.",
-    actionText: "Liên hệ ngay",
-    actionLink: "/contact",
+      "Lưu trữ hợp đồng điện tử, tự động nhắc nhở gia hạn, tính toán chi phí minh bạch hàng tháng trực tiếp trên nền tảng.",
   },
 ];
 
 export function Features() {
   return (
-    <section className="bg-white py-16 md:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-          <p className="text-sm font-bold tracking-widest text-black uppercase text-brand-primary">
-            Giải pháp
+    <section className="bg-white py-12 md:py-20">
+      <div className="mx-auto max-w-[1280px] px-8 lg:px-12">
+        {/* Section Header — centered */}
+        <div className="mb-10 flex flex-col items-center gap-4 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.1em] text-brand-primary">
+            GIẢI PHÁP
           </p>
-          <h2 className="text-3xl md:text-4xl font-bold text-black">
+          <h2
+            className="text-2xl md:text-[32px] font-semibold leading-[1.3] tracking-[0.01em]"
+            style={{ color: "#0B1C30" }}
+          >
             Đơn giản hóa mọi trải nghiệm lưu trú
           </h2>
-          <p className="text-lg text-black/80">
-            Từ việc tìm kiếm căn phòng ưng ý cho đến quản lý dữ liệu hợp đồng
-            hàng tháng.
-          </p>
         </div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Cards Grid — 3 columns on desktop */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {features.map((feature, index) => (
             <motion.div
               key={index}
@@ -59,40 +51,46 @@ export function Features() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full"
+              // 1. Đưa thẻ cha về lại flex-col để chia 2 phần trên/dưới
+              className="relative flex flex-col overflow-hidden rounded-3xl p-6 xl:p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl"
+              style={{
+                backgroundColor: "#F8F9FF",
+                boxShadow: "0px 10px 30px 0px rgba(10, 25, 47, 0.05)",
+              }}
             >
-              <div
-                className="h-48 bg-brand-gray flex-shrink-0 flex items-center justify-center relative overflow-hidden"
-                role="img"
-                aria-label={`Ảnh minh họa: ${feature.title}`}
-              >
-                <div className="absolute inset-0 bg-black/40" />
-                <span className="text-white relative z-10 font-medium">
-                  Ảnh minh họa
-                </span>
-              </div>
-              <div className="p-6 flex flex-col flex-grow">
-                <p className="text-sm font-semibold text-black uppercase tracking-wide mb-2">
-                  {feature.tagline}
-                </p>
-                <h3 className="text-xl font-bold text-black mb-3">
+              {/* --- PHẦN TRÊN: ICON + TITLE --- */}
+              <div className="flex items-center gap-4">
+                {/* Icon */}
+                <div
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: "#D6E3FF" }}
+                >
+                  <Image
+                    src={feature.icon}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 object-contain"
+                  />
+                </div>
+
+                {/* Title */}
+                <h3
+                  className="text-lg xl:text-[22px] font-semibold leading-snug"
+                  style={{ color: "#0B1C30" }}
+                >
                   {feature.title}
                 </h3>
-                <p className="text-black/80 mb-6 flex-grow">
-                  {feature.description}
-                </p>
-                <div className="mt-auto pt-4 border-t border-white/5">
-                  <Link href={feature.actionLink}>
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto font-semibold text-white hover:text-blue-400 transition-colors pointer-events-none text-brand-primary"
-                    >
-                      {feature.actionText}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </Link>
-                </div>
               </div>
+
+              {/* --- PHẦN DƯỚI: DESCRIPTION --- */}
+              {/* 2. Đẩy mô tả xuống dưới, dùng text-justify để căn đều 2 bên */}
+              <p
+                className="mt-5 text-sm xl:text-base leading-relaxed text-justify flex-1"
+                style={{ color: "#44474D" }}
+              >
+                {feature.description}
+              </p>
             </motion.div>
           ))}
         </div>

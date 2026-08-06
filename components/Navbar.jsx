@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home, LayoutDashboard, LogIn, Menu, X } from "lucide-react";
+import { LayoutDashboard, Menu, X } from "lucide-react";
 
 const STAFF_ROLES = new Set(["OWNER", "MANAGER", "owner", "manager"]);
 
@@ -14,6 +14,8 @@ export function Navbar() {
   const [staffRole, setStaffRole] = useState(null);
   const pathname = usePathname();
   const router = useRouter();
+  const isHomePage = pathname === "/";
+  const hasSolidBackground = scrolled || !isHomePage;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,7 +47,6 @@ export function Navbar() {
     { name: "Trang chủ", href: "/" },
     { name: "Phòng trọ", href: "/rooms" },
     { name: "Nội quy", href: "/rules" },
-    // { name: "Liên hệ", href: "/contact" },
   ];
 
   const toggleMobileMenu = () => setIsMobileMenuOpen((current) => !current);
@@ -69,13 +70,15 @@ export function Navbar() {
   return (
     <nav
       className={`fixed left-0 right-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? "border-b border-white/5 bg-[#091426]/80 py-4 shadow-lg shadow-black/5 backdrop-blur-md" // Chỉnh lại màu ở đây cho đồng bộ
-          : "bg-[#091426] py-6"
+        hasSolidBackground
+          ? "border-b border-white/5 bg-[#232946]/90 py-0 shadow-lg shadow-black/5 backdrop-blur-md"
+          : "bg-transparent py-0"
       }`}
     >
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-12 items-center justify-between">
+      <div className="mx-auto w-full max-w-[1280px] px-8 lg:px-16">
+        {/* Main header bar: height 72px matching Figma */}
+        <div className="flex h-[72px] items-center justify-between">
+          {/* Logo — far left */}
           <div className="shrink-0">
             <Link
               href="/"
@@ -153,9 +156,10 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop: navigation remains grouped, login is anchored at the far right. */}
-          <div className="hidden items-center gap-5 md:flex">
-            <div className="flex items-center gap-5">
+          {/* Desktop: Nav links centered, button anchored right */}
+          <div className="hidden items-center md:flex md:flex-1 md:justify-between md:pl-8">
+            {/* Center nav links */}
+            <div className="flex flex-1 items-center justify-center gap-8">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
 
@@ -163,13 +167,13 @@ export function Navbar() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    className="group relative px-1 py-2 text-sm font-medium transition-colors"
+                    className="group relative px-1 py-2 text-sm font-semibold tracking-wide transition-colors"
                   >
                     <span
                       className={`relative z-10 transition-colors duration-200 ${
                         isActive
-                          ? "font-bold text-white"
-                          : "text-slate-300 group-hover:text-white"
+                          ? "font-bold text-[#FCD400]"
+                          : "text-white/90 group-hover:text-white"
                       }`}
                     >
                       {link.name}
@@ -177,7 +181,7 @@ export function Navbar() {
                     {isActive && (
                       <motion.span
                         layoutId="navbar-indicator"
-                        className="absolute inset-x-1 -bottom-0.5 h-0.5 rounded-full bg-white/70"
+                        className="absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-[#705D00]"
                         transition={{
                           type: "spring",
                           stiffness: 380,
@@ -190,16 +194,17 @@ export function Navbar() {
               })}
             </div>
 
+            {/* Right: CTA button */}
             <button
               type="button"
               onClick={goToPrimaryAction}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#1a223d] shadow-sm transition-all duration-200 hover:bg-slate-100 hover:shadow-md"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-[#F8F9FF] px-6 text-sm font-semibold tracking-wide text-[#0B1C30] shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md"
             >
-              <PrimaryActionIcon className="h-4 w-4" />
               {primaryActionLabel}
             </button>
           </div>
 
+          {/* Mobile hamburger */}
           <div className="flex items-center md:hidden">
             <button
               type="button"

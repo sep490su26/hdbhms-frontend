@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="bg-[#091426] border-t border-white/5 pt-12 pb-8">
+    <footer className="bg-[#232946] border-t border-white/5 pt-12 pb-8">
       <div className="w-full px-6 sm:px-8 lg:px-12 mx-auto max-w-7xl">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 mb-16">
           {/* Cột 1: Giới thiệu Building */}

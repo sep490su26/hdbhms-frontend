@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  AlertTriangle,
   Building2,
   CheckCircle2,
   Clock3,
@@ -38,6 +39,12 @@ import {
 import { formatDate } from "../../../../lib/dateFormat";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DateInput } from "@/components/DateInput";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const normalizeHoldStatus = (status) => {
   if (!status) return null;
@@ -114,6 +121,18 @@ function RequiredLabel({ htmlFor, children }) {
     <label htmlFor={htmlFor} className="text-sm font-medium text-slate-700">
       {children} <span className="text-rose-600">*</span>
     </label>
+  );
+}
+
+function FieldError({ id, message }) {
+  return (
+    <p
+      id={id}
+      aria-live="polite"
+      className={`min-h-4 text-xs leading-4 font-medium text-rose-600 ${message ? "" : "invisible"}`}
+    >
+      {message || " "}
+    </p>
   );
 }
 
@@ -201,7 +220,7 @@ function ContactCard() {
 }
 
 function viewingInputClass(error) {
-  return `min-h-12 rounded-[14px] border bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+  return `min-h-11 rounded-[14px] border bg-white px-4 py-2.5 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
     error
       ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500/10"
       : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
@@ -434,7 +453,7 @@ function BookingCard({ room }) {
         <div className="mt-6">
           {/* Thanh trạng thái động */}
           <div
-            className={`mb-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}
+            className={`mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}
           >
             <span
               className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`}
@@ -446,6 +465,21 @@ function BookingCard({ room }) {
             {isDraft && "Bản nháp - Chưa mở cho thuê"}
             {isOccupied && "Đã thuê - Không còn trống"}
             {isDeposited && "Đã đặt cọc - Không còn trống"}
+          </div>
+
+          <div
+            role="note"
+            className="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5 text-rose-800"
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-wide text-rose-700">
+                Lưu ý quan trọng
+              </p>
+              <p className="mt-1 text-xs font-medium leading-5 text-rose-700">
+                Tiền cọc sẽ không được hoàn lại sau khi giao dịch đặt cọc hoàn tất. Vui lòng kiểm tra kỹ thông tin phòng và lịch nhận phòng trước khi thanh toán.
+              </p>
+            </div>
           </div>
 
           <div className="grid gap-3">
@@ -510,19 +544,24 @@ function BookingCard({ room }) {
 
       <ContactCard />
 
-      {isViewingModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
-          onClick={closeViewingModal}
+      <Dialog
+        modal={false}
+        open={isViewingModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !isSubmittingViewing) closeViewingModal();
+        }}
+      >
+        <DialogContent
+          lockScroll={false}
+          showCloseButton={false}
+          overlayClassName="bg-black/50 backdrop-blur-sm"
+          className="max-h-[calc(100dvh-1rem)] gap-4 overflow-y-auto rounded-[24px] border border-slate-100 bg-white p-5 text-[#091426] shadow-2xl shadow-slate-950/20 sm:max-h-[calc(100vh-2rem)] sm:max-w-lg sm:p-6"
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="viewing-modal-title"
-            className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[24px] border border-slate-100 bg-white p-5 text-[#091426] shadow-2xl shadow-slate-950/20 sm:max-h-[calc(100vh-3rem)] sm:p-8"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
+          <DialogTitle className="sr-only">Room viewing appointment</DialogTitle>
+          <DialogDescription className="sr-only">
+            Submit your information to schedule a room viewing appointment.
+          </DialogDescription>
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
                   Xem phòng
@@ -560,11 +599,11 @@ function BookingCard({ room }) {
             )}
 
             <form
-              className="mt-7 grid gap-5"
+              className="mt-4 grid gap-3"
               onSubmit={handleViewingSubmit}
               noValidate
             >
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <RequiredLabel htmlFor="viewing-full-name">
                   Họ và tên
                 </RequiredLabel>
@@ -584,17 +623,13 @@ function BookingCard({ room }) {
                   className={viewingInputClass(viewingErrors.fullName)}
                   placeholder="Nhập họ và tên"
                 />
-                {viewingErrors.fullName && (
-                  <p
-                    id="viewing-full-name-error"
-                    className="text-xs font-medium text-rose-600"
-                  >
-                    {viewingErrors.fullName}
-                  </p>
-                )}
+                <FieldError
+                  id="viewing-full-name-error"
+                  message={viewingErrors.fullName}
+                />
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <RequiredLabel htmlFor="viewing-phone">
                   Số điện thoại
                 </RequiredLabel>
@@ -614,17 +649,13 @@ function BookingCard({ room }) {
                   className={viewingInputClass(viewingErrors.phone)}
                   placeholder="Nhập số điện thoại"
                 />
-                {viewingErrors.phone && (
-                  <p
-                    id="viewing-phone-error"
-                    className="text-xs font-medium text-rose-600"
-                  >
-                    {viewingErrors.phone}
-                  </p>
-                )}
+                <FieldError
+                  id="viewing-phone-error"
+                  message={viewingErrors.phone}
+                />
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <label
                   htmlFor="viewing-room"
                   className="text-sm font-medium text-slate-700"
@@ -636,12 +667,12 @@ function BookingCard({ room }) {
                   type="text"
                   disabled
                   value={roomLabel}
-                  className="min-h-12 rounded-[14px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500 outline-none"
+                  className="min-h-11 rounded-[14px] border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-500 outline-none"
                 />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
+                <div className="grid gap-1.5">
                   <RequiredLabel htmlFor="viewing-date">
                     Ngày xem phòng
                   </RequiredLabel>
@@ -660,17 +691,13 @@ function BookingCard({ room }) {
                     }
                     className={viewingInputClass(viewingErrors.viewingDate)}
                   />
-                  {viewingErrors.viewingDate && (
-                    <p
-                      id="viewing-date-error"
-                      className="text-xs font-medium text-rose-600"
-                    >
-                      {viewingErrors.viewingDate}
-                    </p>
-                  )}
+                  <FieldError
+                    id="viewing-date-error"
+                    message={viewingErrors.viewingDate}
+                  />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-1.5">
                   <RequiredLabel htmlFor="viewing-time">
                     Giờ xem phòng
                   </RequiredLabel>
@@ -689,14 +716,10 @@ function BookingCard({ room }) {
                     }
                     className={viewingInputClass(viewingErrors.viewingTime)}
                   />
-                  {viewingErrors.viewingTime && (
-                    <p
-                      id="viewing-time-error"
-                      className="text-xs font-medium text-rose-600"
-                    >
-                      {viewingErrors.viewingTime}
-                    </p>
-                  )}
+                  <FieldError
+                    id="viewing-time-error"
+                    message={viewingErrors.viewingTime}
+                  />
                 </div>
               </div>
 
@@ -718,9 +741,8 @@ function BookingCard({ room }) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

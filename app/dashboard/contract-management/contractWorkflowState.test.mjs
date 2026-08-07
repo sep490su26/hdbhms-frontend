@@ -42,8 +42,8 @@ test("activation requires the signed handover document", () => {
   });
 
   assert.equal(readiness.ready, false);
-  assert.equal(readiness.completedCount, 3);
-  assert.equal(readiness.totalCount, 4);
+  assert.equal(readiness.completedCount, 2);
+  assert.equal(readiness.totalCount, 3);
 });
 
 test("direct lease activation does not require a deposit document", () => {

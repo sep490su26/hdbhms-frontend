@@ -8,15 +8,13 @@ export function isLeaseSignedUploadDisabled({
 }
 
 export function getContractActivationReadiness({
-  hasDeposit = false,
-  depositSignedFileId = null,
   leaseSignedFileId = null,
   requiresMoveInHandover = true,
   hasHandoverData = false,
   handoverSignedFileId = null,
 } = {}) {
   const requirements = [
-    ...(hasDeposit
+    /* ...(hasDeposit
       ? [
           {
             key: "deposit",
@@ -24,7 +22,7 @@ export function getContractActivationReadiness({
             complete: Boolean(depositSignedFileId),
           },
         ]
-      : []),
+      : []), */
     {
       key: "lease",
       label: "Hợp đồng thuê đã ký",

@@ -1,6 +1,7 @@
 "use client";
 
-import { LoaderCircle, MapPin, X } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { ImagePlus, LoaderCircle, MapPin, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,9 @@ function FieldError({ id, message }) {
     </p>
   );
 }
+
+const EMPTY_IMAGES = [];
+
 export function FacilityFormDialog({
   formState,
   onClose,
@@ -30,6 +34,56 @@ export function FacilityFormDialog({
   const statusLocked =
     isEditing &&
     (!formState.values.hasFloorPlan || (formState.values.roomCount ?? 0) <= 0);
+  const existingImages = formState.values.images ?? EMPTY_IMAGES;
+  const pendingImages = formState.values.pendingImages ?? EMPTY_IMAGES;
+  const pendingImagesRef = useRef([]);
+
+  useEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  }, [pendingImages]);
+
+  useEffect(() => {
+    return () => {
+      pendingImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (formState.isOpen) return;
+    pendingImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    pendingImagesRef.current = [];
+  }, [formState.isOpen]);
+
+  const addPendingImages = (files) => {
+    const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    onChange("pendingImages", [
+      ...pendingImages,
+      ...imageFiles.map((file) => ({
+        id: `${file.name}-${file.lastModified}-${Math.random()}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })),
+    ]);
+  };
+
+  const removePendingImage = (imageId) => {
+    const target = pendingImages.find((image) => image.id === imageId);
+    if (target) URL.revokeObjectURL(target.previewUrl);
+    onChange(
+      "pendingImages",
+      pendingImages.filter((image) => image.id !== imageId),
+    );
+  };
+
+  const removeExistingImage = (image) => {
+    if (!image?.id) return;
+    onChange(
+      "images",
+      existingImages.filter((item) => item.id !== image.id),
+    );
+    onChange("deletedImageIds", [...new Set([...(formState.values.deletedImageIds ?? []), image.id])]);
+  };
   const openAddressPicker = () => {
     const query = formState.values.address?.trim() || "Vietnam";
     window.open(
@@ -184,8 +238,89 @@ export function FacilityFormDialog({
                 className="min-h-28 resize-y rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 py-3 text-sm font-medium text-slate-900 dark:text-white outline-none transition placeholder:text-slate-400 dark:text-slate-500 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
               />
             </label>
-          </div>
+              {isEditing && (
+                  <section className="grid gap-3 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 dark:border-white/10 dark:bg-white/5">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                                  Ảnh cơ sở
+                              </h3>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Ảnh mới sẽ được tải lên sau khi bấm lưu thay đổi.
+                              </p>
+                          </div>
+                          <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#cbd3df] bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-[#1e40af] hover:text-[#1e40af] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200">
+                              <ImagePlus className="h-4 w-4" />
+                              Thêm ảnh
+                              <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  className="sr-only"
+                                  onChange={(event) => {
+                                      addPendingImages(event.target.files);
+                                      event.target.value = "";
+                                  }}
+                              />
+                          </label>
+                      </div>
 
+                      {[...existingImages, ...pendingImages].length > 0 ? (
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                              {existingImages.map((image, index) => (
+                                  <div
+                                      key={`facility-image-${image.id ?? image.url ?? index}`}
+                                      className="group relative overflow-hidden rounded-lg border border-[#dbe1ea] bg-white dark:border-white/10 dark:bg-[#0f172a]"
+                                  >
+                                      <img
+                                          src={image.url}
+                                          alt={`Ảnh cơ sở ${index + 1}`}
+                                          className="aspect-[4/3] w-full object-cover"
+                                      />
+                                      <button
+                                          type="button"
+                                          onClick={() => removeExistingImage(image)}
+                                          className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white opacity-100 transition hover:bg-rose-600 sm:opacity-0 sm:group-hover:opacity-100"
+                                          aria-label="Xóa ảnh cơ sở"
+                                          title="Xóa ảnh cơ sở"
+                                      >
+                                          <Trash2 className="h-4 w-4" />
+                                      </button>
+                                  </div>
+                              ))}
+                              {pendingImages.map((image, index) => (
+                                  <div
+                                      key={image.id}
+                                      className="group relative overflow-hidden rounded-lg border border-dashed border-[#93a4b8] bg-white dark:border-white/20 dark:bg-[#0f172a]"
+                                  >
+                                      <img
+                                          src={image.previewUrl}
+                                          alt={`Ảnh cơ sở mới ${index + 1}`}
+                                          className="aspect-[4/3] w-full object-cover"
+                                      />
+                                      <span className="absolute left-2 top-2 rounded-md bg-[#1e40af]/90 px-2 py-1 text-[10px] font-bold text-white">
+                          Chờ lưu
+                        </span>
+                                      <button
+                                          type="button"
+                                          onClick={() => removePendingImage(image.id)}
+                                          className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white transition hover:bg-rose-600"
+                                          aria-label="Bỏ ảnh cơ sở mới"
+                                          title="Bỏ ảnh cơ sở mới"
+                                      >
+                                          <Trash2 className="h-4 w-4" />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="rounded-lg border border-dashed border-[#cbd3df] bg-white p-5 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-400">
+                              Chưa có ảnh cơ sở.
+                          </div>
+                      )}
+                  </section>
+              )}
+          </div>
           <div className="flex flex-col-reverse gap-3 border-t border-[#e2e8f0] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-5 sm:flex-row sm:justify-end">
             <button
               type="button"

@@ -248,7 +248,7 @@ export default function CccdUploadFlow({
   };
 
   return (
-    <div className={`rounded-lg border border-[#d8dde6] bg-white p-4 sm:col-span-2 ${className}`}>
+    <div className={`min-w-0 w-full rounded-lg border border-[#d8dde6] bg-white p-4 ${className}`}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#232946]">
           {isScanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <StatusIcon className="h-5 w-5" />}
@@ -264,7 +264,7 @@ export default function CccdUploadFlow({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2">
         <CccdSideCard
           side="front"
           slot={slots.front}

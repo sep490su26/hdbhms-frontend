@@ -3,12 +3,25 @@ export const ROOM_PLACEHOLDER_IMAGE = "/room-placeholder.svg";
 import { API_BASE_URL } from "@/lib/apiConfig";
 const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
 
-function resolveRoomImageUrl(url) {
+export function resolvePublicAssetUrl(url) {
   if (!url) return null;
 
   const normalized = String(url).trim();
   if (!normalized) return null;
   if (/^(data:|blob:)/i.test(normalized)) return normalized;
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  if (normalized.startsWith("/api/v1")) return `${API_ROOT}${normalized}`;
+  if (normalized.startsWith("/room-samples/")) return `${API_ROOT}${normalized}`;
+  if (normalized.startsWith("room-samples/")) return `${API_ROOT}/${normalized}`;
+  if (normalized.startsWith("/")) return `${API_BASE_URL}${normalized}`;
+  return `${API_BASE_URL}/${normalized}`;
+}
+
+function resolveRoomImageUrl(url) {
+  if (!url) return null;
+
+  const normalized = String(url).trim();
+  if (!normalized) return null;
   if (
     normalized === ROOM_PLACEHOLDER_IMAGE ||
     normalized.startsWith(`${ROOM_PLACEHOLDER_IMAGE}?`) ||
@@ -16,14 +29,7 @@ function resolveRoomImageUrl(url) {
   ) {
     return normalized;
   }
-  if (/^https?:\/\//i.test(normalized)) return normalized;
-  if (normalized.startsWith("/api/v1")) return `${API_ROOT}${normalized}`;
-  if (normalized.startsWith("/room-samples/")) return `${API_ROOT}${normalized}`;
-  // Relative path without leading slash (e.g. "room-samples/P102/1.jpg")
-  // must use API_ROOT (not API_BASE_URL which contains /api/v1)
-  if (normalized.startsWith("room-samples/")) return `${API_ROOT}/${normalized}`;
-  if (normalized.startsWith("/")) return `${API_BASE_URL}${normalized}`;
-  return `${API_BASE_URL}/${normalized}`;
+  return resolvePublicAssetUrl(normalized);
 }
 export const PUBLIC_ROOMS_API_URL = `${API_BASE_URL}/rooms`;
 export const LANDLORD_CONTACT_PHONE = "0914339682";
@@ -88,6 +94,34 @@ export function normalizeRoomImages(apiRoom) {
   return uniqueImages.length > 0 ? uniqueImages : [ROOM_PLACEHOLDER_IMAGE];
 }
 
+function normalizeRoomImageItems(apiRoom, fallbackUrls = []) {
+  const rawImages = Array.isArray(apiRoom?.images) ? apiRoom.images : [];
+  const items = rawImages
+    .map((image, index) => {
+      const url = normalizeRoomImageValue(image);
+      if (!url) return null;
+      return {
+        id: typeof image === "object" ? image.id ?? null : null,
+        fileId: typeof image === "object" ? image.fileId ?? image.file_id ?? null : null,
+        url,
+        sortOrder: typeof image === "object" ? image.sortOrder ?? image.sort_order ?? index : index,
+        fallback: Boolean(typeof image === "object" ? image.fallback : false),
+      };
+    })
+    .filter(Boolean);
+
+  if (items.length) return items;
+  return fallbackUrls
+    .filter((url) => url && url !== ROOM_PLACEHOLDER_IMAGE)
+    .map((url, index) => ({
+      id: null,
+      fileId: null,
+      url,
+      sortOrder: index,
+      fallback: true,
+    }));
+}
+
 export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   const roomCode = apiRoom.room_code ?? apiRoom.roomCode ?? apiRoom.code ?? apiRoom.name ?? "";
   const listedPrice = apiRoom.listed_price ?? apiRoom.listedPrice ?? apiRoom.price ?? 0;
@@ -102,6 +136,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
   const floorNumber = floorOrder ?? parseInt(floorName?.replace(/\D/g, "") || "1", 10);
 
   const imageUrls = normalizeRoomImages(apiRoom);
+  const imageItems = normalizeRoomImageItems(apiRoom, imageUrls);
   const status = mapApiRoomStatus(apiRoomStatus(apiRoom));
 
   const normalizedRoom = {
@@ -121,6 +156,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     type: apiRoom.type ?? "standard",
     image: imageUrls[0],
     images: imageUrls,
+    imageItems,
     imageUrls,
     floor: floorName,
     floorNumber,
@@ -172,6 +208,15 @@ export async function fetchPublicActiveProperties() {
   const response = await fetch(`${API_BASE_URL}/properties?${params.toString()}`, { cache: "no-store" });
   const data = await readApiResponse(response, "Không thể tải danh sách cơ sở đang hoạt động");
   return pageRows(data);
+}
+
+export async function fetchPublicPropertyImages(propertyId) {
+  if (!propertyId) return [];
+
+  const response = await fetch(`${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/images`, {
+    cache: "no-store",
+  });
+  return readApiResponse(response, "Không thể tải ảnh cơ sở");
 }
 
 export async function fetchPublicFloors(propertyId) {

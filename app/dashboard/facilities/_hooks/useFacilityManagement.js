@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FACILITY_STATUS,
+  attachPropertyImage,
   createFacility as createFacilityRequest,
+  deletePropertyImage,
   getFacilitiesDashboard,
   updateFacility as updateFacilityRequest,
   updateFacilityStatus as updateFacilityStatusRequest,
+  uploadPropertyImage,
 } from "@/services/facilityService";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 
@@ -14,6 +17,9 @@ const EMPTY_FORM = {
   name: "",
   address: "",
   description: "",
+  images: [],
+  pendingImages: [],
+  deletedImageIds: [],
 };
 
 function normalizeName(value) {
@@ -128,6 +134,9 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
         status: facility.status || FACILITY_STATUS.ACTIVE,
         hasFloorPlan: Boolean(facility.hasFloorPlan),
         roomCount: facility.roomCount ?? 0,
+        images: facility.images ?? [],
+        pendingImages: [],
+        deletedImageIds: [],
       },
       errors: {},
       isSubmitting: false,
@@ -178,6 +187,15 @@ export function useFacilityManagement({ keyword = "", status = "", page = 1, siz
         pushToast("Đã thêm cơ sở mới");
       } else {
         await updateFacilityRequest(formState.editingId, payload);
+        await Promise.all(
+          (formState.values.deletedImageIds ?? []).map((imageId) =>
+            deletePropertyImage(formState.editingId, imageId),
+          ),
+        );
+        for (const image of formState.values.pendingImages ?? []) {
+          const uploaded = await uploadPropertyImage(image.file);
+          await attachPropertyImage(formState.editingId, uploaded.fileId);
+        }
         pushToast("Đã cập nhật thông tin cơ sở");
       }
 

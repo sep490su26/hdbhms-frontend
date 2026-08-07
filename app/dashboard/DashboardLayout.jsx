@@ -11,7 +11,6 @@ import {
   Building2,
   CheckCheck,
   ChevronDown,
-  FileCheck2,
   FileText,
   Gauge,
   Home,
@@ -141,12 +140,6 @@ const navigation = [
     label: "Quản lý công nợ",
     icon: WalletMinimal,
     permissionKey: "debt",
-  },
-  {
-    path: "/dashboard/deposits",
-    label: "Danh sách cọc",
-    icon: FileCheck2,
-    permissionKey: "deposits",
   },
   {
     path: "/dashboard/contract-management",

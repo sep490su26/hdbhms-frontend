@@ -91,12 +91,12 @@ test("lease contract download fallbacks use room HDT filenames", () => {
     "utf8",
   );
   const pageSource = readFileSync(
-    new URL("../app/dashboard/contract-template/page.jsx", import.meta.url),
+    new URL("../app/dashboard/contract-management/page.jsx", import.meta.url),
     "utf8",
   );
   const wizardSource = readFileSync(
     new URL(
-      "../app/dashboard/contract-template/ContractPrintWizard.jsx",
+      "../app/dashboard/contract-management/ContractPrintWizard.jsx",
       import.meta.url,
     ),
     "utf8",
@@ -214,7 +214,7 @@ test("downloadLeaseContractDraftPdf uses caller fallback when header is unavaila
 test("contract workflow lease action passes generated HDT filename fallback", () => {
   const source = readFileSync(
     new URL(
-      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      "../app/dashboard/contract-management/ContractWorkflowStepper.jsx",
       import.meta.url,
     ),
     "utf8",
@@ -233,14 +233,14 @@ test("contract workflow lease action passes generated HDT filename fallback", ()
 test("contract workflow lease signed state uses signedFileId and replace=true for re-upload", () => {
   const source = readFileSync(
     new URL(
-      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      "../app/dashboard/contract-management/ContractWorkflowStepper.jsx",
       import.meta.url,
     ),
     "utf8",
   );
   const activationFlowSource = readFileSync(
     new URL(
-      "../app/dashboard/contract-template/ContractActivationFlow.jsx",
+      "../app/dashboard/contract-management/ContractActivationFlow.jsx",
       import.meta.url,
     ),
     "utf8",

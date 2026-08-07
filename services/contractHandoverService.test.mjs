@@ -110,7 +110,7 @@ test("handover download fallbacks do not use legacy bien-ban filenames", () => {
   );
   const stepperSource = readFileSync(
     new URL(
-      "../app/dashboard/contract-template/ContractWorkflowStepper.jsx",
+      "../app/dashboard/contract-management/ContractWorkflowStepper.jsx",
       import.meta.url,
     ),
     "utf8",

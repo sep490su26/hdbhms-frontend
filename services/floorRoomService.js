@@ -30,6 +30,7 @@ function normalizeRoom(raw = {}) {
     maxOccupants: numberValue(raw.maxOccupants),
     sortOrder: numberValue(raw.sortOrder),
     currentStatus: raw.currentStatus ?? raw.status ?? "DRAFT",
+    images: Array.isArray(raw.images) ? raw.images : [],
   };
 }
 
@@ -82,6 +83,13 @@ export async function fetchRooms(propertyId, floorId) {
   return pageRows(data).map(normalizeRoom);
 }
 
+export async function fetchRoomById(roomId) {
+  return authenticatedFetch(
+    `${API_BASE_URL}/rooms/id/${encodeURIComponent(roomId)}`,
+    { method: "GET" },
+  );
+}
+
 export async function createRoom({ propertyId, floorId, roomCode, name, areaM2, listedPrice, maxOccupants, sortOrder }) {
   return authenticatedFetch(`${API_BASE_URL}/rooms`, {
     method: "POST",
@@ -117,4 +125,42 @@ export async function updateRoom(roomId, { floorId, roomCode, name, areaM2, list
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+async function uploadImageFile(file, category) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("category", category);
+  formData.append("isSensitive", "false");
+  return authenticatedFetch(`${API_BASE_URL}/files/upload`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function uploadRoomImage(file) {
+  const data = await uploadImageFile(file, "ROOM_IMAGE");
+  const fileId = data.fileId ?? data.file_id ?? data.id;
+  if (!fileId) {
+    throw new Error("Không nhận được mã file ảnh phòng.");
+  }
+  return {
+    fileId,
+    url: data.url || `/files/download/${fileId}`,
+  };
+}
+
+export async function attachRoomImage(roomId, fileId, sortOrder) {
+  return authenticatedFetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileId, sortOrder }),
+  });
+}
+
+export async function deleteRoomImage(roomId, imageId) {
+  return authenticatedFetch(
+    `${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/images/${encodeURIComponent(imageId)}`,
+    { method: "DELETE" },
+  );
 }

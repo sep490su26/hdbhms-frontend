@@ -2,6 +2,8 @@
 
 import { normalizePageResponse } from "@/lib/pageResponse";
 
+const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+
 export const FACILITY_STATUS = {
   DRAFT: "DRAFT",
   ACTIVE: "ACTIVE",
@@ -41,6 +43,27 @@ function normalizeFloor(floor = {}) {
   };
 }
 
+export function resolveFacilityImageUrl(url) {
+  if (!url) return "";
+  const normalized = String(url).trim();
+  if (!normalized) return "";
+  if (/^(https?:|data:|blob:)/i.test(normalized)) return normalized;
+  if (normalized.startsWith("/api/v1")) return `${API_ROOT}${normalized}`;
+  if (normalized.startsWith("/")) return `${API_BASE_URL}${normalized}`;
+  return `${API_BASE_URL}/${normalized}`;
+}
+
+function normalizeImage(image = {}) {
+  const fileId = image.fileId ?? image.file_id ?? null;
+  return {
+    id: image.id ?? fileId,
+    fileId,
+    url: resolveFacilityImageUrl(image.url || (fileId ? `/files/download/${fileId}` : "")),
+    sortOrder: numberValue(image.sortOrder ?? image.sort_order),
+    createdAt: image.createdAt ?? image.created_at ?? null,
+  };
+}
+
 function normalizeFacility(facility = {}) {
   const floors = Array.isArray(facility.floors) ? facility.floors.map(normalizeFloor) : [];
   return {
@@ -61,6 +84,7 @@ function normalizeFacility(facility = {}) {
     hasActiveContracts: Boolean(facility.hasActiveContracts ?? facility.has_active_contracts ?? false),
     hasOutstandingDebts: Boolean(facility.hasOutstandingDebts ?? facility.has_outstanding_debts ?? false),
     outstandingDebtAmount: numberValue(facility.outstandingDebtAmount ?? facility.outstanding_debt_amount),
+    images: Array.isArray(facility.images) ? facility.images.map(normalizeImage).filter((image) => image.url) : [],
     floors,
   };
 }
@@ -148,4 +172,43 @@ export async function updateFacilityStatus(id, status) {
   });
 
   return normalizeFacility(data);
+}
+
+async function uploadImageFile(file, category) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("category", category);
+  formData.append("isSensitive", "false");
+  return authenticatedFetch(`${API_BASE_URL}/files/upload`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function uploadPropertyImage(file) {
+  const data = await uploadImageFile(file, "PROPERTY_IMAGE");
+  const fileId = data.fileId ?? data.file_id ?? data.id;
+  if (!fileId) {
+    throw new Error("Không nhận được mã file ảnh cơ sở.");
+  }
+  return {
+    fileId,
+    url: resolveFacilityImageUrl(data.url || `/files/download/${fileId}`),
+  };
+}
+
+export async function attachPropertyImage(propertyId, fileId, sortOrder) {
+  const data = await authenticatedFetch(`${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileId, sortOrder }),
+  });
+  return normalizeImage(data);
+}
+
+export async function deletePropertyImage(propertyId, imageId) {
+  return authenticatedFetch(
+    `${API_BASE_URL}/properties/${encodeURIComponent(propertyId)}/images/${encodeURIComponent(imageId)}`,
+    { method: "DELETE" },
+  );
 }

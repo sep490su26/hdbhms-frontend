@@ -18,7 +18,7 @@ const MODES = [
 ];
 
 export default function IdentityEntryModeSelector({
-  value = "scan",
+  value = "manual",
   onChange,
   disabled = false,
   className = "",

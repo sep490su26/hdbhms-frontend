@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,17 +21,27 @@ import {
   Check,
   Copy,
   CreditCard,
-  Download,
   FileText,
   Home,
   Mail,
   MapPin,
   Phone,
   Ruler,
+  RotateCcw,
   ShieldCheck,
   Wifi,
+  ZoomIn,
+  ZoomOut,
   X,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ROOM_HOLD_DURATION_MS,
   clearRoomHold,
@@ -46,15 +57,11 @@ import {
   normalizeApiRoom,
 } from "../../../services/roomsService";
 import {
-  downloadDepositContractByPaymentPdf,
-  openDepositContractByPaymentPdf,
-  previewDepositContract,
-} from "../../../services/depositContractsService";
-import {
   fetchMyTenantProfile,
   fetchPrivateFile,
   lookupPersonProfileByPhone,
 } from "../../../services/tenantProfilesService";
+import { previewDepositContract } from "../../../services/depositContractsService";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CameraCapture from "../../../components/CameraCapture";
 import DateInput from "../../../components/DateInput";
@@ -308,6 +315,7 @@ const buildDepositScheduleWindow = (room) => {
 };
 
 const REQUIRED_DEPOSIT_MESSAGES = {
+  contractTermMonths: "Vui lòng nhập thời hạn hợp đồng.",
   fullName: "Vui lòng nhập họ và tên.",
   birthDate: "Vui lòng chọn ngày sinh.",
   gender: "Vui lòng chọn giới tính.",
@@ -331,6 +339,8 @@ const REQUIRED_DEPOSIT_MESSAGES = {
 };
 
 const BACKEND_DEPOSIT_FIELD_MAP = {
+  contractTermMonths: "contractTermMonths",
+  contract_term_months: "contractTermMonths",
   roomId: "roomId",
   room_id: "roomId",
   fullName: "fullName",
@@ -372,6 +382,10 @@ const BACKEND_DEPOSIT_FIELD_MAP = {
 };
 
 const API_ERROR_HINTS = [
+  {
+    pattern: /contract\s*term|contractTermMonths|contract_term_months/i,
+    field: "contractTermMonths",
+  },
   {
     pattern: /full\s*name|fullName|full_name|họ\s*và\s*tên/i,
     field: "fullName",
@@ -427,6 +441,7 @@ const API_ERROR_HINTS = [
 ];
 
 const DEPOSIT_FIELD_LABELS = {
+  contractTermMonths: "thời hạn hợp đồng",
   fullName: "họ và tên",
   birthDate: "ngày sinh",
   gender: "giới tính",
@@ -565,6 +580,7 @@ const DEPOSIT_DRAFT_COOKIE_NAME = "hdbhmsDepositFormDraft";
 const LEGACY_DEPOSIT_DRAFT_COOKIE_NAME = "hdbhms_deposit_form_draft";
 const DEPOSIT_DRAFT_MAX_AGE_SECONDS = 30 * 60;
 const DEPOSIT_DRAFT_FIELDS = [
+  "contractTermMonths",
   "fullName",
   "birthDate",
   "gender",
@@ -783,6 +799,10 @@ const validateDepositValue = (
     return "Số lượng người ở chỉ được chọn từ 1 đến 3.";
   }
 
+  if (name === "contractTermMonths" && (!/^\d+$/.test(normalizedValue) || Number(normalizedValue) < 6)) {
+    return "Thời hạn hợp đồng tối thiểu là 6 tháng.";
+  }
+
   if (name === "paymentCycleMonths" && !["1", "3"].includes(normalizedValue)) {
     return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
   }
@@ -935,6 +955,7 @@ const buildDepositMetadata = (room, data) => ({
   idIssueDate: data.idIssueDate || null,
   idIssuePlace: String(data.idIssuePlace || "").trim(),
   permanentAddress: String(data.permanentAddress || "").trim(),
+  contractTermMonths: Number(data.contractTermMonths || 12),
   depositMonths: 1,
   paymentCycleMonths: Number(data.paymentCycleMonths || 1),
   occupantCount: Number(data.occupantCount || 1),
@@ -1044,7 +1065,7 @@ function Field({
 function FormSection({ title, icon: Icon, children, className = "" }) {
   return (
     <section
-      className={`grid gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2 ${className}`}
+      className={`grid min-w-0 gap-5 rounded-xl border border-[#d8dde6] bg-white p-5 sm:col-span-2 ${className}`}
     >
       <div className="flex items-center gap-3">
         {Icon && <Icon className="h-5 w-5 text-[#4f46e5]" />}
@@ -1061,6 +1082,29 @@ function ContractPreviewModal({
   onAcceptedChange,
   onClose,
 }) {
+  const DEFAULT_ZOOM = 0.7;
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 1.8;
+  const ZOOM_STEP = 0.1;
+  const dragRef = useRef(null);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const previewHtml = useMemo(() => {
+    const html = preview?.html || "";
+    if (!html) return "";
+    const previewStyles = `
+      <style>
+        html, body { background: #fff !important; }
+        body { padding: 58px 64px 64px !important; }
+      </style>
+    `;
+    return html.includes("</head>")
+      ? html.replace("</head>", `${previewStyles}</head>`)
+      : `${previewStyles}${html}`;
+  }, [preview?.html]);
+
   const resizePreviewFrame = (event) => {
     const frameDocument = event.currentTarget.contentDocument;
     if (frameDocument?.documentElement)
@@ -1074,39 +1118,145 @@ function ContractPreviewModal({
     event.currentTarget.style.height = `${contentHeight}px`;
   };
 
+  const updateZoom = (nextZoom) => {
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom)));
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.button !== 0) return;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+    };
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    setOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    });
+  };
+
+  const stopDragging = (event) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+    setIsDragging(false);
+  };
+
+  const resetPreviewPosition = () => {
+    setZoom(DEFAULT_ZOOM);
+    setOffset({ x: 0, y: 0 });
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm">
-      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        onInteractOutside={(event) => event.preventDefault()}
+        className="flex h-[min(94vh,980px)] w-[calc(100%-1rem)] !max-w-7xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:rounded-2xl"
+      >
+        <DialogHeader className="flex shrink-0 flex-row items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">
               Xem trước hợp đồng
             </p>
-            <h2 className="text-lg font-bold text-[#091426]">
-              Hợp đồng đặt cọc
-            </h2>
+            <DialogTitle className="text-lg font-bold text-[#091426]">
+              Hợp đồng thuê và đặt cọc
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Ban xem truoc hop dong thue va dat coc.
+            </DialogDescription>
           </div>
-          <button
+          <DialogClose asChild>
+            <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-[#45474c] transition hover:bg-[#f2f4f6] hover:text-[#091426]"
             aria-label="Đóng"
           >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto bg-[#eef2f7] px-3 py-6">
+              <X className="h-5 w-5" />
+            </button>
+          </DialogClose>
+        </DialogHeader>
+        <div className="flex min-h-0 flex-1 flex-col bg-[#eef2f7]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#dce3ec] bg-white px-4 py-2">
+            <div className="flex items-center gap-1 rounded-lg border border-[#d8dde6] bg-[#f8fafc] p-1">
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom - ZOOM_STEP)}
+                disabled={zoom <= MIN_ZOOM}
+                className="rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Thu nho"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <span className="min-w-14 text-center text-xs font-bold tabular-nums text-[#091426]">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom + ZOOM_STEP)}
+                disabled={zoom >= MAX_ZOOM}
+                className="rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Phong to"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={resetPreviewPosition}
+                className="ml-1 rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426]"
+                aria-label="Dat lai vi tri va zoom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
           <div
-            className="origin-top scale-[0.46] sm:scale-[0.7] lg:scale-90 xl:scale-100"
-            style={{ width: 794, margin: "0 auto", minHeight: 540 }}
+            className={`relative min-h-0 flex-1 overflow-hidden px-3 py-6 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            style={{ touchAction: "none" }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
           >
-            <iframe
-              title="Xem trước hợp đồng đặt cọc"
-              srcDoc={preview?.html || ""}
+            <div
+              className="absolute left-1/2 top-6 w-[794px] select-none"
+              style={{
+                transform: `translate3d(calc(-50% + ${offset.x}px), ${offset.y}px, 0)`,
+              }}
+            >
+              <iframe
+              title="Xem trước hợp đồng thuê và đặt cọc"
+              srcDoc={previewHtml}
               scrolling="no"
               onLoad={resizePreviewFrame}
-              className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
-            />
+                className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top center",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
           </div>
         </div>
         <div className="grid gap-4 border-t border-[#e2e8f0] bg-white px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -1119,7 +1269,7 @@ function ContractPreviewModal({
             />
             <span>
               Tôi đã đọc và đồng ý với{" "}
-              <strong className="text-[#091426]">điều khoản đặt cọc</strong>{" "}
+              <strong className="text-[#091426]">điều khoản hợp đồng</strong>{" "}
               trong hợp đồng này.
             </span>
           </label>
@@ -1131,8 +1281,8 @@ function ContractPreviewModal({
             Quay lại form
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1248,7 +1398,7 @@ function DepositInfoForm({
     citizenIdBack: null,
     portraitImage: null,
   });
-  const [identityEntryMode, setIdentityEntryMode] = useState("scan");
+  const [identityEntryMode, setIdentityEntryMode] = useState("manual");
   const [isCccdExtracting, setIsCccdExtracting] = useState(false);
   const [isPortraitCameraOpen, setIsPortraitCameraOpen] = useState(false);
   const [contractPreview, setContractPreview] = useState(null);
@@ -1792,7 +1942,6 @@ function DepositInfoForm({
       ...currentDraft,
       ...IDENTITY_FIELD_DEFAULTS,
     }));
-    setAcceptedContract(false);
     writeDraftWithIdentityValues(IDENTITY_FIELD_DEFAULTS);
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
@@ -1819,8 +1968,6 @@ function DepositInfoForm({
       ...currentDraft,
       ...extractedValues,
     }));
-    setAcceptedContract(false);
-
     setFieldErrors((currentErrors) => {
       const nextErrors = { ...currentErrors, _form: "" };
       Object.entries(extractedValues).forEach(([name, value]) => {
@@ -1955,6 +2102,7 @@ function DepositInfoForm({
       "occupantCount",
       "contractDate",
       "moveInDate",
+      "contractTermMonths",
       "paymentCycleMonths",
     ];
     const nextErrors = {};
@@ -2106,6 +2254,7 @@ function DepositInfoForm({
                 citizenIdBack: fieldErrors.citizenIdBack,
               }}
               maxFileSize={MAX_DEPOSIT_UPLOAD_FILE_BYTES}
+              className="w-full sm:col-span-2"
             />
           )}
 
@@ -2115,7 +2264,7 @@ function DepositInfoForm({
                 className="sm:col-span-2"
                 label="Họ và tên"
                 name="fullName"
-                placeholder="Phạm Thèng C"
+                placeholder="Họ và tên"
                 value={identityValues.fullName}
                 defaultValue={savedDraft.fullName}
                 disabled={isCccdExtracting}
@@ -2380,6 +2529,18 @@ function DepositInfoForm({
                 onBlur={handleFieldBlur}
                 value={scheduleDates.moveInDate}
               />
+              <Field
+                label="Thời hạn hợp đồng (tháng)"
+                name="contractTermMonths"
+                type="number"
+                min={6}
+                step={1}
+                defaultValue={savedDraft.contractTermMonths || "12"}
+                error={fieldErrors.contractTermMonths}
+                validateValue={validateDepositField}
+                onChange={handleFieldChange}
+                onBlur={handleFieldBlur}
+              />
               {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
                   Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp
@@ -2471,7 +2632,7 @@ function DepositInfoForm({
               <div>
                 <p className="flex items-center gap-2 text-sm font-bold text-[#091426]">
                   <FileText className="h-4 w-4 text-[#006c49]" />
-                  Hợp đồng đặt cọc
+                  Hợp đồng thuê và đặt cọc
                 </p>
                 <p className="mt-1 text-sm leading-6 text-[#45474c]">
                   Xem trước hợp đồng đã tự điền thông tin trước khi chuyển sang
@@ -2491,7 +2652,7 @@ function DepositInfoForm({
               className={`rounded-lg px-4 py-3 text-sm font-semibold ${acceptedContract ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
             >
               {acceptedContract
-                ? "Đã đọc và đồng ý điều khoản đặt cọc."
+                ? "Đã đọc và đồng ý điều khoản hợp đồng."
                 : "Bạn cần xem hợp đồng và tick đồng ý trong bản preview trước khi tiếp tục thanh toán."}
             </div>
             {fieldErrors.terms && (
@@ -2519,7 +2680,7 @@ function DepositInfoForm({
             />
             <span className="text-sm leading-6 text-[#45474c]">
               Tôi cam kết các thông tin trên là chính xác và đồng ý với các{" "}
-              <strong className="text-[#091426]">điều khoản đặt cọc</strong> của
+              <strong className="text-[#091426]">điều khoản hợp đồng</strong> của
               Hải Đăng House.
             </span>
           </label>
@@ -2806,7 +2967,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     }
   };
 
-  const handleOpenContract = async () => {
+  /* const handleOpenContract = async () => {
     if (!paymentIntentId) {
       alert("Chưa có mã phiên thanh toán để mở hợp đồng đặt cọc.");
       return;
@@ -2836,6 +2997,8 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
     }
   };
 
+  */
+
   if (isConfirmed) {
     return (
       <section className="flex flex-col items-center justify-center rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] p-10 text-center shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
@@ -2849,7 +3012,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
           Yêu cầu đặt cọc phòng {room.id} đã được ghi nhận. Chủ nhà sẽ liên hệ
           xác nhận trong thời gian sớm nhất.
         </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        {/* <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             onClick={handleOpenContract}
@@ -2866,7 +3029,7 @@ function DepositPaymentStep({ room, customer, paymentIntent }) {
             <Download className="h-4 w-4" />
             Tải PDF
           </button>
-        </div>
+        </div> */}
         <Link
           href="/rooms"
           className="mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-[#091426] px-8 text-sm font-bold text-white transition hover:bg-[#16253a]"
@@ -3066,6 +3229,12 @@ export function DepositClient({ room: initialRoom = null }) {
   const isBlockedOnInfoStep = Boolean(
     step === "info" && blockingStatus && !blockingStatus.canBook,
   );
+
+  useEffect(() => {
+    if (step === "deposit") {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+  }, [step]);
 
   useEffect(() => {
     if (initialRoom) return undefined;

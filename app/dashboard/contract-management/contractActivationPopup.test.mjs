@@ -105,7 +105,10 @@ test("contract list hides pagination until rows exceed page size", () => {
 
 test("contract list action button keeps activation label visible", () => {
   assert.match(pageSource, /min-w-\[9\.75rem\]/);
-  assert.match(pageSource, /\? "Kích hoạt hợp đồng" : "Xem chi tiết"/);
+  assert.match(
+    pageSource,
+    /\?\s*"Kích hoạt hợp đồng"\s*:\s*"Xem chi tiết"/,
+  );
   assert.doesNotMatch(pageSource, /h-9 w-full[\s\S]*Kích hoạt hợp đồng/);
 });
 
@@ -133,7 +136,7 @@ test("contract extension updates the current contract instead of creating a rene
   assert.match(pageSource, /Lưu gia hạn/);
   assert.match(
     pageSource,
-    /const updated = await updateLeaseContractTerms\(mergedSelected\.leaseContractId/,
+    /const updated = await updateLeaseContractTerms\(\s*mergedSelected\.leaseContractId/,
   );
   assert.doesNotMatch(pageSource, /renewLeaseContract/);
   assert.doesNotMatch(pageSource, /Mã hợp đồng mới/);

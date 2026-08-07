@@ -71,6 +71,13 @@ import {
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import DateInput from "@/components/DateInput";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "../_contexts/AuthContext";
 import { ROLES } from "../_lib/rbac";
 
@@ -713,16 +720,27 @@ function normalizeKeyword(value) {
 }
 
 function getContractRowKey(item, index) {
+  const depositFormId = getDepositFormId(item);
   if (item.sourceType === "CONTRACT" && item.contractId)
     return `contract-${item.contractId}`;
-  if (item.sourceType === "DEPOSIT" && item.depositAgreementId)
-    return `deposit-${item.depositAgreementId}`;
+  if (item.sourceType === "DEPOSIT" && depositFormId)
+    return `deposit-${depositFormId}`;
   if (item.contractId) return `contract-${item.contractId}`;
-  if (item.depositAgreementId) return `deposit-${item.depositAgreementId}`;
+  if (depositFormId) return `deposit-${depositFormId}`;
   if (item.leaseContractId) return `lease-${item.leaseContractId}`;
   if (item.id) return `item-${item.id}`;
   if (item.displayCode) return `code-${item.displayCode}`;
   return `row-${index}`;
+}
+
+function getDepositFormId(item = {}) {
+  return (
+    item?.depositFormId ??
+    item?.deposit_form_id ??
+    item?.depositAgreementId ??
+    item?.deposit_agreement_id ??
+    null
+  );
 }
 
 function getOccupantsCount(item, details) {
@@ -785,9 +803,7 @@ function getContractType(item = {}) {
 }
 
 function isVisibleLeaseContract(item) {
-  return Boolean(
-    item?.leaseContractId || item?.contractId || item?.depositAgreementId,
-  );
+  return Boolean(item?.leaseContractId || item?.contractId || getDepositFormId(item));
 }
 
 function getContractDateValue(item = {}) {
@@ -807,7 +823,7 @@ function getContractTimestamp(item = {}) {
   const timestamp = new Date(getContractDateValue(item) || 0).getTime();
   if (Number.isFinite(timestamp) && timestamp > 0) return timestamp;
   return Number(
-    item.leaseContractId || item.depositAgreementId || item.id || 0,
+    item.leaseContractId || getDepositFormId(item) || item.id || 0,
   );
 }
 
@@ -909,7 +925,7 @@ function needsActivationFlow(item) {
   if (!item) return false;
   if (isRoomTransferManagedContract(item)) return false;
   if (isRenewalContract(item)) return false;
-  if (!item.leaseContractId && item.depositAgreementId) return true;
+  if (!item.leaseContractId && getDepositFormId(item)) return true;
   if (!item.leaseContractId) return false;
   return ACTIVATION_FLOW_WORKFLOWS.has(getWorkflow(item));
 }
@@ -1960,18 +1976,19 @@ export default function ContractTemplatePage() {
 
   async function openPrintWizard(item) {
     let targetContractId = item?.leaseContractId;
+    const depositFormId = getDepositFormId(item);
 
     if (!targetContractId) {
-      if (item?.depositAgreementId) {
-        setActionLoading(`draft-${item.depositAgreementId}`);
+      if (depositFormId) {
+        setActionLoading(`draft-${depositFormId}`);
         setError("");
         try {
-          await createDraftLeaseContractFromDeposit(item.depositAgreementId);
+          await createDraftLeaseContractFromDeposit(depositFormId);
           const refreshedContracts = await loadContracts();
           const updatedItem = refreshedContracts.find(
             (c) =>
-              String(c.depositAgreementId) ===
-                String(item.depositAgreementId) && c.leaseContractId,
+              String(getDepositFormId(c)) === String(depositFormId) &&
+              c.leaseContractId,
           );
           if (updatedItem && updatedItem.leaseContractId) {
             targetContractId = updatedItem.leaseContractId;
@@ -2079,18 +2096,18 @@ export default function ContractTemplatePage() {
   }
 
   async function handleCreateDraft(item) {
-    if (!item?.depositAgreementId) return;
-    setActionLoading(`draft-${item.depositAgreementId}`);
+    const depositFormId = getDepositFormId(item);
+    if (!depositFormId) return;
+    setActionLoading(`draft-${depositFormId}`);
     setError("");
     try {
       const draft = await createDraftLeaseContractFromDeposit(
-        item.depositAgreementId,
+        depositFormId,
       );
       const items = await loadContracts();
       const created = items.find(
         (contract) =>
-          String(contract.depositAgreementId) ===
-            String(item.depositAgreementId) ||
+          String(getDepositFormId(contract)) === String(depositFormId) ||
           String(contract.leaseContractId) === String(draft?.leaseContractId),
       );
       const nextSelected = created || draft;
@@ -3513,40 +3530,47 @@ export default function ContractTemplatePage() {
       )}
 
       {mergedSelected && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#091426]/65 p-3 backdrop-blur-sm xl:p-4"
-          onClick={() => {
-            setSelected(null);
-            setIsEditingTerms(false);
-            setTermsFieldErrors({});
-            setTermsError("");
+        <Dialog
+          open={Boolean(mergedSelected)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelected(null);
+              setIsEditingTerms(false);
+              setTermsFieldErrors({});
+              setTermsError("");
+            }
           }}
         >
-          <section
+          <DialogContent
+            showCloseButton={false}
             id="contract-detail-dialog"
-            className="custom-scrollbar max-h-[92vh] w-full max-w-[1100px] overflow-y-auto rounded-xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            className="custom-scrollbar flex max-h-[92vh] w-[calc(100%-1rem)] !max-w-7xl flex-col overflow-y-auto rounded-xl bg-white p-0 shadow-2xl sm:rounded-xl"
           >
             <header className="relative bg-[#05091d] px-5 py-7 text-white xl:px-7 xl:py-8">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelected(null);
-                  setIsEditingTerms(false);
-                  setTermsFieldErrors({});
-                  setTermsError("");
-                }}
-                aria-label="Đóng chi tiết hợp đồng"
-                className="absolute right-4 top-4 rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <DialogClose asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelected(null);
+                    setIsEditingTerms(false);
+                    setTermsFieldErrors({});
+                    setTermsError("");
+                  }}
+                  aria-label="Đóng chi tiết hợp đồng"
+                  className="absolute right-4 top-4 rounded-md p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </DialogClose>
               <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-300 xl:text-xs">
                 Chi tiết hợp đồng
               </p>
-              <h2 className="mt-4 text-2xl font-extrabold tracking-[-0.02em] xl:text-3xl">
+              <DialogTitle className="mt-4 text-2xl font-extrabold tracking-[-0.02em] text-white xl:text-3xl">
                 {selectedDetailTitle}
-              </h2>
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                Thông tin chi tiết và các thao tác quản lý hợp đồng.
+              </DialogDescription>
               {selectedLeaseContractFilename &&
                 selectedContractDisplayName &&
                 selectedContractDisplayName !==
@@ -4750,7 +4774,7 @@ export default function ContractTemplatePage() {
 
                   <section className="grid gap-3 lg:col-span-2 sm:grid-cols-2">
                     {!mergedSelected.leaseContractId &&
-                      mergedSelected.depositAgreementId && (
+                      getDepositFormId(mergedSelected) && (
                         <button
                           type="button"
                           onClick={() => handleCreateDraft(mergedSelected)}
@@ -4830,8 +4854,8 @@ export default function ContractTemplatePage() {
                 </>
               )}
             </div>
-          </section>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       <TransferExecutionModal

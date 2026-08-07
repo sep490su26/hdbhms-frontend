@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,6 +30,7 @@ import {
   ROOM_PLACEHOLDER_IMAGE,
 } from "../../services/roomsService";
 import { fetchPublicPropertyFloorPlan } from "../../services/floorPlanService";
+import { readDepositBatchDraft } from "../../services/depositBatchDraftStorage";
 
 const BUILDING_OVERVIEW_LABEL = "Sơ đồ nhà trọ";
 const ALL_FLOORS_VALUE = "all";
@@ -2112,6 +2113,7 @@ function RoomsListView({
 
 export default function RoomsClient({
   depositSuccess = false,
+  mobileDeposit = false,
   requestedRoomId = "",
   requestedPropertyId = "",
 }) {
@@ -2127,6 +2129,7 @@ export default function RoomsClient({
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const restoredMobileDepositRef = useRef(false);
 
   const [facilities, setFacilities] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -2180,6 +2183,44 @@ export default function RoomsClient({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadRooms();
   }, [loadRooms]);
+
+  useEffect(() => {
+    if (!mobileDeposit || rooms.length === 0 || restoredMobileDepositRef.current) return undefined;
+    restoredMobileDepositRef.current = true;
+
+    const timer = window.setTimeout(() => {
+      const draftRooms = readDepositBatchDraft()?.data?.selectedRooms || [];
+      let savedRooms = [];
+      try {
+        savedRooms = JSON.parse(
+          window.sessionStorage.getItem("hdbhms_batch_selected_rooms") || "[]",
+        );
+      } catch {
+        savedRooms = [];
+      }
+
+      const selectedIds = new Set(
+        [...draftRooms, ...savedRooms]
+          .map((room) => String(room?.roomId ?? ""))
+          .filter(Boolean),
+      );
+
+      if (selectedIds.size === 0) {
+        setMultiSelect(true);
+        setViewMode("list");
+        return;
+      }
+
+      const restoredRooms = rooms.filter((room) =>
+        selectedIds.has(String(room.roomId)),
+      );
+      setSelectedRooms(restoredRooms);
+      setMultiSelect(true);
+      setViewMode("list");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [mobileDeposit, rooms]);
 
   const floorsForPlan = useMemo(
     () => catalogFloors.map((floor) => floor.name).filter(Boolean),

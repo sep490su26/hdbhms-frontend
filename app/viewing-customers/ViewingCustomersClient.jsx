@@ -7,7 +7,6 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
-  FileCheck2,
   FileText,
   Gauge,
   HelpCircle,
@@ -69,7 +68,6 @@ const navItems = [
   { label: "Quản lý Tài khoản", icon: UserRoundCog },
   { label: "Nhập số điện nước", icon: Gauge },
   { label: "Bảo trì", icon: Wrench },
-  { label: "Danh sách cọc", icon: FileCheck2 },
   { label: "Mẫu hợp đồng", icon: FileText },
   { label: "Báo cáo Tài chính", icon: ClipboardList },
 ];

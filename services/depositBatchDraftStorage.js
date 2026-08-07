@@ -6,12 +6,15 @@ const SAFE_FORM_FIELDS = [
   "fullName",
   "phone",
   "email",
+  "gender",
+  "idNumber",
   "dob",
   "idIssueDate",
   "idIssuePlace",
   "permanentAddress",
   "expectedMoveInDate",
   "expectedLeaseSignDate",
+  "contractTermMonths",
   "paymentCycleMonths",
 ];
 

@@ -6,6 +6,13 @@ export async function POST(request) {
     const token = formData.get('token');
     const sessionId = formData.get('sessionId');
     const userRole = formData.get('userRole');
+    const redirectValue = formData.get('redirect');
+    const redirectPath =
+      typeof redirectValue === 'string' &&
+      redirectValue.startsWith('/') &&
+      !redirectValue.startsWith('//')
+        ? redirectValue
+        : '/rooms';
 
     const cookieStore = await cookies();
     if (token) {
@@ -29,6 +36,7 @@ export async function POST(request) {
             const token = '${token || ''}';
             const sessionId = '${sessionId || ''}';
             const userRole = '${userRole || ''}';
+            const redirectPath = '${redirectPath.replace(/'/g, "\\'")}';
 
             if (token) {
               window.localStorage.setItem('token', token);
@@ -40,8 +48,7 @@ export async function POST(request) {
               window.localStorage.setItem('userRole', userRole);
             }
             
-            // Immediately redirect to /rooms
-            window.location.replace('/rooms');
+            window.location.replace(redirectPath);
           </script>
           <style>
             body {

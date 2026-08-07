@@ -42,7 +42,6 @@ import {
   writeDepositBatchDraft,
 } from "../../../services/depositBatchDraftStorage";
 import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
-import { previewDepositContract } from "../../../services/depositContractsService";
 import { fetchMyTenantProfile, fetchPrivateFile, lookupPersonProfileByPhone } from "../../../services/tenantProfilesService";
 import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
@@ -114,6 +113,7 @@ function validateField(name, value, form = {}) {
   const today = todayValue();
   const maxScheduleDate = todayValue(MAX_DEPOSIT_SCHEDULE_DAYS);
   const requiredMessages = {
+    contractTermMonths: "Vui lòng nhập thời hạn hợp đồng.",
     fullName: "Vui lòng nhập họ và tên.",
     dob: "Vui lòng chọn ngày sinh.",
     gender: "Vui lòng chọn giới tính.",
@@ -141,6 +141,9 @@ function validateField(name, value, form = {}) {
   }
   if (name === "dob" && normalized > today) {
     return "Ngày sinh không được lớn hơn ngày hiện tại.";
+  }
+  if (name === "contractTermMonths" && (!/^\d+$/.test(normalized) || Number(normalized) < 6)) {
+    return "Thời hạn hợp đồng tối thiểu là 6 tháng.";
   }
   if (name === "gender" && !GENDER_OPTIONS.includes(normalized)) {
     return requiredMessages.gender;
@@ -256,7 +259,7 @@ function CopyRow({ label, value, disabled = false }) {
   );
 }
 
-function buildContractPreviewMetadata(room, form) {
+/* function buildContractPreviewMetadata(room, form) {
   return {
     roomId: room.roomId,
     fullName: String(form.fullName || "").trim(),
@@ -267,6 +270,7 @@ function buildContractPreviewMetadata(room, form) {
     idIssueDate: form.idIssueDate || null,
     idIssuePlace: String(form.idIssuePlace || "").trim(),
     permanentAddress: String(form.permanentAddress || "").trim(),
+    contractTermMonths: Number(form.contractTermMonths || 12),
     expectedMoveInDate: form.expectedMoveInDate || null,
     expectedLeaseSignDate: form.expectedLeaseSignDate || null,
     paymentCycleMonths: Number(form.paymentCycleMonths || 1),
@@ -359,6 +363,7 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
   );
 }
 
+*/
 function createDefaultRoomForms(rooms) {
   return Object.fromEntries(
     rooms.map((room) => [room.roomId, { occupantCount: 1, coOccupants: [] }]),
@@ -393,11 +398,12 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     permanentAddress: "",
     expectedMoveInDate: todayValue(1),
     expectedLeaseSignDate: todayValue(1),
+    contractTermMonths: "12",
     paymentCycleMonths: "1",
   });
   const [files, setFiles] = useState({ front: null, back: null, portrait: null });
   const [filePreviews, setFilePreviews] = useState({ front: "", back: "", portrait: "" });
-  const [identityEntryMode, setIdentityEntryMode] = useState("scan");
+  const [identityEntryMode, setIdentityEntryMode] = useState("manual");
   const [checkout, setCheckout] = useState(null);
   const [batchStatus, setBatchStatus] = useState(null);
   const [qrImage, setQrImage] = useState("");
@@ -412,9 +418,6 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const [remainingMs, setRemainingMs] = useState(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [redirectSeconds, setRedirectSeconds] = useState(10);
-  const [contractReviews, setContractReviews] = useState({});
-  const [activeContractRoomId, setActiveContractRoomId] = useState(null);
-  const [previewingRoomId, setPreviewingRoomId] = useState(null);
   const handleCccdExtractedRef = useRef(null);
   const lastCccdExtractSignatureRef = useRef("");
   const dismissedConflictRef = useRef("");
@@ -425,10 +428,13 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const totalAmount = rooms.length * DEPOSIT_PER_ROOM;
   const expiresAtMs = useMemo(() => (checkout ? resolveExpiresAtMs(checkout) : null), [checkout]);
   const paymentExpired = Boolean(expiresAtMs && remainingMs !== null && remainingMs <= 0);
-  const allContractsAccepted = rooms.length >= 1 && rooms.every((room) => {
-    const review = contractReviews[room.roomId];
-    return review?.accepted && review.signature === contractSignature(room, form);
-  });
+
+  useEffect(() => {
+    if (checkout) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+  }, [checkout]);
+
   const isCccdScanMode = identityEntryMode === "scan";
   const initialRoomKey = useMemo(
     () => initialRooms.map((room) => String(room.roomId)).join(","),
@@ -564,6 +570,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
         permanentAddress: profileData?.person?.permanentAddress || savedForm.permanentAddress || "",
         expectedMoveInDate: savedForm.expectedMoveInDate || todayValue(1),
         expectedLeaseSignDate: savedForm.expectedLeaseSignDate || todayValue(1),
+        contractTermMonths: savedForm.contractTermMonths || "12",
         paymentCycleMonths: savedForm.paymentCycleMonths || "1",
       };
 
@@ -1000,6 +1007,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
       "permanentAddress",
       "expectedMoveInDate",
       "expectedLeaseSignDate",
+      "contractTermMonths",
     ].forEach((name) => {
       const message = validateField(name, form[name], form);
       if (message) nextErrors[name] = message;
@@ -1027,11 +1035,11 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     const mainPhone = normalizePhone(form.phone);
     rooms.forEach((room) => {
       const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
-      const review = contractReviews[room.roomId];
+      /* const review = contractReviews[room.roomId];
       if (!review?.accepted || review.signature !== contractSignature(room, form)) {
         nextErrors[`room-${room.roomId}-terms`] =
           `Vui lòng xem hợp đồng đặt cọc phòng ${room.roomCode} và tick đồng ý.`;
-      }
+      } */
       if (roomForm.occupantCount < 1 || roomForm.occupantCount > Number(room.maxPeople || 1)) {
         nextErrors[`room-${room.roomId}-occupantCount`] = `Số người ở tối đa là ${room.maxPeople}.`;
       }
@@ -1060,7 +1068,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     return nextErrors;
   };
 
-  const validateContractPreviewFields = () => {
+  /* const validateContractPreviewFields = () => {
     const nextErrors = {};
     [
       "fullName",
@@ -1138,6 +1146,8 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     }
   };
 
+  } */
+
   const updateRoomForm = (roomId, updater) => {
     setRoomForms((current) => ({
       ...current,
@@ -1204,6 +1214,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     dob: form.dob || null,
     idIssueDate: form.idIssueDate || null,
     depositMonths: 1,
+    contractTermMonths: Number(form.contractTermMonths || 12),
     paymentCycleMonths: Number(form.paymentCycleMonths),
     rooms: rooms.map((room) => {
       const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
@@ -1328,12 +1339,14 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
     router.push("/rooms");
   };
 
-  const activeContractRoom = rooms.find(
+  /* const activeContractRoom = rooms.find(
     (room) => String(room.roomId) === String(activeContractRoomId),
   );
   const activeContractReview = activeContractRoom
     ? contractReviews[activeContractRoom.roomId]
     : null;
+
+  } */
 
   if (isLoadingRooms) {
     return (
@@ -1812,6 +1825,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
                 </div>
                 <TextField label="Ngày dự kiến vào ở" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedMoveInDate} value={form.expectedMoveInDate} onChange={(event) => updateFormField("expectedMoveInDate", event.target.value)} onBlur={(event) => updateFormField("expectedMoveInDate", event.target.value)} />
                 <TextField label="Ngày hẹn ký hợp đồng" required type="date" min={todayValue()} max={todayValue(MAX_DEPOSIT_SCHEDULE_DAYS)} error={fieldErrors.expectedLeaseSignDate} value={form.expectedLeaseSignDate} onChange={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} onBlur={(event) => updateFormField("expectedLeaseSignDate", event.target.value)} />
+                <TextField label="Thời hạn hợp đồng (tháng)" required type="number" min={6} step={1} error={fieldErrors.contractTermMonths} value={form.contractTermMonths} onChange={(event) => updateFormField("contractTermMonths", event.target.value)} onBlur={(event) => updateFormField("contractTermMonths", event.target.value)} />
                 <label className="grid gap-2 text-sm font-bold text-slate-700">
                   <span>Chu kỳ thanh toán</span>
                   <select
@@ -1975,7 +1989,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
               </section>
             </section>
 
-            {rooms.map((room) => {
+            {/* {rooms.map((room) => {
               const review = contractReviews[room.roomId];
               const accepted = review?.accepted && review.signature === contractSignature(room, form);
               return (
@@ -2026,9 +2040,11 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
               </div>
             ) : null}
 
+            */}
+
             <button
               type="submit"
-              disabled={submitting || isCccdExtracting || rooms.length < 1 || unavailableRooms.length > 0 || !allContractsAccepted}
+              disabled={submitting || isCccdExtracting || rooms.length < 1 || unavailableRooms.length > 0}
               className="flex h-14 w-full items-center justify-center gap-3 rounded-lg bg-[#091426] px-5 text-base font-black text-white shadow-sm transition hover:bg-[#16253a] disabled:cursor-not-allowed disabled:bg-[#8f9398]"
             >
               {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : null}
@@ -2093,14 +2109,14 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
         </div>
       )}
 
-      {activeContractRoom && activeContractReview?.preview ? (
+      {/* {activeContractRoom && activeContractReview?.preview ? (
         <ContractPreviewModal
           room={activeContractRoom}
           review={activeContractReview}
           onAcceptedChange={(accepted) => setContractAccepted(activeContractRoom, accepted)}
           onClose={() => setActiveContractRoomId(null)}
         />
-      ) : null}
+      ) : null} */}
     </main>
   );
 }

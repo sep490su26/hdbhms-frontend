@@ -1,4 +1,6 @@
 export function formatDraftCreationError(error, item, contracts = []) {
+  const depositFormId =
+    item?.depositFormId ?? item?.depositAgreementId ?? item?.deposit_form_id ?? null;
   const rawError = [error?.message, error?.details]
     .filter(Boolean)
     .join(" ");
@@ -10,8 +12,9 @@ export function formatDraftCreationError(error, item, contracts = []) {
         contract?.leaseContractId &&
         String(contract.roomId) === String(item?.roomId) &&
         ["DRAFT", "PENDING_SIGNATURE"].includes(status) &&
-        String(contract.depositAgreementId || "") !==
-          String(item?.depositAgreementId || "")
+        String(
+          contract.depositFormId ?? contract.depositAgreementId ?? "",
+        ) !== String(depositFormId || "")
       );
     });
     const roomCode = item?.roomCode || item?.room?.roomCode || "đã chọn";

@@ -18,8 +18,14 @@ export default function ContractActivationFlow({
   onReadinessChange,
 }) {
   const contractId = contract?.leaseContractId || contract?.contractId;
+  const depositFormId =
+    contract?.depositFormId ??
+    contract?.deposit_form_id ??
+    contract?.depositAgreementId ??
+    contract?.deposit_agreement_id ??
+    null;
   const leaseSignedFileId = contract?.signedFileId ?? contract?.signed_file_id ?? null;
-  const creatingDraft = actionLoading === `draft-${contract?.depositAgreementId}`;
+  const creatingDraft = actionLoading === `draft-${depositFormId}`;
   const isRenewalContract = Boolean(
     contract?.previousContractId ?? contract?.previous_contract_id,
   );
@@ -36,11 +42,11 @@ export default function ContractActivationFlow({
   // Auto-create draft lease contract when entering activation flow without one
   const draftCreatedRef = useRef(false);
   useEffect(() => {
-    if (!contractId && contract?.depositAgreementId && !draftCreatedRef.current && !creatingDraft) {
+    if (!contractId && depositFormId && !draftCreatedRef.current && !creatingDraft) {
       draftCreatedRef.current = true;
       onCreateDraft?.(contract);
     }
-  }, [contractId, contract?.depositAgreementId, creatingDraft, onCreateDraft, contract]);
+  }, [contractId, depositFormId, creatingDraft, onCreateDraft, contract]);
 
   useEffect(() => {
     const prev = prevFileIdRef.current;

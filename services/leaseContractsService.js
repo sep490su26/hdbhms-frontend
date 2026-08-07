@@ -143,11 +143,14 @@ export function normalizeLeaseContractItem(item = {}) {
     item.lease_contract_id ??
     null;
   const depositCode = item.depositCode ?? item.deposit_code ?? null;
+  const depositFormId =
+    item.depositFormId ?? item.deposit_form_id ?? item.depositAgreementId ?? item.deposit_agreement_id ?? null;
   const contractCode = item.contractCode ?? item.contract_code ?? null;
   const legacyContractCode = contractId
     ? (item.displayCode ?? item.display_code ?? item.code ?? null)
     : null;
-  const displayedContractCode = contractCode ?? legacyContractCode ?? "";
+  const displayedContractCode =
+    contractCode ?? legacyContractCode ?? depositCode ?? "";
 
   return {
     ...item,
@@ -155,12 +158,15 @@ export function normalizeLeaseContractItem(item = {}) {
     contractId,
     leaseContractId:
       item.leaseContractId ?? item.lease_contract_id ?? contractId,
-    depositAgreementId:
-      item.depositAgreementId ?? item.deposit_agreement_id ?? null,
+    depositFormId,
+    // Keep the old property as a compatibility alias for existing UI branches.
+    depositAgreementId: depositFormId,
     code: displayedContractCode,
     displayCode: displayedContractCode,
     depositCode,
     contractCode,
+    contractTermMonths:
+      item.contractTermMonths ?? item.contract_term_months ?? null,
     propertyId:
       item.propertyId ??
       item.property_id ??
@@ -442,14 +448,14 @@ export async function fetchLeaseContractManagementList({
   };
 }
 
-export async function createDraftLeaseContractFromDeposit(depositAgreementId) {
-  if (!depositAgreementId) {
+export async function createDraftLeaseContractFromDeposit(depositFormId) {
+  if (!depositFormId) {
     throw new Error(
       "Không xác định được hợp đồng đặt cọc để tạo hợp đồng thuê.",
     );
   }
   const data = await authenticatedFetch(
-    `${API_BASE_URL}/lease-contracts/management/deposits/${encodeURIComponent(depositAgreementId)}/draft`,
+    `${API_BASE_URL}/lease-contracts/management/deposits/${encodeURIComponent(depositFormId)}/draft`,
     { method: "POST" },
   );
   return normalizeLeaseContractItem(data);

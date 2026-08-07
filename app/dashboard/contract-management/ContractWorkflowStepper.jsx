@@ -14,11 +14,6 @@ import {
 import {toast} from "sonner";
 
 import {
-    buildDepositContractDocumentFilename,
-    downloadDepositContractPdf,
-    uploadSignedDepositContractFile,
-} from "@/services/depositContractsService";
-import {
     buildHandoverDocumentFilename,
     downloadHandoverDraftPdf,
     fetchContractHandover,
@@ -38,8 +33,6 @@ import {
 const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024;
 
 const ACTION = {
-    DOWNLOAD_DEPOSIT: "download-deposit",
-    UPLOAD_DEPOSIT: "upload-deposit",
     DOWNLOAD_LEASE: "download-lease",
     UPLOAD_LEASE: "upload-lease",
     DOWNLOAD_HANDOVER: "download-handover",
@@ -231,7 +224,6 @@ export default function ContractWorkflowStepper({
                                                     leaseVersion = 0,
                                                     isActivating = false,
                                                 }) {
-    const depositInputRef = useRef(null);
     const leaseInputRef = useRef(null);
     const handoverInputRef = useRef(null);
     const leaseUploadInFlightRef = useRef(false);
@@ -246,14 +238,8 @@ export default function ContractWorkflowStepper({
 
     const contractId =
         contractDetails?.contractId || contractDetails?.leaseContractId;
-    const depositAgreementId = contractDetails?.depositAgreementId;
-    const hasDeposit = Boolean(depositAgreementId);
     const leaseSignedFileId =
         contractDetails?.signedFileId ?? contractDetails?.signed_file_id ?? null;
-    const depositSignedFileId =
-        contractDetails?.depositSignedFileId ??
-        contractDetails?.deposit_signed_file_id ??
-        null;
     const isRenewalContract = Boolean(
         contractDetails?.previousContractId ?? contractDetails?.previous_contract_id,
     );
@@ -324,8 +310,6 @@ export default function ContractWorkflowStepper({
         ? "PDF toi da 15 MB - can upload truoc khi kich hoat"
         : "Mo sau khi hoan tat thong tin ban giao";
     const readiness = getContractActivationReadiness({
-        hasDeposit,
-        depositSignedFileId,
         leaseSignedFileId,
         requiresMoveInHandover,
         hasHandoverData: handoverReady,
@@ -337,11 +321,9 @@ export default function ContractWorkflowStepper({
         leaseContractId: contractDetails?.leaseContractId,
         loadingStep,
     });
-    const requiredUploadTotal =
-        Number(hasDeposit) + 1 + Number(requiresMoveInHandover);
+    const requiredUploadTotal = 1 + Number(requiresMoveInHandover);
     const requiredUploadedCount =
         Number(Boolean(leaseSignedFileId)) +
-        (hasDeposit ? Number(Boolean(depositSignedFileId)) : 0) +
         (requiresMoveInHandover ? Number(Boolean(signedHandoverReady)) : 0);
     const missingCount = readiness.totalCount - readiness.completedCount;
     const electricValue = getReadingValue(handoverData?.electricity);
@@ -379,7 +361,7 @@ export default function ContractWorkflowStepper({
         return true;
     }
 
-    async function handleDownloadDeposit() {
+    /* async function handleDownloadDeposit() {
         if (!depositAgreementId) return;
         try {
             setLoadingStep(ACTION.DOWNLOAD_DEPOSIT);
@@ -394,6 +376,8 @@ export default function ContractWorkflowStepper({
             setLoadingStep(null);
         }
     }
+
+    } */
 
     async function handleDownloadLease() {
         try {
@@ -429,7 +413,7 @@ export default function ContractWorkflowStepper({
         }
     }
 
-    async function handleUploadDeposit(event) {
+    /* async function handleUploadDeposit(event) {
         const file = event.target.files?.[0];
         if (!validateSelectedPdf(file, depositInputRef)) return;
 
@@ -445,6 +429,8 @@ export default function ContractWorkflowStepper({
             resetFileInput(depositInputRef);
         }
     }
+
+    } */
 
     async function handleUploadLease(event) {
         const file = event.target.files?.[0];
@@ -491,7 +477,6 @@ export default function ContractWorkflowStepper({
         }
     }
 
-    const depositDocumentFilename = buildDepositContractDocumentFilename(contractDetails);
     const leaseDocumentFilename = buildLeaseContractDocumentFilename(contractDetails);
     const handoverDocumentFilename = buildHandoverDocumentFilename(contractDetails);
 
@@ -541,10 +526,10 @@ export default function ContractWorkflowStepper({
                             ? "Tải từng tài liệu để in, ký trực tiếp tại cơ sở và chốt dữ liệu bàn giao."
                             : "Gia hạn giữ nguyên phòng hiện tại, không cần nhập bàn giao phòng."
                     }
-                    count={Number(hasDeposit) + 1 + Number(requiresMoveInHandover)}
+                    count={1 + Number(requiresMoveInHandover)}
                 />
 
-                {hasDeposit && (
+                {/* {hasDeposit && (
                     <DocumentRow
                         title={depositDocumentFilename}
                         meta="Hợp đồng đặt cọc · PDF · 2 bản"
@@ -563,7 +548,7 @@ export default function ContractWorkflowStepper({
                             Tải PDF
                         </button>
                     </DocumentRow>
-                )}
+                )} */}
 
                 <DocumentRow
                     title={leaseDocumentFilename}
@@ -643,7 +628,7 @@ export default function ContractWorkflowStepper({
                     count={`${requiredUploadedCount}/${requiredUploadTotal}`}
                 />
 
-                {hasDeposit && (
+                {/* {hasDeposit && (
                     <UploadRow
                         title={depositDocumentFilename}
                         description="PDF tối đa 15 MB · cần đủ chữ ký các bên"
@@ -656,7 +641,7 @@ export default function ContractWorkflowStepper({
                         disabled={isBusy}
                         onClick={() => depositInputRef.current?.click()}
                     />
-                )}
+                )} */}
 
                 <UploadRow
                     title={leaseDocumentFilename}
@@ -699,7 +684,6 @@ export default function ContractWorkflowStepper({
                 <div className="grid border-t border-slate-200 px-4 dark:border-white/10 sm:grid-cols-2 sm:px-1">
                     {readiness.requirements.map((item) => {
                         const descriptions = {
-                            deposit: "Upload đúng file PDF có đầy đủ chữ ký.",
                             lease: "Upload đúng file PDF có đầy đủ chữ ký.",
                             "handover-data": "Chỉ số điện, nước và thiết bị đã được chốt.",
                             "handover-signed-file": "Upload biên bản bàn giao PDF có chữ ký.",
@@ -746,13 +730,6 @@ export default function ContractWorkflowStepper({
                 </div>
             </section>
 
-            <input
-                ref={depositInputRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                onChange={handleUploadDeposit}
-            />
             <input
                 ref={leaseInputRef}
                 type="file"

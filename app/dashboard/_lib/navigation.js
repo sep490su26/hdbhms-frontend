@@ -1,7 +1,6 @@
 import {
   BellRing,
   Building2,
-  FileCheck2,
   Gauge,
   Inbox,
   LayoutDashboard,
@@ -30,7 +29,6 @@ export const navigation = [
     icon: ReceiptText,
   },
   { path: "/dashboard/debt", label: "Công nợ", icon: WalletMinimal },
-  { path: "/dashboard/deposits", label: "Danh sách cọc", icon: FileCheck2 },
   { path: "/dashboard/requests", label: "Hộp thư yêu cầu", icon: Inbox },
   {
     path: "/dashboard/notification-templates",
@@ -49,7 +47,6 @@ export const navigationPermissionKeys = {
   "/dashboard/maintenance": "maintenance",
   "/dashboard/billing": "billing",
   "/dashboard/debt": "debt",
-  "/dashboard/deposits": "deposits",
   "/dashboard/requests": "requests",
   "/dashboard/room-transfer-history": "roomTransferHistory",
   "/dashboard/notification-templates": "notificationTemplates",

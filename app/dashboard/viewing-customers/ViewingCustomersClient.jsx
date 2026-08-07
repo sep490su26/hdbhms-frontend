@@ -39,6 +39,7 @@ import {
 import { DateInput } from "@/components/DateInput";
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import TimeTreeFilter, { buildTreeFromCustomers } from "@/components/dashboard/TimeTreeFilter";
 import {
   Dialog,
   DialogContent,
@@ -84,7 +85,9 @@ function StatusSelect({ status, onChange }) {
     VIEWED: "bg-emerald-500",
     DISMISSED: "bg-slate-400",
   };
-  const currentStatus = STATUS_OPTIONS.find((option) => option.value === status);
+  const currentStatus = STATUS_OPTIONS.find(
+    (option) => option.value === status,
+  );
 
   return (
     <DropdownMenu modal={false}>
@@ -470,7 +473,10 @@ function CustomerActionsMenu({ customer, onView, onEdit, onDelete }) {
         sideOffset={8}
         className="w-44 rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
       >
-        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+        <DropdownMenuItem
+          asChild
+          className="rounded-md p-0 focus:bg-transparent"
+        >
           <button
             type="button"
             onClick={() => onView(customer)}
@@ -480,7 +486,10 @@ function CustomerActionsMenu({ customer, onView, onEdit, onDelete }) {
             Xem chi tiết
           </button>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+        <DropdownMenuItem
+          asChild
+          className="rounded-md p-0 focus:bg-transparent"
+        >
           <button
             type="button"
             onClick={() => onEdit(customer)}
@@ -490,7 +499,10 @@ function CustomerActionsMenu({ customer, onView, onEdit, onDelete }) {
             Sửa
           </button>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="rounded-md p-0 focus:bg-transparent">
+        <DropdownMenuItem
+          asChild
+          className="rounded-md p-0 focus:bg-transparent"
+        >
           <button
             type="button"
             onClick={() => onDelete(customer)}
@@ -604,6 +616,7 @@ export default function ViewingCustomersClient() {
     fromDate: "",
     toDate: "",
   });
+  const [timeFilter, setTimeFilter] = useState(null);
   const [stats, setStats] = useState({
     todayCount: 0,
     pendingCount: 0,
@@ -630,6 +643,52 @@ export default function ViewingCustomersClient() {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [minDateTime, setMinDateTime] = useState("");
+  const [fullTreeData, setFullTreeData] = useState(null);
+
+  useEffect(() => {
+    fetchViewingCustomers({ filters: {}, page: 1, size: 10000 })
+      .then((res) => {
+        setFullTreeData(buildTreeFromCustomers(res.items || []));
+      })
+      .catch((err) => console.error("Error fetching full tree data", err));
+  }, []);
+
+  /** When a date is picked from the tree filter, update fromDate/toDate accordingly. */
+  const handleTimeFilterSelect = useCallback((dateSelection) => {
+    setTimeFilter(dateSelection);
+    if (!dateSelection) {
+      setFilters((prev) => ({ ...prev, fromDate: "", toDate: "" }));
+      return;
+    }
+    const { year, month, day } = dateSelection;
+
+    if (month === "all") {
+      // Select entire year
+      setFilters((prev) => ({
+        ...prev,
+        fromDate: `${year}-01-01`,
+        toDate: `${year}-12-31`,
+      }));
+    } else if (day === "all" || day == null) {
+      // Select entire month
+      const mm = String(month).padStart(2, "0");
+      const lastDay = new Date(year, month, 0).getDate();
+      setFilters((prev) => ({
+        ...prev,
+        fromDate: `${year}-${mm}-01`,
+        toDate: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
+      }));
+    } else {
+      // Select specific day
+      const mm = String(month).padStart(2, "0");
+      const dd = String(day).padStart(2, "0");
+      setFilters((prev) => ({
+        ...prev,
+        fromDate: `${year}-${mm}-${dd}`,
+        toDate: `${year}-${mm}-${dd}`,
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     if (!modalMode) return;
@@ -888,151 +947,97 @@ export default function ViewingCustomersClient() {
 
   return (
     <>
-      <div className="w-full min-w-0 flex flex-col gap-6">
-        <div className="w-full min-w-0">
-          {errorMessage && (
-            <div className="mb-4 rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
+      <div className="flex min-h-0 w-full flex-col">
+       {errorMessage && errorMessage.toLowerCase() !== "undefined" && (
+            <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
               {errorMessage}
             </div>
           )}
-          <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
-                Danh sách khách xem phòng
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Quản lý và theo dõi lịch hẹn xem phòng của khách tiềm năng.
-              </p>
-            </div>
-            <div className="flex justify-start sm:justify-end">
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
-              >
-                <Plus className="h-4 w-4" />
-                Thêm khách xem
-              </button>
-            </div>
-          </section>
 
-          <section className="mt-7 grid gap-5 md:grid-cols-3">
-            <DashboardStatCard
-              icon={CalendarDays}
-              label="Hôm nay"
-              value={String(stats.todayCount ?? 0).padStart(2, "0")}
-              tone="blue"
-            />
-            <DashboardStatCard
-              icon={ClipboardList}
-              label="Chưa xem"
-              value={String(stats.pendingCount ?? 0).padStart(2, "0")}
-              tone="amber"
-            />
-            <DashboardStatCard
-              icon={CheckCircle2}
-              label="Đã xem"
-              value={String(stats.viewedCount ?? 0).padStart(2, "0")}
-              tone="green"
-            />
-          </section>
+        {/* Top Header Row */}
+        <section className="mb-6 flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
+              Danh sách khách xem phòng
+            </h1>
+          </div>
+          <div className="flex justify-start sm:justify-end">
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
+            >
+              <Plus className="h-4 w-4" />
+              Thêm khách xem
+            </button>
+          </div>
+        </section>
 
-          <section className="mt-7 overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
+
+        {/* Body Row */}
+        <div className="flex gap-[24px]">
+          {/* Column 2 – Time Tree Filter Sidebar */}
+          <TimeTreeFilter
+            treeData={fullTreeData}
+            selectedDate={timeFilter}
+            onDateSelect={handleTimeFilterSelect}
+            className="hidden lg:flex"
+          />
+
+          {/* Column 3 – Main Content */}
+          <div className="w-full min-w-0 flex-1">
+            <section className="overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
             <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="grid gap-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="relative w-full sm:max-w-xl lg:max-w-2xl">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Tìm tên hoặc SĐT"
-                      value={filters.keyword}
-                      onChange={(event) =>
-                        updateFilter("keyword", event.target.value)
-                      }
-                      aria-label="Tìm khách xem phòng"
-                      className={`${filterControlClassName} pl-9`}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={openTrash}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#cfd5de] bg-white px-3 text-sm font-bold text-slate-700 transition hover:bg-[#f1f3f5] dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Thùng rác
-                  </button>
-                </div>
+              <div className="grid gap-3">  
+             <div className="flex flex-wrap items-center gap-2">
+  <button
+    type="button"
+    onClick={() => updateFilter("status", "all")}
+    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+      filters?.status === "all"
+       ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
+            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+    }`}
+  >
+    Tất cả
+  </button>
+  <button
+    type="button"
+    // ĐỔI PENDING THÀNH NOT_VIEWED
+    onClick={() => updateFilter("status", "NOT_VIEWED")} 
+    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+      filters?.status === "NOT_VIEWED"
+        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
+            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+    }`}
+  >
+    Chờ xem
+  </button>
+  <button
+    type="button"
+    onClick={() => updateFilter("status", "VIEWED")}
+    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+      filters?.status === "VIEWED"
+        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
+            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+    }`}
+  >
+    Đã xem
+  </button>
+  <button
+    type="button"
+    // ĐỔI CANCELLED THÀNH DISMISSED
+    onClick={() => updateFilter("status", "DISMISSED")} 
+    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+      filters?.status === "DISMISSED"
+        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
+            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+    }`}
+  >
+    Hủy hẹn
+  </button>
+</div>
 
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                  <select
-                    value={filters.propertyId}
-                    onChange={(event) =>
-                      updateFilter("propertyId", event.target.value)
-                    }
-                    className={filterControlClassName}
-                  >
-                    <option value="all">Tất cả cơ sở</option>
-                    {properties.map((property) => (
-                      <option key={property.id} value={property.id}>
-                        {property.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={filters.roomId}
-                    onChange={(event) =>
-                      updateFilter("roomId", event.target.value)
-                    }
-                    disabled={filters.propertyId === "all"}
-                    className={filterControlClassName}
-                  >
-                    <option value="all">
-                      {filters.propertyId === "all"
-                        ? "Chọn cơ sở trước"
-                        : "Tất cả phòng"}
-                    </option>
-                    {filterRooms.map((room) => (
-                      <option key={room.id} value={room.id}>
-                        {room.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={filters.status}
-                    onChange={(event) =>
-                      updateFilter("status", event.target.value)
-                    }
-                    className={filterControlClassName}
-                  >
-                    <option value="all">Tất cả trạng thái</option>
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <DateInput
-                    value={filters.fromDate}
-                    onChange={(event) =>
-                      updateFilter("fromDate", event.target.value)
-                    }
-                    max={filters.toDate || undefined}
-                    placeholder="Từ ngày"
-                    wrapperClassName="min-w-0"
-                    className={filterControlClassName}
-                  />
-                  <DateInput
-                    value={filters.toDate}
-                    onChange={(event) =>
-                      updateFilter("toDate", event.target.value)
-                    }
-                    min={filters.fromDate || undefined}
-                    placeholder="Đến ngày"
-                    wrapperClassName="min-w-0"
-                    className={filterControlClassName}
-                  />
-                </div>
               </div>
             </div>
 
@@ -1046,7 +1051,6 @@ export default function ViewingCustomersClient() {
                   <col style={{ width: 130 }} />
                   <col style={{ width: 210 }} />
                   <col style={{ width: 150 }} />
-                  <col style={{ width: 160 }} />
                   <col style={{ width: 124 }} />
                   <col style={{ width: 80 }} />
                 </colgroup>
@@ -1054,10 +1058,9 @@ export default function ViewingCustomersClient() {
                   <tr>
                     <th className="px-5 py-3.5">Tên khách</th>
                     <th className="px-5 py-3.5">Số điện thoại</th>
-                    <th className="px-5 py-3.5">Cơ sở</th>
-                    <th className="px-5 py-3.5">Phòng quan tâm</th>
-                    <th className="px-5 py-3.5">Ngày giờ xem</th>
-                    <th className="px-5 py-3.5">Trạng thái</th>
+                    <th className="px-5 py-3.5 text-center">Cơ sở</th>
+                    <th className="px-5 py-3.5 text-center">Phòng quan tâm</th>
+                    <th className="px-5 py-3.5 text-center">Trạng thái</th>
                     <th className="px-4 py-3.5 text-center">Thao tác</th>
                   </tr>
                 </thead>
@@ -1084,13 +1087,13 @@ export default function ViewingCustomersClient() {
                       </td>
                       <td
                         data-label="Số điện thoại"
-                        className="whitespace-nowrap px-5 py-3.5 align-middle font-semibold text-slate-700 dark:text-slate-200"
+                        className="whitespace-nowrap px-5 py-3.5 align-middle font-semibold text-slate-700 dark:text-slate-200 text-center"
                       >
                         {customer.phone}
                       </td>
                       <td
                         data-label="Cơ sở"
-                        className="px-5 py-3.5 align-middle text-slate-700 dark:text-slate-200"
+                        className="px-5 py-3.5 align-middle text-slate-700 dark:text-slate-200 text-center"
                       >
                         <span
                           className="block truncate font-semibold leading-5"
@@ -1101,7 +1104,7 @@ export default function ViewingCustomersClient() {
                       </td>
                       <td
                         data-label="Phòng quan tâm"
-                        className="px-5 py-3.5 align-middle"
+                        className="px-5 py-3.5 align-middle text-center"
                       >
                         <span
                           className={`inline-flex max-w-full items-center overflow-hidden rounded-md px-2.5 py-1 text-[11px] font-bold ${
@@ -1118,14 +1121,7 @@ export default function ViewingCustomersClient() {
                           </span>
                         </span>
                       </td>
-                      <td
-                        data-label="Ngày giờ xem"
-                        className="px-5 py-3.5 align-middle"
-                      >
-                        <span className="block whitespace-nowrap font-bold text-slate-900 dark:text-white">
-                          {customer.appointmentLabel || "—"}
-                        </span>
-                      </td>
+                      
                       <td
                         data-label="Trạng thái"
                         className="px-5 py-3.5 align-middle"
@@ -1174,6 +1170,7 @@ export default function ViewingCustomersClient() {
               onSizeChange={setPageSize}
             />
           </section>
+           </div>
         </div>
       </div>
 
@@ -1216,5 +1213,6 @@ export default function ViewingCustomersClient() {
         />
       )}
     </>
-  );
+  )
 }
+

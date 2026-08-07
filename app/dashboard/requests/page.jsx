@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -69,6 +69,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import TimeTreeFilter, { buildTreeFromCustomers } from "@/components/dashboard/TimeTreeFilter";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import {
   TransferRequestDetail,
@@ -93,7 +94,7 @@ const translateType = (type) => {
   const map = {
     ROOM_TRANSFER: "Chuyển phòng",
     MOVE_OUT: "Trả phòng",
-    CONTRACT_RENEWAL: "Gia hạn HĐ",
+    CONTRACT_RENEWAL: "Gia hạn Hợp Đồng",
     PERMISSION_ACCESS: "Quyền truy cập",
     TENANT_PROFILE_ACCESS: "Xem hồ sơ khách thuê",
     METER_READING_CORRECTION: "Điều chỉnh chỉ số",
@@ -103,9 +104,9 @@ const translateType = (type) => {
     EXPENSE_APPROVAL: "Duyệt khoản chi",
     TRANSFER: "Chuyển phòng",
     MOVEOUT: "Trả phòng",
-    RENEWAL: "Gia hạn HĐ",
-    TERMINATION: "Thanh lý HĐ",
-    CONTRACT_LIQUIDATION: "Thanh lý HĐ",
+    RENEWAL: "Gia hạn Hợp Đồng",
+    TERMINATION: "Thanh lý Hợp Đồng",
+    CONTRACT_LIQUIDATION: "Thanh lý Hợp Đồng",
     ADD_CO_OCCUPANT: "Thêm người ở cùng",
     MAINTENANCE: "Bảo trì",
     COMPLAINT: "Khiếu nại",
@@ -140,9 +141,6 @@ const mapRequestType = (type) => {
 const translateStatus = (status) => {
   const map = {
     PENDING: "Đang chờ",
-    UNDER_REVIEW: "Đang xem xét",
-    APPROVED: "Đã duyệt",
-    REJECTED: "Đã từ chối",
     PROCESSING: "Đang xử lý",
     COMPLETED: "Hoàn thành",
     CANCELLED: "Đã hủy",
@@ -209,11 +207,8 @@ function requesterInitials(request) {
 
 const STATUS_FILTERS = [
   { value: "PENDING", label: "Đang chờ" },
-  { value: "UNDER_REVIEW", label: "Đang xem xét" },
-  { value: "APPROVED", label: "Đã duyệt" },
   { value: "PROCESSING", label: "Đang xử lý" },
   { value: "COMPLETED", label: "Hoàn thành" },
-  { value: "REJECTED", label: "Đã từ chối" },
   { value: "CANCELLED", label: "Đã hủy" },
   { value: "ALL", label: "Tất cả" },
 ];
@@ -764,16 +759,19 @@ function RequestDetailContent({ req, detailTransfer }) {
     </div>
   );
 }
-
 export default function ApprovalCenter() {
   const router = useRouter();
   const { user } = useAuth();
   const isOwner = user?.role === ROLES.OWNER;
   const [typeFilter, setTypeFilter] = useState("All Types");
-  const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [fullTreeData, setFullTreeData] = useState(null);
+  const [timeFilter, setTimeFilter] = useState(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const [data, setData] = useState([]);
   const [stats, setStats] = useState({
@@ -803,6 +801,45 @@ export default function ApprovalCenter() {
     useState(null);
   const signedTransferContractInputRef = useRef(null);
 
+  useEffect(() => {
+    fetchChangeRequests({ page: 0, size: 10000 })
+      .then((res) => {
+        const mappedForTree = (res.requests || []).map((req) => ({
+          ...req,
+          appointmentAt: req.createdAt,
+        }));
+        setFullTreeData(buildTreeFromCustomers(mappedForTree));
+      })
+      .catch((err) => console.error("Error fetching full tree data", err));
+  }, []);
+
+  const handleTimeFilterSelect = useCallback((dateSelection) => {
+    setTimeFilter(dateSelection);
+    if (!dateSelection) {
+      setFromDate("");
+      setToDate("");
+      setPage(1);
+      return;
+    }
+    const { year, month, day } = dateSelection;
+
+    if (month === "all") {
+      setFromDate(`${year}-01-01`);
+      setToDate(`${year}-12-31`);
+    } else if (day === "all" || day == null) {
+      const mm = String(month).padStart(2, "0");
+      const lastDay = new Date(year, month, 0).getDate();
+      setFromDate(`${year}-${mm}-01`);
+      setToDate(`${year}-${mm}-${String(lastDay).padStart(2, "0")}`);
+    } else {
+      const mm = String(month).padStart(2, "0");
+      const dd = String(day).padStart(2, "0");
+      setFromDate(`${year}-${mm}-${dd}`);
+      setToDate(`${year}-${mm}-${dd}`);
+    }
+    setPage(1);
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -814,6 +851,8 @@ export default function ApprovalCenter() {
           type: typeFilter === "All Types" ? undefined : typeFilter,
           status: apiStatus,
           search,
+          fromDate,
+          toDate,
         }),
         fetchChangeRequestStats(),
       ]);
@@ -858,7 +897,7 @@ export default function ApprovalCenter() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, size, statusFilter, typeFilter]);
+  }, [page, search, size, statusFilter, typeFilter, fromDate, toDate]);
 
   const handleApprove = async (requestOrId) => {
     const req =
@@ -1143,36 +1182,7 @@ export default function ApprovalCenter() {
     (req) => req.status === "PENDING" || req.status === "PROCESSING",
   ).length;
 
-  const statCards = [
-    {
-      label: "Chờ xử lý",
-      value: stats.pendingCount,
-      iconBg: "bg-amber-50",
-      iconColor: "text-amber-500",
-      icon: Clock,
-    },
-    {
-      label: "Cần ưu tiên",
-      value: overdueItems.length,
-      iconBg: "bg-red-50",
-      iconColor: "text-red-500",
-      icon: AlertCircle,
-    },
-    {
-      label: "Đang xử lý",
-      value: processingVisibleCount,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-500",
-      icon: Hourglass,
-    },
-    {
-      label: "Đang mở",
-      value: openVisibleCount,
-      iconBg: "bg-violet-50",
-      iconColor: "text-violet-500",
-      icon: FileText,
-    },
-  ];
+
 
   const OPEN_REQUEST_STATUSES = new Set([
     "PENDING",
@@ -1227,11 +1237,10 @@ export default function ApprovalCenter() {
           title={
             <span className="flex items-center gap-2">Quản lý yêu cầu</span>
           }
-          description="Quản lý và phê duyệt tất cả các yêu cầu từ khách thuê."
           actions={
             <Button
               onClick={() => router.push("/dashboard/room-transfer-history")}
-              className="h-11 rounded-xl bg-slate-900 px-5 text-white hover:bg-slate-800"
+              className="h-11 rounded-xl bg-[#1e40af] px-5 text-white hover:bg-slate-800"
             >
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Lịch sử chuyển phòng
@@ -1241,59 +1250,43 @@ export default function ApprovalCenter() {
         <div className="grid grid-cols-1 gap-6 2xl:items-start">
           {/* LEFT: main content */}
           <div className="min-w-0 space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {statCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div
-                    key={card.label}
-                    className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-[#0f172a]"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${card.iconBg}`}
+            {/* Table */}
+            <div className="flex gap-[24px]">
+              {/* Left Column: TimeTreeFilter */}
+              <TimeTreeFilter 
+                treeData={fullTreeData}
+                selectedDate={timeFilter}
+                onDateSelect={handleTimeFilterSelect}
+                className="hidden lg:flex"
+              />
+
+              {/* Right Column: Main Data Table & Pagination */}
+              <div className="w-full min-w-0 flex-1 space-y-4">
+                {/* Toolbar */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {STATUS_FILTERS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => {
+                          setStatusFilter(item.value);
+                          setPage(1);
+                        }}
+                        className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                          statusFilter === item.value
+                            ? "bg-[#1e40af] text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+                        }`}
                       >
-                        <Icon className={`h-4 w-4 ${card.iconColor}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">
-                          {card.label}
-                        </p>
-                        <p className="mt-1 text-2xl font-bold leading-none text-slate-900 dark:text-white">
-                          {card.value}
-                        </p>
-                        <p className="mt-1 text-xs leading-4 text-slate-400 dark:text-slate-500">
-                          {card.sub}
-                        </p>
-                      </div>
-                    </div>
+                        {item.label}
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
-              <div className="relative min-w-0">
-                <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                  Tìm kiếm
-                </p>
-                <Search className="absolute left-4 top-[calc(50%+14px)] h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  className="h-12 rounded-2xl border-slate-200 bg-background pl-11 text-sm dark:border-white/10 dark:bg-[#020817]"
-                  placeholder="Tìm theo mã yêu cầu, tiêu đề, người tạo..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-
-              <div className="mt-5 flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
-                <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                      Loại yêu cầu
-                    </p>
+                  <div className="w-full sm:w-auto shrink-0">
                     <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:ring-blue-400/20"
+                      className="h-9 w-full sm:w-[200px] rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:border-slate-300 focus:ring-0 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
                       value={typeFilter}
                       onChange={(e) => {
                         setTypeFilter(e.target.value);
@@ -1308,84 +1301,30 @@ export default function ApprovalCenter() {
                       ))}
                     </select>
                   </div>
-
-                  <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                      Trạng thái
-                    </p>
-                    <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-slate-100 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:ring-blue-400/20"
-                      value={statusFilter}
-                      onChange={(e) => {
-                        setStatusFilter(e.target.value);
-                        setPage(1);
-                      }}
-                    >
-                      {STATUS_FILTERS.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="mb-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                      Thời gian tạo
-                    </p>
-                    <button className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-background px-4 text-left text-sm text-slate-400 hover:bg-muted dark:border-white/10 dark:bg-[#020817] dark:hover:bg-white/10">
-                      <CalendarDays className="mr-3 h-4 w-4 shrink-0" />
-                      <span className="truncate">Chọn khoảng thời gian</span>
-                    </button>
-                  </div>
                 </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap 2xl:justify-end">
-                  <Button
-                    variant="outline"
-                    className="h-10 justify-center rounded-2xl border-slate-200 bg-background px-4 text-slate-700 hover:bg-muted dark:border-white/10 dark:bg-[#020817] dark:text-slate-300 dark:hover:bg-white/10 sm:min-w-[140px]"
-                    onClick={() => {
-                      setTypeFilter("All Types");
-                      setStatusFilter("PENDING");
-                      setSearch("");
-                      setPage(1);
-                    }}
-                  >
-                    <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
-                    Đặt lại
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
               <div className="hidden min-[1536px]:block">
                 <Table className="w-full table-fixed">
                   <TableHeader>
                     <TableRow className="bg-gray-50/50 hover:bg-gray-50/50 dark:bg-white/5 dark:hover:bg-white/5">
-                      <TableHead className="h-12 w-[16%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[14%]">
+                      <TableHead className="h-12 w-[16%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[14%] text-center">
                         Người gửi
                       </TableHead>
-                      <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[12%]">
+                      <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[12%] text-center">
                         Loại yêu cầu
                       </TableHead>
-                      <TableHead className="h-12 w-[40%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[35%] min-[1700px]:w-[23%]">
-                        Tiêu đề
-                      </TableHead>
-                      <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell">
+
+                      <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell text-center">
                         Mã yêu cầu
                       </TableHead>
-                      <TableHead className="h-12 w-[11%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[10%]">
-                        Ngày tạo
-                      </TableHead>
-                      <TableHead className="h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[9%]">
+
+                      <TableHead className="h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[9%] text-center">
                         Trạng thái
                       </TableHead>
-                      <TableHead className="hidden h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell">
+                      <TableHead className="hidden h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:table-cell text-center">
                         Hạn xử lý
                       </TableHead>
-                      <TableHead className="h-12 w-[8%] whitespace-nowrap px-2 text-center text-xs font-semibold uppercase tracking-normal text-slate-400 min-[1650px]:w-[7%]">
+                      <TableHead className="h-12 w-[8%] whitespace-nowrap px-2 text-center text-xs font-semibold uppercase tracking-normal text-slate-400 min-[1650px]:w-[7%] text-center">
                         Thao tác
                       </TableHead>
                     </TableRow>
@@ -1420,21 +1359,19 @@ export default function ApprovalCenter() {
                             key={req.id}
                             className="border-slate-100 transition-colors hover:bg-slate-50/60 dark:border-white/10 dark:hover:bg-white/5"
                           >
-                            <TableCell className="px-3 py-3 align-top">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-700 dark:bg-white/10 dark:text-slate-300">
-                                  {requesterInitials(req)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white" title={requesterName(req)}>
-                                    {requesterName(req)}
-                                  </p>
-                                  <p className="mt-1 truncate text-xs font-semibold text-slate-500 dark:text-slate-400" title={requesterSecondaryText(req)}>
-                                    {requesterSecondaryText(req) || "--"}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
+                          <TableCell className="px-3 py-3 align-top">
+  <div className="flex min-w-0 items-center">
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-center text-sm font-semibold">
+        {requesterName(req)}
+      </p>
+
+      <p className="mt-1 truncate text-center text-xs">
+        {requesterSecondaryText(req) || "--"}
+      </p>
+    </div>
+  </div>
+</TableCell>
                             <TableCell className="px-3 py-3 align-top">
                               <div className="flex items-start gap-2">
                                 <div
@@ -1449,39 +1386,10 @@ export default function ApprovalCenter() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="min-w-0 max-w-0 px-3 py-3 align-top">
-                              <p
-                                className="truncate text-sm font-semibold leading-5 text-slate-900 dark:text-white"
-                                title={req.title || "--"}
-                              >
-                                {req.title || "--"}
-                              </p>
-                              <p
-                                className="mt-1 truncate text-sm leading-5 text-slate-500 dark:text-slate-400"
-                                title={
-                                  req.description || "Không có mô tả bổ sung"
-                                }
-                              >
-                                {req.description || "Không có mô tả bổ sung"}
-                              </p>
-                            </TableCell>
-                            <TableCell className="hidden min-[1700px]:table-cell px-3 py-3 align-top">
-                              <p className="break-all font-mono text-xs font-semibold text-slate-900 dark:text-white">
-                                {req.requestCode || `#${req.id}`}
-                              </p>
-                              <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                Ưu tiên: Thường
-                              </p>
-                            </TableCell>
-                            <TableCell className="px-3 py-3 align-top text-sm text-slate-700 dark:text-slate-300">
-                              <p>
-                                {formatRequestDate(req.createdAt)}
-                              </p>
-                              <p className="mt-2 text-slate-400 dark:text-slate-500">
-                                {formatRequestTime(req.createdAt)}
-                              </p>
-                            </TableCell>
-                            <TableCell className="px-3 py-3 align-top">
+
+
+
+                            <TableCell className="px-3 py-3 align-top text-center">
                               <Badge
                                 variant="outline"
                                 className={`rounded-full capitalize ${statusBadgeClass(req.status)}`}
@@ -1489,7 +1397,7 @@ export default function ApprovalCenter() {
                                 {translateStatus(req.status)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm">
+                            <TableCell className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm text-center">
                               <p
                                 className={`${req.status === "REJECTED" ? "text-red-500 dark:text-red-300" : "text-slate-900 dark:text-white"}`}
                               >
@@ -1653,6 +1561,8 @@ export default function ApprovalCenter() {
                 setPage(1);
               }}
             />
+              </div>
+            </div>
           </div>
         </div>
       </div>

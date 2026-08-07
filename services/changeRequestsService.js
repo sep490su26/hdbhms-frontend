@@ -65,7 +65,7 @@ function firstText(...values) {
 }
 
 export async function fetchChangeRequests(filters = {}) {
-    const { page = 0, size = 8, type = "all", status = "all", search = "" } = filters;
+    const { page = 0, size = 8, type = "all", status = "all", search = "", fromDate, toDate } = filters;
     const params = new URLSearchParams({
         page: String(page),
         size: String(size),
@@ -78,6 +78,8 @@ export async function fetchChangeRequests(filters = {}) {
     }
     if (status && status !== "all") params.set("status", status.toUpperCase());
     if (search.trim()) params.set("search", search.trim());
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
 
     const data = await request(`/change-requests?${params.toString()}`);
     const rawItems = Array.isArray(data.data || data.content) ? (data.data || data.content) : [];

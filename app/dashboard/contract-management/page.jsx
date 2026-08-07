@@ -3070,40 +3070,12 @@ export default function ContractTemplatePage() {
       {
         <DashboardPageHeader
           title={`Quản lý hợp đồng thuê ${selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}`}
-          description="Dữ liệu lấy từ backend, quản lý file scan/PDF và trạng thái vòng đời hợp đồng thuê."
         />
       }
 
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3 xl:gap-4">
-        <StatCard label="Tổng" value={summary.total} tone="dark" />
-        <StatCard
-          label="Chờ ký"
-          value={summary.pendingSignature}
-          tone="amber"
-        />
-        <StatCard
-          label="Chờ kích hoạt"
-          value={summary.pendingActivation}
-          tone="blue"
-        />
-        <StatCard label="Đang hiệu lực" value={summary.active} tone="green" />
-        <StatCard label="Chưa có file" value={summary.missingFile} tone="red" />
-      </section>
 
       <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
         <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
-            <input
-              value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Tìm mã HĐ, phòng hoặc người ký..."
-              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-10 pr-3 text-sm font-semibold text-[#091426] outline-none focus:border-[#091426]"
-            />
-          </label>
           <label className="relative">
             <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
             <select
@@ -3271,23 +3243,12 @@ export default function ContractTemplatePage() {
       )}
 
       <section className="overflow-hidden rounded-xl border border-[#dfe5ef] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-        <header className="border-b border-[#dfe5ef] px-5 py-5 xl:px-8 xl:py-7">
-          <h2 className="text-xl font-extrabold tracking-[-0.01em] text-[#091426] xl:text-2xl">
-            Danh sách hợp đồng
-          </h2>
-          <p className="mt-2 text-sm text-[#6b7280] xl:text-base">
-            Quản lý hợp đồng thuê, file scan/PDF và trạng thái vòng đời hợp
-            đồng.
-          </p>
-        </header>
-
         <div className="dashboard-table contract-management-table">
           <table className="table-auto text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3">
             <colgroup>
               <col style={{ width: "18%" }} />
               <col style={{ width: "7%" }} />
-              <col style={{ width: "15%" }} />
-              <col style={{ width: "7%" }} />
+              <col style={{ width: "22%" }} />
               <col style={{ width: "14%" }} />
               <col style={{ width: "10%" }} />
               <col style={{ width: "13%" }} />
@@ -3295,13 +3256,12 @@ export default function ContractTemplatePage() {
             </colgroup>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
-                <th className="!pl-5 xl:!pl-6">Mã HĐ</th>
-                <th>Phòng</th>
-                <th>Người ký chính</th>
-                <th>Số người</th>
-                <th>Thời hạn</th>
-                <th>Giá thuê</th>
-                <th>Trạng thái</th>
+                <th className="!pl-5 xl:!pl-6 text-center">Mã HĐ</th>
+                <th className="text-center">Phòng</th>
+                <th className="text-center">Người ký chính</th>
+                <th className="text-center">Thời hạn</th>
+                <th className="text-center">Giá thuê</th>
+                <th className="text-center">Trạng thái</th>
                 <th className="contract-management-table__action !px-2 text-center xl:!px-2.5">
                   Thao tác
                 </th>
@@ -3407,25 +3367,20 @@ export default function ContractTemplatePage() {
                         </button>
                       )}
                     </td>
-                    <td data-label="Phòng" className="align-middle">
+                    <td data-label="Phòng" className="align-middle text-center">
                       <span className="inline-flex items-center gap-1 font-extrabold text-slate-900 dark:text-white">
-                        <Home className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500 xl:h-4 xl:w-4" />
                         {item.roomCode || "-"}
                       </span>
                     </td>
-                    <td data-label="Người ký chính" className="align-middle">
+                    <td data-label="Người ký chính" className="align-middle text-center">
                       <p className="font-extrabold leading-5 text-[#091426]">
                         {item.primaryTenantName ||
                           item.customerName ||
                           "Chưa có"}
                       </p>
                     </td>
-                    <td data-label="Số người" className="align-middle">
-                      <p className="font-extrabold leading-5 text-[#091426]">
-                        {getOccupantsCount(item, null)}
-                      </p>
-                    </td>
-                    <td data-label="Thời hạn" className="align-middle">
+                    
+                    <td data-label="Thời hạn" className="align-middle text-center">
                       <p className="font-semibold leading-5 text-[#091426]">
                         {formatDate(
                           item.startDate || item.expectedLeaseSignDate,
@@ -3436,12 +3391,12 @@ export default function ContractTemplatePage() {
                         {formatDate(item.endDate || item.expectedMoveInDate)}
                       </p>
                     </td>
-                    <td data-label="Giá thuê" className="align-middle">
+                    <td data-label="Giá thuê" className="align-middle text-center">
                       <p className="font-extrabold leading-5 text-[#091426]">
                         {formatMoney(item.monthlyRent)}
                       </p>
                     </td>
-                    <td data-label="Trạng thái" className="align-middle">
+                    <td data-label="Trạng thái" className="align-middle text-center">
                       <StatusBadge item={item} />
                     </td>
                     <td

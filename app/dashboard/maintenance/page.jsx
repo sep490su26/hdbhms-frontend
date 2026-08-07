@@ -618,11 +618,10 @@ export default function MaintenancePage() {
   return (
     <section className="grid gap-6">
       <DashboardPageHeader
-        title="Báo sự cố & Bảo trì"
-        description="Theo dõi phiếu sự cố từ lúc tiếp nhận, xử lý, chờ xác nhận đến hoàn tất."
+        title="Báo cáo sự cố & Bảo trì"
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <UnitBadge />
+            
             {canManage && (
               <button
                 type="button"

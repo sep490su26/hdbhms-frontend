@@ -103,6 +103,9 @@ export async function getDashboardOverview() {
       maintenancePendingCount: numberValue(
         actionSummary.maintenancePendingCount ?? actionSummary.maintenance_pending_count,
       ),
+      requestPendingCount: numberValue(
+        actionSummary.requestPendingCount ?? actionSummary.request_pending_count,
+      ),
       billingPeriod: textValue(
         actionSummary.billingPeriod ?? actionSummary.billing_period,
       ),

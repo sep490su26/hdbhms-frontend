@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
   Droplets,
   HandCoins,
   Loader2,
@@ -624,7 +625,7 @@ export default function DashboardPage() {
         <DashboardNotice message={error} onRetry={loadDashboard} />
       ) : null}
 
-      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
         <ActionCard
           href="/dashboard/viewing-customers"
           icon={UserPlus}
@@ -654,6 +655,13 @@ export default function DashboardPage() {
           value={loading ? "..." : formatNumber(actionSummary.expiringContractCount)}
           suffix="hợp đồng"
           accent="red"
+        />
+        <ActionCard
+          href="/dashboard/requests"
+          icon={ClipboardList}
+          label="Yêu cầu đang chờ"
+          value={loading ? "..." : formatNumber(actionSummary.requestPendingCount)}
+          accent="blue"
         />
       </section>
 

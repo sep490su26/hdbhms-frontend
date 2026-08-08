@@ -114,7 +114,6 @@ function ActionCard({
           >
             <Icon className="h-4.5 w-4.5" />
           </span>
-          <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#315ac8] dark:text-slate-600" />
         </div>
         <p className="mt-5 text-xs font-bold uppercase text-[#526070] dark:text-slate-400">
           {label}

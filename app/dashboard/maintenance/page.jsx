@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   AlertCircle,
   Check,
-  Clock3,
   Eye,
   ImagePlus,
   Loader2,
@@ -15,7 +14,6 @@ import {
   Search,
   ShieldAlert,
   SlidersHorizontal,
-  TimerReset,
   Wrench,
   X,
 } from "lucide-react";
@@ -137,13 +135,6 @@ function formatMoney(value) {
   return `${MONEY_FORMAT.format(Number.isFinite(amount) ? amount : 0)} VNĐ`;
 }
 
-function formatThousandMoney(value) {
-  const amount = Number(value || 0);
-  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
-    (Number.isFinite(amount) ? amount : 0) / 1000,
-  );
-}
-
 function statusMeta(status) {
   return (
     STATUS_META[status] || [
@@ -240,26 +231,6 @@ function UnitBadge() {
   );
 }
 
-function Metric({ label, value, icon: Icon, tone }) {
-  return (
-    <article className="relative flex h-full min-h-28 flex-col rounded-lg border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-      <div className="flex items-center justify-between gap-4">
-        <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-          {label}
-        </p>
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone}`}
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-4 truncate text-2xl font-black text-slate-900 dark:text-white">
-        {value}
-      </p>
-    </article>
-  );
-}
-
 function buildDefaultInternalForm(propertyId = "") {
   return {
     propertyId: propertyId ? String(propertyId) : "",
@@ -348,52 +319,6 @@ export default function MaintenancePage() {
     if (!filters.floor || filters.floor === "all") return [];
     return roomOptions.filter((room) => room.floorId === filters.floor);
   }, [filters.floor, roomOptions]);
-
-  const metrics = useMemo(() => {
-    const count = (statuses) =>
-      tickets.filter((ticket) => statuses.includes(ticket.status)).length;
-    const totalCost = tickets.reduce(
-      (sum, ticket) => sum + Number(ticket.costAmount || 0),
-      0,
-    );
-    const landlordCost = tickets
-      .filter(
-        (ticket) => String(ticket.payer || "").toUpperCase() === "LANDLORD",
-      )
-      .reduce((sum, ticket) => sum + Number(ticket.costAmount || 0), 0);
-    return [
-      {
-        label: "Chờ tiếp nhận",
-        value: count(["PENDING"]),
-        icon: Clock3,
-        tone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
-      },
-      {
-        label: "Đang xử lý",
-        value: count(["ACCEPTED", "IN_PROGRESS"]),
-        icon: Wrench,
-        tone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
-      },
-      {
-        label: "Chờ xác nhận",
-        value: count(["WAITING_CONFIRMATION"]),
-        icon: TimerReset,
-        tone: "bg-violet-50 text-violet-700",
-      },
-      {
-        label: "Chi phí ghi nhận",
-        value: formatThousandMoney(totalCost),
-        icon: Check,
-        tone: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-      },
-      {
-        label: "Chi phí chủ trọ chịu",
-        value: formatThousandMoney(landlordCost),
-        icon: Wrench,
-        tone: "bg-slate-100 text-slate-700",
-      },
-    ];
-  }, [tickets]);
 
   const loadTickets = useCallback(async () => {
     if (!filters.propertyId) {
@@ -646,12 +571,6 @@ export default function MaintenancePage() {
           </div>
         }
       />
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,210px),1fr))] gap-4">
-        {metrics.map((item) => (
-          <Metric key={item.label} {...item} />
-        ))}
-      </div>
 
       {internalSuccess && <InlineNotice>{internalSuccess}</InlineNotice>}
 

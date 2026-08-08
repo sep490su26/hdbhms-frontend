@@ -133,32 +133,6 @@ function formatMoney(value) {
   return `${money.format(Number(value || 0))} VNĐ`;
 }
 
-function formatThousandMoney(value) {
-  return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(
-    Number(value || 0) / 1000,
-  );
-}
-
-function BillingMetricCard({ label, value, note, color }) {
-  return (
-    <article className="relative flex h-full min-h-[112px] flex-col overflow-hidden rounded-lg border border-[#dce2ec] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
-      <span
-        className="absolute inset-x-0 top-0 h-0.5"
-        style={{ backgroundColor: color }}
-      />
-      <p className="text-[10px] font-bold uppercase leading-4 text-[#5f6b7c] dark:text-slate-400">
-        {label}
-      </p>
-      <p className="mt-2 truncate text-2xl font-black text-[#0f1d33] dark:text-white">
-        {value}
-      </p>
-      <p className="mt-auto pt-2 text-[10px] font-semibold text-[#5f6b7c] dark:text-slate-400">
-        {note}
-      </p>
-    </article>
-  );
-}
-
 function UnitBadge() {
   return (
     <div className="inline-flex h-9 shrink-0 overflow-hidden rounded-md border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
@@ -166,23 +140,6 @@ function UnitBadge() {
         Đơn vị: Nghìn VND
       </p>
     </div>
-  );
-}
-
-const metricToneColors = {
-  blue: "#3f5db5",
-  emerald: "#10b981",
-  rose: "#ef627f",
-};
-
-function DashboardStatCard({ label, value, tone, subtitle }) {
-  return (
-    <BillingMetricCard
-      label={label}
-      value={value}
-      note={subtitle}
-      color={metricToneColors[tone] || "#3f5db5"}
-    />
   );
 }
 
@@ -687,15 +644,6 @@ export default function BillingPage() {
     }
   }
 
-  const totals = invoices.reduce(
-    (acc, invoice) => ({
-      total: acc.total + Number(invoice.totalAmount || 0),
-      paid: acc.paid + Number(invoice.paidAmount || 0),
-      remaining: acc.remaining + Number(invoice.remainingAmount || 0),
-    }),
-    { total: 0, paid: 0, remaining: 0 },
-  );
-
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
@@ -727,26 +675,6 @@ export default function BillingPage() {
         </section>
       )}
 
-      <section className="grid items-stretch gap-3 md:grid-cols-3">
-        <DashboardStatCard
-          label="Tổng hóa đơn"
-          value={formatThousandMoney(totals.total)}
-          tone="blue"
-          subtitle="Tổng giá trị trong kỳ"
-        />
-        <DashboardStatCard
-          label="Đã thu"
-          value={formatThousandMoney(totals.paid)}
-          tone="emerald"
-          subtitle="Khoản đã ghi nhận"
-        />
-        <DashboardStatCard
-          label="Còn lại"
-          value={formatThousandMoney(totals.remaining)}
-          tone="rose"
-          subtitle="Khoản cần tiếp tục thu"
-        />
-      </section>
 
       <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="grid gap-3 md:grid-cols-5">

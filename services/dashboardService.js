@@ -45,6 +45,7 @@ export async function getDashboardOverview() {
   const utilityUsage = data?.utilityUsage ?? data?.utility_usage ?? {};
   const expiringContractSummary =
     data?.expiringContractSummary ?? data?.expiring_contract_summary ?? {};
+  const actionSummary = data?.actionSummary ?? data?.action_summary ?? {};
 
   return {
     totalRoomCount: numberValue(data?.totalRoomCount ?? data?.total_room_count),
@@ -94,6 +95,26 @@ export async function getDashboardOverview() {
       tenants: Array.isArray(expiringContractSummary.tenants)
         ? expiringContractSummary.tenants.map(normalizeExpiringTenant)
         : [],
+    },
+    actionSummary: {
+      viewingPendingCount: numberValue(
+        actionSummary.viewingPendingCount ?? actionSummary.viewing_pending_count,
+      ),
+      maintenancePendingCount: numberValue(
+        actionSummary.maintenancePendingCount ?? actionSummary.maintenance_pending_count,
+      ),
+      billingPeriod: textValue(
+        actionSummary.billingPeriod ?? actionSummary.billing_period,
+      ),
+      billingPaidRoomCount: numberValue(
+        actionSummary.billingPaidRoomCount ?? actionSummary.billing_paid_room_count,
+      ),
+      billingTotalRoomCount: numberValue(
+        actionSummary.billingTotalRoomCount ?? actionSummary.billing_total_room_count,
+      ),
+      expiringContractCount: numberValue(
+        actionSummary.expiringContractCount ?? actionSummary.expiring_contract_count,
+      ),
     },
     recentActivities: Array.isArray(data?.recentActivities ?? data?.recent_activities)
       ? (data?.recentActivities ?? data?.recent_activities).map(normalizeRecentActivity)

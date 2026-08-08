@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
   ArrowRight,
-  Building2,
+  CalendarClock,
   CheckCircle2,
   Droplets,
   HandCoins,
-  Home,
   Loader2,
   RefreshCw,
   ServerCrash,
@@ -52,7 +50,6 @@ const revenuePeriodOptions = [
 function formatNumber(value) {
   return numberFormatter.format(Number(value || 0));
 }
-
 function formatMoney(value) {
   return formatNumber(value);
 }
@@ -75,6 +72,10 @@ function occupancyPercent(occupied, total) {
   if (!total) return 0;
   return Math.round((Number(occupied || 0) / Number(total || 0)) * 100);
 }
+function billingPeriodLabel(value) {
+  const [year, month] = String(value || "").split("-");
+  return year && month ? `${month.padStart(2, "0")}/${year}` : "hiện tại";
+}
 
 function UnitBadge() {
   return (
@@ -84,60 +85,48 @@ function UnitBadge() {
   );
 }
 
-function StatCard({
+function ActionCard({
   icon: Icon,
   label,
   value,
   suffix,
-  note,
-  badge,
-  badgeTone = "green",
+  href,
   accent = "blue",
 }) {
   const accentClasses = {
     blue: "bg-[#eef3ff] text-[#4360b6] dark:bg-blue-500/10 dark:text-blue-300",
-    red: "bg-[#fff1f1] text-[#df2727] dark:bg-rose-500/10 dark:text-rose-300",
     amber:
       "bg-[#fff4e8] text-[#8f5b22] dark:bg-amber-500/10 dark:text-amber-300",
-  };
-
-  const badgeClasses = {
     green:
       "bg-[#e8fbef] text-[#14934a] dark:bg-emerald-500/10 dark:text-emerald-300",
-    red: "bg-[#ffe5e5] text-[#d72222] dark:bg-rose-500/10 dark:text-rose-300",
+    red: "bg-[#fff1f1] text-[#df2727] dark:bg-rose-500/10 dark:text-rose-300",
   };
 
   return (
-    <article className="relative flex h-full flex-col rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${accentClasses[accent]}`}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        {badge ? (
+    <Link
+      href={href}
+      className="group block h-full rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#315ac8] focus-visible:ring-offset-2"
+    >
+      <article className="relative flex h-full flex-col rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm transition group-hover:-translate-y-0.5 group-hover:border-[#b9c9ed] group-hover:shadow-md dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex items-center justify-between gap-3">
           <span
-            className={`rounded px-2.5 py-1 text-xs font-bold ${badgeClasses[badgeTone]}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded ${accentClasses[accent]}`}
           >
-            {badge}
+            <Icon className="h-4.5 w-4.5" />
           </span>
-        ) : null}
-      </div>
-      <p className="mt-5 truncate text-xs font-bold uppercase text-[#526070] dark:text-slate-400">
-        {label}
-      </p>
-      <div className="mt-2 flex items-baseline gap-1.5 text-[#102039] dark:text-white">
-        <span className="text-2xl font-extrabold leading-none">{value}</span>
-        {suffix ? (
-          <span className="text-sm font-semibold">{suffix}</span>
-        ) : null}
-      </div>
-      {note ? (
-        <p className="mt-auto pt-3 text-xs font-semibold text-[#d71920] dark:text-rose-300">
-          {note}
+          <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#315ac8] dark:text-slate-600" />
+        </div>
+        <p className="mt-5 text-xs font-bold uppercase text-[#526070] dark:text-slate-400">
+          {label}
         </p>
-      ) : null}
-    </article>
+        <div className="mt-2 flex items-baseline gap-1.5 text-[#102039] dark:text-white">
+          <span className="text-2xl font-extrabold leading-none">{value}</span>
+          {suffix ? (
+            <span className="text-sm font-semibold">{suffix}</span>
+          ) : null}
+        </div>
+      </article>
+    </Link>
   );
 }
 
@@ -530,10 +519,10 @@ function ExpiringContractCard({ summary }) {
             {formatNumber(count)} Người thuê
           </p>
           <Link
-            href="/dashboard/tenants"
+            href="/dashboard/contract-management?status=EXPIRING_SOON"
             className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[#315ac8] dark:text-blue-300"
           >
-            Xem danh sách <ArrowRight className="h-4 w-4" />
+            Xem danh sách hợp đồng <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         {count ? (
@@ -609,9 +598,11 @@ export default function DashboardPage() {
   const totalRooms = overview?.totalRoomCount ?? 0;
   const occupiedRooms = overview?.totalOccupiedRoomCount ?? 0;
   const vacantRooms = overview?.totalVacantRoomCount ?? 0;
-  const occupiedRate = occupancyPercent(occupiedRooms, totalRooms);
-  const revenueGrowth = overview?.revenueGrowthPercent ?? 0;
-  const debtWarningRoomCount = overview?.debtWarningRoomCount ?? 0;
+  const actionSummary = overview?.actionSummary ?? {};
+  const billingPeriod = billingPeriodLabel(actionSummary.billingPeriod);
+  const billingValue = loading
+    ? "..."
+    : `${formatNumber(actionSummary.billingPaidRoomCount)}/${formatNumber(actionSummary.billingTotalRoomCount)}`;
   const utilityUsage = overview?.utilityUsage ?? {};
   const canUseAiReport = user?.role === ROLES.OWNER;
   const isDark = theme === "dark";
@@ -635,50 +626,35 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          icon={HandCoins}
-          label="Doanh thu tháng"
-          value={
-            loading ? "..." : formatThousandMoney(overview?.currentMonthRevenue)
-          }
-          badge={`${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth}%`}
+        <ActionCard
+          href="/dashboard/viewing-customers"
+          icon={UserPlus}
+          label="Khách chờ xem phòng"
+          value={loading ? "..." : formatNumber(actionSummary.viewingPendingCount)}
+          accent="blue"
         />
-        <StatCard
-          icon={Building2}
-          label="Tỷ lệ lấp đầy"
-          value={loading ? "..." : `${occupiedRate}%`}
-          badge={
-            totalRooms
-              ? `${formatNumber(occupiedRooms)}/${formatNumber(totalRooms)}`
-              : ""
-          }
-        />
-        <StatCard
-          icon={DoorOpenIcon}
-          label="Phòng trống"
-          value={loading ? "..." : formatNumber(vacantRooms)}
-          suffix="Phòng"
-          note={
-            vacantRooms
-              ? `Có ${formatNumber(vacantRooms)} phòng đang trống`
-              : ""
-          }
-          badge={vacantRooms ? "Cần chú ý" : ""}
-          badgeTone="red"
-          accent="red"
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Tổng công nợ"
-          value={
-            loading ? "..." : formatThousandMoney(overview?.totalDebtAmount)
-          }
-          note={
-            debtWarningRoomCount
-              ? `${formatNumber(debtWarningRoomCount)} phòng vượt ngưỡng`
-              : ""
-          }
+        <ActionCard
+          href="/dashboard/maintenance"
+          icon={Wrench}
+          label="Sự cố chờ tiếp nhận"
+          value={loading ? "..." : formatNumber(actionSummary.maintenancePendingCount)}
           accent="amber"
+        />
+        <ActionCard
+          href="/dashboard/billing"
+          icon={HandCoins}
+          label={`Thu tiền hóa đơn ${billingPeriod}`}
+          value={billingValue}
+          suffix="phòng"
+          accent="green"
+        />
+        <ActionCard
+          href="/dashboard/contract-management?status=EXPIRING_SOON"
+          icon={CalendarClock}
+          label="Hợp đồng sắp hết hạn"
+          value={loading ? "..." : formatNumber(actionSummary.expiringContractCount)}
+          suffix="hợp đồng"
+          accent="red"
         />
       </section>
 
@@ -727,8 +703,4 @@ export default function DashboardPage() {
       </section>
     </div>
   );
-}
-
-function DoorOpenIcon(props) {
-  return <Home {...props} />;
 }

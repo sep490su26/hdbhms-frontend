@@ -206,11 +206,11 @@ function requesterInitials(request) {
 }
 
 const STATUS_FILTERS = [
+    { value: "ALL", label: "Tất cả" },
   { value: "PENDING", label: "Đang chờ" },
   { value: "PROCESSING", label: "Đang xử lý" },
   { value: "COMPLETED", label: "Hoàn thành" },
   { value: "CANCELLED", label: "Đã hủy" },
-  { value: "ALL", label: "Tất cả" },
 ];
 
 const statusBadgeClass = (status) => {
@@ -1313,11 +1313,6 @@ export default function ApprovalCenter() {
                       <TableHead className="h-12 w-[13%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[12%] text-center">
                         Loại yêu cầu
                       </TableHead>
-
-                      <TableHead className="hidden h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1700px]:table-cell text-center">
-                        Mã yêu cầu
-                      </TableHead>
-
                       <TableHead className="h-12 w-[12%] px-3 text-xs font-semibold uppercase tracking-wide text-slate-400 min-[1650px]:w-[9%] text-center">
                         Trạng thái
                       </TableHead>
@@ -1333,7 +1328,7 @@ export default function ApprovalCenter() {
                     {loading ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={5}
                           className="py-12 text-center text-slate-500 dark:text-slate-400"
                         >
                           <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
@@ -1343,7 +1338,7 @@ export default function ApprovalCenter() {
                     ) : data.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={5}
                           className="py-12 text-center text-slate-500 dark:text-slate-400"
                         >
                           Không tìm thấy yêu cầu nào.
@@ -1362,34 +1357,32 @@ export default function ApprovalCenter() {
                           <TableCell className="px-3 py-3 align-top">
   <div className="flex min-w-0 items-center">
     <div className="min-w-0 flex-1">
-      <p className="truncate text-center text-sm font-semibold">
+      <p className="font-extrabold leading-5 text-slate-900 text-center dark:text-white">
         {requesterName(req)}
       </p>
 
-      <p className="mt-1 truncate text-center text-xs">
+      <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 xl:text-xs text-center">
         {requesterSecondaryText(req) || "--"}
       </p>
     </div>
   </div>
 </TableCell>
-                            <TableCell className="px-3 py-3 align-top">
-                              <div className="flex items-start gap-2">
-                                <div
-                                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tc.color}`}
-                                >
-                                  {tc.icon}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                                    {translateType(req.requestType)}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-
-
-
-                            <TableCell className="px-3 py-3 align-top text-center">
+                           <TableCell className="px-3 py-3 align-middle">
+  <div className="flex items-center gap-3 ml-10">
+    {/* Cố định kích thước khung chứa icon để chúng luôn thẳng hàng */}
+    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tc.color}`}>
+      {tc.icon}
+    </div>
+    
+    {/* Phần chữ có thể đặt chiều rộng hoặc flex-1 tùy ý */}
+    <div className="min-w-0">
+      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+        {translateType(req.requestType)}
+      </p>
+    </div>
+  </div>
+</TableCell>
+                            <TableCell className="px-3 py-3 align-middle text-center">
                               <Badge
                                 variant="outline"
                                 className={`rounded-full capitalize ${statusBadgeClass(req.status)}`}

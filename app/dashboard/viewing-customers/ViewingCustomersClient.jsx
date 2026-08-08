@@ -995,8 +995,8 @@ export default function ViewingCustomersClient() {
     onClick={() => updateFilter("status", "all")}
     className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
       filters?.status === "all"
-       ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
-            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+      ? "bg-[#1e40af] text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
     }`}
   >
     Tất cả
@@ -1007,8 +1007,8 @@ export default function ViewingCustomersClient() {
     onClick={() => updateFilter("status", "NOT_VIEWED")} 
     className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
       filters?.status === "NOT_VIEWED"
-        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
-            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+         ? "bg-[#1e40af] text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
     }`}
   >
     Chờ xem
@@ -1018,8 +1018,8 @@ export default function ViewingCustomersClient() {
     onClick={() => updateFilter("status", "VIEWED")}
     className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
       filters?.status === "VIEWED"
-        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
-            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+         ? "bg-[#1e40af] text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
     }`}
   >
     Đã xem
@@ -1030,8 +1030,8 @@ export default function ViewingCustomersClient() {
     onClick={() => updateFilter("status", "DISMISSED")} 
     className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
       filters?.status === "DISMISSED"
-        ? "bg-[#091426] text-white dark:bg-white dark:text-[#0f172a]"
-            : "bg-[#f1f3f5] text-[#4b5563] hover:bg-[#e2e8f0] dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+         ? "bg-[#1e40af] text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
     }`}
   >
     Hủy hẹn
@@ -1057,7 +1057,7 @@ export default function ViewingCustomersClient() {
                 <thead className="bg-[#f1f3f5] dark:bg-white/5 text-[11px] font-bold uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
                   <tr>
                     <th className="px-5 py-3.5">Tên khách</th>
-                    <th className="px-5 py-3.5">Số điện thoại</th>
+                    <th className="px-5 py-3.5 text-center">Số điện thoại</th>
                     <th className="px-5 py-3.5 text-center">Cơ sở</th>
                     <th className="px-5 py-3.5 text-center">Phòng quan tâm</th>
                     <th className="px-5 py-3.5 text-center">Trạng thái</th>
@@ -1123,14 +1123,16 @@ export default function ViewingCustomersClient() {
                       </td>
                       
                       <td
-                        data-label="Trạng thái"
-                        className="px-5 py-3.5 align-middle"
-                      >
-                        <StatusSelect
-                          status={customer.status}
-                          onChange={(status) => changeStatus(customer, status)}
-                        />
-                      </td>
+  data-label="Trạng thái"
+  className="px-5 py-3.5 align-middle text-center"
+>
+  <div className="inline-block min-w-[130px]">
+    <StatusSelect
+      status={customer.status}
+      onChange={(status) => changeStatus(customer, status)}
+    />
+  </div>
+</td>
                       <td
                         data-label="Thao tác"
                         className="px-4 py-3.5 align-middle"
@@ -1149,7 +1151,7 @@ export default function ViewingCustomersClient() {
                   {customers.length === 0 && (
                     <tr key="empty-customers-row">
                       <td
-                        colSpan={7}
+                        colSpan={6}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
                       >
                         Không có khách xem phòng phù hợp với bộ lọc.

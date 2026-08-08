@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -2977,49 +2977,6 @@ export default function ContractTemplatePage() {
     setTimePopoverOpen(false);
   }
 
-  function handleExportExcel() {
-    const exportScope = [
-      selectedYear === "all" ? "tat-ca-nam" : `nam-${selectedYear}`,
-      timeFilter === "all" ? "tat-ca-thoi-gian" : timeFilter.toLowerCase(),
-      roomFilter === "all" ? "tat-ca-phong" : `phong-${roomFilter}`,
-    ].join("-");
-    const header = [
-      "Ma HD",
-      "Phong",
-      "Nguoi ky chinh",
-      "So nguoi",
-      "Ngay bat dau",
-      "Ngay ket thuc",
-      "Gia thue",
-      "Trang thai",
-    ];
-    const rows = filteredContracts.map((item) => [
-      getContractDisplayName(item),
-      item.roomCode || "",
-      item.primaryTenantName || item.customerName || "",
-      getOccupantsCount(item),
-      formatDate(item.startDate || item.expectedLeaseSignDate),
-      formatDate(item.endDate || item.expectedMoveInDate),
-      formatMoney(item.monthlyRent),
-      getStatusLabel(item),
-    ]);
-    const csv = [header, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
-          .join(","),
-      )
-      .join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], {
-      type: "application/vnd.ms-excel;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `danh-sach-hop-dong-${exportScope}.xls`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
 
   function openCleanupModal() {
     setCleanupStep(1);
@@ -3047,7 +3004,7 @@ export default function ContractTemplatePage() {
   const canUseLiquidationActions = user?.role === ROLES.OWNER;
 
   return (
-    <div className="w-full min-w-0 flex flex-col gap-6 text-[#091426] text-[13px] xl:text-sm">
+    <div className="w-full min-w-0 flex flex-col text-[#091426] text-[13px] xl:text-sm">
       <input
         ref={fileInputRef}
         type="file"
@@ -3058,166 +3015,33 @@ export default function ContractTemplatePage() {
       {
         <DashboardPageHeader
           title={`Quản lý hợp đồng thuê ${selectedYear === "all" ? "Tất cả năm" : `năm ${selectedYear}`}`}
+          actions={
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Nút Dọn dữ liệu cũ */}
+      <button
+        type="button"
+        onClick={openCleanupModal}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 text-xs font-bold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        Dọn dữ liệu cũ
+      </button>
+
+      {/* Nút Lịch sử */}
+      <button
+        type="button"
+        onClick={() => {
+          setStatusFilter(HISTORY_FILTER.id);
+          setPage(1);
+        }}
+        className="h-11 shrink-0 rounded-lg bg-[#1e40af] px-5 text-sm font-extrabold text-white transition hover:bg-[#16253a]"
+      >
+        {HISTORY_FILTER.label}
+      </button>
+    </div>
+          }
         />
       }
-
-
-      <section className="rounded-xl border border-[#dfe5ef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] xl:p-5">
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="relative">
-            <FileCheck2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a98af]" />
-            <select
-              value={fileFilter}
-              onChange={(event) => {
-                setFileFilter(event.target.value);
-                setPage(1);
-              }}
-              className="h-11 w-full appearance-none rounded-lg border border-[#cbd5e1] bg-white pl-9 pr-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426]"
-            >
-              <option value="all">Tất cả file</option>
-              <option value="uploaded">Đã upload</option>
-              <option value="missing">Chưa upload</option>
-            </select>
-          </label>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={openTimePopover}
-              aria-expanded={timePopoverOpen}
-              className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none transition hover:border-[#9ba8ba] focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
-            >
-              <span className="inline-flex min-w-0 items-center gap-2">
-                <CalendarDays className="h-4 w-4 shrink-0 text-[#8a98af]" />
-                <span className="truncate">{activeTimeLabel}</span>
-              </span>
-              <span className="text-xs text-[#8a98af]">
-                {timePopoverOpen ? "Thu gọn" : "Mở"}
-              </span>
-            </button>
-
-            {timePopoverOpen && (
-              <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-[#dfe5ef] bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-[#0f172a]">
-                <div className="grid grid-cols-[120px_1fr] gap-3">
-                  <div className="flex flex-col gap-1 border-r border-[#edf1f6] pr-3 dark:border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => selectTimeFilter("all")}
-                      className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
-                        timeFilter === "all"
-                          ? "bg-[#091426] text-white"
-                          : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                      }`}
-                    >
-                      Cả năm
-                    </button>
-                    {TIME_QUARTERS.map((quarter) => (
-                      <button
-                        key={quarter.id}
-                        type="button"
-                        onMouseEnter={() => setTimePanelQuarter(quarter.id)}
-                        onFocus={() => setTimePanelQuarter(quarter.id)}
-                        onClick={() => selectTimeFilter(quarter.id)}
-                        className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
-                          timeFilter === quarter.id ||
-                          timePanelQuarter === quarter.id
-                            ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
-                            : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                        }`}
-                      >
-                        {quarter.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-1 gap-2">
-                    {visibleTimeQuarter.months.map((month) => (
-                      <button
-                        key={month}
-                        type="button"
-                        onClick={() => selectTimeFilter(`M${month}`)}
-                        className={`h-9 rounded-lg border px-3 text-left text-xs font-extrabold transition ${
-                          timeFilter === `M${month}`
-                            ? "border-[#091426] bg-[#091426] text-white"
-                            : "border-[#edf1f6] bg-white text-slate-600 hover:border-[#9ba8ba] hover:bg-[#f8fafc] hover:text-slate-900 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                        }`}
-                      >
-                        Tháng {month}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <label>
-            <span className="sr-only">Lọc theo phòng</span>
-            <select
-              value={roomFilter}
-              onChange={(event) => {
-                setRoomFilter(event.target.value);
-                setPage(1);
-              }}
-              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
-            >
-              <option value="all">Tất cả phòng</option>
-              {roomOptions.map((roomCode) => (
-                <option key={roomCode} value={roomCode}>
-                  Phòng {roomCode}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="mt-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {STATUS_FILTERS.map((filter) => (
-              <button
-                key={filter.id}
-                type="button"
-                onClick={() => {
-                  setStatusFilter(filter.id);
-                  setPage(1);
-                }}
-                className={`h-9 shrink-0 rounded-full border px-4 text-xs font-extrabold transition ${
-                  statusFilter === filter.id
-                    ? "border-[#091426] bg-[#091426] text-white"
-                    : "border-[#d7deea] bg-white text-[#56647a] hover:border-[#9ba8ba] hover:text-[#091426]"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onClick={openCleanupModal}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 text-xs font-extrabold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Dọn dữ liệu cũ
-            </button>
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-xs font-extrabold text-white transition hover:bg-[#1d4ed8] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8]"
-            >
-              <Download className="h-4 w-4" />
-              Xuất Excel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStatusFilter(HISTORY_FILTER.id);
-                setPage(1);
-              }}
-              className="h-11 shrink-0 rounded-lg bg-[#091426] px-5 text-sm font-extrabold text-white transition hover:bg-[#16253a]"
-            >
-              {HISTORY_FILTER.label}
-            </button>
-          </div>
-        </div>
-      </section>
-
       {error && (
         <div className="rounded-xl border border-red-200 dark:border-rose-500/20 bg-red-50 dark:bg-rose-500/10 px-4 py-3 text-sm font-bold text-red-700 dark:text-rose-300">
           {error}
@@ -3229,37 +3053,148 @@ export default function ContractTemplatePage() {
           {actionMessage}
         </div>
       )}
+ <div className="border-b border-[#edf1f6] bg-[#f7f9fe] px-5 py-3.5 dark:border-white/10 dark:bg-white/5 mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {STATUS_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(filter.id);
+                    setPage(1);
+                  }}
+                  className={`h-8 shrink-0 rounded-full border px-3.5 text-xs font-bold transition ${
+                    statusFilter === filter.id
+                      ? "bg-[#1e40af] text-white shadow-sm"
+                      : "bg-white text-slate-600 hover:bg-slate-100 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
 
-      <section className="overflow-hidden rounded-xl border border-[#dfe5ef] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-        <div className="dashboard-table contract-management-table">
-          <table className="table-auto text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3">
-            <colgroup>
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "16%" }} />
-            </colgroup>
-            <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
-              <tr>
-                <th className="!pl-5 xl:!pl-6 text-center">Mã HĐ</th>
-                <th className="text-center">Phòng</th>
-                <th className="text-center">Người ký chính</th>
-                <th className="text-center">Thời hạn</th>
-                <th className="text-center">Giá thuê</th>
-                <th className="text-center">Trạng thái</th>
-                <th className="contract-management-table__action !px-2 text-center xl:!px-2.5">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#edf1f6]">
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="relative min-w-[200px] max-w-[240px]">
+                <button
+                  type="button"
+                  onClick={openTimePopover}
+                  aria-expanded={timePopoverOpen}
+                  className="inline-flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-[#091426] outline-none transition hover:border-[#9ba8ba] focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                >
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <CalendarDays className="h-4 w-4 shrink-0 text-[#8a98af]" />
+                    <span className="truncate">{activeTimeLabel}</span>
+                  </span>
+                </button>
+                {timePopoverOpen && (
+                  <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-[#dfe5ef] bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-[#0f172a]">
+                    <div className="grid grid-cols-[120px_1fr] gap-3">
+                      <div className="flex flex-col gap-1 border-r border-[#edf1f6] pr-3 dark:border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => selectTimeFilter("all")}
+                          className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                            timeFilter === "all"
+                              ? "bg-[#091426] text-white"
+                              : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                          }`}
+                        >
+                          Cả năm
+                        </button>
+                        {TIME_QUARTERS.map((quarter) => (
+                          <button
+                            key={quarter.id}
+                            type="button"
+                            onMouseEnter={() => setTimePanelQuarter(quarter.id)}
+                            onFocus={() => setTimePanelQuarter(quarter.id)}
+                            onClick={() => selectTimeFilter(quarter.id)}
+                            className={`h-9 rounded-lg px-3 text-left text-xs font-extrabold transition ${
+                              timeFilter === quarter.id ||
+                              timePanelQuarter === quarter.id
+                                ? "bg-[#eff6ff] text-[#1e40af] dark:bg-[#1e40af]/20 dark:text-[#93c5fd]"
+                                : "text-slate-600 hover:bg-[#f5f7fb] hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                          >
+                            {quarter.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {visibleTimeQuarter.months.map((month) => (
+                          <button
+                            key={month}
+                            type="button"
+                            onClick={() => selectTimeFilter(`M${month}`)}
+                            className={`h-9 rounded-lg border px-3 text-left text-xs font-extrabold transition ${
+                              timeFilter === `M${month}`
+                                ? "border-[#091426] bg-[#091426] text-white"
+                                : "border-[#edf1f6] bg-white text-slate-600 hover:border-[#9ba8ba] hover:bg-[#f8fafc] hover:text-slate-900 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                          >
+                            Tháng {month}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="min-w-[160px]">
+                  <select
+                    value={roomFilter}
+                    onChange={(event) => {
+                      setRoomFilter(event.target.value);
+                      setPage(1);
+                    }}
+                    className="h-9 w-full rounded-lg border border-[#cbd5e1] bg-white px-2.5 text-xs font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                  >
+                    <option value="all">Tất cả phòng</option>
+                    {roomOptions.map((roomCode) => (
+                      <option key={roomCode} value={roomCode}>
+                        Phòng {roomCode}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+  </div>
+
+     <section className="overflow-hidden rounded-xl border border-[#dfe5ef] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
+  <div className="dashboard-table contract-management-table">
+    <table className="table-auto text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3">
+      <colgroup>
+        <col style={{ width: "18%" }} />
+        <col style={{ width: "7%" }} />
+        <col style={{ width: "22%" }} />
+        <col style={{ width: "14%" }} />
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "13%" }} />
+        <col style={{ width: "16%" }} />
+      </colgroup>
+      <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
+        <tr>
+          <th className="!pl-5 xl:!pl-6 text-center">Mã HĐ</th>
+          <th className="text-center">Phòng</th>
+          <th className="text-center">Tiền cọc</th>
+          <th className="text-center">Thời hạn</th>
+          <th className="text-center">Giá thuê</th>
+          <th className="text-center">Trạng thái</th>
+          <th className="contract-management-table__action !px-2 text-center xl:!px-2.5">
+            Thao tác
+          </th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-[#edf1f6]">
               {loading && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="py-12 text-center text-sm font-bold text-[#607089]"
                   >
                     <span className="inline-flex items-center gap-2">
@@ -3360,11 +3295,9 @@ export default function ContractTemplatePage() {
                         {item.roomCode || "-"}
                       </span>
                     </td>
-                    <td data-label="Người ký chính" className="align-middle text-center">
-                      <p className="font-extrabold leading-5 text-[#091426]">
-                        {item.primaryTenantName ||
-                          item.customerName ||
-                          "Chưa có"}
+                    <td data-label="Tiền cọc" className="align-middle text-center">
+                      <p className="font-extrabold leading-5 text-[#091426] dark:text-white">
+                        {formatMoney(item.depositAmount)}
                       </p>
                     </td>
                     

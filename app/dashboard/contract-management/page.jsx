@@ -3234,21 +3234,19 @@ export default function ContractTemplatePage() {
         <div className="dashboard-table contract-management-table">
           <table className="table-auto text-left text-[12px] xl:text-sm [&_td]:px-2 [&_td]:py-4 xl:[&_td]:px-2.5 xl:[&_td]:py-4 [&_th]:px-2 [&_th]:py-3 xl:[&_th]:px-2.5 xl:[&_th]:py-3">
             <colgroup>
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "7%" }} />
               <col style={{ width: "18%" }} />
-              <col style={{ width: "8%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "22%" }} />
               <col style={{ width: "14%" }} />
               <col style={{ width: "10%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "15%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "16%" }} />
             </colgroup>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
                 <th className="!pl-5 xl:!pl-6 text-center">Mã HĐ</th>
                 <th className="text-center">Phòng</th>
                 <th className="text-center">Người ký chính</th>
-                <th className="text-center">Số người</th>
                 <th className="text-center">Thời hạn</th>
                 <th className="text-center">Giá thuê</th>
                 <th className="text-center">Trạng thái</th>
@@ -3369,11 +3367,7 @@ export default function ContractTemplatePage() {
                           "Chưa có"}
                       </p>
                     </td>
-                    <td data-label="Số người" className="align-middle text-center">
-                      <p className="font-extrabold text-[#091426]">
-                        {getOccupantsCount(item)} người
-                      </p>
-                    </td>
+                    
                     <td data-label="Thời hạn" className="align-middle text-center">
                       <p className="font-semibold leading-5 text-[#091426]">
                         {formatDate(

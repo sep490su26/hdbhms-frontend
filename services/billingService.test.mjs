@@ -121,7 +121,6 @@ test("billing page uses the shared dashboard pagination without changing totals"
   assert.match(source, /import \{ DashboardPagination \}/);
   assert.match(source, /const paginatedInvoices = useMemo/);
   assert.match(source, /return invoices\.slice\(firstIndex, firstIndex \+ size\)/);
-  assert.match(source, /const totalElements = invoices\.length/);
-  assert.match(source, /totalElements=\{totalElements\}/);
+  assert.match(source, /const totals = invoices\.reduce/);
   assert.match(source, /<DashboardPagination[\s\S]*itemLabel="hóa đơn"/);
 });

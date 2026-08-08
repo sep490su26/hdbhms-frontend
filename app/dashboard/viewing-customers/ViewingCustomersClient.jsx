@@ -660,14 +660,26 @@ export default function ViewingCustomersClient() {
       setFilters((prev) => ({ ...prev, fromDate: "", toDate: "" }));
       return;
     }
-    const { year, month, day } = dateSelection;
+    const { year, quarter, month, day } = dateSelection;
 
-    if (month === "all") {
+    if (quarter === "all" && month === "all") {
       // Select entire year
       setFilters((prev) => ({
         ...prev,
         fromDate: `${year}-01-01`,
         toDate: `${year}-12-31`,
+      }));
+    } else if (month === "all") {
+      // Select entire quarter
+      const startMonth = (quarter - 1) * 3 + 1;
+      const endMonth = quarter * 3;
+      const mmStart = String(startMonth).padStart(2, "0");
+      const mmEnd = String(endMonth).padStart(2, "0");
+      const lastDay = new Date(year, endMonth, 0).getDate();
+      setFilters((prev) => ({
+        ...prev,
+        fromDate: `${year}-${mmStart}-01`,
+        toDate: `${year}-${mmEnd}-${String(lastDay).padStart(2, "0")}`,
       }));
     } else if (day === "all" || day == null) {
       // Select entire month

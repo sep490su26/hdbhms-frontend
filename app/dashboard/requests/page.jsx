@@ -821,11 +821,19 @@ export default function ApprovalCenter() {
       setPage(1);
       return;
     }
-    const { year, month, day } = dateSelection;
+    const { year, quarter, month, day } = dateSelection;
 
-    if (month === "all") {
+    if (quarter === "all" && month === "all") {
       setFromDate(`${year}-01-01`);
       setToDate(`${year}-12-31`);
+    } else if (month === "all") {
+      const startMonth = (quarter - 1) * 3 + 1;
+      const endMonth = quarter * 3;
+      const mmStart = String(startMonth).padStart(2, "0");
+      const mmEnd = String(endMonth).padStart(2, "0");
+      const lastDay = new Date(year, endMonth, 0).getDate();
+      setFromDate(`${year}-${mmStart}-01`);
+      setToDate(`${year}-${mmEnd}-${String(lastDay).padStart(2, "0")}`);
     } else if (day === "all" || day == null) {
       const mm = String(month).padStart(2, "0");
       const lastDay = new Date(year, month, 0).getDate();

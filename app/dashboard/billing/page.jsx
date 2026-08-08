@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import TimeTreeFilter, { buildTreeFromData } from "@/components/dashboard/TimeTreeFilter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,12 +38,9 @@ const FORM_CONTROL_CLASS =
   "h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white";
 
 const STATUS_LABELS = {
-  DRAFT: "Nháp",
   ISSUED: "Chờ thanh toán",
-  PARTIALLY_PAID: "Thanh toán một phần",
   PAID: "Đã thanh toán",
   OVERDUE: "Quá hạn",
-  VOIDED: "Đã hủy",
 };
 
 const TYPE_LABELS = {
@@ -133,15 +131,7 @@ function formatMoney(value) {
   return `${money.format(Number(value || 0))} VNĐ`;
 }
 
-function UnitBadge() {
-  return (
-    <div className="inline-flex h-9 shrink-0 overflow-hidden rounded-md border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
-      <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm">
-        Đơn vị: Nghìn VND
-      </p>
-    </div>
-  );
-}
+
 
 function statusLabel(value) {
   return STATUS_LABELS[value] || value || "Chưa rõ";
@@ -279,6 +269,8 @@ export default function BillingPage() {
   const [overrideBillingPeriodText, setOverrideBillingPeriodText] = useState(
     () => billingPeriodToVietnameseDate(currentMonth()),
   );
+  const [timeFilter, setTimeFilter] = useState(null);
+  const [billingFullTree, setBillingFullTree] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
@@ -423,6 +415,36 @@ export default function BillingPage() {
     fetchManagementRoomCatalog()
       .then(setRooms)
       .catch(() => setRooms([]));
+  }, []);
+
+  /* Build the billing tree from all loaded invoices (billingPeriod field). */
+  useEffect(() => {
+    if (invoices.length === 0) return;
+    const tree = buildTreeFromData(invoices, (inv) => {
+      const period = inv.billingPeriod; // "YYYY-MM"
+      if (!period) return null;
+      return `${period}-01`; // make a full date so Date() can parse it
+    });
+    setBillingFullTree(tree);
+  }, [invoices]);
+
+  /** Converts a tree selection (year / quarter / month) to a billingPeriod string "YYYY-MM". */
+  const handleTimeFilterSelect = useCallback((dateSelection) => {
+    setTimeFilter(dateSelection);
+    if (!dateSelection) {
+      setFilters((prev) => ({ ...prev, billingPeriod: "" }));
+      return;
+    }
+    const { year, quarter, month } = dateSelection;
+    if (month === "all" || month == null) {
+      // Year or Quarter selected – clear month filter so all invoices in that range show
+      setFilters((prev) => ({ ...prev, billingPeriod: "" }));
+    } else {
+      // Specific month selected → filter by that billing period
+      const mm = String(month).padStart(2, "0");
+      setFilters((prev) => ({ ...prev, billingPeriod: `${year}-${mm}` }));
+    }
+    setPage(1);
   }, []);
 
   useEffect(() => {
@@ -648,15 +670,12 @@ export default function BillingPage() {
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
         title="Hóa đơn & Thu tiền"
-        description="Theo dõi hóa đơn phòng, ghi nhận thanh toán thủ công và quản lý các khoản còn phải thu."
         actions={
           <div className="flex items-center gap-4">
-            <UnitBadge />
             <Link
               href="/dashboard/billing/history"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200"
+              className="inline-flex h-10 items-center bg-[#1e40af] text-white gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200"
             >
-              <History className="h-4 w-4 dark:text-slate-300" />
               Lịch sử thanh toán
             </Link>
           </div>
@@ -675,43 +694,42 @@ export default function BillingPage() {
         </section>
       )}
 
+      {/* ── Body: Sidebar + Main ── */}
+      <div className="flex gap-6">
+        {/* Sidebar – Time Tree Filter (Năm → Quý → Tháng) */}
+        <TimeTreeFilter
+          treeData={billingFullTree}
+          selectedDate={timeFilter}
+          onDateSelect={handleTimeFilterSelect}
+          maxDepth="month"
+          className="hidden lg:flex"
+        />
 
-      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="grid gap-3 md:grid-cols-5">
-          <label className="grid gap-1 text-sm font-bold">
-            Tháng
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="vd: 01/07/2026"
-              value={billingPeriodText}
-              onBlur={normalizeBillingPeriodText}
-              onChange={(event) => updateBillingPeriodText(event.target.value)}
-              className={FORM_CONTROL_CLASS}
-            />
-          </label>
-          <label className="grid gap-1 text-sm font-bold">
-            Trạng thái
-            <select
-              value={filters.status}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value,
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
-            >
-              <option value="ALL">Tất cả</option>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold">
-            Loại
+        {/* Main content */}
+        <div className="w-full min-w-0 flex-1 flex flex-col gap-6">
+
+      <section className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Left – Status chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[["ALL", "Tất cả"], ...Object.entries(STATUS_LABELS)].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFilters((current) => ({ ...current, status: value }))}
+                className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                  filters.status === value
+                    ? "bg-[#1e40af] text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right – Type + Property dropdowns */}
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={filters.invoiceType}
               onChange={(event) =>
@@ -721,17 +739,15 @@ export default function BillingPage() {
                 }))
               }
               className={FORM_CONTROL_CLASS}
+              aria-label="Lọc theo loại hóa đơn"
             >
-              <option value="ALL">Tất cả</option>
+              <option value="ALL">Tất cả loại</option>
               {Object.entries(TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold">
-            Cơ sở
             <select
               value={filters.propertyId}
               onChange={(event) =>
@@ -742,6 +758,7 @@ export default function BillingPage() {
                 }))
               }
               className={FORM_CONTROL_CLASS}
+              aria-label="Lọc theo cơ sở"
             >
               <option value="">Tất cả cơ sở</option>
               {properties.map((property) => (
@@ -750,42 +767,22 @@ export default function BillingPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold">
-            Phòng
-            <select
-              value={filters.roomId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  roomId: event.target.value,
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
-            >
-              <option value="">Tất cả phòng</option>
-              {filterRooms.map((room) => (
-                <option key={roomKey(room)} value={roomKey(room)}>
-                  {roomLabel(room)}
-                </option>
-              ))}
-            </select>
-          </label>
+          </div>
         </div>
       </section>
 
+
       <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-[#f2f4f6] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-3">Hóa đơn</th>
                 <th className="px-4 py-3 text-center">Phòng</th>
-                <th className="px-4 py-3">Khách thuê</th>
-                <th className="px-4 py-3">Tháng</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Tổng tiền</th>
-                <th className="px-4 py-3 text-right">Thao tác</th>
+                <th className="px-4 py-3 text-center">Khách thuê</th>
+                <th className="px-4 py-3 text-center">Trạng thái</th>
+                <th className="px-4 py-3 text-center">Tổng tiền</th>
+                <th className="px-4 py-3 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -793,7 +790,7 @@ export default function BillingPage() {
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
-                    colSpan={7}
+                    colSpan={6}
                   >
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Đang tải hóa đơn...
@@ -803,7 +800,7 @@ export default function BillingPage() {
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400"
-                    colSpan={7}
+                    colSpan={6}
                   >
                     Chưa có hóa đơn phù hợp với bộ lọc.
                   </td>
@@ -830,24 +827,21 @@ export default function BillingPage() {
                     <td className="px-4 py-3 font-semibold text-center">
                       {displayRoomCode(invoice.roomCode)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center">
                       {invoice.tenantName || "Chưa có"}
                     </td>
-                    <td className="px-4 py-3">
-                      {formatBillingPeriod(invoice.billingPeriod)}
-                    </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-center">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-black ${invoiceStatusClasses(invoice.status)}`}
                       >
                         {statusLabel(invoice.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-black">
+                    <td className="px-4 py-3 text-center font-black">
                       {formatMoney(invoice.totalAmount)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-2">
                         <InvoiceActionsMenu
                           invoice={invoice}
                           saving={saving}
@@ -877,6 +871,9 @@ export default function BillingPage() {
           className="border-t border-[#e2e8f0] dark:border-white/10"
         />
       </section>
+
+        </div>
+      </div>
 
       {isOverrideModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

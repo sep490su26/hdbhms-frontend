@@ -86,6 +86,7 @@ const CONTRACT_MANAGEMENT_FETCH_SIZE = 1000;
 
 const STATUS_FILTERS = [
   { id: "all", label: "Tất cả" },
+  { id: "EXPIRING_SOON", label: "Sắp hết hạn" },
   { id: "PENDING_SIGNATURE", label: "Chờ ký" },
   { id: "SIGNED", label: "Đã ký" },
   { id: "OVERDUE", label: "Quá hạn" },
@@ -1468,7 +1469,9 @@ export default function ContractTemplatePage() {
   const [actionMessage, setActionMessage] = useState("");
   const [keyword, setKeyword] = useState("");
   const [fileFilter, setFileFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(
+    () => searchParams.get("status") || "all",
+  );
   const [timeFilter, setTimeFilter] = useState("all");
   const [timePopoverOpen, setTimePopoverOpen] = useState(false);
   const [timePanelQuarter, setTimePanelQuarter] = useState("Q1");

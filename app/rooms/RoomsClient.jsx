@@ -1760,17 +1760,11 @@ function RoomDetail({ room, onClose }) {
               Chỉ số gần nhất
             </h3>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="mt-4 text-sm">
             <div className="rounded-lg bg-white p-3 border border-slate-200/60">
               <p className="text-xs font-semibold text-slate-400">Điện cũ</p>
               <p className="mt-1 text-lg font-bold text-slate-900">
                 {room.lastMeterReading?.electric ?? "—"} kWh
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-3 border border-slate-200/60">
-              <p className="text-xs font-semibold text-slate-400">Nước cũ</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">
-                {room.lastMeterReading?.water ?? "—"} m³
               </p>
             </div>
           </div>

@@ -136,13 +136,9 @@ export async function queueMeterReadingForSync(entry) {
         period: entry.period || "",
         propertyId: entry.propertyId || "",
         electricityValue: entry.electricityValue,
-        waterValue: entry.waterValue,
         electricityPhotoId: entry.electricityPhotoId ?? null,
-        waterPhotoId: entry.waterPhotoId ?? null,
         electricityPhotoFile: entry.electricityPhotoFile ?? null,
         electricityPhotoName: entry.electricityPhotoName || entry.electricityPhotoFile?.name || "electricity-meter.jpg",
-        waterPhotoFile: entry.waterPhotoFile ?? null,
-        waterPhotoName: entry.waterPhotoName || entry.waterPhotoFile?.name || "water-meter.jpg",
         attemptCount: entry.attemptCount ?? 0,
         lastError: entry.lastError || "",
         createdAt: entry.createdAt || now,
@@ -206,29 +202,19 @@ export async function syncQueuedMeterReadings() {
     for (const item of items) {
         try {
             let electricityPhotoId = item.electricityPhotoId;
-            let waterPhotoId = item.waterPhotoId;
 
-            if (!electricityPhotoId) {
+            if (!electricityPhotoId && item.electricityPhotoFile) {
                 const photoFile = fileFromQueuedPhoto(item.electricityPhotoFile, item.electricityPhotoName);
-                if (!photoFile) throw new Error("Missing electricity evidence photo");
-                const response = await uploadMeterReadingPhoto(photoFile);
-                electricityPhotoId = response?.fileId || response?.id;
-                if (!electricityPhotoId) throw new Error("Cannot upload electricity evidence photo");
-            }
-
-            if (!waterPhotoId) {
-                const photoFile = fileFromQueuedPhoto(item.waterPhotoFile, item.waterPhotoName);
-                if (!photoFile) throw new Error("Missing water evidence photo");
-                const response = await uploadMeterReadingPhoto(photoFile);
-                waterPhotoId = response?.fileId || response?.id;
-                if (!waterPhotoId) throw new Error("Cannot upload water evidence photo");
+                if (photoFile) {
+                    const response = await uploadMeterReadingPhoto(photoFile);
+                    electricityPhotoId = response?.fileId || response?.id;
+                    if (!electricityPhotoId) throw new Error("Cannot upload electricity evidence photo");
+                }
             }
 
             await saveProgressiveRoomReading(item.batchId, item.roomId, {
                 electricityValue: item.electricityValue,
-                waterValue: item.waterValue,
                 electricityPhotoId,
-                waterPhotoId,
             });
 
             await removeQueuedMeterReading(item.id);

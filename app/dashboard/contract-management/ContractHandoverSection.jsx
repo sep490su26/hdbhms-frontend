@@ -150,15 +150,10 @@ export default function ContractHandoverSection({
   /* meter readings -------------------------------------------------- */
   const [handoverDate, setHandoverDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricReading, setElectricReading] = useState("");
-  const [waterReading, setWaterReading] = useState("");
   const [electricReadingDate, setElectricReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [waterReadingDate, setWaterReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricImageFile, setElectricImageFile] = useState(null);
   const [electricImageUrl, setElectricImageUrl] = useState("");
   const [electricPhotoFileId, setElectricPhotoFileId] = useState(null);
-  const [waterImageFile, setWaterImageFile] = useState(null);
-  const [waterImageUrl, setWaterImageUrl] = useState("");
-  const [waterPhotoFileId, setWaterPhotoFileId] = useState(null);
 
   /* assets ---------------------------------------------------------- */
   const [assets, setAssets] = useState(() =>
@@ -250,19 +245,12 @@ export default function ContractHandoverSection({
         setElectricReading(prev => prev === "" ? String(elecValue ?? 0) : prev);
         if (elecDate) setElectricReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? elecDate : prev);
 
-        const wat = data?.water || {};
-        const watValue = wat.suggested_value ?? wat.suggestedValue;
-        const watDate = wat.last_reading_date ?? wat.lastReadingDate;
-
-        setWaterReading(prev => prev === "" ? String(watValue ?? 0) : prev);
-        if (watDate) setWaterReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? watDate : prev);
       })
       .catch((err) => {
         if (signal?.aborted) return;
         setElectricReading(prev => prev === "" ? "0" : prev);
-        setWaterReading(prev => prev === "" ? "0" : prev);
         console.warn(
-          "Không tải được chỉ số điện nước gần nhất; vẫn có thể nhập bàn giao thủ công.",
+          "Không tải được chỉ số điện gần nhất; vẫn có thể nhập bàn giao thủ công.",
           err?.message ?? "Unknown error",
         );
       });
@@ -287,9 +275,6 @@ export default function ContractHandoverSection({
               const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
               setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
               setElectricPhotoFileId(data.electricity?.photoFileId ?? data.electricity?.photo_file_id ?? null);
-              const watValue = data.water?.current_value ?? data.water?.currentValue;
-              setWaterReading(prev => watValue != null ? String(watValue) : (prev === "" ? "0" : prev));
-              setWaterPhotoFileId(data.water?.photoFileId ?? data.water?.photo_file_id ?? null);
               if (data.note) setNote(data.note);
               if (showCompensation && Array.isArray(data.items) && data.items.length > 0) {
                 setAssets(
@@ -317,21 +302,21 @@ export default function ContractHandoverSection({
             } else {
               setIsConfirmed(false);
               onLoaded?.(null);
-              if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
+              if (electricReading === "") loadReadings(controller.signal);
             }
           })
           .catch((err) => {
             if (controller.signal.aborted) return;
             onLoaded?.(null);
-            if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
+            if (electricReading === "") loadReadings(controller.signal);
           });
     } else {
       onLoaded?.(null);
-      if (electricReading === "" && waterReading === "") loadReadings(controller.signal);
+      if (electricReading === "") loadReadings(controller.signal);
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, waterReading, showCompensation]);
+  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, showCompensation]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -352,21 +337,14 @@ export default function ContractHandoverSection({
     return url;
   }, []);
 
-  const handleMeterImage = useCallback((type, file) => {
+  const handleMeterImage = useCallback((file) => {
     if (!file) return;
     const url = makeBlobUrl(file);
-    if (type === "electric") {
-      if (electricImageUrl) URL.revokeObjectURL(electricImageUrl);
-      setElectricImageFile(file);
-      setElectricImageUrl(url);
-      setElectricPhotoFileId(null);
-    } else {
-      if (waterImageUrl) URL.revokeObjectURL(waterImageUrl);
-      setWaterImageFile(file);
-      setWaterImageUrl(url);
-      setWaterPhotoFileId(null);
-    }
-  }, [electricImageUrl, waterImageUrl, makeBlobUrl]);
+    if (electricImageUrl) URL.revokeObjectURL(electricImageUrl);
+    setElectricImageFile(file);
+    setElectricImageUrl(url);
+    setElectricPhotoFileId(null);
+  }, [electricImageUrl, makeBlobUrl]);
 
   const updateAsset = useCallback((index, field, value) => {
     setSaveSuccess(false);
@@ -456,9 +434,7 @@ export default function ContractHandoverSection({
   const isValid =
     Boolean(contractId && handoverDate) &&
     electricReading !== "" &&
-    waterReading !== "" &&
     Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
-    Number.isFinite(Number(waterReading)) && Number(waterReading) >= 0 &&
     (!showAssets || assets.every((a) =>
       a.assetName.trim() &&
       a.assetCategory.trim() &&
@@ -472,8 +448,8 @@ export default function ContractHandoverSection({
   function validateBeforeSave() {
     if (!isValid) {
       toast.error(showAssets
-        ? "Vui lòng nhập đủ ngày bàn giao, chỉ số điện/nước và thông tin thiết bị."
-        : "Vui lòng nhập đủ ngày bàn giao và chỉ số điện/nước."
+        ? "Vui lòng nhập đủ ngày bàn giao, chỉ số điện và thông tin thiết bị."
+        : "Vui lòng nhập đủ ngày bàn giao và chỉ số điện."
       );
       return false;
     }
@@ -503,14 +479,9 @@ export default function ContractHandoverSection({
     try {
       // 1. Upload meter photos
       let electricPhotoId = electricPhotoFileId;
-      let waterPhotoId = waterPhotoFileId;
       if (electricImageFile) {
         const res = await uploadFile(electricImageFile, "METER_PHOTO");
         electricPhotoId = res?.fileId || res?.id;
-      }
-      if (waterImageFile) {
-        const res = await uploadFile(waterImageFile, "METER_PHOTO");
-        waterPhotoId = res?.fileId || res?.id;
       }
 
       // 2. Upload new asset images
@@ -586,11 +557,6 @@ export default function ContractHandoverSection({
           photoFileId: electricPhotoId,
           readingDate: electricReadingDate || undefined,
         },
-        water: {
-          currentValue: (waterReading != null && waterReading !== "" && !isNaN(Number(waterReading))) ? Number(waterReading) : 0,
-          photoFileId: waterPhotoId,
-          readingDate: waterReadingDate || undefined,
-        },
         assets: showAssets ? assetPayloads : undefined,
         deletedAssetIds,
       });
@@ -601,7 +567,6 @@ export default function ContractHandoverSection({
       setSaveSuccess(true);
       setIsConfirmed(true);
       setElectricPhotoFileId(electricPhotoId ?? null);
-      setWaterPhotoFileId(waterPhotoId ?? null);
       onSaved?.(response || {status: "CONFIRMED", handoverType});
       return true;
     } catch (err) {
@@ -671,7 +636,7 @@ export default function ContractHandoverSection({
       </div>
 
       {/* Meter Readings */}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="mt-4 max-w-xl">
         {/* Electric Card */}
         <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
           <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ điện</h4>
@@ -711,44 +676,6 @@ export default function ContractHandoverSection({
           </div>
         </div>
 
-        {/* Water Card */}
-        <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-          <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ nước</h4>
-
-          <div className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#58667c]">{readingLabel} (m³) *</span>
-            <input
-              type="number"
-              min="0"
-              value={waterReading}
-              disabled={effectiveReadonly}
-              onChange={(e) => setWaterReading(e.target.value)}
-              placeholder="VD: 56"
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <span className="text-xs font-bold text-[#58667c]">Ngày chốt chỉ số *</span>
-            <input
-              type="date"
-              value={waterReadingDate}
-              disabled={effectiveReadonly}
-              onChange={(e) => setWaterReadingDate(e.target.value)}
-              className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
-            />
-          </div>
-
-          <div className="mt-1">
-            <ImageUploadButton
-              imageUrl={waterImageUrl}
-              fileId={waterPhotoFileId}
-              label="Upload ảnh bằng chứng nước"
-              disabled={effectiveReadonly}
-              onChange={(e) => handleMeterImage("water", e.target.files?.[0])}
-            />
-          </div>
-        </div>
       </div>
 
       {/* Assets Table */}

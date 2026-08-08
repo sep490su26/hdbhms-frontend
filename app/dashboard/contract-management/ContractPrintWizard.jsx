@@ -221,7 +221,6 @@ function buildPrintableHtml({form, handover, assets}) {
         .join("");
     const meterRows = [
         ["ĐỒNG HỒ ĐO ĐIỆN", "CÁI", "01", `Chỉ số: ${(handover.electricReading !== "" && handover.electricReading != null) ? handover.electricReading : "............"}, ngày ${formatDate(handover.handoverDate)}`],
-        ["ĐỒNG HỒ ĐO NƯỚC", "CÁI", "01", `Chỉ số: ${(handover.waterReading !== "" && handover.waterReading != null) ? handover.waterReading : "............"}, ngày ${formatDate(handover.handoverDate)}`],
         ["CHÌA KHÓA CỬA CHÍNH", "BỘ", "01", ""],
     ]
         .map(
@@ -301,7 +300,6 @@ function buildPrintableHtml({form, handover, assets}) {
     <p class="section-title">4. Bàn giao phòng</p>
     <p class="indent">Ngày bàn giao: <span class="line">${e(formatDate(handover.handoverDate))}</span></p>
     <p class="indent">Chỉ số điện ban đầu: <span class="line">${e((handover.electricReading !== "" && handover.electricReading != null) ? handover.electricReading : "..........")}</span></p>
-    <p class="indent">Chỉ số nước ban đầu: <span class="line">${e((handover.waterReading !== "" && handover.waterReading != null) ? handover.waterReading : "..........")}</span></p>
     <table>
       <thead>
         <tr><th>STT</th><th>Tên thiết bị</th><th>Đơn vị</th><th>SL</th><th>Hiện trạng</th><th>Ghi chú</th></tr>
@@ -344,7 +342,6 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
     const [handover, setHandover] = useState({
         handoverDate: new Date().toISOString().split("T")[0],
         electricReading: "",
-        waterReading: "",
         note: "",
     });
     const [assets, setAssets] = useState(HANDOVER_ASSET_TEMPLATE);
@@ -377,7 +374,6 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                         ...prev,
                         handoverDate: (hData.handover_date || hData.handoverDate) ? (hData.handover_date || hData.handoverDate).split("T")[0] : prev.handoverDate,
                         electricReading: hData.electricity?.current_value ?? hData.electricity?.currentValue ?? "",
-                        waterReading: hData.water?.current_value ?? hData.water?.currentValue ?? "",
                         note: hData.note || "",
                     }));
                 } else {
@@ -389,11 +385,9 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                         if (latestRes.ok) {
                             const body = await latestRes.json();
                             const elec = body.data?.electricity?.suggested_value ?? body.data?.electricity?.suggestedValue ?? "";
-                            const water = body.data?.water?.suggested_value ?? body.data?.water?.suggestedValue ?? "";
                             setHandover(prev => ({
                                 ...prev,
                                 electricReading: elec,
-                                waterReading: water,
                             }));
                         }
                     } catch (e) {
@@ -627,8 +621,6 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         <Field label="Chỉ số điện ban đầu" type="number"
                                                value={handover.electricReading}
                                                onChange={(value) => updateHandover("electricReading", value)}/>
-                                        <Field label="Chỉ số nước ban đầu" type="number" value={handover.waterReading}
-                                               onChange={(value) => updateHandover("waterReading", value)}/>
                                     </div>
                                 </section>
                                 <div className="mt-4 overflow-x-auto rounded-xl border border-[#dfe5ef] dark:border-white/10">
@@ -714,7 +706,6 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         <PrintLine label="Đến ngày" value={formatDate(form.endDate)}/>
                                         <PrintLine label="Ngày bàn giao" value={formatDate(handover.handoverDate)}/>
                                         <PrintLine label="Chỉ số điện ban đầu" value={handover.electricReading}/>
-                                        <PrintLine label="Chỉ số nước ban đầu" value={handover.waterReading}/>
                                         <table className="mt-4 w-full border-collapse text-xs">
                                             <thead>
                                             <tr className="[&_th]:border [&_th]:p-2">

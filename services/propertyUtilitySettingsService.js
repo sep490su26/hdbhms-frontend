@@ -22,8 +22,7 @@ export async function updatePropertyUtilitySettings(propertyId, payload) {
       body: JSON.stringify({
         electricityUnitPrice: toNonNegativeNumber(payload.electricityUnitPrice),
         electricityFreeAllowance: toNonNegativeNumber(payload.electricityFreeAllowance),
-        waterUnitPrice: toNonNegativeNumber(payload.waterUnitPrice),
-        waterFreeAllowance: toNonNegativeNumber(payload.waterFreeAllowance),
+        serviceFeeUnitPrice: toNonNegativeNumber(payload.serviceFeeUnitPrice ?? 50000),
       }),
     },
   );

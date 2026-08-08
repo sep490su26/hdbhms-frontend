@@ -114,6 +114,22 @@ async function safeFetch(url, options) {
     }
 }
 
+function resolveApiUrl(url) {
+    if (!url) return API_BASE_URL;
+    if (/^https?:\/\//i.test(url)) return url;
+
+    const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+    if (url === baseUrl || url.startsWith(`${baseUrl}/`)) return url;
+    if (url === "/api/v1" || url.startsWith("/api/v1/")) {
+        if (/^https?:\/\//i.test(baseUrl)) {
+            return `${baseUrl.replace(/\/api\/v1$/i, "")}${url}`;
+        }
+        return url;
+    }
+
+    return url.startsWith("/") ? `${baseUrl}${url}` : url;
+}
+
 export async function parseEnvelope(response) {
     const { payload, rawText } = await readResponsePayload(response);
     const isEnvelope = isEnvelopePayload(payload);
@@ -137,7 +153,7 @@ export async function parseEnvelope(response) {
 }
 
 export async function authenticatedFetch(url, options = {}) {
-    const fullUrl = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+    const fullUrl = resolveApiUrl(url);
     const requestOptions = {
         ...options,
         credentials: "include",

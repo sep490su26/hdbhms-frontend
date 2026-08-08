@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-function loadIdentityAccessService() {
+function loadIdentityAccessService(apiBaseUrl = "https://api.test/api/v1") {
   const source = readFileSync(new URL("./identityAccessService.js", import.meta.url), "utf8")
     .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/lib\/apiConfig";\s*/m, "")
     .replace(/import\s*{[\s\S]*?}\s*from\s*"@\/lib\/pageResponse";\s*/m, "")
@@ -22,7 +22,7 @@ return {
 };`,
   );
 
-  return factory("https://api.test/api/v1");
+  return factory(apiBaseUrl);
 }
 
 function jsonResponse(body, init = {}) {
@@ -136,6 +136,38 @@ test("authenticatedFetch requests JSON responses", async () => {
     };
 
     assert.deepEqual(await authenticatedFetch("/meter-readings/history"), { ok: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("authenticatedFetch does not duplicate relative API base paths", async () => {
+  const { authenticatedFetch } = loadIdentityAccessService("/api/v1");
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (url) => {
+      assert.equal(url, "/api/v1/person-profiles/me");
+      return jsonResponse({ code: 0, data: { ok: true } });
+    };
+
+    assert.deepEqual(await authenticatedFetch("/api/v1/person-profiles/me"), { ok: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("authenticatedFetch resolves prefixed paths against absolute API bases", async () => {
+  const { authenticatedFetch } = loadIdentityAccessService("https://api.test/api/v1");
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (url) => {
+      assert.equal(url, "https://api.test/api/v1/person-profiles/me");
+      return jsonResponse({ code: 0, data: { ok: true } });
+    };
+
+    assert.deepEqual(await authenticatedFetch("/api/v1/person-profiles/me"), { ok: true });
   } finally {
     globalThis.fetch = originalFetch;
   }

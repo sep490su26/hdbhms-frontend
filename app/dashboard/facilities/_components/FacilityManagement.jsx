@@ -33,8 +33,7 @@ import { ROLES } from "@/app/dashboard/_lib/rbac";
 const DEFAULT_UTILITY_VALUES = {
   electricityUnitPrice: "3500",
   electricityFreeAllowance: "0",
-  waterUnitPrice: "20000",
-  waterFreeAllowance: "6",
+  serviceFeeUnitPrice: "50000",
 };
 
 function utilitySettingsToValues(settings) {
@@ -46,11 +45,8 @@ function utilitySettingsToValues(settings) {
       settings?.electricity?.freeAllowance ??
         DEFAULT_UTILITY_VALUES.electricityFreeAllowance,
     ),
-    waterUnitPrice: String(
-      settings?.water?.unitPrice ?? DEFAULT_UTILITY_VALUES.waterUnitPrice,
-    ),
-    waterFreeAllowance: String(
-      settings?.water?.freeAllowance ?? DEFAULT_UTILITY_VALUES.waterFreeAllowance,
+    serviceFeeUnitPrice: String(
+      settings?.serviceFee?.unitPrice ?? DEFAULT_UTILITY_VALUES.serviceFeeUnitPrice,
     ),
   };
 }
@@ -207,7 +203,7 @@ export function FacilityManagement() {
       setUtilityState((current) => ({
         ...current,
         loading: false,
-        error: error?.message || "Không thể tải giá điện nước.",
+        error: error?.message || "Không thể tải giá điện và phí dịch vụ.",
       }));
     }
   }
@@ -242,12 +238,12 @@ export function FacilityManagement() {
         saving: false,
         isOpen: false,
       }));
-      facility.pushToast("Đã cập nhật giá điện nước");
+      facility.pushToast("Đã cập nhật giá điện và phí dịch vụ");
     } catch (error) {
       setUtilityState((current) => ({
         ...current,
         saving: false,
-        error: error?.message || "Không thể lưu giá điện nước.",
+        error: error?.message || "Không thể lưu giá điện và phí dịch vụ.",
       }));
     }
   }

@@ -300,7 +300,7 @@ export default function MeterReadingHistoryPage() {
           className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]"
         >
           <ArrowLeft className="h-4 w-4" />
-          Quản lý điện nước
+          Quản lý chỉ số điện
         </Link>
         <div className="mt-2">
           <DashboardPageHeader
@@ -308,7 +308,7 @@ export default function MeterReadingHistoryPage() {
             description={
               facilityName
                 ? `Tra cứu trạng thái, tiến độ và cảnh báo theo từng kỳ tại ${facilityName}.`
-                : "Tra cứu trạng thái, tiến độ và cảnh báo theo từng kỳ ghi điện nước."
+                : "Tra cứu trạng thái, tiến độ và cảnh báo theo từng kỳ ghi điện."
             }
           />
         </div>

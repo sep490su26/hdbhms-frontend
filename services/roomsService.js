@@ -178,7 +178,7 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
       "Không tự ý cải tạo kết cấu phòng.",
       "Thông báo trước khi nuôi thú cưng hoặc ở thêm người.",
     ],
-    lastMeterReading: { electric: 0, water: 0, recordedAt: "" },
+    lastMeterReading: { electric: 0, recordedAt: "" },
     amenities: apiRoom.amenities?.length
       ? apiRoom.amenities
       : ["Wifi tốc độ cao", "Điều hòa", "Bình nóng lạnh", "Máy giặt", "Vệ sinh khép kín", "Khu phơi đồ"],

@@ -1,4 +1,12 @@
 /** @type {import('next').NextConfig} */
+function trimTrailingSlash(value = "") {
+  return value.replace(/\/+$/, "");
+}
+
+function stripApiBasePath(value = "") {
+  return trimTrailingSlash(value).replace(/\/api\/v1$/i, "");
+}
+
 const remotePatterns = [
   {
     protocol: "https",
@@ -32,6 +40,7 @@ const remotePatterns = [
 ];
 
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const apiProxyTarget = stripApiBasePath(process.env.API_PROXY_TARGET || "");
 if (configuredApiBaseUrl) {
   try {
     const apiUrl = new URL(configuredApiBaseUrl);
@@ -62,6 +71,16 @@ const nextConfig = {
   images: {
     remotePatterns,
     dangerouslyAllowLocalIP: process.env.NODE_ENV !== "production",
+  },
+  async rewrites() {
+    if (!apiProxyTarget) return [];
+
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiProxyTarget}/api/v1/:path*`,
+      },
+    ];
   },
 };
 

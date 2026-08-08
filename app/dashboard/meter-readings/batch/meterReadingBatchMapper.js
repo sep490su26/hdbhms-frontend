@@ -12,6 +12,17 @@ const toFiniteNumber = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizeWarnings = (warnings) =>
+  Array.isArray(warnings)
+    ? warnings.map((warning) => ({
+        id: readField(warning, "id", "id") ?? readField(warning, "warningId", "warning_id") ?? null,
+        meterType: readField(warning, "meterType", "meter_type") ?? "",
+        type: readField(warning, "type", "type") ?? "",
+        severity: readField(warning, "severity", "severity") ?? "",
+        message: readField(warning, "message", "message") ?? "",
+      }))
+    : [];
+
 export function calculateMeterUsage(currentValue, previousValue) {
   if (currentValue === null || currentValue === undefined || currentValue === "") {
     return null;
@@ -32,10 +43,7 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
     readField(room, "electricityPrevious", "electricity_previous"),
     0,
   );
-  const waterPrevious = toFiniteNumber(
-    readField(room, "waterPrevious", "water_previous"),
-    0,
-  );
+  const electricityPhotoId = readField(room, "electricityPhotoId", "electricity_photo_id");
 
   return {
     key:
@@ -52,16 +60,10 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
       readField(room, "electricityCurrent", "electricity_current"),
       electricityPrevious,
     ),
-    waterPrev: waterPrevious,
-    waterCurr: toFiniteNumber(
-      readField(room, "waterCurrent", "water_current"),
-      waterPrevious,
-    ),
+    electricityPhotoId: electricityPhotoId ?? null,
     status: readField(room, "status", "status") || "pending",
     syncTime: formatDateTime(syncTimeValue, null),
-    photos: Math.max(
-      0,
-      toFiniteNumber(readField(room, "photosCount", "photos_count"), 0),
-    ),
+    photos: Number(Boolean(electricityPhotoId)),
+    warnings: normalizeWarnings(readField(room, "warnings", "warnings")),
   };
 }

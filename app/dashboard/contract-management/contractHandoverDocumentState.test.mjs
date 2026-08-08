@@ -15,7 +15,6 @@ test("handover document waits for handover data", () => {
 test("confirmed handover without a signed file stays optional and pending", () => {
   const state = getHandoverDocumentState({
     electricity: { currentValue: 12 },
-    water: { currentValue: 3 },
     signedDocumentId: null,
   });
 
@@ -26,7 +25,6 @@ test("confirmed handover without a signed file stays optional and pending", () =
 test("signed handover file completes the document card", () => {
   const state = getHandoverDocumentState({
     electricity: { currentValue: 12 },
-    water: { currentValue: 3 },
     signed_document_id: 91,
   });
 

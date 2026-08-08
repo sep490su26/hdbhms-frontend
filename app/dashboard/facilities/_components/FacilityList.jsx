@@ -158,7 +158,7 @@ function FacilityActionsMenu({
               className={facilityActionItemClass}
             >
               <Gauge className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              Điện nước
+              Nhập số điện
             </Link>
           </DropdownMenuItem>
         ) : null}
@@ -184,7 +184,7 @@ function FacilityActionsMenu({
             className={facilityActionItemClass}
           >
             <CircleDollarSign className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            Giá điện nước
+            Giá điện & dịch vụ
           </button>
         </DropdownMenuItem>
       </DropdownMenuContent>

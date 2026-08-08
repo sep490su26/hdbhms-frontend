@@ -54,8 +54,8 @@ function getTransferOutScopeTitle(transfer) {
 
 function getTransferOutScopeDescription(transfer) {
     return requiresFullMoveOut(transfer)
-        ? "Lưu bàn giao phòng cũ bằng luồng bàn giao hợp đồng, sau đó chốt để hệ thống tạo hóa đơn điện nước cuối kỳ."
-        : "Phòng cũ vẫn còn người ở, chỉ chốt chỉ số điện/nước cho người chuyển đi; không cập nhật tài sản phòng.";
+        ? "Lưu bàn giao phòng cũ bằng luồng bàn giao hợp đồng, sau đó chốt để hệ thống tạo hóa đơn điện cuối kỳ."
+        : "Phòng cũ vẫn còn người ở, chỉ chốt chỉ số điện cho người chuyển đi; không cập nhật tài sản phòng.";
 }
 
 function isConfirmedHandover(handover) {
@@ -441,11 +441,11 @@ export default function TransferExecutionModal({
                                         <p className="text-sm font-semibold text-blue-950">Phòng cũ đã được chốt.</p>
                                         {transfer?.oldRoomFinalInvoiceId ? (
                                             <p className="mt-1 text-xs font-semibold text-blue-700">
-                                                Hóa đơn điện/nước chốt phòng cũ: #{transfer.oldRoomFinalInvoiceId}. Hóa đơn này cần được thanh toán trước khi hoàn tất chuyển phòng.
+                                                Hóa đơn điện chốt phòng cũ: #{transfer.oldRoomFinalInvoiceId}. Hóa đơn này cần được thanh toán trước khi hoàn tất chuyển phòng.
                                             </p>
                                         ) : (
                                             <p className="mt-1 text-xs font-semibold text-blue-700">
-                                                Không có hóa đơn điện/nước phát sinh cho phòng cũ hoặc hóa đơn đã được xử lý.
+                                                Không có hóa đơn điện phát sinh cho phòng cũ hoặc hóa đơn đã được xử lý.
                                             </p>
                                         )}
                                     </div>

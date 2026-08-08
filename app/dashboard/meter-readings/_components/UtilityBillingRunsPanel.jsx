@@ -9,6 +9,13 @@ import {
   fetchUtilityBillingRuns,
   publishUtilityBillingRun,
 } from "@/services/billingService";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const money = new Intl.NumberFormat("vi-VN");
 const PUBLISHED_STATUS = "INVOICES_CREATED";
@@ -99,6 +106,7 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
   const [billingRunDetail, setBillingRunDetail] = useState(null);
   const [loadingRun, setLoadingRun] = useState(false);
   const [saving, setSaving] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const activeRun = billingRunDetail || billingRun;
   const runItems = activeRun?.items || [];
@@ -131,7 +139,7 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
         setBillingRunDetail(detail);
       }
     } catch (error) {
-      toast.error(error?.message || "Không tải được bản nháp hóa đơn điện nước.");
+      toast.error(error?.message || "Không tải được bản nháp hóa đơn điện.");
     } finally {
       setLoadingRun(false);
     }
@@ -144,22 +152,22 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
 
   async function generateBillingBatch() {
     if (!propertyId) {
-      toast.error("Vui lòng chọn cơ sở trước khi tạo bản nháp hóa đơn điện nước.");
+      toast.error("Vui lòng chọn cơ sở trước khi tạo bản nháp hóa đơn điện.");
       return;
     }
     if (!billingPeriod) {
-      toast.error("Không xác định được kỳ ghi chỉ số để tạo hóa đơn điện nước.");
+      toast.error("Không xác định được kỳ ghi chỉ số để tạo hóa đơn điện.");
       return;
     }
 
     setSaving("generate-batch");
     try {
       const run = await createUtilityBillingRun({ propertyId, billingPeriod });
-      toast.success("Đã tạo bản nháp hóa đơn điện nước để quản lý review.");
+      toast.success("Đã tạo bản nháp hóa đơn điện để quản lý review.");
       setBillingRun(run);
       setBillingRunDetail(run);
     } catch (error) {
-      toast.error(error?.message || "Không tạo được bản nháp hóa đơn điện nước.");
+      toast.error(error?.message || "Không tạo được bản nháp hóa đơn điện.");
     } finally {
       setSaving("");
     }
@@ -171,11 +179,11 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
     setSaving(`publish-batch-${activeRun.runId}`);
     try {
       const run = await publishUtilityBillingRun(activeRun.runId);
-      toast.success("Đã phát hành hóa đơn điện nước và gửi thông báo cho khách thuê.");
+      toast.success("Đã phát hành hóa đơn điện và gửi thông báo cho khách thuê.");
       setBillingRun(run);
       setBillingRunDetail(run);
     } catch (error) {
-      toast.error(error?.message || "Không phát hành được hóa đơn điện nước.");
+      toast.error(error?.message || "Không phát hành được hóa đơn điện.");
     } finally {
       setSaving("");
     }
@@ -185,116 +193,122 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
   if (!loadingRun && activeRun?.status === PUBLISHED_STATUS) return null;
 
   return (
-    <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-      <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-4 py-3 dark:border-white/10 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
-            <ReceiptText className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Gửi hóa đơn điện nước
-            </h2>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Kỳ ghi chỉ số đã chốt. Kiểm tra bản nháp rồi phát hành hóa đơn cho khách thuê.
-            </p>
+    <>
+      <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+              <ReceiptText className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                Gửi hóa đơn điện
+              </h2>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Kiểm tra và phát hành hóa đơn cho kỳ {formatBillingPeriod(billingPeriod)}.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <span className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] px-3 text-sm font-black text-slate-700 dark:border-white/10 dark:text-slate-200">
-            Kỳ {formatBillingPeriod(billingPeriod)}
-          </span>
           <button
             type="button"
-            onClick={loadBillingRun}
-            disabled={!propertyId || loadingRun}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+            onClick={() => setDialogOpen(true)}
+            disabled={!propertyId}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw className={`h-4 w-4 ${loadingRun ? "animate-spin" : ""}`} />
-            Làm mới
-          </button>
-          <button
-            type="button"
-            onClick={generateBillingBatch}
-            disabled={!propertyId || saving === "generate-batch"}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
-          >
-            {saving === "generate-batch" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {activeRun ? "Tạo lại bản nháp" : "Tạo bản nháp"}
+            <ReceiptText className="h-4 w-4" />
+            Mở khu vực gửi hóa đơn
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="p-4">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(nextOpen) => {
+          if (!saving) setDialogOpen(nextOpen);
+        }}
+      >
+        <DialogContent
+          lockScroll={false}
+          className="grid min-h-0 w-[calc(100%-2rem)] max-h-[min(92vh,900px)] max-w-6xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-0 sm:max-w-6xl"
+        >
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="text-lg font-black">Gửi hóa đơn điện</DialogTitle>
+            <DialogDescription>
+              Kiểm tra bản nháp kỳ {formatBillingPeriod(billingPeriod)} trước khi phát hành cho khách thuê.
+            </DialogDescription>
+          </DialogHeader>
+
+          <section className="flex min-h-0 flex-1 flex-col border-t border-[#e2e8f0] dark:border-white/10">
+            <div className="flex flex-col gap-3 border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeRun ? (
+                    <>
+                      <h3 className="min-w-0 text-base font-black text-slate-900 dark:text-white">
+                        Bản nháp kỳ {formatBillingPeriod(activeRun.billingPeriod)} - {activeRun.propertyName || "Cơ sở"}
+                      </h3>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchStatusClasses(activeRun.status)}`}
+                      >
+                        {billingBatchStatusLabel(activeRun.status)}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+                {activeRun ? (
+                  <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    {activeRun.totalRooms} phòng, tổng dự kiến {formatMoney(activeRun.totalAmount)}.
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateBillingBatch}
+                  disabled={!propertyId || saving === "generate-batch"}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+                >
+                  {saving === "generate-batch" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {activeRun ? "Tạo lại bản nháp" : "Tạo bản nháp"}
+                </button>
+                {activeRun ? (
+                  <button
+                    type="button"
+                    onClick={publishBillingBatch}
+                    disabled={publishBlocked || saving === `publish-batch-${activeRun.runId}`}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving === `publish-batch-${activeRun.runId}` ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    Phát hành hóa đơn
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 pt-4">
         {!propertyId ? (
           <div className="rounded-lg border border-dashed border-[#cbd5e1] p-6 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
-            Vui lòng chọn cơ sở để phát hành hóa đơn điện nước.
+            Vui lòng chọn cơ sở để phát hành hóa đơn điện.
           </div>
         ) : loadingRun ? (
           <div className="rounded-lg border border-dashed border-[#cbd5e1] p-6 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
             <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-            Đang tải bản nháp hóa đơn điện nước...
+            Đang tải bản nháp hóa đơn điện...
           </div>
         ) : !activeRun ? (
           <div className="rounded-lg border border-dashed border-[#cbd5e1] p-6 text-center text-sm font-semibold text-slate-500 dark:border-white/10 dark:text-slate-400">
-            Chưa có bản nháp hóa đơn điện nước cho kỳ này.
+            Chưa có bản nháp hóa đơn điện cho kỳ này.
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Bản nháp kỳ {formatBillingPeriod(activeRun.billingPeriod)} - {activeRun.propertyName || "Cơ sở"}
-                  </h3>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchStatusClasses(activeRun.status)}`}
-                  >
-                    {billingBatchStatusLabel(activeRun.status)}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {activeRun.totalRooms} phòng, tổng dự kiến {formatMoney(activeRun.totalAmount)}.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={publishBillingBatch}
-                disabled={publishBlocked || saving === `publish-batch-${activeRun.runId}`}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving === `publish-batch-${activeRun.runId}` ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Phát hành hóa đơn
-              </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-4">
-              <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Sẵn sàng</p>
-                <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeRun.readyCount}</p>
-              </div>
-              <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-500/10">
-                <p className="text-xs font-bold text-amber-700 dark:text-amber-300">Cần kiểm tra</p>
-                <p className="mt-1 text-xl font-black text-amber-800 dark:text-amber-200">{activeRun.warningCount}</p>
-              </div>
-              <div className="rounded-lg bg-slate-50 p-3 dark:bg-white/5">
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Bỏ qua</p>
-                <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{activeRun.skippedCount}</p>
-              </div>
-              <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-500/10">
-                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Đã phát hành</p>
-                <p className="mt-1 text-xl font-black text-emerald-800 dark:text-emerald-200">{activeRun.generatedInvoiceCount}</p>
-              </div>
-            </div>
-
             {warningRunItems.length > 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                 Còn {warningRunItems.length} phòng cần kiểm tra. Hãy sửa chỉ số hoặc tạo lại bản nháp trước khi phát hành.
@@ -302,12 +316,11 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
             ) : null}
 
             <div className="overflow-x-auto rounded-lg border border-[#e2e8f0] dark:border-white/10">
-              <table className="w-full min-w-[860px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-[#f2f4f6] text-xs uppercase text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Phòng</th>
                     <th className="px-4 py-3 text-right">Điện</th>
-                    <th className="px-4 py-3 text-right">Nước</th>
                     <th className="px-4 py-3 text-right">Dịch vụ</th>
                     <th className="px-4 py-3">Trạng thái</th>
                     <th className="px-4 py-3 text-right">Tổng</th>
@@ -316,7 +329,7 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
                 <tbody>
                   {runItems.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
                         Chưa có phòng trong bản nháp.
                       </td>
                     </tr>
@@ -335,10 +348,6 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
                           <p className="font-bold">{item.electricityUsage}</p>
                           <p className="text-xs text-slate-500">{formatMoney(item.electricityAmount)}</p>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <p className="font-bold">{item.waterUsage}</p>
-                          <p className="text-xs text-slate-500">{formatMoney(item.waterAmount)}</p>
-                        </td>
                         <td className="px-4 py-3 text-right font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
                         <td className="px-4 py-3">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(item.status)}`}>
@@ -355,6 +364,9 @@ export function UtilityBillingRunsPanel({ propertyId, defaultPeriod }) {
           </div>
         )}
       </div>
-    </section>
+          </section>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

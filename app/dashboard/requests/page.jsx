@@ -362,7 +362,7 @@ const getTransferTimingNote = (transfer) => {
   const moveOutNote =
     "Chỉ thực hiện full move-out khi sau chuyển phòng cũ trở thành phòng trống. Nếu phòng cũ vẫn còn người ở thì chỉ xử lý phần occupant rời đi, không làm room-level move-out đầy đủ.";
   const moveInNote = requiresFullMoveIn(transfer)
-    ? "Chốt phòng cũ chỉ ghi nhận người rời phòng và tạo hóa đơn điện/nước nếu phát sinh; sau khi hóa đơn này đã thanh toán, manager mới nhập check-in phòng mới và hoàn tất chuyển phòng."
+    ? "Chốt phòng cũ chỉ ghi nhận người rời phòng và tạo hóa đơn điện nếu phát sinh; sau khi hóa đơn này đã thanh toán, manager mới nhập check-in phòng mới và hoàn tất chuyển phòng."
     : "Ca này không cần full move-in kiểu nhận phòng trống vì tenant đi vào hợp đồng/phòng đang có người.";
   return `${moveOutNote} ${moveInNote}`;
 };
@@ -406,13 +406,13 @@ const getTransferActionMeta = (transfer) => {
       return {
         primaryAction: "execute-transfer",
         helperText:
-          "Hồ sơ đã sẵn sàng. Manager bấm Chốt phòng cũ để ghi nhận người rời phòng và chỉ số điện/nước.",
+          "Hồ sơ đã sẵn sàng. Manager bấm Chốt phòng cũ để ghi nhận người rời phòng và chỉ số điện.",
       };
     case "WAITING_EXECUTION":
       return {
         primaryAction: "complete-transfer",
         helperText:
-          "Phiên chuyển phòng đang diễn ra. Nếu có hóa đơn điện/nước chốt chuyển phòng thì cần thanh toán trước, sau đó nhập check-in phòng mới và bấm Complete Transfer.",
+          "Phiên chuyển phòng đang diễn ra. Nếu có hóa đơn điện chốt chuyển phòng thì cần thanh toán trước, sau đó nhập check-in phòng mới và bấm Complete Transfer.",
       };
     case "EXECUTED":
       return {

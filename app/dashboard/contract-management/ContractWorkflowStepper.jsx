@@ -44,7 +44,7 @@ function unwrapHandoverResponse(response) {
 }
 
 function hasHandoverReadings(handover) {
-    return Boolean(handover?.electricity && handover?.water);
+    return Boolean(handover?.electricity);
 }
 
 function getSignedHandoverDocumentId(handover) {
@@ -327,7 +327,6 @@ export default function ContractWorkflowStepper({
         (requiresMoveInHandover ? Number(Boolean(signedHandoverReady)) : 0);
     const missingCount = readiness.totalCount - readiness.completedCount;
     const electricValue = getReadingValue(handoverData?.electricity);
-    const waterValue = getReadingValue(handoverData?.water);
 
     useEffect(() => {
         onReadinessChange?.({
@@ -575,8 +574,8 @@ export default function ContractWorkflowStepper({
                             title={handoverDocumentFilename}
                             meta={
                                 handoverHasData
-                                    ? `Biên bản bàn giao · Điện ${electricValue ?? "—"} kWh · Nước ${waterValue ?? "—"} m³`
-                                    : "Biên bản bàn giao · Cần chốt chỉ số điện, nước và hiện trạng thiết bị"
+                                    ? `Biên bản bàn giao · Điện ${electricValue ?? "—"} kWh`
+                                    : "Biên bản bàn giao · Cần chốt chỉ số điện và hiện trạng thiết bị"
                             }
                             complete={handoverReady}
                             statusLabel={handoverReady ? "Đã đủ dữ liệu" : "Cần nhập dữ liệu"}
@@ -685,7 +684,7 @@ export default function ContractWorkflowStepper({
                     {readiness.requirements.map((item) => {
                         const descriptions = {
                             lease: "Upload đúng file PDF có đầy đủ chữ ký.",
-                            "handover-data": "Chỉ số điện, nước và thiết bị đã được chốt.",
+                            "handover-data": "Chỉ số điện và thiết bị đã được chốt.",
                             "handover-signed-file": "Upload biên bản bàn giao PDF có chữ ký.",
                         };
                         return (

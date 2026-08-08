@@ -73,8 +73,6 @@ function normalizeUtilityBillingRunItem(raw = {}) {
     contractCode: read(raw, "contractCode", "contract_code") || "",
     electricityUsage: Number(read(raw, "electricityUsage", "electricity_usage") || 0),
     electricityAmount: Number(read(raw, "electricityAmount", "electricity_amount") || 0),
-    waterUsage: Number(read(raw, "waterUsage", "water_usage") || 0),
-    waterAmount: Number(read(raw, "waterAmount", "water_amount") || 0),
     serviceFeeAmount: Number(read(raw, "serviceFeeAmount", "service_fee_amount") || 0),
     subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
     discountAmount: Number(read(raw, "discountAmount", "discount_amount") || 0),

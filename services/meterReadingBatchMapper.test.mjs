@@ -13,10 +13,8 @@ test("normalizes the backend camelCase meter reading payload", () => {
     roomName: "Phòng 401",
     electricityPrevious: "1200.5",
     electricityCurrent: null,
-    waterPrevious: 35,
-    waterCurrent: 42,
+    electricityPhotoId: 9,
     status: "synced",
-    photosCount: "2",
   });
 
   assert.equal(room.key, "room:41");
@@ -24,9 +22,7 @@ test("normalizes the backend camelCase meter reading payload", () => {
   assert.equal(room.roomId, 41);
   assert.equal(room.elecPrev, 1200.5);
   assert.equal(room.elecCurr, 1200.5);
-  assert.equal(room.waterPrev, 35);
-  assert.equal(room.waterCurr, 42);
-  assert.equal(room.photos, 2);
+  assert.equal(room.photos, 1);
 });
 
 test("keeps compatibility with legacy snake_case payloads", () => {
@@ -35,15 +31,34 @@ test("keeps compatibility with legacy snake_case payloads", () => {
     room_code: "P402",
     electricity_previous: 900,
     electricity_current: 950,
-    water_previous: 20,
-    water_current: 24,
-    photos_count: 1,
   });
 
   assert.equal(room.key, "room:42");
   assert.equal(room.id, "P402");
   assert.equal(room.elecCurr, 950);
-  assert.equal(room.waterCurr, 24);
+});
+
+test("normalizes unresolved reading warnings", () => {
+  const room = normalizeMeterReadingRoom({
+    roomId: 43,
+    roomCode: "P403",
+    status: "warning",
+    warnings: [
+      {
+        id: 7,
+        meter_type: "ELECTRICITY",
+        type: "HIGH_USAGE",
+        severity: "MEDIUM",
+        message: "Mức tiêu thụ điện vượt ngưỡng cần kiểm tra.",
+      },
+    ],
+  });
+
+  assert.equal(room.status, "warning");
+  assert.equal(room.warnings.length, 1);
+  assert.equal(room.warnings[0].id, 7);
+  assert.equal(room.warnings[0].meterType, "ELECTRICITY");
+  assert.equal(room.warnings[0].type, "HIGH_USAGE");
 });
 
 test("never returns NaN when calculating meter usage", () => {

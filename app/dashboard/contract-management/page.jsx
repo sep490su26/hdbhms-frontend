@@ -120,7 +120,6 @@ const HISTORY_CONTRACT_WORKFLOWS = new Set([
 
 const LIQUIDATION_CHARGE_TYPES = [
   { value: "ELECTRICITY", label: "Tiền điện" },
-  { value: "WATER", label: "Tiền nước" },
   { value: "SERVICE_FEE", label: "Phí dịch vụ" },
   { value: "ROOM_RENT", label: "Tiền phòng" },
   { value: "MAINTENANCE_COMPENSATION", label: "Sửa chữa/bồi thường" },
@@ -130,7 +129,6 @@ const LIQUIDATION_CHARGE_TYPES = [
 
 const DEFAULT_LIQUIDATION_CHARGES = [
   ["ELECTRICITY", "Tiền điện chốt phòng"],
-  ["WATER", "Tiền nước chốt phòng"],
   ["SERVICE_FEE", "Phí dịch vụ chốt phòng"],
   ["ROOM_RENT", "Tiền phòng còn thiếu"],
   ["MAINTENANCE_COMPENSATION", "Sửa chữa/bồi thường"],
@@ -388,7 +386,7 @@ function todayInputValue() {
 }
 
 function isMeterLiquidationCharge(lineType) {
-  return lineType === "ELECTRICITY" || lineType === "WATER";
+  return lineType === "ELECTRICITY";
 }
 
 function getContractPropertyId(item = {}) {
@@ -409,16 +407,13 @@ function getContractPropertyId(item = {}) {
 
 const DEFAULT_LIQUIDATION_TARIFFS = {
   ELECTRICITY: DEFAULT_UTILITY_TARIFFS.electricity,
-  WATER: DEFAULT_UTILITY_TARIFFS.water,
 };
 
 function getLiquidationTariff(lineType, tariffs = DEFAULT_LIQUIDATION_TARIFFS) {
   const key =
     lineType === "ELECTRICITY"
       ? "electricity"
-      : lineType === "WATER"
-        ? "water"
-        : null;
+      : null;
   const fallback =
     DEFAULT_LIQUIDATION_TARIFFS[lineType] || DEFAULT_UTILITY_TARIFFS[key] || {};
   return normalizeUtilityTariff(
@@ -959,7 +954,7 @@ function unwrapHandoverResponse(response) {
 }
 
 function hasHandoverReadings(handover) {
-  return Boolean(handover?.electricity && handover?.water);
+  return Boolean(handover?.electricity);
 }
 
 function getSignedHandoverDocumentId(handover = {}) {
@@ -1103,7 +1098,6 @@ function LiquidationInvoiceLines({ lines = [] }) {
   const electricityLines = lines.filter(
     (line) => line.lineType === "ELECTRICITY",
   );
-  const waterLines = lines.filter((line) => line.lineType === "WATER");
   const otherLines = lines.filter(
     (line) => !isMeterLiquidationCharge(line.lineType),
   );
@@ -1157,14 +1151,6 @@ function LiquidationInvoiceLines({ lines = [] }) {
             Chốt điện
           </p>
           {renderLines(electricityLines, { compactMeter: true })}
-        </div>
-      )}
-      {waterLines.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-[#dfe5ef] bg-white">
-          <p className="border-b border-[#edf1f6] bg-[#f7f9fe] px-4 py-3 text-xs font-extrabold uppercase tracking-[0.06em] text-[#58667c]">
-            Chốt nước
-          </p>
-          {renderLines(waterLines, { compactMeter: true })}
         </div>
       )}
       {otherLines.length > 0 && (
@@ -1258,9 +1244,6 @@ function LiquidationChargeRows({
   const electricityCharges = charges
     .map((charge, index) => ({ charge, index }))
     .filter(({ charge }) => charge.lineType === "ELECTRICITY");
-  const waterCharges = charges
-    .map((charge, index) => ({ charge, index }))
-    .filter(({ charge }) => charge.lineType === "WATER");
   const otherCharges = charges
     .map((charge, index) => ({ charge, index }))
     .filter(({ charge }) => !isMeterLiquidationCharge(charge.lineType));
@@ -1439,16 +1422,6 @@ function LiquidationChargeRows({
             Chốt điện
           </p>
           {electricityCharges.map(({ charge, index }) =>
-            renderChargeRow(charge, index),
-          )}
-        </div>
-      )}
-      {waterCharges.length > 0 && (
-        <div className="grid gap-3">
-          <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">
-            Chốt nước
-          </p>
-          {waterCharges.map(({ charge, index }) =>
             renderChargeRow(charge, index),
           )}
         </div>
@@ -2186,7 +2159,7 @@ export default function ContractTemplatePage() {
           }
         } catch (err) {
           window.alert(
-            "Vui lòng nhập chỉ số điện nước và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.",
+            "Vui lòng nhập chỉ số điện và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.",
           );
           setActionLoading("");
           return;
@@ -2548,9 +2521,9 @@ export default function ContractTemplatePage() {
     const propertyId = getContractPropertyId(item);
     if (!propertyId) {
       setLiquidationError(
-        "Không xác định được cơ sở để tải đơn giá điện nước.",
+        "Không xác định được cơ sở để tải đơn giá điện.",
       );
-      toast.error("Không xác định được cơ sở để tải đơn giá điện nước.");
+      toast.error("Không xác định được cơ sở để tải đơn giá điện.");
       return;
     }
     let tariffs = DEFAULT_LIQUIDATION_TARIFFS;
@@ -2561,17 +2534,13 @@ export default function ContractTemplatePage() {
           settings?.electricity,
           DEFAULT_LIQUIDATION_TARIFFS.ELECTRICITY,
         ),
-        WATER: normalizeUtilityTariff(
-          settings?.water,
-          DEFAULT_LIQUIDATION_TARIFFS.WATER,
-        ),
       };
     } catch (err) {
       setLiquidationError(
-        err?.message || "Không tải được đơn giá điện nước của cơ sở.",
+        err?.message || "Không tải được đơn giá điện của cơ sở.",
       );
       toast.error(
-        err?.message || "Không tải được đơn giá điện nước của cơ sở.",
+        err?.message || "Không tải được đơn giá điện của cơ sở.",
       );
       return;
     }
@@ -2591,8 +2560,7 @@ export default function ContractTemplatePage() {
         ...current,
         charges: (current.charges || []).map((charge) => {
           if (!isMeterLiquidationCharge(charge.lineType)) return charge;
-          const key =
-            charge.lineType === "ELECTRICITY" ? "electricity" : "water";
+          const key = "electricity";
           const reading = latestReadings?.[key] || {};
           const suggestedValue =
             reading.suggestedValue ??

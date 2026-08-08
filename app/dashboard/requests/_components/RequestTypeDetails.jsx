@@ -105,7 +105,7 @@ function RoomTransferEligibilitySummary({ transfer }) {
                         {formatVnd(debt.totalDebtAmount)}
                     </p>
                     <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
-                        Thuê {formatVnd(debt.rentDebtAmount)} · Điện/nước {formatVnd(debt.utilityDebtAmount)}
+                        Thuê {formatVnd(debt.rentDebtAmount)} · Tiện ích {formatVnd(debt.utilityDebtAmount)}
                     </p>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
@@ -269,7 +269,7 @@ export function TransferRequestDetail({ payload, transfer }) {
     );
     const invoiceText = [
         formatId("Chênh lệch", transfer?.transferDifferenceInvoiceId),
-        formatId("Điện/nước phòng cũ", transfer?.oldRoomFinalInvoiceId),
+        formatId("Hóa đơn điện phòng cũ", transfer?.oldRoomFinalInvoiceId),
     ].filter(Boolean).join(" · ");
     const handoverText = [
         transfer?.transferOutHandoverRequired ? "Bàn giao phòng cũ" : "",

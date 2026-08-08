@@ -379,7 +379,7 @@ export default function UtilityManagement() {
         if (normalizedDashboard) setDashboard(normalizedDashboard);
       } catch (error) {
         if (!cancelled) {
-          setErrorMessage("Không tải được dữ liệu ghi chỉ số điện nước.");
+          setErrorMessage("Không tải được dữ liệu ghi chỉ số điện.");
           console.error("Error fetching data", error);
         }
       } finally {
@@ -410,7 +410,9 @@ export default function UtilityManagement() {
   }, [selectedPropertyId]);
 
   const displayHistory = dedupeBatchHistory(history);
-  const currentPeriod = displayHistory.find((item) => item.isCurrent);
+  const currentPeriod = displayHistory.find(
+    (item) => item.isCurrent && String(item.status || "").toUpperCase() === "DRAFT",
+  );
 
   const handleStartBatch = async () => {
     try {
@@ -460,8 +462,8 @@ export default function UtilityManagement() {
     return (
       <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
         <DashboardPageHeader
-          title="Nhập điện nước hàng tháng"
-          description="Quản lý kỳ ghi chỉ số, tiến độ nhập liệu và lịch sử chốt điện nước."
+          title="Nhập điện hàng tháng"
+          description="Quản lý kỳ ghi chỉ số điện, tiến độ nhập liệu và lịch sử chốt điện."
         />
         <section className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
           <AlertTriangle className="h-4 w-4" />
@@ -494,8 +496,8 @@ export default function UtilityManagement() {
       ) : null}
 
       <DashboardPageHeader
-        title="Nhập điện nước hàng tháng"
-        description="Quản lý kỳ ghi chỉ số, tiến độ nhập liệu và lịch sử chốt điện nước."
+        title="Nhập điện hàng tháng"
+        description="Quản lý kỳ ghi chỉ số điện, tiến độ nhập liệu và lịch sử chốt điện."
         actions={
           <>
             <Link
@@ -538,10 +540,10 @@ export default function UtilityManagement() {
       <section className="grid gap-4 md:grid-cols-4">
         <DashboardStatCard
           icon={CalendarDays}
-          label="Kỳ hiện tại"
+          label="Kỳ ghi đang xử lý"
           value={periodValue(currentPeriod) || "Chưa mở"}
           tone="blue"
-          subtitle={currentPeriod ? formatTime(currentPeriod.startDate, currentPeriod.endDate) : "Chờ tạo kỳ ghi"}
+          subtitle={currentPeriod ? formatTime(currentPeriod.startDate, currentPeriod.endDate) : "Chờ mở kỳ ghi mới"}
         />
         <DashboardStatCard
           icon={CheckCircle2}
@@ -655,7 +657,7 @@ export default function UtilityManagement() {
                 Hướng dẫn nhanh
               </p>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Quy trình ghi chỉ số điện nước hàng tháng
+                Quy trình ghi chỉ số điện hàng tháng
               </p>
             </div>
           </div>

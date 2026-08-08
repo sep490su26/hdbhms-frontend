@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Droplets, Zap, X } from "lucide-react";
+import { Check, HandCoins, Zap, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -92,7 +92,7 @@ export function FacilityUtilitySettingsDialog({
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
           <DialogHeader className="gap-1 text-left">
             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
-              Giá điện nước
+              Giá điện & dịch vụ
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
               {state.facility?.name || "Cơ sở"}
@@ -112,7 +112,7 @@ export function FacilityUtilitySettingsDialog({
         <div className="max-h-[68vh] overflow-y-auto p-6">
           {state.loading ? (
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-5 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-              Đang tải giá điện nước...
+              Đang tải giá điện và phí dịch vụ...
             </div>
           ) : (
             <form id="facility-utility-settings-form" className="grid gap-4" onSubmit={onSubmit}>
@@ -156,31 +156,23 @@ export function FacilityUtilitySettingsDialog({
 
                 <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 dark:border-white/10 dark:bg-white/5">
                   <div className="flex items-start gap-3">
-                    <span className="rounded-lg bg-sky-50 p-2 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                      <Droplets className="h-5 w-5" />
+                    <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                      <HandCoins className="h-5 w-5" />
                     </span>
                     <div>
                       <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                        Nước
+                        Phí dịch vụ
                       </h3>
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Áp dụng cho toàn bộ phòng trong cơ sở này.
+                        Áp dụng theo từng người ở trong phòng.
                       </p>
                     </div>
                   </div>
                   <UtilityMoneyInput
-                    label="Đơn giá nước"
-                    name="waterUnitPrice"
-                    suffix="VNĐ/m³"
-                    value={state.values.waterUnitPrice}
-                    disabled={disabled}
-                    onChange={onChange}
-                  />
-                  <UtilityNumberInput
-                    label="Định mức miễn phí"
-                    name="waterFreeAllowance"
-                    suffix="m³"
-                    value={state.values.waterFreeAllowance}
+                    label="Đơn giá dịch vụ"
+                    name="serviceFeeUnitPrice"
+                    suffix="VNĐ/người"
+                    value={state.values.serviceFeeUnitPrice}
                     disabled={disabled}
                     onChange={onChange}
                   />

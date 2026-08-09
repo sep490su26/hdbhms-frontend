@@ -1310,7 +1310,8 @@ export default function ApprovalCenter() {
                     </select>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
+              <div className="overflow-hidden">
               <div className="hidden min-[1536px]:block">
                 <Table className="w-full table-fixed">
                   <TableHeader>
@@ -1555,13 +1556,13 @@ export default function ApprovalCenter() {
               totalElements={total}
               totalPages={totalPages}
               itemLabel="yêu cầu"
-              className="rounded-b-3xl"
               onPageChange={setPage}
               onSizeChange={(nextSize) => {
                 setSize(nextSize);
                 setPage(1);
               }}
             />
+                </div>
               </div>
             </div>
           </div>

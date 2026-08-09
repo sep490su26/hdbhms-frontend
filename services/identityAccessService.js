@@ -497,8 +497,6 @@ function normalizeTenantAccountCandidate(item = {}) {
         profileStatus: item.profileStatus ?? item.profile_status ?? null,
         missingIdentity: item.missingIdentity ?? item.missing_identity ?? false,
         missingPortrait: item.missingPortrait ?? item.missing_portrait ?? false,
-        missingEmergencyContact:
-            item.missingEmergencyContact ?? item.missing_emergency_contact ?? false,
         message: item.message ?? "",
     };
 }

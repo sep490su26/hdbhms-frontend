@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Check,
   Clock3,
-  ImagePlus,
   Loader2,
   Mail,
   Phone,
@@ -32,7 +31,16 @@ import {
 } from "@/services/maintenanceService";
 import { getAuthToken } from "@/services/identityAccessService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
+import MaintenanceCompletionImageSection from "@/components/dashboard/MaintenanceCompletionImageSection";
+import VietnameseMonthPicker from "@/components/dashboard/VietnameseMonthPicker";
 import { toDate } from "@/lib/dateFormat";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const STATUS_META = {
   PENDING: ["Pending", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
@@ -53,13 +61,6 @@ const CATEGORY_LABELS = {
   SECURITY: "An ninh",
   COMMON_EQUIPMENT: "Thiết bị chung",
   OTHER: "Khác",
-};
-
-const PRIORITY_LABELS = {
-  LOW: "Thấp",
-  MEDIUM: "Trung bình",
-  HIGH: "Cao",
-  URGENT: "Khẩn cấp",
 };
 
 const SCOPE_LABELS = {
@@ -440,6 +441,7 @@ export default function MaintenanceTicketDetailPage() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
   const [completeForm, setCompleteForm] = useState(buildCompleteForm());
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
 
   const locationText = useMemo(() => {
     if (!ticket) return "";
@@ -489,8 +491,10 @@ export default function MaintenanceTicketDetailPage() {
     try {
       await callback();
       await loadTicket();
+      return true;
     } catch (actionError) {
       setError(actionError?.message || "Không xử lý được thao tác.");
+      return false;
     } finally {
       setActionLoading("");
     }
@@ -506,8 +510,11 @@ export default function MaintenanceTicketDetailPage() {
     runAction("decline", () => declineMaintenanceTicket(ticketId, reason.trim()));
   }
 
-  function handleStartProgress() {
-    runAction("progress", () => startMaintenanceProgress(ticketId, { note: "Đã bắt đầu xử lý sự cố" }));
+  async function handleStartProgress() {
+    const started = await runAction("progress", () =>
+      startMaintenanceProgress(ticketId, { note: "Đã bắt đầu xử lý sự cố" }),
+    );
+    if (started) setIsCompleteDialogOpen(true);
   }
 
   async function handleComplete(event) {
@@ -538,7 +545,7 @@ export default function MaintenanceTicketDetailPage() {
       return;
     }
 
-    await runAction("complete", async () => {
+    const completed = await runAction("complete", async () => {
       const uploaded = await Promise.all(completeForm.images.map((file) => uploadMaintenanceImage(file)));
       await completeMaintenanceTicket(ticketId, {
         repairmanName: completeForm.repairmanName.trim(),
@@ -557,6 +564,7 @@ export default function MaintenanceTicketDetailPage() {
         phase: "AFTER",
       });
     });
+    if (completed) setIsCompleteDialogOpen(false);
   }
 
   function handleConfirmCommonArea() {
@@ -643,7 +651,7 @@ export default function MaintenanceTicketDetailPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
               >
                 {actionLoading === "progress" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
-                Bắt đầu xử lý
+                Xử lý
               </button>
             )}
             {ticket.status === "WAITING_CONFIRMATION" && ticket.ticketScope !== "ROOM" && (
@@ -668,7 +676,6 @@ export default function MaintenanceTicketDetailPage() {
         <InfoItem label="Vị trí" value={locationText} />
         <InfoItem label="Hạng mục" value={CATEGORY_LABELS[ticket.category] || ticket.category} />
         <InfoItem label="Mong muốn xử lý" value={ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"} />
-        <InfoItem label="Mức độ" value={PRIORITY_LABELS[ticket.priority] || ticket.priority} />
         <InfoItem label="Ngày tạo" value={formatDateTime(ticket.createdAt)} />
       </div>
 
@@ -710,17 +717,31 @@ export default function MaintenanceTicketDetailPage() {
         <AttachmentGrid title="Ảnh sau sửa" attachments={ticket.afterAttachments} />
       </div>
 
-      {canManage && ticket.status === "IN_PROGRESS" && (
-        <form onSubmit={handleComplete} className="grid gap-5 rounded-lg border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300">
-              <Wrench className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">Hoàn tất xử lý</h2>
-              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.</p>
-            </div>
+      <Dialog
+        open={isCompleteDialogOpen}
+        onOpenChange={(open) => {
+          if (actionLoading === "complete") return;
+          setIsCompleteDialogOpen(open);
+          if (!open) setError("");
+        }}
+      >
+        <DialogContent
+          className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] !max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full"
+        >
+          <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <DialogHeader className="gap-1 text-left">
+              <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
+                Hoàn tất xử lý
+              </DialogTitle>
+              <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.
+              </DialogDescription>
+            </DialogHeader>
+            {error && <div className="mt-3"><Notice type="error">{error}</Notice></div>}
           </div>
+          <div className="min-h-0 overflow-y-auto p-5">
+      {canManage && ticket.status === "IN_PROGRESS" && (
+        <form onSubmit={handleComplete} className="grid gap-5">
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="Người sửa">
               <div className="relative">
@@ -757,11 +778,9 @@ export default function MaintenanceTicketDetailPage() {
               </Field>
               {completeForm.collectionMethod === "MONTHLY_SCHEDULED" && (
                 <Field label="Kỳ hóa đơn gộp *">
-                  <input
-                    type="month"
+                  <VietnameseMonthPicker
                     value={completeForm.billingPeriod}
-                    onChange={(event) => updateCompleteForm("billingPeriod", event.target.value)}
-                    className={inputClassName()}
+                    onChange={(value) => updateCompleteForm("billingPeriod", value)}
                   />
                 </Field>
               )}
@@ -776,35 +795,27 @@ export default function MaintenanceTicketDetailPage() {
             </Field>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Chi phí thực tế">
-              <input value={completeForm.actualCost} onChange={(event) => updateCompleteForm("actualCost", event.target.value)} className={inputClassName()} inputMode="numeric" placeholder="0" />
+            <Field label="Chi phí thực tế (VNĐ)">
+              <input value={completeForm.actualCost} onChange={(event) => updateCompleteForm("actualCost", event.target.value)} className={`${inputClassName()} tabular-nums`} inputMode="numeric" placeholder="0" />
             </Field>
             <Field label="Ghi chú hoàn tất">
               <input value={completeForm.completionNote} onChange={(event) => updateCompleteForm("completionNote", event.target.value)} className={inputClassName()} placeholder="Ghi chú hoàn tất nếu có" />
             </Field>
           </div>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap gap-3">
-              {completeForm.images.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5">
-                  <Image src={URL.createObjectURL(file)} alt={file.name} fill sizes="80px" className="object-cover" unoptimized />
-                  <button
-                    type="button"
-                    onClick={() => setCompleteForm((current) => ({ ...current, images: current.images.filter((_, fileIndex) => fileIndex !== index) }))}
-                    className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white"
-                    aria-label="Xóa ảnh"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              {((ticket.afterAttachments?.length || 0) + completeForm.images.length) < 3 && (
-                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]">
-                  <ImagePlus className="h-6 w-6" />
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleAfterImages} className="sr-only" />
-                </label>
-              )}
-            </div>
+          <div className="grid gap-3">
+            <MaintenanceCompletionImageSection
+              existingAttachments={ticket.afterAttachments}
+              files={completeForm.images}
+              onChange={handleAfterImages}
+              onRemove={(index) =>
+                setCompleteForm((current) => ({
+                  ...current,
+                  images: current.images.filter(
+                    (_, fileIndex) => fileIndex !== index,
+                  ),
+                }))
+              }
+            />
             <button
               type="submit"
               disabled={Boolean(actionLoading)}
@@ -816,6 +827,10 @@ export default function MaintenanceTicketDetailPage() {
           </div>
         </form>
       )}
+
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {(ticket.status === "WAITING_CONFIRMATION" || ticket.status === "COMPLETED") && (
         <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">

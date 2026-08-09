@@ -7,6 +7,7 @@ import {
   Banknote,
   Bell,
   Check,
+  FileSpreadsheet,
   History,
   Loader2,
   MoreVertical,
@@ -19,6 +20,14 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import TimeTreeFilter, { buildTreeFromData } from "@/components/dashboard/TimeTreeFilter";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -27,6 +36,7 @@ import {
 import {
   applyRentOverride,
   confirmManualPayment,
+  downloadBillingInvoicesExcel,
   fetchBillingInvoices,
   sendOverdueInvoiceWarning,
 } from "@/services/billingService";
@@ -54,6 +64,10 @@ const TYPE_LABELS = {
 function currentMonth() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function isSpecificBillingPeriod(value) {
+  return /^(\d{4})-(0[1-9]|1[0-2])$/.test(String(value || ""));
 }
 
 function normalizeQueryId(value) {
@@ -266,21 +280,18 @@ export default function BillingPage() {
   const [billingPeriodText, setBillingPeriodText] = useState(() =>
     billingPeriodToVietnameseDate(initialBillingPeriod),
   );
-  const [overrideBillingPeriodText, setOverrideBillingPeriodText] = useState(
-    () => billingPeriodToVietnameseDate(currentMonth()),
-  );
   const [timeFilter, setTimeFilter] = useState(null);
-  const [billingFullTree, setBillingFullTree] = useState(null);
+  const [billingTreeInvoices, setBillingTreeInvoices] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [overrideForm, setOverrideForm] = useState({
-    propertyId: "",
     roomId: "",
     billingPeriod: currentMonth(),
     overrideMonthlyRent: "",
     reason: "",
   });
+  const [overrideInvoice, setOverrideInvoice] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     propertyId: "",
     roomId: "",
@@ -290,6 +301,7 @@ export default function BillingPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
@@ -330,6 +342,9 @@ export default function BillingPage() {
       ]),
     [selectedInvoice],
   );
+  const overrideRentLine = overrideInvoice?.lines?.find(
+    (line) => line.lineType === "ROOM_RENT",
+  );
 
   const properties = useMemo(() => {
     const propertyMap = new Map();
@@ -346,11 +361,6 @@ export default function BillingPage() {
   const filterRooms = useMemo(
     () => roomsForProperty(rooms, filters.propertyId),
     [rooms, filters.propertyId],
-  );
-
-  const overrideRooms = useMemo(
-    () => roomsForProperty(rooms, overrideForm.propertyId),
-    [rooms, overrideForm.propertyId],
   );
 
   const paymentRooms = useMemo(
@@ -411,38 +421,58 @@ export default function BillingPage() {
     }
   }, [filters]);
 
+  // Keep the time tree independent from the active month/status filters.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchBillingInvoices({ propertyId: filters.propertyId })
+      .then((data) => {
+        if (!cancelled) setBillingTreeInvoices(data);
+      })
+      .catch(() => {
+        if (!cancelled) setBillingTreeInvoices([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.propertyId]);
+
   useEffect(() => {
     fetchManagementRoomCatalog()
       .then(setRooms)
       .catch(() => setRooms([]));
   }, []);
 
-  /* Build the billing tree from all loaded invoices (billingPeriod field). */
-  useEffect(() => {
-    if (invoices.length === 0) return;
-    const tree = buildTreeFromData(invoices, (inv) => {
+  /* Build the billing tree from all invoices, not only the active list filter. */
+  const billingFullTree = useMemo(
+    () => buildTreeFromData(billingTreeInvoices, (inv) => {
       const period = inv.billingPeriod; // "YYYY-MM"
       if (!period) return null;
       return `${period}-01`; // make a full date so Date() can parse it
-    });
-    setBillingFullTree(tree);
-  }, [invoices]);
+    }),
+    [billingTreeInvoices],
+  );
 
   /** Converts a tree selection (year / quarter / month) to a billingPeriod string "YYYY-MM". */
   const handleTimeFilterSelect = useCallback((dateSelection) => {
     setTimeFilter(dateSelection);
     if (!dateSelection) {
+      setBillingPeriodText("");
       setFilters((prev) => ({ ...prev, billingPeriod: "" }));
       return;
     }
     const { year, quarter, month } = dateSelection;
     if (month === "all" || month == null) {
       // Year or Quarter selected – clear month filter so all invoices in that range show
+      setBillingPeriodText("");
       setFilters((prev) => ({ ...prev, billingPeriod: "" }));
     } else {
       // Specific month selected → filter by that billing period
       const mm = String(month).padStart(2, "0");
-      setFilters((prev) => ({ ...prev, billingPeriod: `${year}-${mm}` }));
+      const period = `${year}-${mm}`;
+      setBillingPeriodText(billingPeriodToVietnameseDate(period));
+      setFilters((prev) => ({ ...prev, billingPeriod: period }));
     }
     setPage(1);
   }, []);
@@ -474,9 +504,6 @@ export default function BillingPage() {
   useEffect(() => {
     if (!selectedInvoice) return;
     const timeoutId = window.setTimeout(() => {
-      const rentLine = selectedInvoice.lines.find(
-        (line) => line.lineType === "ROOM_RENT",
-      );
       const propertyId = selectedInvoice.propertyId
         ? String(selectedInvoice.propertyId)
         : "";
@@ -492,20 +519,6 @@ export default function BillingPage() {
           ? String(selectedInvoice.remainingAmount)
           : "",
       }));
-      setOverrideForm((current) => ({
-        ...current,
-        propertyId: propertyId || current.propertyId,
-        roomId: roomId || current.roomId,
-        billingPeriod: selectedInvoice.billingPeriod || current.billingPeriod,
-        overrideMonthlyRent: rentLine?.unitPrice
-          ? String(rentLine.unitPrice)
-          : current.overrideMonthlyRent,
-      }));
-      if (selectedInvoice.billingPeriod) {
-        setOverrideBillingPeriodText(
-          billingPeriodToVietnameseDate(selectedInvoice.billingPeriod),
-        );
-      }
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [selectedInvoice]);
@@ -519,12 +532,14 @@ export default function BillingPage() {
       const result = await applyRentOverride(overrideForm);
       setMessage(
         result?.invoiceApplied
-          ? "Đã điều chỉnh giá và cập nhật hóa đơn tháng đã chọn."
-          : "Đã lưu giá điều chỉnh cho tháng đã chọn.",
+          ? "Đã lưu giá khuyến mãi và cập nhật hóa đơn tháng đã chọn."
+          : "Đã lưu giá khuyến mãi cho tháng đã chọn.",
       );
+      setIsOverrideModalOpen(false);
+      setOverrideInvoice(null);
       await loadInvoices();
     } catch (saveError) {
-      setError(saveError?.message || "Không lưu được giá điều chỉnh.");
+      setError(saveError?.message || "Không lưu được giá khuyến mãi.");
     } finally {
       setSaving("");
     }
@@ -562,8 +577,28 @@ export default function BillingPage() {
   }
 
   function openOverrideModal(invoice) {
+    if (!invoice) return;
+    const rentLine = invoice.lines?.find(
+      (line) => line.lineType === "ROOM_RENT",
+    );
+    const billingPeriod = invoice.billingPeriod || currentMonth();
+
     setSelectedInvoiceId(invoice.id || "");
+    setOverrideInvoice(invoice);
+    setOverrideForm({
+      roomId: invoice.roomId ? String(invoice.roomId) : "",
+      billingPeriod,
+      overrideMonthlyRent: rentLine?.unitPrice
+        ? String(rentLine.unitPrice)
+        : "",
+      reason: "",
+    });
     setIsOverrideModalOpen(true);
+  }
+
+  function closeOverrideModal() {
+    setIsOverrideModalOpen(false);
+    setOverrideInvoice(null);
   }
 
   async function sendOverdueWarning(invoice) {
@@ -584,6 +619,26 @@ export default function BillingPage() {
       );
     } finally {
       setSaving("");
+    }
+  }
+
+  async function exportInvoicesExcel() {
+    if (!isSpecificBillingPeriod(filters.billingPeriod)) {
+      setError("Vui long chon mot thang cu the truoc khi xuat Excel.");
+      return;
+    }
+    if (invoices.length === 0) {
+      setError("Chưa có hóa đơn phù hợp với bộ lọc để xuất.");
+      return;
+    }
+    setExporting(true);
+    setError("");
+    try {
+      await downloadBillingInvoicesExcel(filters);
+    } catch (exportError) {
+      setError(exportError?.message || "Xuất file Excel thất bại.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -638,40 +693,26 @@ export default function BillingPage() {
     );
   }
 
-  function updateOverrideBillingPeriodText(value) {
-    const nextText = formatVietnameseDateInput(value);
-    setOverrideBillingPeriodText(nextText);
-
-    if (!nextText.trim()) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: "" }));
-      return;
-    }
-
-    const nextPeriod = vietnameseDateToBillingPeriod(nextText);
-    if (nextPeriod) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
-    }
-  }
-
-  function normalizeOverrideBillingPeriodText() {
-    if (!overrideBillingPeriodText.trim()) return;
-
-    const nextPeriod = vietnameseDateToBillingPeriod(overrideBillingPeriodText);
-    const normalizedPeriod = nextPeriod || overrideForm.billingPeriod;
-    setOverrideBillingPeriodText(
-      billingPeriodToVietnameseDate(normalizedPeriod),
-    );
-    if (nextPeriod) {
-      setOverrideForm((current) => ({ ...current, billingPeriod: nextPeriod }));
-    }
-  }
-
   return (
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
         title="Hóa đơn & Thu tiền"
         actions={
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={exportInvoicesExcel}
+              disabled={
+                exporting ||
+                loading ||
+                invoices.length === 0 ||
+                !isSpecificBillingPeriod(filters.billingPeriod)
+              }
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              Xuất Excel
+            </button>
             <Link
               href="/dashboard/billing/history"
               className="inline-flex h-10 items-center bg-[#1e40af] text-white gap-2 rounded-lg border border-[#cbd5e1] dark:border-white/10 px-4 text-sm font-bold text-slate-700 dark:text-slate-200"
@@ -875,96 +916,74 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {isOverrideModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-[#0f172a]">
-            <button
-              type="button"
-              onClick={() => setIsOverrideModalOpen(false)}
-              className="absolute right-4 top-4 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
-              aria-label="Đóng"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <form
-              onSubmit={submitOverride}
-              className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4"
-            >
-              <div className="mb-4 flex items-center gap-2">
+      <Dialog
+        open={isOverrideModalOpen}
+        onOpenChange={(open) => {
+          if (!open && saving !== "override") closeOverrideModal();
+        }}
+      >
+        <DialogContent
+          lockScroll={false}
+          showCloseButton={false}
+          overlayClassName="bg-slate-950/55 backdrop-blur-sm"
+          className="max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] gap-0 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-[#0f172a] sm:max-w-lg"
+        >
+          <form onSubmit={submitOverride}>
+            <DialogHeader className="border-b border-slate-200 px-5 py-4 text-left dark:border-white/10">
+              <DialogTitle className="flex items-center gap-2 pr-8 text-base font-black text-slate-900 dark:text-white">
                 <RefreshCw className="h-4 w-4 text-[#3156b6]" />
-                <h2 className="text-sm font-black">
-                  Điều chỉnh giá theo tháng
-                </h2>
+                Điều chỉnh giá khuyến mãi
+              </DialogTitle>
+              <DialogDescription className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">
+                Chỉ thay đổi giá thuê áp dụng cho kỳ này. Giá niêm yết trong hợp đồng không thay đổi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 px-5 py-5">
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03] sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Cơ sở
+                  </p>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {overrideInvoice?.propertyName || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Phòng
+                  </p>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {displayRoomCode(overrideInvoice?.roomCode)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Kỳ áp dụng
+                  </p>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {formatBillingPeriod(overrideInvoice?.billingPeriod)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Giá hiện tại
+                  </p>
+                  <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
+                    {overrideRentLine?.unitPrice != null
+                      ? formatMoney(overrideRentLine.unitPrice)
+                      : "-"}
+                  </p>
+                </div>
               </div>
-              <div className="grid gap-3">
-                <label className="grid gap-1 text-sm font-bold">
-                  Cơ sở
-                  <select
-                    required
-                    value={overrideForm.propertyId}
-                    onChange={(event) =>
-                      setOverrideForm((current) => ({
-                        ...current,
-                        propertyId: event.target.value,
-                        roomId: "",
-                      }))
-                    }
-                    className={FORM_CONTROL_CLASS}
-                  >
-                    <option value="">Chọn cơ sở</option>
-                    {properties.map((property) => (
-                      <option key={property.id} value={property.id}>
-                        {property.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  Phòng
-                  <select
-                    required
-                    value={overrideForm.roomId}
-                    onChange={(event) =>
-                      setOverrideForm((current) => ({
-                        ...current,
-                        roomId: event.target.value,
-                      }))
-                    }
-                    disabled={!overrideForm.propertyId}
-                    className={FORM_CONTROL_CLASS}
-                  >
-                    <option value="">
-                      {overrideForm.propertyId
-                        ? "Chọn phòng"
-                        : "Chọn cơ sở trước"}
-                    </option>
-                    {overrideRooms.map((room) => (
-                      <option key={roomKey(room)} value={roomKey(room)}>
-                        {room.roomCode || room.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  Tháng
-                  <input
-                    required
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="vd: 01/07/2026"
-                    value={overrideBillingPeriodText}
-                    onBlur={normalizeOverrideBillingPeriodText}
-                    onChange={(event) =>
-                      updateOverrideBillingPeriodText(event.target.value)
-                    }
-                    className={FORM_CONTROL_CLASS}
-                  />
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  Giá điều chỉnh
+
+              <label className="grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
+                Giá khuyến mãi/tháng
+                <div className="relative">
                   <input
                     required
                     min="1"
+                    step="1000"
                     type="number"
                     value={overrideForm.overrideMonthlyRent}
                     onChange={(event) =>
@@ -973,39 +992,69 @@ export default function BillingPage() {
                         overrideMonthlyRent: event.target.value,
                       }))
                     }
-                    className={FORM_CONTROL_CLASS}
+                    className={`${FORM_CONTROL_CLASS} w-full pr-16`}
+                    placeholder="Ví dụ: 2500000"
                   />
-                </label>
-                <label className="grid gap-1 text-sm font-bold">
-                  Ghi chú
-                  <input
-                    value={overrideForm.reason}
-                    onChange={(event) =>
-                      setOverrideForm((current) => ({
-                        ...current,
-                        reason: event.target.value,
-                      }))
-                    }
-                    className={FORM_CONTROL_CLASS}
-                  />
-                </label>
-              </div>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-bold text-slate-400">
+                    VNĐ
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Giá này phải thấp hơn giá niêm yết của phòng.
+                </span>
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
+                Lý do áp dụng
+                <textarea
+                  rows={3}
+                  value={overrideForm.reason}
+                  onChange={(event) =>
+                    setOverrideForm((current) => ({
+                      ...current,
+                      reason: event.target.value,
+                    }))
+                  }
+                  className={`${FORM_CONTROL_CLASS} h-auto resize-none py-2.5`}
+                  placeholder="Ví dụ: Ưu đãi khách thuê dài hạn"
+                />
+              </label>
+            </div>
+
+            <DialogFooter className="border-t border-slate-200 px-5 py-4 dark:border-white/10 sm:flex-row">
+              <button
+                type="button"
+                onClick={closeOverrideModal}
+                disabled={saving === "override"}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                Hủy
+              </button>
               <button
                 type="submit"
-                disabled={saving === "override"}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white disabled:opacity-60"
+                disabled={saving === "override" || !overrideForm.roomId}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#3156b6] px-4 text-sm font-bold text-white transition hover:bg-[#26489c] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving === "override" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Lưu điều chỉnh
+                Lưu giá khuyến mãi
               </button>
-            </form>
-          </div>
-        </div>
-      )}
+            </DialogFooter>
+          </form>
+          <button
+            type="button"
+            onClick={closeOverrideModal}
+            disabled={saving === "override"}
+            className="absolute right-4 top-4 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+            aria-label="Đóng"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </DialogContent>
+      </Dialog>
 
       {isPaymentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

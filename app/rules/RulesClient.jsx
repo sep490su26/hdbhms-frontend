@@ -184,6 +184,7 @@ export default function RulesClient({ variant = "public" }) {
   const [draggingRuleId, setDraggingRuleId] = useState(null);
   const [orderingRuleId, setOrderingRuleId] = useState(null);
   const [showViolationDialog, setShowViolationDialog] = useState(false);
+  const [activePublicCategoryId, setActivePublicCategoryId] = useState("");
 
   const applyCatalog = useCallback((catalog) => {
     setProperties(catalog.properties);
@@ -234,6 +235,10 @@ export default function RulesClient({ variant = "public" }) {
     [rules],
   );
   const fineRules = useMemo(() => rules.filter(isFineRule), [rules]);
+  const activePublicCategory = useMemo(
+    () => categories.find((category) => category.id === activePublicCategoryId) || categories[0] || null,
+    [activePublicCategoryId, categories],
+  );
 
   const handlePropertyChange = (event) => {
     const nextPropertyId = event.target.value;
@@ -548,57 +553,78 @@ export default function RulesClient({ variant = "public" }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-950">
-      <section className="border-b border-slate-800 bg-[#091426] px-4 py-12 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-amber-300">Nội quy nhà trọ</p>
-            <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
-              Quy định sinh hoạt tại Hải Đăng
+    <div className="min-h-screen bg-white text-[#0B1C30]">
+      <section className="relative min-h-[390px] overflow-hidden bg-[#0B1C30] text-white sm:min-h-[450px]">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/image_desk.png')" }}
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(11,28,48,0.88)_0%,rgba(11,28,48,0.48)_58%,rgba(11,28,48,0.28)_100%)]" />
+        <div className="relative mx-auto flex min-h-[390px] max-w-[1280px] items-end px-8 pb-12 sm:min-h-[450px] sm:pb-16 lg:px-12">
+          <div className="w-full max-w-[760px]">
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-amber-300">NỘI QUY HẢI ĐĂNG</p>
+            <h1 className="mt-4 text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-[52px]">
+              Quy định sinh hoạt rõ ràng, cuộc sống thoải mái hơn.
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-              Danh sách nội quy được lấy trực tiếp từ hệ thống quản lý và tự động sắp xếp theo nhóm.
+            <p className="mt-5 max-w-[680px] text-base leading-relaxed text-white/90 sm:text-lg">
+              Cùng giữ Hải Đăng là một nơi ở tiện nghi, an toàn và dễ chịu cho tất cả mọi người.
             </p>
-          </div>
-
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-72">
-            {properties.length > 1 && (
-              <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                Cơ sở
-                <select
-                  value={selectedPropertyId}
-                  onChange={handlePropertyChange}
-                  className="h-11 rounded-lg border border-white/15 bg-white px-3 text-sm font-semibold text-slate-950 outline-none"
-                >
-                  {properties.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {property?.name && (
-              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-                Đang hiển thị: <span className="font-bold text-white">{property.name}</span>
-              </div>
-            )}
+            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-white/85">
+              <span>{rules.length} nội quy đang áp dụng</span>
+              <span className="hidden h-1 w-1 rounded-full bg-amber-300 sm:block" />
+              <span>{categories.length} nhóm quy định</span>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
+      <section className="bg-white py-12 md:py-20">
+        <div className="mx-auto max-w-[1280px] px-8 lg:px-12">
+          <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.1em] text-brand-primary">TRA CỨU NỘI QUY</p>
+              <h2 className="mt-2 text-2xl font-semibold leading-[1.3] tracking-[0.01em] text-[#0B1C30] md:text-[32px]">
+                Các nhóm quy định tại Hải Đăng
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#44474D] sm:text-base">
+                Nội dung được sắp xếp theo từng nhóm để bạn dễ đọc và tìm đúng thông tin cần thiết.
+              </p>
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-[240px]">
+              {properties.length > 1 ? (
+                <label className="grid gap-2 text-sm font-semibold text-[#0B1C30]">
+                  Chọn cơ sở
+                  <select
+                    value={selectedPropertyId}
+                    onChange={handlePropertyChange}
+                    className="h-11 rounded-xl border border-[#cfd5de] bg-white px-3 text-sm font-semibold text-[#0B1C30] shadow-sm outline-none transition focus:border-[#232946] focus:ring-4 focus:ring-[#232946]/10"
+                  >
+                    {properties.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : property?.name ? (
+                <div className="border-l-2 border-[#D6E3FF] pl-4 text-sm text-[#44474D]">
+                  <span className="block text-xs font-semibold uppercase tracking-[0.08em] text-[#7A8494]">Đang xem</span>
+                  <span className="mt-1 block font-bold text-[#0B1C30]">{property.name}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
           {status === "loading" && (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-56 animate-pulse rounded-lg border border-slate-200 bg-white" />
+                <div key={index} className="h-64 animate-pulse rounded-3xl bg-[#F8F9FF]" />
               ))}
             </div>
           )}
 
           {status === "error" && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 p-6">
+            <div className="rounded-2xl bg-rose-50 p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-rose-950">Không tải được nội quy</h2>
@@ -609,30 +635,51 @@ export default function RulesClient({ variant = "public" }) {
           )}
 
           {status === "success" && rules.length === 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+            <div className="rounded-3xl bg-[#F8F9FF] p-10 text-center">
               <h2 className="text-xl font-bold text-slate-950">Chưa có nội quy</h2>
               <p className="mt-2 text-sm text-slate-600">Cơ sở này chưa có nội quy đang hoạt động.</p>
             </div>
           )}
 
           {status === "success" && rules.length > 0 && (
-            <div className="space-y-10">
-              <div>
-                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-slate-500">Danh mục nội quy</p>
-                    <h2 className="mt-1 text-2xl font-bold text-slate-950">Các nhóm quy định</h2>
-                  </div>
-                  <p className="text-sm font-semibold text-slate-500">{rules.length} nội quy đang hoạt động</p>
-                </div>
+            <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+              <aside className="h-fit rounded-3xl bg-[#F8F9FF] p-4 lg:sticky lg:top-24">
+                <p className="px-3 text-xs font-bold uppercase tracking-[0.12em] text-[#7A8494]">Mục lục</p>
+                <nav className="mt-3 grid gap-1" aria-label="Nhóm nội quy">
+                  {categories.map((category) => {
+                    const Icon = category.icon;
+                    const isActive = category.id === activePublicCategory?.id;
 
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {categories.map((category) => (
-                    <RuleCategoryCard key={category.id} category={category} />
-                  ))}
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => setActivePublicCategoryId(category.id)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition ${
+                          isActive
+                            ? "bg-[#232946] text-white shadow-md"
+                            : "text-[#0B1C30] hover:bg-white"
+                        }`}
+                      >
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isActive ? "bg-white/15" : category.iconBox}`}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold">{category.title}</span>
+                        <span className={`text-xs font-bold ${isActive ? "text-white/70" : "text-[#7A8494]"}`}>
+                          {category.rules.length}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+                <div className="mt-4 border-t border-[#dce3ef] px-3 pt-4 text-xs leading-5 text-[#7A8494]">
+                  <span className="font-bold text-[#0B1C30]">{rules.length} nội quy</span> đang được áp dụng tại cơ sở này.
                 </div>
-              </div>
+              </aside>
 
+              {activePublicCategory ? (
+                <PublicRuleCategoryPanel category={activePublicCategory} />
+              ) : null}
             </div>
           )}
         </div>
@@ -907,40 +954,47 @@ function DashboardRuleRow({
   );
 }
 
-function RuleCategoryCard({ category }) {
+function PublicRuleCategoryPanel({ category }) {
   const Icon = category.icon;
 
   return (
-    <article className={`flex min-h-56 flex-col rounded-lg border p-5 shadow-sm ${category.panel}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${category.iconBox}`}>
-          <Icon className="h-5 w-5" />
+    <article
+      className={`group relative flex min-h-[520px] flex-col overflow-hidden rounded-3xl p-6 transition-all duration-300 xl:p-10 ${category.panel}`}
+      style={{ boxShadow: "0px 10px 30px 0px rgba(10, 25, 47, 0.05)" }}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ${category.iconBox}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#7A8494]">Nhóm quy định</p>
+            <h3 className="mt-1 truncate text-2xl font-semibold leading-snug text-[#0B1C30]">{category.title}</h3>
+          </div>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${category.badge}`}>
-          {category.rules.length} mục
+        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${category.badge}`}>
+          {category.rules.length} nội quy
         </span>
       </div>
-      <h3 className="mt-4 text-xl font-bold text-slate-950">{category.title}</h3>
-      <div className="mt-4 flex flex-1 flex-col gap-3">
-        {category.rules.map((rule) => (
-          <div key={rule.id || rule.ruleCode} className="min-h-24 rounded-lg border border-white/70 bg-white/80 p-3">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px] sm:items-start">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900" />
-                <div className="min-w-0">
-                  <p className="font-bold leading-6 text-slate-950">{rule.title}</p>
-                  {rule.description ? (
-                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">
-                      {rule.description}
-                    </p>
-                  ) : null}
-                </div>
+      <div className="mt-8 flex flex-1 flex-col">
+        {category.rules.map((rule, index) => (
+          <div
+            key={rule.id || rule.ruleCode}
+            className={`py-5 first:pt-0 ${index > 0 ? "border-t border-slate-900/10" : ""}`}
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#232946]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold leading-6 text-[#0B1C30]">{rule.title}</p>
+                {rule.description ? (
+                  <p className="mt-2 max-w-3xl text-[15px] leading-7 text-[#44474D]">{rule.description}</p>
+                ) : null}
+                {isFineRule(rule) ? (
+                  <span className="mt-3 inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-black text-amber-900 ring-1 ring-amber-200">
+                    Mức phạt: {formatCurrency(rule.defaultFineAmount)}
+                  </span>
+                ) : null}
               </div>
-              {isFineRule(rule) ? (
-                <span className="inline-flex h-8 w-fit items-center justify-end rounded-lg bg-amber-50 px-2.5 text-xs font-extrabold text-amber-900 ring-1 ring-amber-200 sm:ml-auto sm:w-[120px]">
-                  {formatCurrency(rule.defaultFineAmount)}
-                </span>
-              ) : null}
             </div>
           </div>
         ))}

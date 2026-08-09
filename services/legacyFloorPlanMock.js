@@ -10,7 +10,6 @@ export const legacyFloorPlans = [
 
 export const legacyRoomStatusIds = {
   available: ["P101", "P103", "P202", "P203", "P208", "P303", "P308", "P401", "P403", "P408", "P503", "P507"],
-  maintenance: ["P204", "P306"],
   premium: ["P101", "P102", "P201", "P202", "P301", "P302", "P401", "P402", "P501", "P502"],
   quiet: ["P103", "P203", "P208", "P303", "P308", "P403", "P408", "P503", "P507"],
 };

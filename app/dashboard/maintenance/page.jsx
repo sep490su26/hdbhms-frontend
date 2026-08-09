@@ -1,28 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   Eye,
   ImagePlus,
   Loader2,
+  MoreVertical,
+  Phone,
   Plus,
   RefreshCcw,
-  Search,
   ShieldAlert,
-  SlidersHorizontal,
+  TimerReset,
+  User,
   Wrench,
   X,
 } from "lucide-react";
 import { useDashboardLayout } from "../_contexts/DashboardLayoutContext";
 import {
   approveMaintenanceTicket,
+  completeMaintenanceTicket,
   createInternalMaintenanceTicket,
   declineMaintenanceTicket,
   fetchMaintenanceTickets,
+  startMaintenanceProgress,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import {
@@ -31,17 +36,26 @@ import {
 } from "@/services/viewingCustomersService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import VietnameseMonthPicker from "@/components/dashboard/VietnameseMonthPicker";
+import TimeTreeFilter, { buildTreeFromData } from "@/components/dashboard/TimeTreeFilter";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { toDate } from "@/lib/dateFormat";
 
 const STATUS_OPTIONS = [
-  ["all", "Tất cả trạng thái"],
+  ["all", "Tất cả"],
   ["PENDING", "Chờ tiếp nhận"],
   ["ACCEPTED", "Đã tiếp nhận"],
   ["IN_PROGRESS", "Đang xử lý"],
@@ -95,14 +109,6 @@ const CATEGORY_OPTIONS = [
   ["OTHER", "Khác"],
 ];
 
-const PRIORITY_OPTIONS = [
-  ["all", "Tất cả mức độ"],
-  ["LOW", "Thấp"],
-  ["MEDIUM", "Trung bình"],
-  ["HIGH", "Cao"],
-  ["URGENT", "Khẩn cấp"],
-];
-
 const SCOPE_OPTIONS = [
   ["all", "Tất cả phạm vi"],
   ["ROOM", "Phòng thuê"],
@@ -111,7 +117,6 @@ const SCOPE_OPTIONS = [
 ];
 
 const CATEGORY_LABELS = Object.fromEntries(CATEGORY_OPTIONS.slice(1));
-const PRIORITY_LABELS = Object.fromEntries(PRIORITY_OPTIONS.slice(1));
 const SCOPE_LABELS = Object.fromEntries(SCOPE_OPTIONS.slice(1));
 
 const MONEY_FORMAT = new Intl.NumberFormat("vi-VN");
@@ -166,35 +171,150 @@ function Field({ label, children, className = "" }) {
   );
 }
 
-function selectClassName() {
-  return "h-11 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10";
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function deriveRoomFloor(room) {
-  const roomCode = String(
-    room?.roomCode || room?.room_code || room?.name || "",
-  );
-  const fallbackFloor = roomCode.match(/\d/)?.[0] || "";
-  const id = String(
-    room?.floorId ||
-      room?.floor_id ||
-      room?.floor?.id ||
-      room?.floorCode ||
-      room?.floor_code ||
-      fallbackFloor,
-  );
-  const label =
-    room?.floorName ||
-    room?.floor_name ||
-    room?.floor?.name ||
-    room?.floorCode ||
-    room?.floor_code ||
-    (fallbackFloor ? `Tang ${fallbackFloor}` : "");
+function AttachmentPreview({ file }) {
+  const previewUrl = useMemo(() => URL.createObjectURL(file), [file]);
 
-  return {
-    id,
-    label: String(label || id),
-  };
+  useEffect(() => {
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  return (
+    <Image
+      src={previewUrl}
+      alt={file.name}
+      fill
+      unoptimized
+      sizes="(min-width: 640px) 30vw, 100vw"
+      className="object-cover"
+    />
+  );
+}
+
+function CompletionImageSection({
+  existingAttachments = [],
+  files,
+  onChange,
+  onRemove,
+}) {
+  const existingCount = existingAttachments.length;
+  const totalCount = existingCount + files.length;
+  const canAddMore = totalCount < 3;
+
+  return (
+    <section className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <ImagePlus className="h-4 w-4 shrink-0 text-[#1e40af] dark:text-blue-300" />
+            <span className="text-sm font-black text-slate-900 dark:text-white">
+              Ảnh sau sửa <span className="text-rose-600">*</span>
+            </span>
+          </div>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+            Bắt buộc ít nhất 1 ảnh · tối đa 3 ảnh · JPG, PNG hoặc WEBP
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-600 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10">
+          {totalCount}/3 ảnh
+        </span>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap gap-3">
+        {files.map((file, index) => (
+          <div
+            key={`${file.name}-${index}`}
+            className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]"
+          >
+            <AttachmentPreview file={file} />
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/75 text-white opacity-100 shadow-sm transition hover:bg-rose-600"
+              aria-label={`Xóa ảnh ${file.name}`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+
+        {canAddMore && (
+          <label className="flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[#94a3b8] bg-white text-slate-500 transition hover:border-[#1e40af] hover:bg-blue-50/60 hover:text-[#1e40af] dark:border-white/20 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:border-blue-400 dark:hover:bg-blue-500/10">
+            <ImagePlus className="h-6 w-6" />
+            <span className="text-[11px] font-black">Thêm ảnh</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={onChange}
+              className="sr-only"
+            />
+          </label>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FilterDropdown({
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}) {
+  const selectedOption = options.find(
+    (option) => String(option.value) === String(value),
+  );
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 text-left text-sm font-semibold text-slate-900 outline-none transition hover:bg-slate-50 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
+          aria-label={label}
+        >
+          <span className="truncate">{selectedOption?.label || label}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        {options.map((option) => {
+          const isSelected = String(option.value) === String(value);
+          return (
+            <DropdownMenuItem
+              key={option.value || "all"}
+              asChild
+              className="rounded-md p-0 focus:bg-transparent"
+            >
+              <button
+                type="button"
+                onClick={() => onChange(option.value)}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-[#f1f3f5] dark:text-slate-200 dark:hover:bg-white/5 ${
+                  isSelected ? "bg-[#f1f3f5] dark:bg-white/5" : ""
+                }`}
+              >
+                <span className="flex-1 truncate text-left">
+                  {option.label}
+                </span>
+                {isSelected && <Check className="h-4 w-4 shrink-0" />}
+              </button>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function inputClassName() {
@@ -237,12 +357,48 @@ function buildDefaultInternalForm(propertyId = "") {
     locationScope: "ROOM",
     roomId: "",
     category: "AIR_CONDITIONER",
-    priority: "MEDIUM",
     title: "",
     description: "",
     accountingNote: "",
     images: [],
   };
+}
+
+const COMPLETE_COST_RESPONSIBILITY_OPTIONS = [
+  ["UNDECIDED", "Chưa xác định"],
+  ["OWNER", "Chủ trọ chịu"],
+  ["TENANT", "Khách thuê chịu"],
+  ["OPERATION", "Chi phí vận hành"],
+];
+
+function buildCompleteForm(ticket) {
+  const nextPeriod = new Date();
+  nextPeriod.setMonth(nextPeriod.getMonth() + 1, 1);
+  return {
+    repairmanName: ticket?.workerName || "",
+    repairmanPhone: ticket?.repairmanPhone || "",
+    rootCause: ticket?.rootCause || "",
+    repairItems: ticket?.repairItems || "",
+    actualCost: ticket?.costAmount ? MONEY_FORMAT.format(ticket.costAmount) : "",
+    costResponsibility:
+      ticket?.ticketScope === "PROPERTY_OPERATION"
+        ? "OWNER"
+        : ticket?.costResponsibility || "UNDECIDED",
+    collectionMethod: "MONTHLY_SCHEDULED",
+    billingPeriod: nextPeriod.toISOString().slice(0, 7),
+    completionNote: "",
+    images: [],
+  };
+}
+
+function formatMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? MONEY_FORMAT.format(Number(digits)) : "";
+}
+
+function parseMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
 }
 
 export default function MaintenancePage() {
@@ -252,16 +408,16 @@ export default function MaintenancePage() {
   const [properties, setProperties] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [filters, setFilters] = useState({
-    keyword: "",
     propertyId: "",
-    floor: "all",
     status: "all",
     category: "all",
-    severity: "all",
     scope: "all",
-    roomId: "",
+    floorId: "",
+    fromDate: "",
+    toDate: "",
   });
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [timeFilter, setTimeFilter] = useState(null);
+  const [treeTickets, setTreeTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState("");
   const [error, setError] = useState("");
@@ -270,10 +426,24 @@ export default function MaintenancePage() {
   const [internalError, setInternalError] = useState("");
   const [internalSuccess, setInternalSuccess] = useState("");
   const [isCreatingInternal, setIsCreatingInternal] = useState(false);
+  const internalCreateLockRef = useRef(false);
+  const [completionTicket, setCompletionTicket] = useState(null);
+  const [completionForm, setCompletionForm] = useState(buildCompleteForm());
+  const [isCompletionOpen, setIsCompletionOpen] = useState(false);
+  const completionSubmitLockRef = useRef(false);
+  const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const fullTreeData = useMemo(
+    () =>
+      buildTreeFromData(treeTickets, (ticket) =>
+        ticket.createdAt || ticket.updatedAt,
+      ),
+    [treeTickets],
+  );
 
   const propertyOptions = useMemo(() => {
     return properties
@@ -288,12 +458,17 @@ export default function MaintenancePage() {
     return rooms
       .filter((room) => room?.id)
       .map((room) => {
-        const floor = deriveRoomFloor(room);
         return {
           id: String(room.id),
           label: room.roomCode || room.name || `Phong ${room.id}`,
-          floorId: floor.id,
-          floorLabel: floor.label,
+          floorId: room.floorId ?? room.floor_id ?? room.floor?.id ?? "",
+          floorLabel:
+            room.floorName ||
+            room.floor_name ||
+            room.floor?.name ||
+            (room.floorId ?? room.floor_id ?? room.floor?.id
+              ? `Tang ${room.floorId ?? room.floor_id ?? room.floor?.id}`
+              : ""),
           status: String(
             room.status || room.currentStatus || room.current_status || "",
           ).toUpperCase(),
@@ -305,20 +480,18 @@ export default function MaintenancePage() {
     const floors = new Map();
     roomOptions.forEach((room) => {
       if (!room.floorId) return;
-      floors.set(room.floorId, {
-        id: room.floorId,
+      floors.set(String(room.floorId), {
+        value: String(room.floorId),
         label: room.floorLabel || `Tang ${room.floorId}`,
       });
     });
-    return [...floors.values()].sort((a, b) =>
-      a.label.localeCompare(b.label, "vi", { numeric: true }),
-    );
+    return [
+      { value: "", label: "Tất cả tầng" },
+      ...[...floors.values()].sort((left, right) =>
+        left.label.localeCompare(right.label, "vi", { numeric: true }),
+      ),
+    ];
   }, [roomOptions]);
-
-  const filteredRoomOptions = useMemo(() => {
-    if (!filters.floor || filters.floor === "all") return [];
-    return roomOptions.filter((room) => room.floorId === filters.floor);
-  }, [filters.floor, roomOptions]);
 
   const loadTickets = useCallback(async () => {
     if (!filters.propertyId) {
@@ -331,10 +504,9 @@ export default function MaintenancePage() {
     setIsLoading(true);
     setError("");
     try {
-      const keyword = filters.keyword || query || "";
       const result = await fetchMaintenanceTickets({
         ...filters,
-        keyword,
+        keyword: query || "",
         page: page - 1,
         size,
       });
@@ -401,6 +573,32 @@ export default function MaintenancePage() {
   }, [filters.propertyId]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadTreeTickets() {
+      if (!filters.propertyId) {
+        setTreeTickets([]);
+        return;
+      }
+      try {
+        const result = await fetchMaintenanceTickets({
+          propertyId: filters.propertyId,
+          page: 0,
+          size: 10000,
+        });
+        if (isMounted) setTreeTickets(result.tickets || []);
+      } catch {
+        if (isMounted) setTreeTickets([]);
+      }
+    }
+
+    loadTreeTickets();
+    return () => {
+      isMounted = false;
+    };
+  }, [filters.propertyId]);
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTickets();
   }, [loadTickets]);
@@ -409,17 +607,16 @@ export default function MaintenancePage() {
     setPage(1);
     setFilters((current) => {
       const nextFilters = { ...current, [name]: value };
-      // Nếu đổi Cơ sở -> Reset Tầng và Phòng
+      // Nếu đổi Cơ sở -> Reset Phòng và khoảng thời gian.
       if (name === "propertyId") {
-        nextFilters.floor = "all";
-        nextFilters.roomId = "";
-      }
-      // Nếu đổi Tầng -> Reset Phòng
-      if (name === "floor") {
-        nextFilters.roomId = "";
+        nextFilters.floorId = "";
+        nextFilters.fromDate = "";
+        nextFilters.toDate = "";
       }
       return nextFilters;
     });
+
+    if (name === "propertyId") setTimeFilter(null);
 
     if (name === "propertyId") {
       setInternalForm((current) => ({
@@ -429,6 +626,41 @@ export default function MaintenancePage() {
       }));
     }
   }
+
+  const handleTimeFilterSelect = useCallback((dateSelection) => {
+    setTimeFilter(dateSelection);
+    setPage(1);
+
+    if (!dateSelection) {
+      setFilters((current) => ({ ...current, fromDate: "", toDate: "" }));
+      return;
+    }
+
+    const { year, quarter, month, day } = dateSelection;
+    let fromDate = "";
+    let toDate = "";
+
+    if (quarter === "all" && month === "all") {
+      fromDate = `${year}-01-01`;
+      toDate = `${year}-12-31`;
+    } else if (month === "all") {
+      const startMonth = (quarter - 1) * 3 + 1;
+      const endMonth = quarter * 3;
+      const lastDay = new Date(year, endMonth, 0).getDate();
+      fromDate = `${year}-${String(startMonth).padStart(2, "0")}-01`;
+      toDate = `${year}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (day === "all" || day == null) {
+      const lastDay = new Date(year, month, 0).getDate();
+      fromDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      toDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else {
+      const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      fromDate = date;
+      toDate = date;
+    }
+
+    setFilters((current) => ({ ...current, fromDate, toDate }));
+  }, []);
 
   function updateInternalForm(name, value) {
     setInternalForm((current) => ({
@@ -442,19 +674,30 @@ export default function MaintenancePage() {
     if (name === "propertyId") updateFilter("propertyId", value);
   }
 
-  function handleInternalImageChange(event) {
-    const files = Array.from(event.target.files || []).filter((file) =>
+  function addInternalImages(fileList) {
+    const files = Array.from(fileList || []).filter((file) =>
       file.type.startsWith("image/"),
     );
     setInternalForm((current) => ({
       ...current,
       images: [...current.images, ...files].slice(0, 3),
     }));
+  }
+
+  function handleInternalImageChange(event) {
+    addInternalImages(event.target.files);
     event.target.value = "";
+  }
+
+  function handleInternalImageDrop(event) {
+    event.preventDefault();
+    setIsDraggingImages(false);
+    addInternalImages(event.dataTransfer.files);
   }
 
   async function handleCreateInternalTicket(event) {
     event.preventDefault();
+    if (internalCreateLockRef.current) return;
     setInternalError("");
     setInternalSuccess("");
     const propertyId = Number(internalForm.propertyId || filters.propertyId);
@@ -477,7 +720,9 @@ export default function MaintenancePage() {
       setInternalError("Mô tả công việc phải có tối thiểu 10 ký tự.");
       return;
     }
+    internalCreateLockRef.current = true;
     setIsCreatingInternal(true);
+    let didCreate = false;
     try {
       const uploaded = await Promise.all(
         internalForm.images.map((file) => uploadMaintenanceImage(file)),
@@ -487,7 +732,6 @@ export default function MaintenancePage() {
         roomId,
         ticketScope: "PROPERTY_OPERATION",
         category: internalForm.category,
-        priority: internalForm.priority,
         title:
           internalForm.title.trim() ||
           `Bảo trì nội bộ - ${CATEGORY_LABELS[internalForm.category] || "Khác"}`,
@@ -497,6 +741,7 @@ export default function MaintenancePage() {
         costType: "COMMON_OPERATING",
         attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
       });
+      didCreate = true;
       setInternalSuccess(
         "Đã tạo phiếu bảo trì nội bộ. Chi phí được ghi nhận là chủ trọ chịu và không tạo hóa đơn khách thuê.",
       );
@@ -508,6 +753,8 @@ export default function MaintenancePage() {
         createError?.message || "Không tạo được phiếu bảo trì nội bộ.",
       );
     } finally {
+      // Keep the lock after success so delayed mobile clicks cannot duplicate it.
+      if (!didCreate) internalCreateLockRef.current = false;
       setIsCreatingInternal(false);
     }
   }
@@ -540,6 +787,129 @@ export default function MaintenancePage() {
     }
   }
 
+  async function handleStartProgress(ticketId) {
+    if (actionLoading) return;
+    setActionLoading(`progress-${ticketId}`);
+    setError("");
+    try {
+      await startMaintenanceProgress(ticketId, {
+        note: "Đã bắt đầu xử lý sự cố",
+      });
+      await loadTickets();
+    } catch (progressError) {
+      setError(progressError?.message || "Không thể bắt đầu xử lý phiếu.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  function updateCompletionForm(name, value) {
+    setCompletionForm((current) => ({
+      ...current,
+      [name]: name === "actualCost" ? formatMoneyInput(value) : value,
+    }));
+  }
+
+  function handleCompletionImages(event) {
+    const files = Array.from(event.target.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    const existingCount = completionTicket?.afterAttachments?.length || 0;
+    const remainingSlots = Math.max(0, 3 - existingCount);
+    setCompletionForm((current) => ({
+      ...current,
+      images: [...current.images, ...files].slice(0, remainingSlots),
+    }));
+    event.target.value = "";
+  }
+
+  function openCompletionDialog(ticket) {
+    completionSubmitLockRef.current = false;
+    setError("");
+    setCompletionTicket(ticket);
+    setCompletionForm(buildCompleteForm(ticket));
+    setIsCompletionOpen(true);
+  }
+
+  async function handleCompleteTicket(event) {
+    event.preventDefault();
+    if (completionSubmitLockRef.current || !completionTicket) return;
+
+    setError("");
+    const ticket = completionTicket;
+    if (!completionForm.repairItems.trim()) {
+      setError("Vui lòng nhập hạng mục đã sửa.");
+      return;
+    }
+    if (
+      ticket.ticketScope === "PROPERTY_OPERATION" &&
+      !completionForm.repairmanName.trim()
+    ) {
+      setError("Vui lòng nhập tên thợ sửa hoặc nhân sự xử lý.");
+      return;
+    }
+    if (
+      (ticket.afterAttachments?.length || 0) === 0 &&
+      completionForm.images.length === 0
+    ) {
+      setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
+      return;
+    }
+    if (
+      (ticket.afterAttachments?.length || 0) + completionForm.images.length >
+      3
+    ) {
+      setError("Ảnh sau sửa tối đa 3 ảnh.");
+      return;
+    }
+    const amount = parseMoneyInput(completionForm.actualCost);
+    if (!Number.isFinite(amount) || amount < 0) {
+      setError("Chi phí thực tế không hợp lệ.");
+      return;
+    }
+    if (ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
+      setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
+      return;
+    }
+
+    completionSubmitLockRef.current = true;
+    setActionLoading(`complete-${ticket.id}`);
+    try {
+      const uploaded = await Promise.all(
+        completionForm.images.map((file) => uploadMaintenanceImage(file)),
+      );
+      await completeMaintenanceTicket(ticket.id, {
+        repairmanName: completionForm.repairmanName.trim(),
+        repairmanPhone: completionForm.repairmanPhone.trim(),
+        rootCause: completionForm.rootCause.trim(),
+        repairItems: completionForm.repairItems.trim(),
+        actualCost: amount,
+        costResponsibility: completionForm.costResponsibility,
+        collectionMethod:
+          completionForm.costResponsibility === "TENANT"
+            ? completionForm.collectionMethod
+            : null,
+        billingPeriod:
+          completionForm.costResponsibility === "TENANT" &&
+          completionForm.collectionMethod === "MONTHLY_SCHEDULED"
+            ? completionForm.billingPeriod
+            : null,
+        costDescription: completionForm.repairItems.trim(),
+        completionNote: completionForm.completionNote.trim(),
+        attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
+        phase: "AFTER",
+      });
+      setIsCompletionOpen(false);
+      setCompletionTicket(null);
+      await loadTickets();
+    } catch (completeError) {
+      completionSubmitLockRef.current = false;
+      setError(completeError?.message || "Không thể hoàn tất xử lý phiếu.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
   return (
     <section className="grid gap-6">
       <DashboardPageHeader
@@ -551,6 +921,8 @@ export default function MaintenancePage() {
               <button
                 type="button"
                 onClick={() => {
+                  // Reset the one-shot lock only for a new dialog session.
+                  internalCreateLockRef.current = false;
                   setInternalError("");
                   setInternalForm((current) => ({
                     ...current,
@@ -584,7 +956,6 @@ export default function MaintenancePage() {
       >
         <DialogContent
           lockScroll={false}
-          showCloseButton={!isCreatingInternal}
           overlayClassName="bg-slate-950/55 supports-backdrop-filter:backdrop-blur-sm"
           overlayProps={{
             "aria-hidden": true,
@@ -592,125 +963,131 @@ export default function MaintenancePage() {
             onTouchMove: (event) => event.preventDefault(),
             onWheel: (event) => event.preventDefault(),
           }}
-          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+          showCloseButton={false}
+          className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-2xl shadow-slate-950/20 sm:max-w-4xl dark:border-white/10 dark:bg-[#0f172a]"
         >
-        <form
-          onSubmit={handleCreateInternalTicket}
-          className="grid gap-5 overflow-y-auto p-5"
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <DialogHeader className="gap-1 text-left">
-              <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
-                Tạo phiếu bảo trì nội bộ
-              </DialogTitle>
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu và
-                không phát sinh hóa đơn tenant.
-              </p>
-            </DialogHeader>
-            <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
-              Chi phí nội bộ
-            </span>
-          </div>
-          {internalError && (
-            <InlineNotice type="error">{internalError}</InlineNotice>
-          )}
-          <div
-            className={`grid gap-5 ${internalForm.locationScope === "ROOM" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          <form
+            onSubmit={handleCreateInternalTicket}
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
-            <Field label="Phạm vi *">
-              <select
-                value={internalForm.locationScope}
-                onChange={(event) =>
-                  updateInternalForm("locationScope", event.target.value)
-                }
-                className={selectClassName()}
-              >
-                <option value="ROOM">Phòng cụ thể</option>
-                <option value="COMMON_AREA">Tài sản/khu vực chung</option>
-              </select>
-            </Field>
-            <Field label="Cơ sở *">
-              <select
-                value={internalForm.propertyId}
-                onChange={(event) =>
-                  updateInternalForm("propertyId", event.target.value)
-                }
-                className={selectClassName()}
-              >
-                <option value="">Chọn cơ sở</option>
-                {propertyOptions.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {internalForm.locationScope === "ROOM" && (
-              <Field label="Phòng *">
-                <select
-                  value={internalForm.roomId}
-                  onChange={(event) =>
-                    updateInternalForm("roomId", event.target.value)
-                  }
-                  className={selectClassName()}
-                >
-                  <option value="">Chọn phòng</option>
-                  {roomOptions.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.label}
-                      {room.status ? ` · ${room.status}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
-          </div>
-          <div className="grid gap-5 md:grid-cols-3">
-            <Field label="Hạng mục *">
-              <select
-                value={internalForm.category}
-                onChange={(event) =>
-                  updateInternalForm("category", event.target.value)
-                }
-                className={selectClassName()}
-              >
-                {CATEGORY_OPTIONS.slice(1)
-                  .filter(([value]) => value !== "RULE_VIOLATION")
-                  .map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-            <Field label="Mức độ">
-              <select
-                value={internalForm.priority}
-                onChange={(event) =>
-                  updateInternalForm("priority", event.target.value)
-                }
-                className={selectClassName()}
-              >
-                {PRIORITY_OPTIONS.slice(1).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Tiêu đề">
-              <input
-                value={internalForm.title}
-                onChange={(event) =>
-                  updateInternalForm("title", event.target.value)
-                }
-                className={inputClassName()}
-                placeholder="VD: Sửa điều hòa trước khi cho thuê"
-              />
-            </Field>
-          </div>
-          <div className="grid gap-5 lg:grid-cols-2">
+            <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-6 py-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex items-start gap-4">
+                <DialogHeader className="min-w-0 flex-1 gap-1 text-left">
+                  <DialogTitle className="text-lg font-black text-slate-900 dark:text-white sm:text-xl">
+                    Tạo phiếu bảo trì nội bộ
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+                    Dùng cho phòng hoặc khu vực chung; chi phí do chủ trọ chịu
+                    và không phát sinh hóa đơn cho khách thuê.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex shrink-0 items-start gap-2">
+                  <span className="hidden rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200 sm:inline-flex dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
+                    Chi phí nội bộ
+                  </span>
+                  {!isCreatingInternal && (
+                    <button
+                      type="button"
+                      onClick={() => setIsInternalOpen(false)}
+                      className="-mr-2 -mt-2 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-200/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                      aria-label="Đóng biểu mẫu"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="grid gap-5">
+                {internalError && (
+                  <InlineNotice type="error">{internalError}</InlineNotice>
+                )}
+                <div className="grid gap-5 md:grid-cols-2">
+                  <Field label="Phạm vi *">
+                    <FilterDropdown
+                      label="Chọn phạm vi"
+                      value={internalForm.locationScope}
+                      onChange={(value) =>
+                        updateInternalForm("locationScope", value)
+                      }
+                      options={[
+                        { value: "ROOM", label: "Phòng cụ thể" },
+                        {
+                          value: "COMMON_AREA",
+                          label: "Tài sản/khu vực chung",
+                        },
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Cơ sở *">
+                    <FilterDropdown
+                      label="Chọn cơ sở"
+                      value={internalForm.propertyId}
+                      onChange={(value) =>
+                        updateInternalForm("propertyId", value)
+                      }
+                      options={[
+                        { value: "", label: "Chọn cơ sở" },
+                        ...propertyOptions.map((property) => ({
+                          value: property.id,
+                          label: property.name,
+                        })),
+                      ]}
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-5 md:grid-cols-2">
+                  {internalForm.locationScope === "ROOM" && (
+                    <Field label="Phòng *">
+                      <FilterDropdown
+                        label={
+                          roomOptions.length ? "Chọn phòng" : "Chưa có phòng"
+                        }
+                        value={internalForm.roomId}
+                        onChange={(value) =>
+                          updateInternalForm("roomId", value)
+                        }
+                        disabled={!internalForm.propertyId || roomOptions.length === 0}
+                        options={[
+                          {
+                            value: "",
+                            label: roomOptions.length
+                              ? "Chọn phòng"
+                              : "Chưa có phòng",
+                          },
+                          ...roomOptions.map((room) => ({
+                            value: room.id,
+                            label: `${room.label}${room.status ? ` · ${room.status}` : ""}`,
+                          })),
+                        ]}
+                      />
+                    </Field>
+                  )}
+                  <Field label="Hạng mục *">
+                    <FilterDropdown
+                      label="Chọn hạng mục"
+                      value={internalForm.category}
+                      onChange={(value) =>
+                        updateInternalForm("category", value)
+                      }
+                      options={CATEGORY_OPTIONS.slice(1)
+                        .filter(([value]) => value !== "RULE_VIOLATION")
+                        .map(([value, label]) => ({ value, label }))}
+                    />
+                  </Field>
+                </div>
+                <Field label="Tiêu đề">
+                  <input
+                    value={internalForm.title}
+                    onChange={(event) =>
+                      updateInternalForm("title", event.target.value)
+                    }
+                    className={inputClassName()}
+                    placeholder="VD: Sửa điều hòa trước khi cho thuê"
+                  />
+                </Field>
+                <div className="grid gap-5 lg:grid-cols-2">
             <Field label="Mô tả sự cố/công việc *">
               <textarea
                 value={internalForm.description}
@@ -731,50 +1108,113 @@ export default function MaintenancePage() {
                 placeholder="Nội dung chi phí, nhà cung cấp hoặc ghi chú chứng từ"
               />
             </Field>
-          </div>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap gap-3">
-              {internalForm.images.map((file, index) => (
-                <div
-                  key={`${file.name}-${index}`}
-                  className="relative flex h-20 w-32 items-center justify-center rounded-lg border border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-2 text-center text-xs font-bold text-slate-600 dark:text-slate-300"
-                >
-                  <span className="line-clamp-2">{file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setInternalForm((current) => ({
-                        ...current,
-                        images: current.images.filter(
-                          (_, itemIndex) => itemIndex !== index,
-                        ),
-                      }))
-                    }
-                    className="absolute right-1 top-1 rounded-full bg-[#091426]/80 p-1 text-white"
-                    aria-label="Xóa ảnh"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
                 </div>
-              ))}
-              {internalForm.images.length < 3 && (
-                <label className="flex h-20 w-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] dark:bg-white/5 text-xs font-bold text-slate-600 dark:text-slate-300">
-                  <ImagePlus className="h-5 w-5" />
-                  Ảnh/chứng từ
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    onChange={handleInternalImageChange}
-                    className="sr-only"
-                  />
-                </label>
-              )}
+                <section className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#1e40af] dark:bg-blue-500/10 dark:text-blue-300">
+                        <ImagePlus className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-slate-800 dark:text-white">
+                          Ảnh/chứng từ
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Không bắt buộc · JPG, PNG hoặc WEBP
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-500 ring-1 ring-inset ring-[#d8dee8] dark:bg-[#0f172a] dark:text-slate-300 dark:ring-white/10">
+                      {internalForm.images.length}/3
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {internalForm.images.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="group relative min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-white dark:border-white/10 dark:bg-[#0f172a]"
+                      >
+                        <div className="relative aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-white/10">
+                          <AttachmentPreview file={file} />
+                          <span className="absolute bottom-2 left-2 rounded-md bg-slate-950/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                            Đã chọn
+                          </span>
+                        </div>
+                        <div className="min-w-0 px-3 py-2.5 pr-10">
+                          <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">
+                            {file.name}
+                          </p>
+                          <p className="mt-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                            {formatFileSize(file.size)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setInternalForm((current) => ({
+                              ...current,
+                              images: current.images.filter(
+                                (_, itemIndex) => itemIndex !== index,
+                              ),
+                            }))
+                          }
+                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-950/65 text-white transition hover:bg-rose-600"
+                          aria-label={`Xóa ${file.name}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {internalForm.images.length < 3 && (
+                      <label
+                        onDragEnter={(event) => {
+                          event.preventDefault();
+                          setIsDraggingImages(true);
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDragLeave={() => setIsDraggingImages(false)}
+                        onDrop={handleInternalImageDrop}
+                        className={
+                          isDraggingImages
+                            ? "flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#1e40af] bg-blue-50 px-3 py-3 text-center text-[#1e40af] dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "flex min-h-[148px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#9aa8ba] bg-white px-3 py-3 text-center text-slate-600 transition hover:border-[#1e40af] hover:bg-blue-50/60 hover:text-[#1e40af] dark:border-white/20 dark:bg-[#0f172a] dark:text-slate-300 dark:hover:border-blue-400 dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
+                        }
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-[#1e40af] dark:bg-blue-500/10 dark:text-blue-300">
+                          <ImagePlus className="h-5 w-5" />
+                        </div>
+                        <span className="text-xs font-black">Thêm ảnh</span>
+                        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                          Kéo thả hoặc bấm để chọn · còn {3 - internalForm.images.length}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          onChange={handleInternalImageChange}
+                          className="sr-only"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </section>
+              </div>
             </div>
+            <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-[#e2e8f0] bg-[#f8fafc] px-6 py-4 sm:flex-row sm:justify-end dark:border-white/10 dark:bg-white/[0.03]">
+            <button
+              type="button"
+              onClick={() => setIsInternalOpen(false)}
+              disabled={isCreatingInternal}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+            >
+              Hủy
+            </button>
             <button
               type="submit"
               disabled={isCreatingInternal}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-5 text-sm font-bold text-white hover:bg-[#115e59] disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f766e] px-5 text-sm font-bold text-white hover:bg-[#115e59] disabled:opacity-60"
             >
               {isCreatingInternal ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -783,136 +1223,246 @@ export default function MaintenancePage() {
               )}
               Tạo phiếu nội bộ
             </button>
-          </div>
-        </form>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-        {/* NHÓM LỌC CHÍNH */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 items-center">
-          {/* 1. Lọc Cơ sở */}
-          <select
-            value={filters.propertyId}
-            onChange={(event) => updateFilter("propertyId", event.target.value)}
-            disabled={propertyOptions.length <= 1 && activeRole === "manager"}
-            className={selectClassName()}
-          >
-            <option value="">Chọn cơ sở</option>
-            {propertyOptions.map((property) => (
-              <option key={property.id} value={property.id}>
-                {property.name}
-              </option>
-            ))}
-          </select>
-
-          {/* 2. Lọc Trạng thái */}
-          <select
-            value={filters.status}
-            onChange={(event) => updateFilter("status", event.target.value)}
-            className={selectClassName()}
-          >
-            {STATUS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-
-          {/* 3. Lọc Tầng */}
-          <select
-            value={filters.floor}
-            onChange={(event) => updateFilter("floor", event.target.value)}
-            disabled={!filters.propertyId || floorOptions.length === 0}
-            className={selectClassName()}
-          >
-            <option value="all">
-              {floorOptions.length > 0 ? "Tất cả tầng" : "Tất cả tầng"}
-            </option>
-            {floorOptions.map((floor) => (
-              <option key={floor.id} value={floor.id}>
-                {floor.label}
-              </option>
-            ))}
-          </select>
-
-          {/* 4. Lọc Phòng */}
-          <select
-            value={filters.roomId}
-            onChange={(event) => updateFilter("roomId", event.target.value)}
-            disabled={
-              !filters.propertyId ||
-              filters.floor === "all" ||
-              filteredRoomOptions.length === 0
+      {completionTicket && (
+        <Dialog
+          open={isCompletionOpen}
+          onOpenChange={(open) => {
+            if (actionLoading === `complete-${completionTicket.id}`) return;
+            setIsCompletionOpen(open);
+            if (!open) {
+              setCompletionTicket(null);
+              setError("");
             }
-            className={selectClassName()}
-          >
-            <option value="">
-              {filters.floor === "all"
-                ? "Chọn tầng trước"
-                : filteredRoomOptions.length > 0
-                  ? "Tất cả phòng"
-                  : "Chưa có phòng"}
-            </option>
-            {filteredRoomOptions.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.label}
-              </option>
-            ))}
-          </select>
+          }}
+        >
+          <DialogContent className="w-[calc(100%-1rem)] !max-w-4xl overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full">
+            <form onSubmit={handleCompleteTicket} className="flex max-h-[calc(100dvh-1rem)] min-w-0 flex-col">
+              <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <DialogHeader className="gap-1 text-left">
+                  <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
+                    Hoàn tất xử lý
+                  </DialogTitle>
+                  <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    {completionTicket.ticketCode} · Ghi nhận kết quả sửa chữa.
+                  </DialogDescription>
+                </DialogHeader>
+                {error && <div className="mt-3"><InlineNotice type="error">{error}</InlineNotice></div>}
+              </div>
 
-          {/* 5. Nút Toggle Bộ Lọc Nâng Cao */}
-          <button
-            type="button"
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-slate-50 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            {showAdvancedFilters ? "Thu gọn" : "Lọc thêm"}
-          </button>
-        </div>
+              <div className="min-h-0 overflow-y-auto p-5">
+                <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+                  <Field label="Người sửa">
+                    <div className="relative">
+                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        value={completionForm.repairmanName}
+                        onChange={(event) => updateCompletionForm("repairmanName", event.target.value)}
+                        className={`${inputClassName()} pl-9`}
+                        placeholder="Tên thợ hoặc nhân sự"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Số điện thoại">
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <input
+                        value={completionForm.repairmanPhone}
+                        onChange={(event) => updateCompletionForm("repairmanPhone", event.target.value)}
+                        className={`${inputClassName()} pl-9`}
+                        placeholder="SĐT liên hệ"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Trách nhiệm chi phí">
+                    <select
+                      value={completionTicket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionForm.costResponsibility}
+                      onChange={(event) => updateCompletionForm("costResponsibility", event.target.value)}
+                      disabled={completionTicket.ticketScope === "PROPERTY_OPERATION"}
+                      className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
+                    >
+                      {COMPLETE_COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
 
-        {/* NHÓM LỌC NÂNG CAO (Chỉ hiện khi toggle) */}
-        {showAdvancedFilters && (
-          <div className="grid gap-3 pt-4 border-t border-slate-200 dark:border-white/10 md:grid-cols-2 lg:grid-cols-4">
-            <select
-              value={filters.category}
-              onChange={(event) => updateFilter("category", event.target.value)}
-              className={selectClassName()}
-            >
-              {CATEGORY_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
+                {completionForm.costResponsibility === "TENANT" && (
+                  <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
+                    <Field label="Cách thu tiền *">
+                      <select
+                        value={completionForm.collectionMethod}
+                        onChange={(event) => updateCompletionForm("collectionMethod", event.target.value)}
+                        className={inputClassName()}
+                      >
+                        <option value="BILL_NOW">Thanh toán hóa đơn ngay</option>
+                        <option value="MONTHLY_SCHEDULED">Gộp vào hóa đơn đầu tháng</option>
+                      </select>
+                    </Field>
+                    {completionForm.collectionMethod === "MONTHLY_SCHEDULED" && (
+                      <Field label="Kỳ hóa đơn gộp *">
+                        <VietnameseMonthPicker
+                          value={completionForm.billingPeriod}
+                          onChange={(value) => updateCompletionForm("billingPeriod", value)}
+                        />
+                      </Field>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
+                  <Field label="Nguyên nhân">
+                    <textarea
+                      value={completionForm.rootCause}
+                      onChange={(event) => updateCompletionForm("rootCause", event.target.value)}
+                      className={textareaClassName()}
+                      placeholder="Nguyên nhân sự cố"
+                    />
+                  </Field>
+                  <Field label="Hạng mục đã sửa *">
+                    <textarea
+                      value={completionForm.repairItems}
+                      onChange={(event) => updateCompletionForm("repairItems", event.target.value)}
+                      className={textareaClassName()}
+                      placeholder="Các việc đã xử lý"
+                    />
+                  </Field>
+                </div>
+
+                <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
+                  <Field label="Chi phí thực tế (VNĐ)">
+                    <input
+                      value={completionForm.actualCost}
+                      onChange={(event) => updateCompletionForm("actualCost", event.target.value)}
+                      className={`${inputClassName()} tabular-nums`}
+                      inputMode="numeric"
+                      placeholder="0"
+                    />
+                  </Field>
+                  <Field label="Ghi chú hoàn tất">
+                    <input
+                      value={completionForm.completionNote}
+                      onChange={(event) => updateCompletionForm("completionNote", event.target.value)}
+                      className={inputClassName()}
+                      placeholder="Ghi chú hoàn tất nếu có"
+                    />
+                  </Field>
+                </div>
+
+                <CompletionImageSection
+                  existingAttachments={completionTicket.afterAttachments}
+                  files={completionForm.images}
+                  onChange={handleCompletionImages}
+                  onRemove={(index) =>
+                    setCompletionForm((current) => ({
+                      ...current,
+                      images: current.images.filter(
+                        (_, fileIndex) => fileIndex !== index,
+                      ),
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 sm:flex-row sm:justify-end dark:border-white/10 dark:bg-white/[0.03]">
+                <button
+                  type="button"
+                  onClick={() => setIsCompletionOpen(false)}
+                  disabled={actionLoading === `complete-${completionTicket.id}`}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {actionLoading === `complete-${completionTicket.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
+                  Xác nhận hoàn tất
+                </button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <div className="flex gap-[24px]">
+        <TimeTreeFilter
+          treeData={fullTreeData}
+          selectedDate={timeFilter}
+          onDateSelect={handleTimeFilterSelect}
+          className="hidden lg:flex"
+        />
+
+        <div className="w-full min-w-0 flex-1 space-y-4">
+      <section className="overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="grid gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <FilterDropdown
+                label="Chọn cơ sở"
+                value={filters.propertyId}
+                onChange={(value) => updateFilter("propertyId", value)}
+                disabled={propertyOptions.length <= 1 && activeRole === "manager"}
+                options={[
+                  { value: "", label: "Chọn cơ sở" },
+                  ...propertyOptions.map((property) => ({
+                    value: property.id,
+                    label: property.name,
+                  })),
+                ]}
+              />
+
+              <FilterDropdown
+                label="Tất cả tầng"
+                value={filters.floorId}
+                onChange={(value) => updateFilter("floorId", value)}
+                disabled={!filters.propertyId || floorOptions.length === 0}
+                options={floorOptions}
+              />
+
+              <FilterDropdown
+                label="Tất cả phạm vi"
+                value={filters.scope}
+                onChange={(value) => updateFilter("scope", value)}
+                options={SCOPE_OPTIONS.map(([value, label]) => ({ value, label }))}
+              />
+
+              <FilterDropdown
+                label="Tất cả hạng mục"
+                value={filters.category}
+                onChange={(value) => updateFilter("category", value)}
+                options={CATEGORY_OPTIONS.map(([value, label]) => ({ value, label }))}
+              />
+
+            </div>
+
+            {/* Trạng thái nằm ở hàng riêng như các màn hình có filter dạng pill. */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {STATUS_OPTIONS.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => updateFilter("status", value)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                    filters.status === value
+                      ? "bg-[#1e40af] text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+                  }`}
+                >
                   {label}
-                </option>
+                </button>
               ))}
-            </select>
-
-            <select
-              value={filters.severity}
-              onChange={(event) => updateFilter("severity", event.target.value)}
-              className={selectClassName()}
-            >
-              {PRIORITY_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.scope}
-              onChange={(event) => updateFilter("scope", event.target.value)}
-              className={selectClassName()}
-            >
-              {SCOPE_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </section>
 
       {error && <InlineNotice type="error">{error}</InlineNotice>}
 
@@ -924,7 +1474,6 @@ export default function MaintenancePage() {
                 <th className="px-5 py-4">Phiếu</th>
                 <th className="px-5 py-4">Phòng</th>
                 <th className="px-5 py-4">Hạng mục</th>
-                <th className="px-5 py-4">Mức độ</th>
                 <th className="px-5 py-4">Trạng thái</th>
                 <th className="px-5 py-4">Cập nhật</th>
                 <th className="px-5 py-4 text-right">Thao tác</th>
@@ -934,7 +1483,7 @@ export default function MaintenancePage() {
               {isLoading && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                   >
                     <span className="inline-flex items-center gap-2">
@@ -1019,14 +1568,6 @@ export default function MaintenancePage() {
                         </span>
                       )}
                     </td>
-                    <td
-                      data-label="Mức độ"
-                      className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200"
-                    >
-                      {PRIORITY_LABELS[ticket.priority] ||
-                        ticket.priority ||
-                        "Trung bình"}
-                    </td>
                     <td data-label="Trạng thái" className="px-5 py-4">
                       <StatusBadge
                         status={ticket.ticketStatus || ticket.status}
@@ -1039,44 +1580,111 @@ export default function MaintenancePage() {
                       {formatDateTime(ticket.updatedAt || ticket.createdAt)}
                     </td>
                     <td data-label="Thao tác" className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/dashboard/maintenance/${ticket.id}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-[#1e40af] hover:text-slate-900 dark:hover:text-white"
-                          aria-label={`Xem ${ticket.ticketCode}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        {canManage && ticket.status === "PENDING" && (
-                          <>
+                      <div className="flex justify-end">
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
                             <button
                               type="button"
-                              onClick={() => handleApprove(ticket.id)}
-                              disabled={Boolean(actionLoading)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/10 disabled:opacity-60"
-                              aria-label="Tiếp nhận"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d8dee8] text-slate-600 transition hover:border-[#1e40af] hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+                              aria-label={`Thao tác với ${ticket.ticketCode}`}
                             >
-                              {actionLoading === `approve-${ticket.id}` ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Check className="h-4 w-4" />
-                              )}
+                              <MoreVertical className="h-4 w-4" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDecline(ticket.id)}
-                              disabled={Boolean(actionLoading)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/10 disabled:opacity-60"
-                              aria-label="Từ chối"
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-44 rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+                          >
+                            <DropdownMenuItem
+                              asChild
+                              className="rounded-md p-0 focus:bg-transparent"
                             >
-                              {actionLoading === `decline-${ticket.id}` ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <X className="h-4 w-4" />
-                              )}
-                            </button>
-                          </>
-                        )}
+                              <Link
+                                href={`/dashboard/maintenance/${ticket.id}`}
+                                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[#f1f3f5] dark:text-slate-200 dark:hover:bg-white/5"
+                              >
+                                <Eye className="h-4 w-4" />
+                                Xem chi tiết
+                              </Link>
+                            </DropdownMenuItem>
+                            {canManage && ticket.status === "PENDING" && (
+                              <>
+                                <DropdownMenuItem
+                                  asChild
+                                  className="rounded-md p-0 focus:bg-transparent"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApprove(ticket.id)}
+                                    disabled={Boolean(actionLoading)}
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                  >
+                                    {actionLoading === `approve-${ticket.id}` ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4" />
+                                    )}
+                                    Tiếp nhận
+                                  </button>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  asChild
+                                  className="rounded-md p-0 focus:bg-transparent"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDecline(ticket.id)}
+                                    disabled={Boolean(actionLoading)}
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                  >
+                                    {actionLoading === `decline-${ticket.id}` ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4" />
+                                    )}
+                                    Từ chối
+                                  </button>
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {canManage && ticket.status === "ACCEPTED" && (
+                              <DropdownMenuItem
+                                asChild
+                                className="rounded-md p-0 focus:bg-transparent"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartProgress(ticket.id)}
+                                  disabled={Boolean(actionLoading)}
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                                >
+                                  {actionLoading === `progress-${ticket.id}` ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Wrench className="h-4 w-4" />
+                                  )}
+                                  Xử lý
+                                </button>
+                              </DropdownMenuItem>
+                            )}
+                            {canManage && ticket.status === "IN_PROGRESS" && (
+                              <DropdownMenuItem
+                                asChild
+                                className="rounded-md p-0 focus:bg-transparent"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => openCompletionDialog(ticket)}
+                                  disabled={Boolean(actionLoading)}
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+                                >
+                                  <TimerReset className="h-4 w-4" />
+                                  Hoàn tất xử lý
+                                </button>
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
@@ -1084,7 +1692,7 @@ export default function MaintenancePage() {
               {!isLoading && tickets.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
                   >
                     Không có phiếu bảo trì phù hợp.
@@ -1107,6 +1715,8 @@ export default function MaintenancePage() {
           }}
         />
       </section>
+        </div>
+      </div>
     </section>
   );
 }

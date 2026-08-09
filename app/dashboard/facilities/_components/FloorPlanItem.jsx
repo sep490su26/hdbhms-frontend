@@ -6,7 +6,6 @@ const STATUS_META = {
   HOLDING: { fill: "#ecfdf5", stroke: "#10b981" },
   RESERVED: { fill: "#ecfdf5", stroke: "#10b981" },
   OCCUPIED: { fill: "#ecfdf5", stroke: "#10b981" },
-  MAINTENANCE: { fill: "#ecfdf5", stroke: "#10b981" },
   EXPIRED: { fill: "#ecfdf5", stroke: "#10b981" },
 };
 

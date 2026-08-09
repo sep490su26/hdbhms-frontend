@@ -84,66 +84,6 @@ function buildTreeFromCustomers(customers) {
 }
 
 /**
- * Generates a static tree structure for demonstration purposes.
- * Used as fallback when no customer data is provided.
- *
- * @returns {Array} A static demo tree.
- */
-function buildStaticDemoTree() {
-  return [
-    {
-      value: 2026,
-      label: "Năm 2026",
-      quarters: [
-        {
-          value: 3,
-          label: "Quý 3",
-          months: [
-            {
-              value: 8,
-              label: "Tháng 08",
-              days: [
-                { value: 7, label: "Ngày 07" },
-                { value: 6, label: "Ngày 06" },
-                { value: 5, label: "Ngày 05" },
-              ],
-            },
-            {
-              value: 7,
-              label: "Tháng 07",
-              days: [
-                { value: 31, label: "Ngày 31" },
-                { value: 30, label: "Ngày 30" },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      value: 2025,
-      label: "Năm 2025",
-      quarters: [
-        {
-          value: 4,
-          label: "Quý 4",
-          months: [
-            {
-              value: 12,
-              label: "Tháng 12",
-              days: [
-                { value: 31, label: "Ngày 31" },
-                { value: 15, label: "Ngày 15" },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ];
-}
-
-/**
  * TimeTreeFilter – Vertical tree-view time filter (Column 2 in the 3-column layout).
  *
  * @param {Object}   props
@@ -164,8 +104,7 @@ export default function TimeTreeFilter({
   /* ---------- derive tree ---------- */
   const tree = useMemo(() => {
     if (treeDataProp) return treeDataProp;
-    if (customers && customers.length > 0) return buildTreeFromCustomers(customers);
-    return buildStaticDemoTree();
+    return buildTreeFromCustomers(customers || []);
   }, [treeDataProp, customers]);
 
   /* ---------- expand / collapse state ---------- */
@@ -501,4 +440,4 @@ export default function TimeTreeFilter({
   );
 }
 
-export { buildTreeFromCustomers, buildTreeFromData, buildStaticDemoTree };
+export { buildTreeFromCustomers, buildTreeFromData };

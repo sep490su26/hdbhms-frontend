@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import DashboardFilterDropdown from "@/components/dashboard/DashboardFilterDropdown";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,7 @@ const STATUS_OPTIONS = [
   { value: "CLOSED", label: "Đã đóng" },
 ];
 const MUTABLE_STATUSES = new Set(["ACTIVE", "INACTIVE"]);
+const STAFF_ACCOUNT_FETCH_SIZE = 1000;
 
 const blankForm = {
   fullName: "",
@@ -165,25 +167,6 @@ function InlineAlert({ tone = "error", children }) {
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{children}</span>
     </div>
-  );
-}
-
-function SelectFilter({ label, value, onChange, options }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
@@ -375,10 +358,9 @@ export default function StaffAccountsPage() {
   const [properties, setProperties] = useState([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState(ALL_VALUE);
+  const [propertyFilter, setPropertyFilter] = useState(ALL_VALUE);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -392,15 +374,11 @@ export default function StaffAccountsPage() {
     setError("");
     try {
       const data = await fetchUsers({
-        page: page - 1,
-        size,
+        page: 0,
+        size: STAFF_ACCOUNT_FETCH_SIZE,
         roles: STAFF_ROLES,
-        status: statusFilter,
-        search: query,
       });
       setItems(sortByNewest(data.items, ["createdAt", "created_at"]));
-      setTotalElements(data.totalElements);
-      setTotalPages(data.totalPages);
     } catch (loadError) {
       setError(
         loadError?.message || "Không tải được danh sách tài khoản nhân viên.",
@@ -408,7 +386,7 @@ export default function StaffAccountsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, size, statusFilter]);
+  }, []);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -436,12 +414,12 @@ export default function StaffAccountsPage() {
 
   const metrics = useMemo(
     () => ({
-      total: totalElements,
+      total: items.length,
       active: items.filter((item) => item.status === "ACTIVE").length,
       firstPassword: items.filter((item) => item.mustChangePassword).length,
       inactive: items.filter((item) => item.status === "INACTIVE").length,
     }),
-    [items, totalElements],
+    [items],
   );
 
   const statusOptions = useMemo(
@@ -449,7 +427,57 @@ export default function StaffAccountsPage() {
     [],
   );
 
-  const resetFiltersPage = (setter) => (value) => {
+  const propertyOptions = useMemo(
+    () => [
+      { value: ALL_VALUE, label: "Tất cả cơ sở" },
+      { value: "UNASSIGNED", label: "Chưa phân công" },
+      ...properties.map((property) => ({
+        value: String(property.id),
+        label: property.name,
+      })),
+    ],
+    [properties],
+  );
+
+  const filteredItems = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return sortByNewest(
+      items.filter((item) => {
+        const assignedProperty = getAssignedProperty(item);
+        const assignedPropertyId = assignedProperty?.id
+          ? String(assignedProperty.id)
+          : "";
+        const searchable = [item.fullName, item.email, item.phone]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchesQuery = !keyword || searchable.includes(keyword);
+        const matchesStatus =
+          statusFilter === ALL_VALUE || item.status === statusFilter;
+        const matchesProperty =
+          propertyFilter === ALL_VALUE ||
+          (propertyFilter === "UNASSIGNED"
+            ? !assignedPropertyId
+            : assignedPropertyId === propertyFilter);
+        return matchesQuery && matchesStatus && matchesProperty;
+      }),
+      ["createdAt", "created_at"],
+    );
+  }, [items, propertyFilter, query, statusFilter]);
+
+  const filteredTotalElements = filteredItems.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const pagedItems = useMemo(() => {
+    const start = (displayedPage - 1) * size;
+    return filteredItems.slice(start, start + size);
+  }, [displayedPage, filteredItems, size]);
+
+  const resetFilterPage = (setter) => (value) => {
     setter(value);
     setPage(1);
   };
@@ -608,7 +636,7 @@ export default function StaffAccountsPage() {
       </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_220px] md:items-end">
+        <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_220px_220px] md:items-end">
           <label className="relative block">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184] dark:text-slate-400" />
             <input
@@ -621,16 +649,19 @@ export default function StaffAccountsPage() {
               className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
             />
           </label>
-          <SelectFilter
+          <DashboardFilterDropdown
             label="Trạng thái"
             value={statusFilter}
             options={statusOptions}
-            onChange={resetFiltersPage(setStatusFilter)}
+            onChange={resetFilterPage(setStatusFilter)}
+          />
+          <DashboardFilterDropdown
+            label="Cơ sở phụ trách"
+            value={propertyFilter}
+            options={propertyOptions}
+            onChange={resetFilterPage(setPropertyFilter)}
           />
         </div>
-        <p className="mt-3 text-xs font-semibold text-[#687184] dark:text-slate-400">
-          Cơ sở phụ trách được sửa trực tiếp bằng dropdown trong từng dòng.
-        </p>
       </section>
 
       {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
@@ -648,7 +679,7 @@ export default function StaffAccountsPage() {
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             Đang tải danh sách nhân viên...
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 text-center">
             <UsersRound className="h-10 w-10 text-[#9aa3b2] dark:text-slate-500" />
             <p className="text-sm font-semibold text-[#526179] dark:text-slate-400">
@@ -669,7 +700,7 @@ export default function StaffAccountsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#d4dbe8] dark:divide-white/10">
-                {items.map((account) => {
+                {pagedItems.map((account) => {
                   const isSelf = String(account.id) === String(currentUserId);
                   const canToggle =
                     MUTABLE_STATUSES.has(account.status) && !isSelf;
@@ -756,8 +787,8 @@ export default function StaffAccountsPage() {
         <DashboardPagination
           page={page}
           size={size}
-          totalElements={totalElements}
-          totalPages={totalPages}
+          totalElements={filteredTotalElements}
+          totalPages={filteredTotalPages}
           itemLabel="nhân viên"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {

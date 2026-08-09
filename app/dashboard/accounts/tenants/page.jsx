@@ -25,104 +25,20 @@ import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
+import DashboardFilterDropdown from "@/components/dashboard/DashboardFilterDropdown";
 
-const ALL_VALUE = "Tất cả";
+const ALL_VALUE = "all";
 // ponytail: local filters cover the first 1000 tenant account candidates; move filters into the API when this grows.
 const TENANT_ACCOUNT_FETCH_SIZE = 1000;
 
-const MOCK_TENANT_ACCOUNT_CANDIDATES = [
-  {
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-01-03T09:30:00",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    profileId: 1001,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    userId: 9001,
-    fullName: "Nguyen Minh Anh",
-    phone: "0901234567",
-    email: "minh.anh@example.com",
-    recipientEmail: "minh.anh@example.com",
-    accountStatus: "ACTIVE",
-    mustChangePassword: false,
-    accountProvisioned: true,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5001,
-    contractCode: "HD-2026-001",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-01-03T09:30:00",
-    propertyId: 1,
-    propertyName: "HDB Home Nguyen Trai",
-    roomId: 101,
-    roomCode: "A101",
-    profileId: 1002,
-    roomRole: "CO_OCCUPANT",
-    roomOccupantCount: 2,
-    roomMaxOccupants: 3,
-    userId: 9002,
-    fullName: "Tran Thu Ha",
-    phone: "0987654321",
-    email: "thu.ha@example.com",
-    recipientEmail: "minh.anh@example.com",
-    accountStatus: "PENDING",
-    mustChangePassword: true,
-    accountProvisioned: true,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5002,
-    contractCode: "HD-2026-014",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-05-20T14:00:00",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 205,
-    roomCode: "B205",
-    profileId: 1003,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 1,
-    roomMaxOccupants: 2,
-    userId: null,
-    fullName: "Le Quang Huy",
-    phone: "0978123456",
-    email: "quang.huy@example.com",
-    recipientEmail: "quang.huy@example.com",
-    accountStatus: null,
-    mustChangePassword: null,
-    accountProvisioned: false,
-    emailAvailable: true,
-  },
-  {
-    contractId: 5003,
-    contractCode: "HD-2026-020",
-    contractStatus: "ACTIVE",
-    signedAt: "2026-06-01T10:15:00",
-    propertyId: 2,
-    propertyName: "HDB Residence Cau Giay",
-    roomId: 301,
-    roomCode: "C301",
-    profileId: 1004,
-    roomRole: "PRIMARY",
-    roomOccupantCount: 1,
-    roomMaxOccupants: 3,
-    userId: null,
-    fullName: "Pham Gia Bao",
-    phone: "0966123456",
-    email: "",
-    recipientEmail: "",
-    accountStatus: null,
-    mustChangePassword: null,
-    accountProvisioned: false,
-    emailAvailable: false,
-  },
+const ACCOUNT_STATE_OPTIONS = [
+  { value: ALL_VALUE, label: "Tất cả trạng thái" },
+  { value: "NOT_SENT", label: "Chưa cấp" },
+  { value: "PENDING", label: "Đang gửi" },
+  { value: "SENT", label: "Đã gửi" },
+  { value: "ACTIVATED", label: "Đã kích hoạt" },
+  { value: "DISABLED", label: "Đã vô hiệu hóa" },
+  { value: "FAILED", label: "Gửi thất bại" },
 ];
 
 function normalize(value) {
@@ -251,25 +167,6 @@ function MetricCard({ icon: Icon, label, value, tone }) {
   );
 }
 
-function SelectFilter({ value, options, onChange, label }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
-      >
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function StatusBadge({ item }) {
   const state = resolveAccountState(item);
   return (
@@ -300,12 +197,18 @@ function tenantContextKey(item) {
   return `${item.contractId || "contract"}-${item.profileId || item.userId || item.phone || "tenant"}`;
 }
 
+function floorFromRoomCode(roomCode) {
+  const digits = String(roomCode || "").match(/\d+/)?.[0] || "";
+  if (!digits) return "";
+  return digits.length >= 3 ? digits.slice(0, -2) : digits.slice(0, -1) || digits;
+}
+
 export default function AccountsPage() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState("");
   const [propertyFilter, setPropertyFilter] = useState(ALL_VALUE);
+  const [floorFilter, setFloorFilter] = useState(ALL_VALUE);
   const [stateFilter, setStateFilter] = useState(ALL_VALUE);
-  const [roleFilter, setRoleFilter] = useState(ALL_VALUE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sendingContractId, setSendingContractId] = useState(null);
@@ -383,13 +286,33 @@ export default function AccountsPage() {
 
   const propertyOptions = useMemo(
     () => [
-      ALL_VALUE,
+      { value: ALL_VALUE, label: "Tất cả cơ sở" },
       ...Array.from(
         new Set(items.map((item) => item.propertyName).filter(Boolean)),
-      ),
+      ).map((property) => ({ value: property, label: property })),
     ],
     [items],
   );
+
+  const floorOptions = useMemo(() => {
+    if (propertyFilter === ALL_VALUE) {
+      return [{ value: ALL_VALUE, label: "Chọn cơ sở trước" }];
+    }
+
+    const floors = new Set();
+    items.forEach((item) => {
+      if (item.propertyName !== propertyFilter) return;
+      const floor = floorFromRoomCode(item.roomCode);
+      if (floor) floors.add(floor);
+    });
+
+    return [
+      { value: ALL_VALUE, label: "Tất cả tầng" },
+      ...Array.from(floors)
+        .sort((left, right) => Number(left) - Number(right))
+        .map((floor) => ({ value: floor, label: `Tầng ${floor}` })),
+    ];
+  }, [items, propertyFilter]);
 
   const metrics = useMemo(() => {
     const contractIds = new Set(
@@ -427,10 +350,10 @@ export default function AccountsPage() {
         const matchesProperty =
           propertyFilter === ALL_VALUE || item.propertyName === propertyFilter;
         const matchesState =
-          stateFilter === ALL_VALUE || state.label === stateFilter;
-        const matchesRole =
-          roleFilter === ALL_VALUE || roleLabel(item.roomRole) === roleFilter;
-        return matchesQuery && matchesProperty && matchesState && matchesRole;
+          stateFilter === ALL_VALUE || state.key === stateFilter;
+        const matchesFloor =
+          floorFilter === ALL_VALUE || floorFromRoomCode(item.roomCode) === floorFilter;
+        return matchesQuery && matchesProperty && matchesFloor && matchesState;
       }),
       [
         "accountCreatedAt",
@@ -443,7 +366,7 @@ export default function AccountsPage() {
         "signed_at",
       ],
     );
-  }, [items, propertyFilter, query, roleFilter, stateFilter]);
+  }, [floorFilter, items, propertyFilter, query, stateFilter]);
 
   const filteredTotalElements = filteredItems.length;
   const filteredTotalPages =
@@ -597,7 +520,7 @@ export default function AccountsPage() {
       </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_190px_180px_180px] xl:items-end">
+        <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_190px_180px_190px] xl:items-end">
           <label className="relative block">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#687184] dark:text-slate-400" />
             <input
@@ -610,38 +533,32 @@ export default function AccountsPage() {
               className="h-11 w-full rounded-lg border border-[#c8ceda] bg-white pl-10 pr-3 text-sm text-[#0f1d33] outline-none placeholder:text-[#687184] focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
             />
           </label>
-          <SelectFilter
+          <DashboardFilterDropdown
             label="Cơ sở"
             value={propertyFilter}
             options={propertyOptions}
             onChange={(value) => {
               setPropertyFilter(value);
+              setFloorFilter(ALL_VALUE);
               setPage(1);
             }}
           />
-          <SelectFilter
+          <DashboardFilterDropdown
+            label="Tầng"
+            value={floorFilter}
+            options={floorOptions}
+            disabled={propertyFilter === ALL_VALUE || floorOptions.length <= 1}
+            onChange={(value) => {
+              setFloorFilter(value);
+              setPage(1);
+            }}
+          />
+          <DashboardFilterDropdown
             label="Trạng thái"
             value={stateFilter}
-            options={[
-              ALL_VALUE,
-              "Chưa cấp",
-              "Đang gửi",
-              "Đã gửi",
-              "Đã kích hoạt",
-              "Đã vô hiệu hóa",
-              "Gửi thất bại",
-            ]}
+            options={ACCOUNT_STATE_OPTIONS}
             onChange={(value) => {
               setStateFilter(value);
-              setPage(1);
-            }}
-          />
-          <SelectFilter
-            label="Vai trò"
-            value={roleFilter}
-            options={[ALL_VALUE, "Người ký chính", "Người ở cùng"]}
-            onChange={(value) => {
-              setRoleFilter(value);
               setPage(1);
             }}
           />

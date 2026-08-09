@@ -6,6 +6,7 @@ import {
   Archive,
   Bike,
   BriefcaseBusiness,
+  Check,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -66,6 +67,13 @@ import { usePermission } from "@/app/dashboard/_hooks/usePermission";
 
 const TENANT_PROFILE_FETCH_SIZE = 1000;
 
+const PROFILE_STATUS_OPTIONS = [
+  { value: "all", label: "Tất cả" },
+  { value: "COMPLETED", label: "Hồ sơ đủ" },
+  { value: "MISSING_CCCD", label: "Thiếu CCCD" },
+  { value: "MISSING_PORTRAIT", label: "Thiếu ảnh chân dung" },
+];
+
 const POLICE_REPORT_EXPORT_COLUMNS = [
   { key: "propertyName", label: "Cơ sở" },
   { key: "roomCode", label: "Phòng" },
@@ -114,6 +122,12 @@ const getInitials = (value) => {
   return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
 };
 
+const floorFromRoomCode = (roomCode) => {
+  const digits = String(roomCode || "").match(/^\d+/)?.[0] || "";
+  if (!digits) return "";
+  return digits.length >= 3 ? digits.slice(0, -2) : digits.slice(0, -1) || digits;
+};
+
 const formatDate = (value) => {
   return formatDisplayDate(value);
 };
@@ -144,6 +158,57 @@ const roleClass = (role) =>
   String(role).toUpperCase() === "PRIMARY"
     ? "border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300"
     : "border-slate-200 bg-slate-50 text-slate-700";
+
+function FilterDropdown({ label, value, options, onChange, disabled = false }) {
+  const selectedOption = options.find(
+    (option) => String(option.value) === String(value),
+  );
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 text-left text-sm font-semibold text-slate-900 outline-none transition hover:bg-slate-50 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5 dark:disabled:bg-white/5 dark:disabled:text-slate-500"
+          aria-label={label}
+        >
+          <span className="truncate">{selectedOption?.label || label}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        className="max-h-72 w-[var(--radix-dropdown-menu-trigger-width)] min-w-48 overflow-y-auto rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
+      >
+        {options.map((option) => {
+          const selected = String(option.value) === String(value);
+          return (
+            <DropdownMenuItem
+              key={option.value}
+              asChild
+              className="rounded-md p-0 focus:bg-transparent"
+            >
+              <button
+                type="button"
+                onClick={() => onChange(option.value)}
+                className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 ${
+                  selected ? "bg-slate-100 dark:bg-white/10" : ""
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {option.label}
+                </span>
+                {selected && <Check className="h-4 w-4 shrink-0 text-[#1e40af] dark:text-blue-300" />}
+              </button>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const profileAccessStatus = (profile) =>
   String(
@@ -1574,10 +1639,9 @@ export default function TenantsPage() {
   const [grantsLoading, setGrantsLoading] = useState(false);
   const [grantsError, setGrantsError] = useState("");
   const [keyword, setKeyword] = useState("");
-  const [roomFilter, setRoomFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
+  const [floorFilter, setFloorFilter] = useState("all");
   const [profileStatusFilter, setProfileStatusFilter] = useState("all");
-  const [roleFilter, setRoleFilter] = useState("all");
   const [expandedRoomKeys, setExpandedRoomKeys] = useState([]);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -1853,19 +1917,6 @@ export default function TenantsPage() {
     };
   }, []);
 
-  const roomOptions = useMemo(() => {
-    const rooms = [
-      ...new Set(
-        profiles
-          .map((profile) => valueOf(profile, "roomCode", "room_code"))
-          .filter(Boolean),
-      ),
-    ];
-    return rooms.sort((a, b) =>
-      String(a).localeCompare(String(b), "vi", { numeric: true }),
-    );
-  }, [profiles]);
-
   const propertyOptions = useMemo(() => {
     const properties = [
       ...new Set(
@@ -1876,6 +1927,35 @@ export default function TenantsPage() {
     ];
     return properties.sort((a, b) => String(a).localeCompare(String(b), "vi"));
   }, [profiles]);
+
+  const floorFilterOptions = useMemo(() => {
+    if (propertyFilter === "all") {
+      return [{ value: "all", label: "Chọn cơ sở trước" }];
+    }
+
+    const floors = new Set();
+    profiles.forEach((profile) => {
+      const profileProperty = valueOf(profile, "propertyName", "property_name");
+      if (propertyFilter !== "all" && profileProperty !== propertyFilter) return;
+      const floor = floorFromRoomCode(valueOf(profile, "roomCode", "room_code"));
+      if (floor) floors.add(floor);
+    });
+
+    return [
+      { value: "all", label: "Tất cả tầng" },
+      ...[...floors]
+        .sort((left, right) => Number(left) - Number(right))
+        .map((floor) => ({ value: floor, label: `Tầng ${floor}` })),
+    ];
+  }, [profiles, propertyFilter]);
+
+  const propertyFilterOptions = useMemo(
+    () => [
+      { value: "all", label: "Tất cả cơ sở" },
+      ...propertyOptions.map((property) => ({ value: property, label: property })),
+    ],
+    [propertyOptions],
+  );
 
   const filteredProfiles = useMemo(() => {
     const normalizedKeyword = normalizeText(keyword);
@@ -1891,21 +1971,19 @@ export default function TenantsPage() {
         );
         const matchKeyword =
           !normalizedKeyword || searchable.includes(normalizedKeyword);
-        const matchRoom =
-          roomFilter === "all" ||
-          valueOf(profile, "roomCode", "room_code") === roomFilter;
         const matchProperty =
           propertyFilter === "all" ||
           valueOf(profile, "propertyName", "property_name") === propertyFilter;
+        const matchFloor =
+          floorFilter === "all" ||
+          floorFromRoomCode(valueOf(profile, "roomCode", "room_code")) ===
+            floorFilter;
         const matchStatus =
           profileStatusFilter === "all" ||
           valueOf(profile, "profileStatus", "profile_status") ===
             profileStatusFilter;
-        const matchRole =
-          roleFilter === "all" ||
-          valueOf(profile, "roomRole", "room_role") === roleFilter;
         return (
-          matchKeyword && matchRoom && matchProperty && matchStatus && matchRole
+          matchKeyword && matchProperty && matchFloor && matchStatus
         );
       }),
       [
@@ -1921,11 +1999,10 @@ export default function TenantsPage() {
     );
   }, [
     keyword,
+    floorFilter,
     profiles,
     profileStatusFilter,
     propertyFilter,
-    roleFilter,
-    roomFilter,
   ]);
 
   const filteredTotalElements = filteredProfiles.length;
@@ -1971,78 +2048,60 @@ export default function TenantsPage() {
         }
       />
 
-      <section className="rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] w-full">
-        <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8b97aa]" />
+      <section className="grid min-w-0 gap-4 rounded-xl border border-[#d8dee8] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_repeat(2,minmax(180px,1fr))]">
+          <div className="relative min-w-0">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b97aa]" />
             <input
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value);
                 setPage(1);
               }}
-              placeholder="Tìm theo tên, SĐT, email hoặc số phòng"
-              className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] pl-12 pr-4 text-sm outline-none focus:border-[#1e40af]"
+              placeholder="Tìm tên, SĐT, email hoặc phòng"
+              className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10 dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
             />
           </div>
-          <select
-            value={roomFilter}
-            onChange={(event) => {
-              setRoomFilter(event.target.value);
-              setPage(1);
-            }}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
-          >
-            <option value="all">Tất cả phòng</option>
-            {roomOptions.map((room) => (
-              <option key={room} value={room}>
-                Phòng {room}
-              </option>
-            ))}
-          </select>
-          <select
+          <FilterDropdown
+            label="Cơ sở"
             value={propertyFilter}
-            onChange={(event) => {
-              setPropertyFilter(event.target.value);
+            options={propertyFilterOptions}
+            onChange={(value) => {
+              setPropertyFilter(value);
+              setFloorFilter("all");
               setPage(1);
             }}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
-          >
-            <option value="all">Tất cả cơ sở</option>
-            {propertyOptions.map((property) => (
-              <option key={property} value={property}>
-                {property}
-              </option>
-            ))}
-          </select>
-          <select
-            value={profileStatusFilter}
-            onChange={(event) => {
-              setProfileStatusFilter(event.target.value);
+          />
+          <FilterDropdown
+            label="Tầng"
+            value={floorFilter}
+            options={floorFilterOptions}
+            onChange={(value) => {
+              setFloorFilter(value);
               setPage(1);
             }}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="COMPLETED">Hồ sơ đủ</option>
-            <option value="MISSING_CCCD">Thiếu CCCD</option>
-            <option value="MISSING_PORTRAIT">Thiếu ảnh chân dung</option>
-            <option value="MISSING_EMERGENCY_CONTACT">
-              Thiếu liên hệ khẩn cấp
-            </option>
-          </select>
-          <select
-            value={roleFilter}
-            onChange={(event) => {
-              setRoleFilter(event.target.value);
-              setPage(1);
-            }}
-            className="h-12 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-sm font-semibold outline-none focus:border-[#1e40af]"
-          >
-            <option value="all">Tất cả vai trò</option>
-            <option value="PRIMARY">Người ký chính</option>
-            <option value="CO_OCCUPANT">Người ở cùng</option>
-          </select>
+            disabled={propertyFilter === "all" || floorFilterOptions.length <= 1}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-white/10">
+          {PROFILE_STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                setProfileStatusFilter(option.value);
+                setPage(1);
+              }}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                profileStatusFilter === option.value
+                  ? "bg-[#1e40af] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </section>
 

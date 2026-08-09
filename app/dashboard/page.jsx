@@ -22,9 +22,8 @@ import {
   Cell,
   ComposedChart,
   Line,
-  PolarAngleAxis,
-  RadialBar,
-  RadialBarChart,
+  Pie,
+  PieChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -346,12 +345,23 @@ function RevenueChart({ items = [], periodType, onPeriodTypeChange, isDark }) {
   );
 }
 
-function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading, isDark }) {
+function OccupancyChart({
+  occupiedRooms,
+  totalRooms,
+  vacantRooms,
+  reservedRooms,
+  loading,
+}) {
   const occupiedRate = occupancyPercent(occupiedRooms, totalRooms);
-  const vacantRate = totalRooms ? Math.max(0, 100 - occupiedRate) : 0;
-  const chartData = [
-    { name: "Đã thuê", value: occupiedRate, fill: chartPrimary },
-  ];
+  const vacantRate = occupancyPercent(vacantRooms, totalRooms);
+  const reservedRate = occupancyPercent(reservedRooms, totalRooms);
+  const chartData = totalRooms
+    ? [
+        { name: "Đã thuê", value: occupiedRooms, fill: chartPrimary },
+        { name: "Phòng trống", value: vacantRooms, fill: "#c5161d" },
+        { name: "Đang giữ chỗ", value: reservedRooms, fill: "#d97706" },
+      ].filter((item) => Number(item.value) > 0)
+    : [{ name: "Chưa có dữ liệu", value: 1, fill: chartMuted }];
 
   return (
     <section className="h-full rounded-lg border border-[#dfe5f0] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
@@ -374,21 +384,24 @@ function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading, isDar
         aria-label="Biểu đồ tỷ lệ lấp đầy"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <RadialBarChart
-            data={chartData}
-            innerRadius="68%"
-            outerRadius="92%"
-            startAngle={90}
-            endAngle={-270}
-          >
-            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-            <RadialBar
+          <PieChart>
+            <Pie
+              data={chartData}
               dataKey="value"
-              background={{ fill: isDark ? "rgba(148, 163, 184, 0.18)" : chartMuted }}
+              nameKey="name"
+              innerRadius="68%"
+              outerRadius="92%"
+              startAngle={90}
+              endAngle={-270}
+              paddingAngle={1.5}
               cornerRadius={12}
-              fill={chartPrimary}
-            />
-          </RadialBarChart>
+              stroke="none"
+            >
+              {chartData.map((item) => (
+                <Cell key={item.name} fill={item.fill} />
+              ))}
+            </Pie>
+          </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
           <div>
@@ -415,6 +428,15 @@ function OccupancyChart({ occupiedRooms, totalRooms, vacantRooms, loading, isDar
           </span>
           <span className="text-[#c5161d] dark:text-rose-300">
             {loading ? "..." : `${vacantRate}%`}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-2 text-[#334155] dark:text-slate-300">
+            <i className="h-2.5 w-2.5 rounded-full bg-[#d97706]" />
+            Đang giữ chỗ ({formatNumber(reservedRooms)} phòng)
+          </span>
+          <span className="text-[#d97706] dark:text-amber-300">
+            {loading ? "..." : `${reservedRate}%`}
           </span>
         </div>
       </div>
@@ -598,6 +620,7 @@ export default function DashboardPage() {
   const totalRooms = overview?.totalRoomCount ?? 0;
   const occupiedRooms = overview?.totalOccupiedRoomCount ?? 0;
   const vacantRooms = overview?.totalVacantRoomCount ?? 0;
+  const reservedRooms = Math.max(0, totalRooms - occupiedRooms - vacantRooms);
   const actionSummary = overview?.actionSummary ?? {};
   const billingPeriod = billingPeriodLabel(actionSummary.billingPeriod);
   const billingValue = loading
@@ -676,8 +699,8 @@ export default function DashboardPage() {
           occupiedRooms={occupiedRooms}
           totalRooms={totalRooms}
           vacantRooms={vacantRooms}
+          reservedRooms={reservedRooms}
           loading={loading}
-          isDark={isDark}
         />
       </section>
 

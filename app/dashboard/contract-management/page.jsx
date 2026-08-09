@@ -370,6 +370,24 @@ function toDateInputValue(value) {
   return String(value).slice(0, 10);
 }
 
+function isShortTermEarlyTerminationPreview(item = {}, liquidationDateValue) {
+  const endDateValue = toDateInputValue(item.endDate);
+  const liquidationDate = toDateInputValue(liquidationDateValue);
+  if (!endDateValue || !liquidationDate || liquidationDate >= endDateValue) {
+    return false;
+  }
+
+  const endDate = new Date(`${endDateValue}T00:00:00`);
+  const liquidation = new Date(`${liquidationDate}T00:00:00`);
+  if (Number.isNaN(endDate.getTime()) || Number.isNaN(liquidation.getTime())) {
+    return false;
+  }
+
+  const oneMonthBeforeEnd = new Date(endDate);
+  oneMonthBeforeEnd.setMonth(oneMonthBeforeEnd.getMonth() - 1);
+  return liquidation > oneMonthBeforeEnd;
+}
+
 function buildTermsForm(item = {}) {
   return {
     startDate: toDateInputValue(item.startDate),
@@ -1849,9 +1867,20 @@ export default function ContractTemplatePage() {
   const safeLiquidationDraftDeposit = Number.isFinite(liquidationDraftDeposit)
     ? liquidationDraftDeposit
     : 0;
+  const isDepositCarriedForward =
+    mergedSelected?.transferContractRole === "REPLACEMENT_OLD_CONTRACT";
+  const shortTermDepositForfeiture =
+    !isDepositCarriedForward &&
+    isShortTermEarlyTerminationPreview(
+      mergedSelected || {},
+      liquidationForm.liquidationDate,
+    );
+  const liquidationDraftDepositDeduction = shortTermDepositForfeiture
+    ? safeLiquidationDraftDeposit
+    : 0;
   const liquidationDraftRemainingDeposit = Math.max(
     0,
-    safeLiquidationDraftDeposit,
+    safeLiquidationDraftDeposit - liquidationDraftDepositDeduction,
   );
   const liquidationDraftRemainingPayable = Math.max(
     0,
@@ -4143,6 +4172,13 @@ export default function ContractTemplatePage() {
                                 className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
                               />
                             </label>
+                            {shortTermDepositForfeiture && (
+                              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold leading-6 text-red-700 sm:col-span-2">
+                                Hợp đồng còn dưới 1 tháng và khách trả phòng
+                                trước hạn: toàn bộ tiền cọc sẽ bị giữ lại,
+                                không tạo yêu cầu hoàn cọc.
+                              </p>
+                            )}
                             <LiquidationChargeRows
                               charges={liquidationDraftCharges}
                               onAdd={addLiquidationCharge}
@@ -4162,11 +4198,21 @@ export default function ContractTemplatePage() {
                                 )}
                               />
                               <InfoValue
-                                label="Cọc phải hoàn"
+                                label={
+                                  shortTermDepositForfeiture
+                                    ? "Cọc bị giữ lại"
+                                    : "Cọc phải hoàn"
+                                }
                                 value={formatMoney(
                                   liquidationDraftRemainingDeposit,
                                 )}
                               />
+                              {shortTermDepositForfeiture && (
+                                <InfoValue
+                                  label="Lý do khấu trừ cọc"
+                                  value="Trả phòng trước hạn khi còn dưới 1 tháng"
+                                />
+                              )}
                             </div>
                             <label className="grid min-w-0 gap-1.5 sm:col-span-2">
                               <span className="text-xs font-bold text-[#58667c]">
@@ -4210,11 +4256,24 @@ export default function ContractTemplatePage() {
                               )}
                             />
                             <InfoValue
+                              label="Khấu trừ cọc"
+                              value={formatOptionalMoney(
+                                mergedSelected.liquidationDepositDeductionAmount,
+                              )}
+                            />
+                            <InfoValue
                               label="Hoàn trả cọc"
                               value={formatOptionalMoney(
                                 mergedSelected.liquidationDepositRefundAmount ??
                                   mergedSelected.depositAmount,
                               )}
+                            />
+                            <InfoValue
+                              label="Lý do khấu trừ cọc"
+                              value={
+                                mergedSelected.liquidationDepositDeductionReason ||
+                                  "Không có"
+                              }
                             />
                             <InfoValue
                               label="Trạng thái hoàn cọc"

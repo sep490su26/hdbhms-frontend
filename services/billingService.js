@@ -1,4 +1,9 @@
-import { API_BASE_URL, authenticatedFetch } from "@/services/identityAccessService";
+import {
+  API_BASE_URL,
+  authenticatedFetch,
+  getAuthToken,
+  refreshTokenApi,
+} from "@/services/identityAccessService";
 
 const read = (raw, ...keys) => {
   for (const key of keys) {
@@ -117,6 +122,61 @@ export async function fetchBillingInvoices(filters = {}) {
   const query = params.toString();
   const data = await authenticatedFetch(`${API_BASE_URL}/admin/invoices${query ? `?${query}` : ""}`);
   return Array.isArray(data) ? data.map(normalizeInvoice) : [];
+}
+
+function extractFilenameFromContentDisposition(headerValue) {
+  if (!headerValue) return "";
+  const encodedMatch = headerValue.match(/filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i);
+  if (encodedMatch?.[1]) {
+    const encoded = encodedMatch[1].trim().replace(/^"|"$/g, "");
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+  const plainMatch = headerValue.match(/filename\s*=\s*("[^"]+"|[^;]+)/i);
+  return plainMatch?.[1]?.trim().replace(/^"|"$/g, "") || "";
+}
+
+export async function downloadBillingInvoicesExcel(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.billingPeriod) params.set("billingPeriod", filters.billingPeriod);
+  if (filters.status && filters.status !== "ALL") params.set("status", filters.status);
+  if (filters.invoiceType && filters.invoiceType !== "ALL") params.set("invoiceType", filters.invoiceType);
+  if (filters.propertyId) params.set("propertyId", filters.propertyId);
+  if (filters.roomId) params.set("roomId", filters.roomId);
+
+  const request = async () => fetch(`${API_BASE_URL}/admin/invoices/export?${params.toString()}`, {
+    credentials: "include",
+    headers: {
+      "X-Client-Type": "web",
+      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+    },
+  });
+
+  let response = await request();
+  if (response.status === 401) {
+    await refreshTokenApi();
+    response = await request();
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.message || payload.details || "Xuất file Excel thất bại");
+  }
+
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const filename = extractFilenameFromContentDisposition(contentDisposition)
+    || `Thông báo đóng tiền trọ Hải Đăng 1${filters.billingPeriod ? ` ${filters.billingPeriod}` : ""}.xlsx`;
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchUtilityBillingRuns(filters = {}) {

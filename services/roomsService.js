@@ -54,7 +54,6 @@ export function mapApiRoomStatus(currentStatus) {
   if (statusLower === "on_hold" || statusLower === "holding") return "onHold";
   if (statusLower === "reserved" || statusLower === "reserved_for_transfer" || statusLower === "deposited") return "deposited";
   if (statusLower === "soon_vacant") return "soonVacant";
-  if (statusLower === "maintenance") return "maintenance";
   if (statusLower === "expired") return "expired";
   return "occupied";
 }
@@ -600,7 +599,6 @@ export function statusCopy(status) {
     deposited: "Đã đặt cọc",
     occupied: "Đã thuê",
     soonVacant: "Sắp trống",
-    maintenance: "Bảo trì",
     expired: "Hết hạn",
   };
 

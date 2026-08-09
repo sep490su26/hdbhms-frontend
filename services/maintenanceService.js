@@ -122,7 +122,6 @@ export function normalizeTicket(raw = {}) {
     roomCode: readField(raw, "roomCode", "room_code") || "",
     roomName: readField(raw, "roomName", "room_name") || "",
     ticketScope: normalizeScope(readField(raw, "scope", "ticketScope", "ticket_scope")),
-    priority: readField(raw, "severity", "priority") || "MEDIUM",
     category: readField(raw, "category") || "OTHER",
     title: maintenanceDisplayText(readField(raw, "title") || "Phiếu sự cố"),
     description: maintenanceDisplayText(readField(raw, "description") || ""),
@@ -208,19 +207,23 @@ export async function fetchMaintenanceTickets(filters = {}) {
     status = "all",
     keyword = "",
     category = "all",
-    severity = "all",
     scope = "all",
     roomId = "",
+    floorId = "",
     propertyId = "",
+    fromDate = "",
+    toDate = "",
   } = filters;
   const params = new URLSearchParams({ page: String(page), size: String(size), sort: "createdAt,desc" });
   if (keyword.trim()) params.set("code", keyword.trim());
   if (status && status !== "all") params.set("status", status);
   if (category && category !== "all") params.set("category", category);
-  if (severity && severity !== "all") params.set("severity", severity);
   if (scope && scope !== "all") params.set("scope", scope);
   if (roomId) params.set("roomId", String(roomId));
+  if (floorId) params.set("floorId", String(floorId));
   if (propertyId) params.set("propertyId", String(propertyId));
+  if (fromDate) params.set("fromDate", fromDate);
+  if (toDate) params.set("toDate", toDate);
 
   const data = await request(`/maintenance/tickets?${params.toString()}`);
   const rows = Array.isArray(data.data) ? data.data : [];

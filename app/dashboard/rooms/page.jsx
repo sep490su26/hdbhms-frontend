@@ -22,7 +22,6 @@ import {
     Save,
     Trash2,
     UserRound,
-    Wrench,
     X,
 } from "lucide-react";
 import {
@@ -68,10 +67,6 @@ const roomStatus = {
     available: [
         "Trống",
         "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    ],
-    maintenance: [
-        "Bảo trì",
-        "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300",
     ],
     soonVacant: [
         "Sắp trống",
@@ -368,14 +363,6 @@ const STATUS_META = {
         card: "border-orange-100 dark:border-orange-500/20 bg-orange-50/90 text-orange-900 dark:text-orange-300",
         icon: "text-orange-600 dark:text-orange-300",
     },
-    MAINTENANCE: {
-        label: "Bảo trì",
-        dot: "bg-red-500",
-        badge:
-            "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300 ring-red-200 dark:ring-rose-500/20",
-        card: "border-red-100 dark:border-rose-500/20 bg-red-50/90 text-red-900 dark:text-rose-300",
-        icon: "text-red-600 dark:text-rose-300",
-    },
     EXPIRED: {
         label: "Hết hạn HĐ",
         dot: "bg-purple-500",
@@ -392,7 +379,6 @@ const STATUS_ORDER = [
     "OCCUPIED",
     "RESERVED",
     "SOON_VACANT",
-    "MAINTENANCE",
     "EXPIRED",
 ];
 
@@ -404,7 +390,6 @@ const ROOM_STATUS_OPTIONS = [
     {value: "RESERVED_FOR_TRANSFER", label: "Giữ chuyển phòng"},
     {value: "OCCUPIED", label: "Đang thuê"},
     {value: "SOON_VACANT", label: "Sắp trống"},
-    {value: "MAINTENANCE", label: "Bảo trì"},
     {value: "EXPIRED", label: "Hết hạn HĐ"},
 ];
 
@@ -418,7 +403,6 @@ const ROOM_STATUS_FORM_ALIASES = {
     reserved: "RESERVED",
     soonvacant: "SOON_VACANT",
     soon_vacant: "SOON_VACANT",
-    maintenance: "MAINTENANCE",
     occupied: "OCCUPIED",
     expired: "EXPIRED",
 };
@@ -672,12 +656,6 @@ function FloorSummary({rooms}) {
                 value: count("RESERVED"),
                 tone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
                 icon: CalendarClock,
-            },
-            {
-                label: "Bảo trì",
-                value: count("MAINTENANCE"),
-                tone: "bg-red-50 dark:bg-rose-500/10 text-red-700 dark:text-rose-300",
-                icon: Wrench,
             },
         ];
     }, [rooms]);
@@ -1993,7 +1971,6 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
         if (s === "vacant") return "available";
         if (s === "soon_vacant") return "soonVacant";
         if (s === "reserved") return "deposited";
-        if (s === "maintenance") return "maintenance";
         return "occupied";
     }
 

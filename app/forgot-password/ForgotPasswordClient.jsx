@@ -216,6 +216,7 @@ export default function ForgotPasswordClient({ initialResetToken = "" }) {
       await resetPasswordWithToken({
         token: normalizedToken,
         newPassword,
+        confirmPassword,
       });
       setSuccess("Đặt lại mật khẩu thành công. Đang chuyển về đăng nhập...");
       window.setTimeout(() => {

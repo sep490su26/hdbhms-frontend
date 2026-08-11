@@ -3110,7 +3110,7 @@ export default function ContractTemplatePage() {
                   type="button"
                   onClick={openTimePopover}
                   aria-expanded={timePopoverOpen}
-                  className="inline-flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-[#091426] outline-none transition hover:border-[#9ba8ba] focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                  className="inline-flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-[#091426] outline-none transition hover:border-[#9ba8ba] focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
                 >
                   <span className="inline-flex min-w-0 items-center gap-2">
                     <CalendarDays className="h-4 w-4 shrink-0 text-[#8a98af]" />
@@ -3179,7 +3179,7 @@ export default function ContractTemplatePage() {
                       setRoomFilter(event.target.value);
                       setPage(1);
                     }}
-                    className="h-9 w-full rounded-lg border border-[#cbd5e1] bg-white px-2.5 text-xs font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                    className="h-10 w-full rounded-lg border border-[#cbd5e1] bg-white px-2.5 text-xs font-bold text-[#091426] outline-none focus:border-[#091426] dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
                   >
                     <option value="all">Tất cả phòng</option>
                     {roomOptions.map((roomCode) => (
@@ -3201,16 +3201,17 @@ export default function ContractTemplatePage() {
         <col style={{ width: "18%" }} />
         <col style={{ width: "7%" }} />
         <col style={{ width: "22%" }} />
+        <col style={{ width: "8%" }} />
         <col style={{ width: "14%" }} />
         <col style={{ width: "10%" }} />
-        <col style={{ width: "13%" }} />
-        <col style={{ width: "16%" }} />
+        <col style={{ width: "8%" }} />
       </colgroup>
       <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
         <tr>
           <th className="!pl-5 xl:!pl-6 text-center">Mã HĐ</th>
           <th className="text-center">Phòng</th>
-          <th className="text-center">Tiền cọc</th>
+          <th className="text-center">Người ký chính</th>
+          <th className="text-center">Số người</th>
           <th className="text-center">Thời hạn</th>
           <th className="text-center">Giá thuê</th>
           <th className="text-center">Trạng thái</th>
@@ -3223,7 +3224,7 @@ export default function ContractTemplatePage() {
               {loading && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-12 text-center text-sm font-bold text-[#607089]"
                   >
                     <span className="inline-flex items-center gap-2">
@@ -3324,12 +3325,17 @@ export default function ContractTemplatePage() {
                         {item.roomCode || "-"}
                       </span>
                     </td>
-                    <td data-label="Tiền cọc" className="align-middle text-center">
+                    <td data-label="Người ký chính" className="align-middle text-center">
                       <p className="font-extrabold leading-5 text-[#091426] dark:text-white">
-                        {formatMoney(item.depositAmount)}
+                        {item.primaryTenantName || item.customerName || "Chưa có"}
                       </p>
                     </td>
-                    
+                    <td data-label="Số người" className="align-middle text-center">
+                      <span className="font-extrabold text-[#091426]">
+                        {getOccupantsCount(item)}
+                      </span>
+                    </td>
+
                     <td data-label="Thời hạn" className="align-middle text-center">
                       <p className="font-semibold leading-5 text-[#091426]">
                         {formatDate(

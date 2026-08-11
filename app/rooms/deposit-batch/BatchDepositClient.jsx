@@ -406,7 +406,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const [identityEntryMode, setIdentityEntryMode] = useState("manual");
   const [checkout, setCheckout] = useState(null);
   const [batchStatus, setBatchStatus] = useState(null);
-  const [qrImage, setQrImage] = useState("");
+  const [generatedQr, setGeneratedQr] = useState({ payload: "", image: "" });
   const [conflict, setConflict] = useState(null);
   const [unavailableRooms, setUnavailableRooms] = useState([]);
   const [draftReady, setDraftReady] = useState(false);
@@ -428,6 +428,16 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const totalAmount = rooms.length * DEPOSIT_PER_ROOM;
   const expiresAtMs = useMemo(() => (checkout ? resolveExpiresAtMs(checkout) : null), [checkout]);
   const paymentExpired = Boolean(expiresAtMs && remainingMs !== null && remainingMs <= 0);
+  const checkoutBatchId = checkout?.batchId;
+  const qrCode = String(checkout?.qrCode || "").trim();
+  const qrPayload = String(checkout?.qrPayload || qrCode).trim();
+  const inlineQrImage = useMemo(() => {
+    if (/^(?:data:image\/|https?:\/\/)/i.test(qrCode)) return qrCode;
+    if (qrCode.startsWith("iVBORw0KGgo")) return `data:image/png;base64,${qrCode}`;
+    if (qrCode.startsWith("/9j/")) return `data:image/jpeg;base64,${qrCode}`;
+    return "";
+  }, [qrCode]);
+  const qrImage = inlineQrImage || (generatedQr.payload === qrPayload ? generatedQr.image : "");
 
   useEffect(() => {
     if (checkout) {
@@ -449,8 +459,8 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
     if (didHandleExpiryRef.current) return;
     didHandleExpiryRef.current = true;
-    if (checkout?.batchId) {
-      expireBatchDeposit(checkout.batchId)
+    if (checkoutBatchId) {
+      expireBatchDeposit(checkoutBatchId)
         .then((status) => {
           if (status) setBatchStatus(status);
         })
@@ -458,7 +468,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
           setBatchStatus((current) => current ?? { status: "EXPIRED", message });
         });
     }
-  }, [checkout?.batchId]);
+  }, [checkoutBatchId]);
 
   useEffect(() => {
     if (!isSessionExpired) return undefined;
@@ -477,23 +487,30 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   }, [isSessionExpired, router]);
 
   useEffect(() => {
+    let cancelled = false;
     const nextRoomIds = new Set(initialRooms.map((room) => String(room.roomId)));
-    setRooms(initialRooms);
-    setRoomForms((current) => ({
-      ...createDefaultRoomForms(initialRooms),
-      ...Object.fromEntries(
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setRooms(initialRooms);
+      setRoomForms((current) => ({
+        ...createDefaultRoomForms(initialRooms),
+        ...Object.fromEntries(
+          Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
+        ),
+      }));
+      setContractReviews((current) => Object.fromEntries(
         Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
-      ),
-    }));
-    setContractReviews((current) => Object.fromEntries(
-      Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
-    ));
-    setUnavailableRooms((current) => current.filter((room) => nextRoomIds.has(String(room.roomId))));
-    setActiveContractRoomId((current) => (nextRoomIds.has(String(current)) ? current : null));
+      ));
+      setUnavailableRooms((current) => current.filter((room) => nextRoomIds.has(String(room.roomId))));
+      setActiveContractRoomId((current) => (nextRoomIds.has(String(current)) ? current : null));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [initialRoomKey, initialRooms]);
 
   useEffect(() => {
-    setError(initialError);
+    queueMicrotask(() => setError(initialError));
   }, [initialError]);
 
   useEffect(() => {
@@ -698,33 +715,28 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
   useEffect(() => {
     if (batchStatus?.status === "EXPIRED") {
-      handleSessionExpired(batchStatus.message || "Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+      queueMicrotask(() => {
+        handleSessionExpired(batchStatus.message || "Phiên giữ chỗ đã hết hạn. Vui lòng chọn lại phòng.");
+      });
     }
   }, [batchStatus?.message, batchStatus?.status, handleSessionExpired]);
 
   useEffect(() => {
-    setQrImage("");
-    const qrCode = String(checkout?.qrCode || "").trim();
-    if (/^(?:data:image\/|https?:\/\/)/i.test(qrCode)) {
-      setQrImage(qrCode);
-      return;
-    }
-    if (qrCode.startsWith("iVBORw0KGgo")) {
-      setQrImage(`data:image/png;base64,${qrCode}`);
-      return;
-    }
-    if (qrCode.startsWith("/9j/")) {
-      setQrImage(`data:image/jpeg;base64,${qrCode}`);
-      return;
-    }
-
-    const qrPayload = String(checkout?.qrPayload || qrCode).trim();
-    if (!qrPayload) return;
+    if (inlineQrImage || !qrPayload) return undefined;
+    let cancelled = false;
 
     QRCode.toDataURL(qrPayload, { width: 280, margin: 1 })
-      .then(setQrImage)
-      .catch(() => setQrImage(""));
-  }, [checkout]);
+      .then((image) => {
+        if (!cancelled) setGeneratedQr({ payload: qrPayload, image });
+      })
+      .catch(() => {
+        if (!cancelled) setGeneratedQr({ payload: qrPayload, image: "" });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inlineQrImage, qrPayload]);
 
   useEffect(() => {
     if (checkout || rooms.length === 0) return undefined;

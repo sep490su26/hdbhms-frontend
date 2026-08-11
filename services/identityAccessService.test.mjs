@@ -19,6 +19,7 @@ return {
   authenticatedFetch,
   normalizeUserAccount,
   parseEnvelope,
+  resetPasswordWithToken,
 };`,
   );
 
@@ -46,19 +47,57 @@ test("parseEnvelope accepts direct JSON object and array responses", async () =>
   assert.deepEqual(await parseEnvelope(jsonResponse([{ id: 1 }])), [{ id: 1 }]);
 });
 
-test("parseEnvelope preserves backend error message, details, code, and status", async () => {
+test("parseEnvelope preserves backend error message, details, and both error codes", async () => {
   const { parseEnvelope } = loadIdentityAccessService();
 
   await assert.rejects(
-    parseEnvelope(jsonResponse({ code: 40902, message: "Meter reading not found", details: "Missing" }, { status: 404 })),
+    parseEnvelope(jsonResponse({ code: 40902, errorCode: "METER_READING_NOT_FOUND", message: "Meter reading not found", details: "Missing" }, { status: 404 })),
     (error) => {
       assert.equal(error.message, "Meter reading not found");
       assert.equal(error.details, "Missing");
       assert.equal(error.code, 40902);
+      assert.equal(error.errorCode, "METER_READING_NOT_FOUND");
       assert.equal(error.status, 404);
       return true;
     },
   );
+});
+
+test("parseEnvelope falls back to the legacy numeric code when errorCode is absent", async () => {
+  const { parseEnvelope } = loadIdentityAccessService();
+
+  await assert.rejects(
+    parseEnvelope(jsonResponse({ code: 40902, message: "Meter reading not found" }, { status: 404 })),
+    (error) => {
+      assert.equal(error.code, 40902);
+      assert.equal(error.errorCode, "40902");
+      return true;
+    },
+  );
+});
+
+test("resetPasswordWithToken sends the confirmation password", async () => {
+  const { resetPasswordWithToken } = loadIdentityAccessService();
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async (_url, options) => {
+      assert.deepEqual(JSON.parse(options.body), {
+        token: "973026",
+        newPassword: "test1234",
+        confirmPassword: "test1234",
+      });
+      return jsonResponse({ code: 0, data: null });
+    };
+
+    await resetPasswordWithToken({
+      token: "973026",
+      newPassword: "test1234",
+      confirmPassword: "test1234",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("parseEnvelope parses XML error envelopes without treating code 0 as success", async () => {

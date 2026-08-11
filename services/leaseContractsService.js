@@ -108,6 +108,7 @@ async function parseEnvelope(response, fallbackMessage) {
   if (!response.ok || payload.code !== 0) {
     throw new ApiError(payload.message || payload.details || fallbackMessage, {
       code: payload.code,
+      errorCode: payload.errorCode,
       details: payload.details,
       status: response.status,
       payload,

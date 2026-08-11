@@ -4,10 +4,11 @@ import { normalizePageResponse, readPageItems } from "@/lib/pageResponse";
 export { API_BASE_URL };
 
 export class ApiError extends Error {
-    constructor(message, { code, details, status, payload } = {}) {
+    constructor(message, { code, errorCode, details, status, payload } = {}) {
         super(message || stringifyDetails(details) || messageForStatus(status));
         this.name = "ApiError";
         this.code = code;
+        this.errorCode = errorCode ?? (code == null ? undefined : String(code));
         this.details = details;
         this.status = status;
         this.payload = payload;
@@ -77,6 +78,7 @@ function parseXmlEnvelope(rawText) {
     };
 
     const code = tagValue("code");
+    const errorCode = tagValue("errorCode");
     const message = tagValue("message");
     const details = tagValue("details");
 
@@ -86,6 +88,7 @@ function parseXmlEnvelope(rawText) {
 
     return {
         ...(code !== undefined ? { code: Number.isNaN(Number(code)) ? code : Number(code) } : {}),
+        ...(errorCode !== undefined ? { errorCode } : {}),
         ...(message !== undefined ? { message } : {}),
         ...(details !== undefined ? { details } : {}),
     };
@@ -118,12 +121,14 @@ export async function parseEnvelope(response) {
     const { payload, rawText } = await readResponsePayload(response);
     const isEnvelope = isEnvelopePayload(payload);
     const code = isEnvelope ? payload.code : undefined;
+    const errorCode = isEnvelope ? payload.errorCode : undefined;
     const details = isEnvelope ? payload.details : rawText;
     const message = isEnvelope ? payload.message : rawText;
 
     if (!response.ok || (isEnvelope && !isSuccessCode(code))) {
         throw new ApiError(message || stringifyDetails(details), {
             code,
+            errorCode,
             details,
             status: response.status,
             payload,
@@ -217,7 +222,7 @@ export async function requestPasswordReset({ email }) {
     return parseEnvelope(response);
 }
 
-export async function resetPasswordWithToken({ token, newPassword }) {
+export async function resetPasswordWithToken({ token, newPassword, confirmPassword }) {
     const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: "POST",
         credentials: "include",
@@ -226,7 +231,7 @@ export async function resetPasswordWithToken({ token, newPassword }) {
             "Content-Type": "application/json",
             "X-Client-Type": "web",
         },
-        body: JSON.stringify({ token, newPassword }),
+        body: JSON.stringify({ token, newPassword, confirmPassword }),
     });
     return parseEnvelope(response);
 }

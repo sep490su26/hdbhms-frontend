@@ -182,6 +182,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     throw new ApiError(payload.message || payload.details || "Không xử lý được phiếu sự cố.", {
       code: payload.code,
+      errorCode: payload.errorCode,
       details: payload.details,
       status: response.status,
       payload,
@@ -191,6 +192,7 @@ async function request(path, options = {}) {
     if (payload.code !== 0) {
       throw new ApiError(payload.message || payload.details || "Không xử lý được phiếu sự cố.", {
         code: payload.code,
+        errorCode: payload.errorCode,
         details: payload.details,
         status: response.status,
         payload,

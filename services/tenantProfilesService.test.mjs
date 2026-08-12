@@ -14,23 +14,25 @@ function loadService(authenticatedFetch) {
     "normalizePageResponse",
     "readPageItems",
     "getAuthToken",
-    `${source}\nreturn { requestTenantProfileAccess };`,
+    `${source}\nreturn { fetchTenantProfiles, downloadTenantProfilesPoliceReportExport };`,
   );
 
   return factory("https://api.test/api/v1", authenticatedFetch, () => ({}), () => [], () => "");
 }
 
-test("requestTenantProfileAccess posts to the selected profile", async () => {
+test("fetchTenantProfiles requests the tenant profile list", async () => {
   const calls = [];
-  const { requestTenantProfileAccess } = loadService(async (url, options) => {
+  const { fetchTenantProfiles } = loadService(async (url, options) => {
     calls.push({ url, options });
-    return { requestId: 12, status: "PENDING", canViewSensitiveProfile: false };
+    return { content: [], totalElements: 0, totalPages: 0 };
   });
 
-  const result = await requestTenantProfileAccess(42);
+  const result = await fetchTenantProfiles({ page: 0, size: 10 });
 
-  assert.equal(calls[0].url, "https://api.test/api/v1/tenant-profiles/42/access-requests");
-  assert.equal(calls[0].options.method, "POST");
-  assert.deepEqual(JSON.parse(calls[0].options.body), {});
-  assert.equal(result.status, "PENDING");
+  assert.equal(
+    calls[0].url,
+    "https://api.test/api/v1/tenant-profiles?page=0&size=10&sort=createdAt%2Cdesc",
+  );
+  assert.equal(calls[0].options.method, "GET");
+  assert.deepEqual(result, { items: [] });
 });

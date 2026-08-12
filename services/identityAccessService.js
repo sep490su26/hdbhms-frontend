@@ -12,6 +12,7 @@ export class ApiError extends Error {
         this.details = details;
         this.status = status;
         this.payload = payload;
+        this.fieldErrors = payload?.data?.fieldErrors ?? payload?.fieldErrors ?? {};
         this.isApiError = true;
     }
 }
@@ -565,13 +566,19 @@ export async function uploadCurrentUserAvatar(file) {
     }
 }
 
-export async function changeCurrentUserPassword({ oldPassword, currentPassword, newPassword }) {
+export async function changeCurrentUserPassword({
+    oldPassword,
+    currentPassword,
+    newPassword,
+    confirmPassword,
+}) {
     return authenticatedFetch(`${API_BASE_URL}/users/me/password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             currentPassword: currentPassword ?? oldPassword,
             newPassword,
+            confirmPassword,
         }),
     });
 }

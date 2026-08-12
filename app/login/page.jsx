@@ -37,6 +37,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(initialLogin.rememberMe);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false); // toggle state
 
@@ -62,6 +63,7 @@ function LoginForm() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setFieldErrors({});
     setIsSubmitting(true);
 
     try {
@@ -89,7 +91,16 @@ function LoginForm() {
       setUser({ ...profile, role: userRole || profile.role });
       router.push("/dashboard");
     } catch (submitError) {
-      setError(submitError.message || "Số điện thoại hoặc mật khẩu không chính xác.");
+      const nextFieldErrors = submitError?.fieldErrors ||
+        submitError?.payload?.data?.fieldErrors ||
+        submitError?.payload?.fieldErrors ||
+        {};
+      setFieldErrors(nextFieldErrors);
+      setError(
+        Object.keys(nextFieldErrors).length > 0
+          ? "Vui lòng kiểm tra lại thông tin đăng nhập."
+          : submitError.message || "Số điện thoại hoặc mật khẩu không chính xác.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -146,9 +157,15 @@ function LoginForm() {
                     autoComplete="tel"
                     required
                     placeholder="0901234567"
-                    className="h-12 w-full rounded-md border border-[#d8dee8] bg-white pl-12 pr-4 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#0b1220] focus:ring-4 focus:ring-[#0b1220]/10"
+                    aria-invalid={Boolean(fieldErrors.phone)}
+                    className={`h-12 w-full rounded-md border bg-white pl-12 pr-4 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#0b1220] focus:ring-4 focus:ring-[#0b1220]/10 ${fieldErrors.phone ? "border-rose-500" : "border-[#d8dee8]"}`}
                   />
                 </span>
+                {fieldErrors.phone && (
+                  <span className="text-xs font-semibold text-rose-700">
+                    {fieldErrors.phone}
+                  </span>
+                )}
               </label>
 
               <label className="grid gap-2 text-sm font-bold text-[#334155]">
@@ -162,7 +179,8 @@ function LoginForm() {
                     autoComplete="current-password"
                     required
                     placeholder="Nhập mật khẩu"
-                    className="h-12 w-full rounded-md border border-[#d8dee8] bg-white pl-12 pr-12 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#0b1220] focus:ring-4 focus:ring-[#0b1220]/10"
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    className={`h-12 w-full rounded-md border bg-white pl-12 pr-12 text-sm font-medium text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#0b1220] focus:ring-4 focus:ring-[#0b1220]/10 ${fieldErrors.password ? "border-rose-500" : "border-[#d8dee8]"}`}
                   />
                   <button
                     type="button"
@@ -173,6 +191,11 @@ function LoginForm() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </span>
+                {fieldErrors.password && (
+                  <span className="text-xs font-semibold text-rose-700">
+                    {fieldErrors.password}
+                  </span>
+                )}
               </label>
             </div>
 

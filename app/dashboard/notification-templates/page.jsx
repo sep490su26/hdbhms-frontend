@@ -54,11 +54,9 @@ const TEMPLATE_RECIPIENT_ROLES_BY_EVENT = {
   ROOM_TRANSFER_HOLDER_NOMINATION_REQUESTED: ["TENANT"],
   ROOM_TRANSFER_TARGET_HOLDER_APPROVAL_REQUESTED: ["TENANT"],
   ROOM_TRANSFER_MANAGER_ACTION_REQUIRED: ["MANAGER", "OWNER"],
-  TENANT_PROFILE_ACCESS_REQUESTED: ["OWNER"],
-  TENANT_PROFILE_ACCESS_APPROVED: ["MANAGER"],
-  TENANT_PROFILE_ACCESS_REJECTED: ["MANAGER"],
   VISIT_REQUEST_CREATED: ["MANAGER", "OWNER"],
   DEPOSIT_CREATED: ["MANAGER", "OWNER"],
+  DEPOSIT_INFORMATION_NOTIFICATION: ["TENANT"],
   DEBT_DIRECT_VISIT_REQUIRED: ["MANAGER", "OWNER"],
   PRE_CREATED_ACCOUNT_NOTIFICATION: ["TENANT"],
   INVOICE_OVERDUE: ["TENANT"],
@@ -75,6 +73,7 @@ const TEMPLATE_RECIPIENT_ROLES_BY_TARGET = {
   MANAGER_TASK: ["MANAGER", "OWNER"],
   VISIT_REQUEST: ["MANAGER", "OWNER"],
   DEPOSIT_AGREEMENT: ["MANAGER", "OWNER"],
+  DEPOSIT_BATCH: ["TENANT"],
   EXPENSE_REQUEST: ["MANAGER", "OWNER"],
 };
 
@@ -156,21 +155,6 @@ const EVENT_TEXTS = {
     description:
       "Gửi cho quản lý hoặc chủ trọ khi yêu cầu chuyển phòng cần thao tác tiếp theo.",
   },
-  TENANT_PROFILE_ACCESS_REQUESTED: {
-    displayName: "Yêu cầu xem hồ sơ khách thuê",
-    description:
-      "Gửi cho chủ trọ khi quản lý yêu cầu quyền xem hồ sơ khách thuê.",
-  },
-  TENANT_PROFILE_ACCESS_APPROVED: {
-    displayName: "Đã được duyệt xem hồ sơ",
-    description:
-      "Gửi cho quản lý khi chủ trọ duyệt quyền xem hồ sơ khách thuê.",
-  },
-  TENANT_PROFILE_ACCESS_REJECTED: {
-    displayName: "Yêu cầu xem hồ sơ bị từ chối",
-    description:
-      "Gửi cho quản lý khi chủ trọ từ chối quyền xem hồ sơ khách thuê.",
-  },
   VISIT_REQUEST_CREATED: {
     displayName: "Khách đặt lịch xem phòng",
     description:
@@ -186,6 +170,11 @@ const EVENT_TEXTS = {
     description:
       "Gửi Email/SMS thông tin tài khoản tạo sẵn cho khách thuê.",
   },
+  DEPOSIT_INFORMATION_NOTIFICATION: {
+    displayName: "Thông báo đặt cọc thành công",
+    description:
+      "Gửi Email/SMS thông tin đặt cọc cho khách thuê sau khi thanh toán thành công.",
+  },
 };
 
 const TARGET_TYPE_LABELS = {
@@ -196,6 +185,8 @@ const TARGET_TYPE_LABELS = {
   TENANT_ACCOUNT_PROVISIONING: "Tài khoản khách thuê",
   TENANT_PROFILE: "Hồ sơ khách thuê",
   VISIT_REQUEST: "Khách xem phòng",
+  DEPOSIT_AGREEMENT: "Đặt cọc",
+  DEPOSIT_BATCH: "Đặt cọc nhiều phòng",
 };
 
 const VARIABLE_LABELS = {
@@ -203,8 +194,16 @@ const VARIABLE_LABELS = {
   actionType: "Loại thao tác",
   contractCode: "Mã hợp đồng",
   contractId: "ID hợp đồng",
+  confirmedAt: "Thời điểm xác nhận",
+  depositAgreementId: "ID đặt cọc",
+  depositAmount: "Số tiền đặt cọc",
+  depositBatchId: "ID nhóm đặt cọc",
+  depositDetails: "Chi tiết đặt cọc",
+  depositReference: "Mã đặt cọc",
   dueDate: "Hạn xử lý",
   expectedTransferDate: "Ngày chuyển dự kiến",
+  expectedLeaseSignDate: "Ngày ký hợp đồng dự kiến",
+  expectedMoveInDate: "Ngày vào ở dự kiến",
   loginIdentifier: "Tên đăng nhập",
   managerId: "ID quản lý",
   managerName: "Tên quản lý",

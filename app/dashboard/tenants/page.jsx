@@ -17,7 +17,6 @@ import {
   FolderOpen,
   IdCard,
   ImageOff,
-  KeyRound,
   Mail,
   MapPin,
   MoreVertical,
@@ -30,13 +29,10 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  fetchTenantProfilePermissionGrants,
   fetchPrivateFileObjectUrl,
   fetchTenantProfiles,
   downloadTenantProfilesPoliceReportPackageExport,
   downloadTenantProfilesPoliceReportExport,
-  requestTenantProfileAccess,
-  revokeTenantProfilePermissionGrant,
 } from "@/services/tenantProfilesService";
 import { fetchManagementLeaseContractDetails } from "@/services/leaseContractsService";
 import {
@@ -210,53 +206,6 @@ function FilterDropdown({ label, value, options, onChange, disabled = false }) {
   );
 }
 
-const profileAccessStatus = (profile) =>
-  String(
-    valueOf(profile, "profileAccessStatus", "profile_access_status") || "",
-  ).toUpperCase();
-
-const canViewProfile = (profile) => {
-  const explicit = valueOf(
-    profile,
-    "canViewSensitiveProfile",
-    "can_view_sensitive_profile",
-  );
-  if (explicit === true || explicit === "true") return true;
-  if (explicit === false || explicit === "false") return false;
-  const status = profileAccessStatus(profile);
-  return !status || status === "APPROVED";
-};
-
-const permissionGrantStatusLabel = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "APPROVED" || value === "ACTIVE") return "Đang hiệu lực";
-  if (value === "EXPIRED") return "Đã hết hạn";
-  if (value === "REVOKED") return "Đã thu hồi";
-  return "Chưa rõ";
-};
-
-const permissionGrantStatusClass = (status) => {
-  const value = String(status || "").toUpperCase();
-  if (value === "APPROVED" || value === "ACTIVE")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (value === "REVOKED") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (value === "EXPIRED") return "border-slate-200 bg-slate-50 text-slate-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
-};
-
-const permissionGrantDurationLabel = (durationCode) => {
-  const value = String(durationCode || "").toUpperCase();
-  if (value === "HOURS_48") return "48 giờ";
-  if (value === "DAYS_7") return "7 ngày";
-  if (value === "DAYS_30") return "30 ngày";
-  return "Theo cấu hình";
-};
-
-const isActivePermissionGrant = (grant) =>
-  ["ACTIVE", "APPROVED"].includes(
-    String(valueOf(grant, "status")).toUpperCase(),
-  );
-
 const accountStatusLabel = (status) => {
   const value = String(status || "").toUpperCase();
   if (value === "ACTIVE") return "Đã kích hoạt";
@@ -381,30 +330,8 @@ function Badge({ children, className = "" }) {
 
 function TenantProfileActionsMenu({
   profile,
-  activeRole,
-  accessRequestingId,
   onViewProfile,
-  onManageAccess,
-  onRequestAccess,
 }) {
-  const profileId = valueOf(profile, "id", "profileId", "profile_id");
-  const accessStatus = profileAccessStatus(profile);
-  const isRequesting = String(accessRequestingId) === String(profileId);
-  const viewAllowed = canViewProfile(profile);
-  const isOwner = String(activeRole).toLowerCase() === "owner";
-  const accessExpiresAt = valueOf(
-    profile,
-    "profileAccessExpiresAt",
-    "profile_access_expires_at",
-  );
-  const requestLabel = isRequesting
-    ? "Đang gửi..."
-    : accessStatus === "PENDING"
-      ? "Chờ duyệt"
-      : accessStatus === "REJECTED"
-        ? "Gửi lại yêu cầu"
-        : "Yêu cầu xem";
-
   return (
     <div className="flex flex-col items-center gap-2">
       <DropdownMenu modal={false}>
@@ -422,60 +349,21 @@ function TenantProfileActionsMenu({
           sideOffset={8}
           className="w-56 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
         >
-          {viewAllowed ? (
-            <>
-              <DropdownMenuItem
-                asChild
-                className="rounded-lg p-0 focus:bg-transparent"
-              >
-                <button
-                  type="button"
-                  onClick={() => onViewProfile(profile)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
-                >
-                  <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                  Xem hồ sơ
-                </button>
-              </DropdownMenuItem>
-              {isOwner && (
-                <DropdownMenuItem
-                  asChild
-                  className="rounded-lg p-0 focus:bg-transparent"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onManageAccess(profile)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-[#1d4ed8] hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10"
-                  >
-                    <KeyRound className="h-4 w-4 text-[#2563eb] dark:text-blue-300" />
-                    Quản lý quyền
-                  </button>
-                </DropdownMenuItem>
-              )}
-            </>
-          ) : (
-            <DropdownMenuItem
-              asChild
-              className="rounded-lg p-0 focus:bg-transparent"
+          <DropdownMenuItem
+            asChild
+            className="rounded-lg p-0 focus:bg-transparent"
+          >
+            <button
+              type="button"
+              onClick={() => onViewProfile(profile)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
             >
-              <button
-                type="button"
-                disabled={accessStatus === "PENDING" || isRequesting}
-                onClick={() => onRequestAccess(profile)}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-[#1d4ed8] hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent dark:text-blue-300 dark:hover:bg-blue-500/10 dark:disabled:text-slate-500"
-              >
-                <KeyRound className="h-4 w-4" />
-                {requestLabel}
-              </button>
-            </DropdownMenuItem>
-          )}
+              <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              Xem hồ sơ
+            </button>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {accessExpiresAt && (
-        <span className="text-xs font-semibold text-[#64748b] dark:text-slate-400">
-          Hiệu lực đến {formatDate(accessExpiresAt)}
-        </span>
-      )}
     </div>
   );
 }
@@ -1296,204 +1184,6 @@ function TenantProfileModal({
   );
 }
 
-function PermissionGrantModal({
-  profile,
-  grants,
-  loading,
-  error,
-  actionId,
-  onClose,
-  onRefresh,
-  onRevoke,
-}) {
-  if (!profile) return null;
-
-  const sortedGrants = sortByNewest(grants, [
-    "grantedAt",
-    "granted_at",
-    "createdAt",
-    "created_at",
-  ]);
-
-  const profileName = valueOf(profile, "fullName", "full_name") || "Khách thuê";
-  const roomCode = valueOf(profile, "roomCode", "room_code");
-  const activeCount = sortedGrants.filter(isActivePermissionGrant).length;
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#091426]/70 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <section className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-[#d8dee8] px-6 py-5">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#64748b]">
-              Quyền xem hồ sơ đầy đủ
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-[#091426]">
-              {profileName}
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-[#64748b]">
-              {roomCode ? `Phòng ${roomCode} · ` : ""}
-              {activeCount} quyền đang hiệu lực
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d8dee8] bg-white px-3 text-sm font-bold text-[#091426] hover:bg-[#f2f4f6] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Làm mới
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-2 text-[#45474c] hover:bg-[#f2f4f6]"
-              aria-label="Đóng quản lý quyền"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto bg-[#fbfcfe] p-5">
-          {loading && (
-            <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-12 text-center text-sm font-bold text-[#64748b]">
-              Đang tải danh sách quyền...
-            </div>
-          )}
-
-          {!loading && error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && sortedGrants.length === 0 && (
-            <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white py-12 text-center">
-              <KeyRound className="mx-auto h-9 w-9 text-[#94a3b8]" />
-              <p className="mt-3 text-sm font-bold text-[#64748b]">
-                Chưa có manager nào được cấp quyền xem hồ sơ này.
-              </p>
-            </div>
-          )}
-
-          {!loading && !error && sortedGrants.length > 0 && (
-            <div className="dashboard-table rounded-xl border border-[#e2e8f0] bg-white">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#f8fafc] text-xs font-black uppercase tracking-[0.04em] text-[#64748b]">
-                  <tr>
-                    <th className="px-4 py-3">Manager</th>
-                    <th className="px-4 py-3">Trạng thái</th>
-                    <th className="px-4 py-3">Thời hạn</th>
-                    <th className="px-4 py-3">Lý do</th>
-                    <th className="px-4 py-3 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e2e8f0]">
-                  {sortedGrants.map((grant) => {
-                    const grantId = valueOf(grant, "id");
-                    const active = isActivePermissionGrant(grant);
-                    const managerName =
-                      valueOf(grant, "granteeFullName", "grantee_full_name") ||
-                      `Manager #${valueOf(grant, "granteeUserId", "grantee_user_id") || ""}`.trim();
-                    const managerContact =
-                      valueOf(grant, "granteePhone", "grantee_phone") ||
-                      valueOf(grant, "granteeEmail", "grantee_email");
-
-                    return (
-                      <tr
-                        key={
-                          grantId ||
-                          `${managerName}-${valueOf(grant, "grantedAt", "granted_at")}`
-                        }
-                      >
-                        <td className="px-4 py-4">
-                          <p className="font-black text-[#091426]">
-                            {managerName}
-                          </p>
-                          <p className="mt-1 text-xs font-semibold text-[#64748b]">
-                            {managerContact || "Chưa có liên hệ"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge
-                            className={permissionGrantStatusClass(
-                              valueOf(grant, "status"),
-                            )}
-                          >
-                            {permissionGrantStatusLabel(
-                              valueOf(grant, "status"),
-                            )}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p>
-                            {permissionGrantDurationLabel(
-                              valueOf(grant, "durationCode", "duration_code"),
-                            )}
-                          </p>
-                          <p className="mt-1 text-xs text-[#64748b]">
-                            Đến{" "}
-                            {formatDateTime(
-                              valueOf(grant, "expiresAt", "expires_at"),
-                            )}
-                          </p>
-                          {valueOf(grant, "revokedAt", "revoked_at") && (
-                            <p className="mt-1 text-xs text-rose-600">
-                              Thu hồi{" "}
-                              {formatDateTime(
-                                valueOf(grant, "revokedAt", "revoked_at"),
-                              )}
-                            </p>
-                          )}
-                        </td>
-                        <td className="max-w-[220px] px-4 py-4 text-sm font-semibold text-[#243247]">
-                          <p className="line-clamp-2">
-                            {valueOf(grant, "reason") || "Không ghi lý do"}
-                          </p>
-                          {valueOf(grant, "revokeReason", "revoke_reason") && (
-                            <p className="mt-2 line-clamp-2 text-xs text-rose-600">
-                              {valueOf(grant, "revokeReason", "revoke_reason")}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          {active ? (
-                            <button
-                              type="button"
-                              disabled={String(actionId) === String(grantId)}
-                              onClick={() => onRevoke(grant)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <KeyRound className="h-4 w-4" />
-                              {String(actionId) === String(grantId)
-                                ? "Đang thu hồi..."
-                                : "Thu hồi"}
-                            </button>
-                          ) : (
-                            <span className="text-xs font-bold text-[#94a3b8]">
-                              Không khả dụng
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function PoliceReportExportModal({
   columns,
   selectedColumns,
@@ -1632,12 +1322,6 @@ export default function TenantsPage() {
   const [selectedContract, setSelectedContract] = useState(null);
   const [contractDetailsLoadingId, setContractDetailsLoadingId] = useState("");
   const [contractDetailsError, setContractDetailsError] = useState("");
-  const [accessRequestingId, setAccessRequestingId] = useState("");
-  const [grantActionId, setGrantActionId] = useState("");
-  const [selectedGrantProfile, setSelectedGrantProfile] = useState(null);
-  const [permissionGrants, setPermissionGrants] = useState([]);
-  const [grantsLoading, setGrantsLoading] = useState(false);
-  const [grantsError, setGrantsError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [floorFilter, setFloorFilter] = useState("all");
@@ -1651,7 +1335,9 @@ export default function TenantsPage() {
   );
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
-  const isOwner = String(activeRole).toLowerCase() === "owner";
+  const canExportProfiles = ["owner", "manager"].includes(
+    String(activeRole).toLowerCase(),
+  );
 
   const toggleRoomExpanded = (roomKey) => {
     setExpandedRoomKeys((current) =>
@@ -1676,10 +1362,6 @@ export default function TenantsPage() {
   };
 
   const handleExportPoliceReport = async () => {
-    if (!isOwner) {
-      setExportError("Chỉ chủ trọ có quyền xuất file này.");
-      return;
-    }
     if (selectedExportColumns.length === 0) {
       setExportError("Vui lòng chọn ít nhất một cột để xuất.");
       return;
@@ -1700,10 +1382,6 @@ export default function TenantsPage() {
   };
 
   const handleExportPoliceReportPackage = async () => {
-    if (!isOwner) {
-      setExportError("Chỉ chủ trọ có quyền xuất file này.");
-      return;
-    }
     if (selectedExportColumns.length === 0) {
       setExportError("Vui lòng chọn ít nhất một cột để xuất.");
       return;
@@ -1758,95 +1436,6 @@ export default function TenantsPage() {
       );
     } finally {
       setContractDetailsLoadingId("");
-    }
-  };
-
-  const handleRequestProfileAccess = async (profile) => {
-    const profileId = valueOf(profile, "id", "profileId", "profile_id");
-    if (!profileId) return;
-
-    const defaultReason =
-      `Cần xem hồ sơ khách thuê phòng ${valueOf(profile, "roomCode", "room_code") || ""}`.trim();
-    const reason = window.prompt(
-      "Lý do cần xem hồ sơ khách thuê?",
-      defaultReason,
-    );
-    if (reason === null) return;
-
-    try {
-      setError("");
-      setAccessRequestingId(String(profileId));
-      await requestTenantProfileAccess(profileId, reason);
-      await loadProfiles();
-    } catch (requestError) {
-      setError(requestError?.message || "Không gửi được yêu cầu xem hồ sơ.");
-    } finally {
-      setAccessRequestingId("");
-    }
-  };
-
-  const loadProfileGrants = async (profile) => {
-    const profileId = valueOf(profile, "id", "profileId", "profile_id");
-    if (!profileId) {
-      setPermissionGrants([]);
-      return;
-    }
-
-    setGrantsLoading(true);
-    setGrantsError("");
-    try {
-      const grants = await fetchTenantProfilePermissionGrants(profileId);
-      setPermissionGrants(
-        sortByNewest(grants, [
-          "grantedAt",
-          "granted_at",
-          "createdAt",
-          "created_at",
-        ]),
-      );
-    } catch (loadError) {
-      setGrantsError(
-        loadError?.message || "Không tải được danh sách quyền xem hồ sơ.",
-      );
-      setPermissionGrants([]);
-    } finally {
-      setGrantsLoading(false);
-    }
-  };
-
-  const openManageProfileAccess = async (profile) => {
-    setSelectedGrantProfile(profile);
-    setPermissionGrants([]);
-    await loadProfileGrants(profile);
-  };
-
-  const handleRevokePermissionGrant = async (grant) => {
-    const grantId = valueOf(grant, "id");
-    if (!grantId) return;
-
-    const managerName =
-      valueOf(grant, "granteeFullName", "grantee_full_name") ||
-      `manager #${valueOf(grant, "granteeUserId", "grantee_user_id") || ""}`.trim();
-    const reason = window.prompt(
-      `Lý do thu hồi quyền xem hồ sơ của ${managerName}?`,
-      "Không còn cần quyền xem hồ sơ này",
-    );
-    if (reason === null) return;
-
-    try {
-      setError("");
-      setGrantActionId(String(grantId));
-      await revokeTenantProfilePermissionGrant(grantId, reason);
-      if (selectedGrantProfile) {
-        await loadProfileGrants(selectedGrantProfile);
-      }
-      await loadProfiles();
-    } catch (revokeError) {
-      setGrantsError(
-        revokeError?.message || "Không thu hồi được quyền xem hồ sơ.",
-      );
-    } finally {
-      setGrantActionId("");
     }
   };
 
@@ -2034,7 +1623,7 @@ export default function TenantsPage() {
         description="Quản lý hồ sơ từng người ở trong phòng, bao gồm người ký chính và người ở cùng."
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            {isOwner && (
+            {canExportProfiles && (
               <button
                 type="button"
                 onClick={openExportDialog}
@@ -2317,11 +1906,7 @@ export default function TenantsPage() {
                                 >
                                   <TenantProfileActionsMenu
                                     profile={profile}
-                                    activeRole={activeRole}
-                                    accessRequestingId={accessRequestingId}
                                     onViewProfile={setSelectedProfile}
-                                    onManageAccess={openManageProfileAccess}
-                                    onRequestAccess={handleRequestProfileAccess}
                                   />
                                 </td>
                               </tr>
@@ -2385,23 +1970,6 @@ export default function TenantsPage() {
           onOpenContractDetails={openContractDetails}
           contractDetailsLoadingId={contractDetailsLoadingId}
           contractDetailsError={contractDetailsError}
-        />
-      )}
-
-      {selectedGrantProfile && (
-        <PermissionGrantModal
-          profile={selectedGrantProfile}
-          grants={permissionGrants}
-          loading={grantsLoading}
-          error={grantsError}
-          actionId={grantActionId}
-          onClose={() => {
-            setSelectedGrantProfile(null);
-            setPermissionGrants([]);
-            setGrantsError("");
-          }}
-          onRefresh={() => loadProfileGrants(selectedGrantProfile)}
-          onRevoke={handleRevokePermissionGrant}
         />
       )}
 

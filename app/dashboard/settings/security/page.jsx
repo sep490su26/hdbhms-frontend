@@ -31,8 +31,12 @@ function validate(values) {
 
   if (!values.newPassword) {
     errors.newPassword = "Enter a new password.";
-  } else if (values.newPassword.length < 6) {
-    errors.newPassword = "The new password must contain at least 6 characters.";
+  } else if (
+    values.newPassword.length < 8 ||
+    !/[a-zA-Z]/.test(values.newPassword) ||
+    !/\d/.test(values.newPassword)
+  ) {
+    errors.newPassword = "The new password must contain at least 8 characters, including a letter and a number.";
   } else if (values.newPassword === values.currentPassword) {
     errors.newPassword = "The new password must differ from your current password.";
   }
@@ -130,6 +134,7 @@ export default function SecuritySettingsPage() {
       const result = await changeCurrentUserPassword({
         oldPassword: values.currentPassword,
         newPassword: values.newPassword,
+        confirmPassword: values.confirmPassword,
       });
 
       setValues(INITIAL_VALUES);
@@ -140,9 +145,26 @@ export default function SecuritySettingsPage() {
         message: result?.message || "Your password has been changed successfully.",
       });
     } catch (error) {
+      const fieldErrors = error?.fieldErrors || error?.payload?.data?.fieldErrors || {};
+      const nextErrors = Object.fromEntries(
+        Object.entries(fieldErrors).filter(([field, message]) =>
+          ["currentPassword", "newPassword", "confirmPassword", "password"].includes(field) &&
+          Boolean(message),
+        ),
+      );
+
+      if (nextErrors.password && !nextErrors.newPassword) {
+        nextErrors.newPassword = nextErrors.password;
+        delete nextErrors.password;
+      }
+
+      setErrors(nextErrors);
       setStatus({
         tone: "error",
-        message: error?.message || "Unable to change your password. Please try again.",
+        message:
+          Object.values(nextErrors)[0] ||
+          error?.message ||
+          "Unable to change your password. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -263,7 +285,7 @@ export default function SecuritySettingsPage() {
           <ul className="mt-5 grid gap-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
             <li className="flex gap-3">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1e40af] dark:bg-[#2563eb]" />
-              Use at least 6 characters.
+              Use at least 8 characters, including a letter and a number.
             </li>
             <li className="flex gap-3">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1e40af] dark:bg-[#2563eb]" />

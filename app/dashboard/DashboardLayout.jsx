@@ -308,17 +308,10 @@ function notificationHref(notification) {
   if (eventType === "VISIT_REQUEST_CREATED" || targetType === "VISIT_REQUEST") {
     return "/dashboard/viewing-customers";
   }
-  if (
-    eventType === "TENANT_PROFILE_ACCESS_REQUESTED" ||
-    targetType === "CHANGE_REQUEST"
-  ) {
+  if (targetType === "CHANGE_REQUEST") {
     return "/dashboard/requests";
   }
-  if (
-    eventType === "TENANT_PROFILE_ACCESS_APPROVED" ||
-    eventType === "TENANT_PROFILE_ACCESS_REJECTED" ||
-    targetType === "TENANT_PROFILE"
-  ) {
+  if (targetType === "TENANT_PROFILE") {
     return "/dashboard/tenants";
   }
   return "/dashboard/requests";

@@ -42,6 +42,15 @@ function isValidPassword(value) {
 }
 
 function getResetMessage(error, fallback) {
+  const fieldErrors =
+    error?.fieldErrors ||
+    error?.payload?.data?.fieldErrors ||
+    error?.payload?.fieldErrors ||
+    {};
+  const fieldMessage = Object.values(fieldErrors).find(Boolean);
+
+  if (fieldMessage) return fieldMessage;
+
   const raw = [
     error?.message,
     error?.details,

@@ -145,65 +145,12 @@ export async function downloadTenantProfilesPoliceReportPackageExport(columns = 
   URL.revokeObjectURL(url);
 }
 
-function normalizePermissionGrant(item = {}) {
-  return {
-    ...item,
-    id: item.id ?? item.grantId ?? item.grant_id ?? null,
-    granteeUserId: item.granteeUserId ?? item.grantee_user_id ?? null,
-    granteeFullName: item.granteeFullName ?? item.grantee_full_name ?? "",
-    granteePhone: item.granteePhone ?? item.grantee_phone ?? "",
-    granteeEmail: item.granteeEmail ?? item.grantee_email ?? "",
-    targetType: item.targetType ?? item.target_type ?? "",
-    targetId: item.targetId ?? item.target_id ?? null,
-    sourceChangeRequestId: item.sourceChangeRequestId ?? item.source_change_request_id ?? null,
-    grantedBy: item.grantedBy ?? item.granted_by ?? null,
-    reason: item.reason ?? "",
-    durationCode: item.durationCode ?? item.duration_code ?? "",
-    grantedAt: item.grantedAt ?? item.granted_at ?? null,
-    expiresAt: item.expiresAt ?? item.expires_at ?? null,
-    revokedAt: item.revokedAt ?? item.revoked_at ?? null,
-    revokedBy: item.revokedBy ?? item.revoked_by ?? null,
-    revokeReason: item.revokeReason ?? item.revoke_reason ?? "",
-    status: item.status ?? "",
-  };
-}
-
-export async function fetchTenantProfilePermissionGrants(profileId) {
-  if (!profileId) return [];
-  const params = new URLSearchParams({
-    targetType: "TENANT_PROFILE",
-    targetId: String(profileId),
-    sort: "grantedAt,desc",
-  });
-  const data = await authenticatedFetch(`${API_BASE_URL}/permission-grants?${params.toString()}`, {
-    method: "GET",
-  });
-  return (Array.isArray(data) ? data : readPageItems(data)).map(normalizePermissionGrant);
-}
-
-export async function revokeTenantProfilePermissionGrant(grantId, reason = "") {
-  const data = await authenticatedFetch(`${API_BASE_URL}/permission-grants/${encodeURIComponent(grantId)}/revoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason }),
-  });
-  return normalizePermissionGrant(data);
-}
-
 export async function fetchMyTenantProfile() {
   const data = await authenticatedFetch(`${API_BASE_URL}/tenants/profiles/me`, {
     method: "GET",
   });
 
   return data;
-}
-
-export async function requestTenantProfileAccess(profileId) {
-  return authenticatedFetch(`${API_BASE_URL}/tenant-profiles/${encodeURIComponent(profileId)}/access-requests`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
 }
 
 export async function fetchPrivateFileObjectUrl(fileUrlOrId) {

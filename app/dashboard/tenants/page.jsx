@@ -1594,27 +1594,28 @@ export default function TenantsPage() {
     propertyFilter,
   ]);
 
-  const filteredTotalElements = filteredProfiles.length;
+  // Keep every profile in a room together before applying pagination.
+  const allRoomGroups = useMemo(() => {
+    const groups = new Map();
+    filteredProfiles.forEach((profile) => {
+      const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(profile);
+    });
+    return [...groups.values()];
+  }, [filteredProfiles]);
+
+  const filteredTotalElements = allRoomGroups.length;
   const filteredTotalPages =
     filteredTotalElements === 0
       ? 0
       : Math.ceil(filteredTotalElements / Math.max(1, size));
   const displayedProfilePage =
     filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
-  const pagedProfiles = useMemo(() => {
-    const start = (displayedProfilePage - 1) * size;
-    return filteredProfiles.slice(start, start + size);
-  }, [displayedProfilePage, filteredProfiles, size]);
-
   const groupedByRoom = useMemo(() => {
-    const groups = new Map();
-    pagedProfiles.forEach((profile) => {
-      const key = `${valueOf(profile, "propertyId", "property_id") || "property"}-${valueOf(profile, "roomId", "room_id") || valueOf(profile, "roomCode", "room_code")}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(profile);
-    });
-    return [...groups.values()];
-  }, [pagedProfiles]);
+    const start = (displayedProfilePage - 1) * size;
+    return allRoomGroups.slice(start, start + size);
+  }, [allRoomGroups, displayedProfilePage, size]);
 
   return (
     <section className="w-full min-w-0 flex flex-col gap-6">
@@ -1929,7 +1930,7 @@ export default function TenantsPage() {
           size={size}
           totalElements={filteredTotalElements}
           totalPages={filteredTotalPages}
-          itemLabel="hồ sơ"
+          itemLabel="phòng"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {
             setSize(nextSize);

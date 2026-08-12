@@ -368,21 +368,10 @@ export default function AccountsPage() {
     );
   }, [floorFilter, items, propertyFilter, query, stateFilter]);
 
-  const filteredTotalElements = filteredItems.length;
-  const filteredTotalPages =
-    filteredTotalElements === 0
-      ? 0
-      : Math.ceil(filteredTotalElements / Math.max(1, size));
-  const displayedItemPage =
-    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
-  const pagedItems = useMemo(() => {
-    const start = (displayedItemPage - 1) * size;
-    return filteredItems.slice(start, start + size);
-  }, [displayedItemPage, filteredItems, size]);
-
-  const groupedContracts = useMemo(() => {
+  // Keep every occupant of a contract together before applying pagination.
+  const allContractGroups = useMemo(() => {
     const groups = new Map();
-    for (const item of pagedItems) {
+    for (const item of filteredItems) {
       const key =
         item.contractId ||
         item.contractCode ||
@@ -403,11 +392,23 @@ export default function AccountsPage() {
       }
       groups.get(key).rows.push(item);
     }
-    return Array.from(groups.values()).map((group, index) => ({
+    return Array.from(groups.values());
+  }, [filteredItems]);
+
+  const filteredTotalElements = allContractGroups.length;
+  const filteredTotalPages =
+    filteredTotalElements === 0
+      ? 0
+      : Math.ceil(filteredTotalElements / Math.max(1, size));
+  const displayedItemPage =
+    filteredTotalPages > 0 ? Math.min(page, filteredTotalPages) : 1;
+  const groupedContracts = useMemo(() => {
+    const start = (displayedItemPage - 1) * size;
+    return allContractGroups.slice(start, start + size).map((group, index) => ({
       ...group,
       safeKey: contractGroupKey(group.rows[0] || {}, index),
     }));
-  }, [pagedItems]);
+  }, [allContractGroups, displayedItemPage, size]);
 
   const toggleRoom = useCallback((roomId) => {
     setExpandedRooms((current) => {
@@ -816,7 +817,7 @@ export default function AccountsPage() {
           size={size}
           totalElements={filteredTotalElements}
           totalPages={filteredTotalPages}
-          itemLabel="khách thuê"
+          itemLabel="hợp đồng"
           onPageChange={setPage}
           onSizeChange={(nextSize) => {
             setSize(nextSize);

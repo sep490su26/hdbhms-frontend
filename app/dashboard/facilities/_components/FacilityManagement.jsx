@@ -7,6 +7,7 @@ import {
   BedDouble,
   Building2,
   CheckCircle2,
+  ChevronDown,
   CircleAlert,
   Layers3,
   Plus,
@@ -14,6 +15,12 @@ import {
   ServerCrash,
   X,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FacilityFormDialog } from "./FacilityFormDialog";
 import { FacilityList } from "./FacilityList";
 import { FacilityStatusDialog } from "./FacilityStatusDialog";
@@ -37,17 +44,18 @@ const DEFAULT_UTILITY_VALUES = {
 };
 
 function utilitySettingsToValues(settings) {
+  const readPositiveOrDefault = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
   return {
-    electricityUnitPrice: String(
-      settings?.electricity?.unitPrice ?? DEFAULT_UTILITY_VALUES.electricityUnitPrice,
-    ),
+    electricityUnitPrice: String(readPositiveOrDefault(settings?.electricity?.unitPrice, DEFAULT_UTILITY_VALUES.electricityUnitPrice)),
     electricityFreeAllowance: String(
       settings?.electricity?.freeAllowance ??
         DEFAULT_UTILITY_VALUES.electricityFreeAllowance,
     ),
-    serviceFeeUnitPrice: String(
-      settings?.serviceFee?.unitPrice ?? DEFAULT_UTILITY_VALUES.serviceFeeUnitPrice,
-    ),
+    serviceFeeUnitPrice: String(readPositiveOrDefault(settings?.serviceFee?.unitPrice, DEFAULT_UTILITY_VALUES.serviceFeeUnitPrice)),
   };
 }
 
@@ -293,19 +301,33 @@ export function FacilityManagement() {
               className="h-10 w-full rounded-lg border border-[#cbd3df] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 pl-10 pr-4 text-sm font-medium text-slate-900 dark:text-white outline-none transition focus:border-[#1e40af] focus:bg-white dark:focus:bg-[#0f172a] focus:ring-2 focus:ring-[#1e40af]/10"
             />
           </label>
-          <select
-            value={statusFilter}
-            onChange={(event) => updateStatus(event.target.value)}
-            className="h-10 rounded-lg border border-[#cbd3df] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-[#1e40af]/10"
-            aria-label="Lọc trạng thái cơ sở"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            {facilityStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-10 min-w-52 items-center justify-between rounded-lg border border-[#cbd3df] bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-slate-400 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200"
+                aria-label="Lọc trạng thái cơ sở"
+              >
+                {statusFilter === "ALL"
+                  ? "Tất cả trạng thái"
+                  : facilityStatusOptions.find((option) => option.value === statusFilter)?.label}
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onSelect={() => updateStatus("ALL")}>
+                Tất cả trạng thái
+              </DropdownMenuItem>
+              {facilityStatusOptions.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onSelect={() => updateStatus(option.value)}
+                >
+                  {option.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </section>
 

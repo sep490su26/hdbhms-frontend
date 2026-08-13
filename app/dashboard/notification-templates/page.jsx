@@ -35,7 +35,7 @@ import {
 
 const CHANNEL_OPTIONS = [
   { value: "WEB", label: "Web" },
-  { value: "PUSH", label: "Mobile push" },
+  { value: "PUSH", label: "Thông báo đẩy" },
   { value: "EMAIL", label: "Email" },
   { value: "SMS", label: "SMS" },
 ];
@@ -140,6 +140,57 @@ const TEMPLATE_TOKEN_PATTERN = /\[\[\$\{[A-Za-z_][A-Za-z0-9_]*\}\]\]/g;
 const TEMPLATE_HISTORY_LIMIT = 80;
 
 const EVENT_TEXTS = {
+  UTILITY_METER_READING_PERIOD_OPENED: {
+    displayName: "Kỳ nhập điện đã mở",
+  },
+  INVOICE_ISSUED: {
+    displayName: "Hóa đơn mới đã phát hành",
+  },
+  INVOICE_OVERDUE: {
+    displayName: "Cảnh báo hóa đơn quá hạn",
+  },
+  INVOICE_PAID: {
+    displayName: "Hóa đơn đã thanh toán",
+  },
+  INVOICE_PARTIALLY_PAID: {
+    displayName: "Hóa đơn thanh toán một phần",
+  },
+  LIQUIDATION_DEPOSIT_REFUND_RECORDED: {
+    displayName: "Xác nhận nhận hoàn cọc",
+  },
+  EXPENSE_APPROVAL_REQUESTED: {
+    displayName: "Yêu cầu chi cần duyệt",
+  },
+  EXPENSE_APPROVED: {
+    displayName: "Yêu cầu chi đã được duyệt",
+  },
+  EXPENSE_REJECTED: {
+    displayName: "Yêu cầu chi bị từ chối",
+  },
+  EXPENSE_PAID: {
+    displayName: "Khoản chi đã được thanh toán",
+  },
+  CHANGE_REQUEST_CREATED: {
+    displayName: "Có yêu cầu mới cần xử lý",
+  },
+  LEASE_EXPIRY_REMINDER_FIRST: {
+    displayName: "Nhắc lần 1 hợp đồng sắp hết hạn",
+  },
+  LEASE_EXPIRY_REMINDER_SECOND: {
+    displayName: "Nhắc lần 2 hợp đồng sắp hết hạn",
+  },
+  LEASE_EXPIRY_REMINDER_FINAL: {
+    displayName: "Nhắc lần cuối hợp đồng sắp hết hạn",
+  },
+  LEASE_EXPIRY_MANAGER_VISIT_REQUIRED: {
+    displayName: "Cần gặp trực tiếp khách sắp hết hạn hợp đồng",
+  },
+  LEASE_RENEWAL_TERMS_CONFIRMATION_DUE: {
+    displayName: "Cần chốt điều khoản gia hạn",
+  },
+  LEASE_HANDOVER_CONFIRMATION_DUE: {
+    displayName: "Cần chốt lịch bàn giao phòng",
+  },
   ROOM_TRANSFER_HOLDER_NOMINATION_REQUESTED: {
     displayName: "Đề cử người đại diện phòng mới",
     description:
@@ -180,10 +231,21 @@ const EVENT_TEXTS = {
 const TARGET_TYPE_LABELS = {
   BROADCAST: "Thông báo hàng loạt",
   CHANGE_REQUEST: "Yêu cầu thay đổi",
+  CONTRACT: "Hợp đồng thuê",
+  DEPOSIT: "Đặt cọc",
+  EXPENSE_REQUEST: "Yêu cầu chi",
+  FILE: "Tệp tin",
+  IDENTITY_DOCUMENT: "Giấy tờ định danh",
+  INVOICE: "Hóa đơn",
   MANAGER_TASK: "Tác vụ quản lý",
+  METER_READING: "Chỉ số điện",
+  OPERATING_EXPENSE: "Khoản chi vận hành",
+  OTHER: "Khác",
+  REPORT: "Báo cáo",
   ROOM_TRANSFER: "Chuyển phòng",
   TENANT_ACCOUNT_PROVISIONING: "Tài khoản khách thuê",
   TENANT_PROFILE: "Hồ sơ khách thuê",
+  UTILITY_BILLING_RUN: "Kỳ nhập điện",
   VISIT_REQUEST: "Khách xem phòng",
   DEPOSIT_AGREEMENT: "Đặt cọc",
   DEPOSIT_BATCH: "Đặt cọc nhiều phòng",
@@ -266,14 +328,20 @@ function optionLabel(options, value) {
 
 function localizeDefinition(definition) {
   const text = EVENT_TEXTS[definition.eventType] ?? {};
+  const backendDisplayName = String(definition.displayName || "").trim();
+  const hasRawDisplayName =
+    !backendDisplayName ||
+    backendDisplayName.toUpperCase() === String(definition.eventType || "").toUpperCase() ||
+    /^[A-Z0-9_]+$/.test(backendDisplayName);
   return {
     ...definition,
-    displayName: text.displayName ?? definition.displayName ?? definition.eventType,
+    displayName:
+      text.displayName ??
+      (hasRawDisplayName ? "Thông báo chưa xác định" : backendDisplayName),
     description: text.description ?? definition.description ?? "",
     targetLabel:
       TARGET_TYPE_LABELS[definition.targetType] ??
-      definition.targetType ??
-      "Thông báo",
+      "Đối tượng thông báo chưa xác định",
   };
 }
 

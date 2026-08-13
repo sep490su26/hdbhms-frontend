@@ -324,14 +324,6 @@ function roomMatchesProperty(room, propertyId) {
 export async function fetchPublicRoomById(roomIdentifier, { propertyId } = {}) {
   if (!roomIdentifier) return null;
 
-  if (propertyId) {
-    const catalog = await fetchPublicRoomCatalog({ propertyId });
-    const scopedRoom = catalog.rooms.find((room) =>
-      roomMatchesIdentifier(room, roomIdentifier),
-    );
-    if (scopedRoom) return scopedRoom;
-  }
-
   try {
     const response = await fetch(`${PUBLIC_ROOMS_API_URL}/${encodeURIComponent(roomIdentifier)}`, { cache: "no-store" });
     const data = await readApiResponse(response, "Không thể tải chi tiết phòng");
@@ -342,7 +334,15 @@ export async function fetchPublicRoomById(roomIdentifier, { propertyId } = {}) {
       return data;
     }
   } catch {
-    // Fallback to list lookup for temporary compatibility with old roomId links.
+    // Fall back to the catalog for older room links or unavailable detail routes.
+  }
+
+  if (propertyId) {
+    const catalog = await fetchPublicRoomCatalog({ propertyId });
+    const scopedRoom = catalog.rooms.find((room) =>
+      roomMatchesIdentifier(room, roomIdentifier),
+    );
+    if (scopedRoom) return scopedRoom;
   }
 
   const catalog = await fetchPublicRoomCatalog();

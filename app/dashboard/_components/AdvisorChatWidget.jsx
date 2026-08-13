@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BotMessageSquare, CalendarDays, Loader2, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import {
   askAdvisor,
+  createAdvisorSession,
   currentAdvisorPeriod,
   fetchAdvisorAnalysis,
   fetchAdvisorSessionHistory,
 } from "@/services/advisorService";
+import { useAuth } from "../_contexts/AuthContext";
 import {
   historyMessages,
   mergeAdvisorMessages,
@@ -44,42 +46,51 @@ async function bootFetch(fetcher, fallback) {
   }
 }
 
-function sessionStorageKey(period) {
-  return `advisor:session:${period || "current"}`;
+function sessionStorageKey(ownerId, period) {
+  if (!ownerId) return "";
+  return `advisor:session:${ownerId}:${period || "current"}`;
 }
 
-function messagesStorageKey(period) {
-  return `advisor:messages:${period || "current"}`;
+function messagesStorageKey(ownerId, period) {
+  if (!ownerId) return "";
+  return `advisor:messages:${ownerId}:${period || "current"}`;
 }
 
-function readCachedSession(period) {
+function readCachedSession(ownerId, period) {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(sessionStorageKey(period)) || "";
+  const key = sessionStorageKey(ownerId, period);
+  return key ? window.localStorage.getItem(key) || "" : "";
 }
 
-function saveCachedSession(period, nextSessionId) {
-  if (typeof window === "undefined" || !nextSessionId) return;
-  window.localStorage.setItem(sessionStorageKey(period), nextSessionId);
+function saveCachedSession(ownerId, period, nextSessionId) {
+  const key = sessionStorageKey(ownerId, period);
+  if (typeof window === "undefined" || !key || !nextSessionId) return;
+  window.localStorage.setItem(key, nextSessionId);
 }
 
-function clearCachedSession(period) {
+function clearCachedSession(ownerId, period) {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(sessionStorageKey(period));
-  window.localStorage.removeItem(messagesStorageKey(period));
+  const sessionKey = sessionStorageKey(ownerId, period);
+  const messageKey = messagesStorageKey(ownerId, period);
+  if (sessionKey) window.localStorage.removeItem(sessionKey);
+  if (messageKey) window.localStorage.removeItem(messageKey);
 }
 
-function readCachedMessages(period) {
+function readCachedMessages(ownerId, period) {
   if (typeof window === "undefined") return [];
+  const key = messagesStorageKey(ownerId, period);
+  if (!key) return [];
   try {
-    return historyMessages(JSON.parse(window.localStorage.getItem(messagesStorageKey(period)) || "[]"));
+    return historyMessages(JSON.parse(window.localStorage.getItem(key) || "[]"));
   } catch {
     return [];
   }
 }
 
-function saveCachedMessages(period, nextMessages) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(messagesStorageKey(period), JSON.stringify(historyMessages(nextMessages)));
+function saveCachedMessages(ownerId, period, nextMessages) {
+  const key = messagesStorageKey(ownerId, period);
+  if (typeof window === "undefined" || !key) return;
+  window.localStorage.setItem(key, JSON.stringify(historyMessages(nextMessages)));
 }
 
 function suggestionTexts(items) {
@@ -90,6 +101,8 @@ function suggestionTexts(items) {
 }
 
 export function AdvisorChatWidget() {
+  const { user } = useAuth();
+  const ownerId = user?.id ?? user?.userId ?? user?.user_id ?? "";
   const [isOpen, setOpen] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
   const [period, setPeriod] = useState(() => currentAdvisorPeriod());
@@ -105,7 +118,7 @@ export function AdvisorChatWidget() {
   const conversationStartedRef = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !ownerId) return;
 
     let ignore = false;
 
@@ -118,8 +131,9 @@ export function AdvisorChatWidget() {
           (signal) => fetchAdvisorAnalysis(period, { signal }),
           { analyses: [] },
         );
-        const cachedSessionId = readCachedSession(period);
-        let restoredMessages = readCachedMessages(period);
+        const cachedSessionId = readCachedSession(ownerId, period);
+        let restoredMessages = readCachedMessages(ownerId, period);
+        let activeSessionId = cachedSessionId;
 
         if (!conversationStartedRef.current) {
           if (cachedSessionId) setSessionId(cachedSessionId);
@@ -133,6 +147,19 @@ export function AdvisorChatWidget() {
           );
           if (history) {
             restoredMessages = mergeAdvisorMessages(restoredMessages, history?.history);
+          } else {
+            activeSessionId = "";
+            restoredMessages = [];
+            clearCachedSession(ownerId, period);
+          }
+        }
+
+        if (!activeSessionId) {
+          try {
+            const createdSession = await createAdvisorSession();
+            activeSessionId = resolveAdvisorSessionId(createdSession);
+          } catch {
+            // The ask endpoint can create a session when it receives an empty id.
           }
         }
 
@@ -140,11 +167,9 @@ export function AdvisorChatWidget() {
         if (ignore) return;
 
         if (!conversationStartedRef.current) {
-          if (cachedSessionId) {
-            setSessionId(cachedSessionId);
-            saveCachedSession(period, cachedSessionId);
-          }
-          if (restoredMessages.length) saveCachedMessages(period, restoredMessages);
+          setSessionId(activeSessionId);
+          saveCachedSession(ownerId, period, activeSessionId);
+          if (restoredMessages.length) saveCachedMessages(ownerId, period, restoredMessages);
           setMessages(restoredMessages.length ? restoredMessages : [INTRO_MESSAGE]);
         }
         setSuggestions(suggestionTexts(analysis?.analyses));
@@ -160,7 +185,7 @@ export function AdvisorChatWidget() {
     return () => {
       ignore = true;
     };
-  }, [isOpen, period]);
+  }, [isOpen, ownerId, period]);
 
   useEffect(() => {
     if (!isOpen || !bodyRef.current) return;
@@ -224,15 +249,38 @@ export function AdvisorChatWidget() {
     conversationStartedRef.current = true;
     const userMessages = [...messages, { role: "user", content: trimmed }];
     setMessages(userMessages);
-    saveCachedMessages(period, userMessages);
+    saveCachedMessages(ownerId, period, userMessages);
 
     try {
-      const reply = await askAdvisor({ question: trimmed, sessionId, period });
-      const nextSessionId = resolveAdvisorSessionId(reply, sessionId);
+      let activeSessionId = sessionId;
+      let reply;
+
+      try {
+        reply = await askAdvisor({ question: trimmed, sessionId: activeSessionId, period });
+      } catch (firstError) {
+        clearCachedSession(ownerId, period);
+        setSessionId("");
+
+        try {
+          const createdSession = await createAdvisorSession();
+          activeSessionId = resolveAdvisorSessionId(createdSession);
+        } catch {
+          activeSessionId = "";
+        }
+
+        // Retry once with a fresh id; an empty id is also supported by the advisor service.
+        try {
+          reply = await askAdvisor({ question: trimmed, sessionId: activeSessionId, period });
+        } catch {
+          throw firstError;
+        }
+      }
+
+      const nextSessionId = resolveAdvisorSessionId(reply, activeSessionId);
       const nextSuggestions = suggestionTexts(reply?.suggestions);
 
       if (nextSessionId && nextSessionId !== sessionId) setSessionId(nextSessionId);
-      saveCachedSession(period, nextSessionId);
+      saveCachedSession(ownerId, period, nextSessionId);
       if (nextSuggestions.length) setSuggestions(nextSuggestions);
 
       const nextMessages = [
@@ -240,7 +288,7 @@ export function AdvisorChatWidget() {
         { role: "assistant", content: reply?.reply || "Tôi chưa có phản hồi phù hợp cho câu hỏi này." },
       ];
       setMessages(nextMessages);
-      saveCachedMessages(period, nextMessages);
+      saveCachedMessages(ownerId, period, nextMessages);
     } catch (sendError) {
       const nextMessages = [
         ...userMessages,
@@ -248,7 +296,7 @@ export function AdvisorChatWidget() {
       ];
       setError(sendError?.message || "Không gửi được câu hỏi.");
       setMessages(nextMessages);
-      saveCachedMessages(period, nextMessages);
+      saveCachedMessages(ownerId, period, nextMessages);
     } finally {
       setSending(false);
     }

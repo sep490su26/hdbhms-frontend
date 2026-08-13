@@ -4,24 +4,18 @@ import {useEffect, useMemo, useRef, useState} from "react";
 import Link from "next/link";
 import {useSearchParams} from "next/navigation";
 import {
-    AlertTriangle,
-    BedDouble,
-    Building2,
-    CalendarClock,
     Check,
+    ChevronDown,
     Download,
     Edit3,
     Eye,
     FileText,
-    Grid3X3,
     Home,
     ImagePlus,
     ListFilter,
     LoaderCircle,
-    Map,
     Save,
     Trash2,
-    UserRound,
     X,
 } from "lucide-react";
 import {
@@ -33,12 +27,17 @@ import {
 import {
     attachRoomImage,
     deleteRoomImage,
-    fetchFloors,
     fetchRoomById,
     updateRoom,
     uploadRoomImage,
 } from "@/services/floorRoomService";
 import {Dialog, DialogContent, DialogTitle} from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {useDashboardLayout} from "../_contexts/DashboardLayoutContext";
 import {authenticatedFetch} from "@/services/identityAccessService";
 import {fetchManagementRoomRentalHistory} from "@/services/leaseContractsService";
@@ -85,11 +84,6 @@ const roomStatus = {
         "bg-purple-50 dark:bg-blue-500/10 text-purple-700 dark:text-blue-300",
     ],
 };
-
-const views = [
-    {value: "floor-map", label: "Sơ đồ tầng", icon: Map},
-    {value: "room-list", label: "Danh sách phòng", icon: Building2},
-];
 
 function formatMoney(value) {
     return `${money.format(value)} VNĐ`;
@@ -310,15 +304,33 @@ function FilterBar({children}) {
     );
 }
 
-function SelectPill({icon: Icon, children}) {
+function RoomFilterMenu({label, icon: Icon, value, options, onChange}) {
     return (
-        <button
-            type="button"
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm text-slate-900 dark:text-white hover:border-[#1e40af]"
-        >
-            {Icon && <Icon className="h-4 w-4 text-slate-600 dark:text-slate-300"/>}
-            {children}
-        </button>
+        <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    className="inline-flex h-10 min-w-44 items-center justify-between gap-2 rounded-lg border border-[#dbe1ea] bg-white px-3 text-sm font-bold text-slate-700 transition hover:border-slate-400 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200"
+                >
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                        {Icon ? <Icon className="h-4 w-4 shrink-0 text-slate-500"/> : null}
+                        <span className="truncate">{value || label}</span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-400"/>
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+                {options.map((option) => (
+                    <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => onChange(option.value)}
+                        className={option.value === value ? "font-bold" : ""}
+                    >
+                        {option.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -341,11 +353,11 @@ const STATUS_META = {
     },
     OCCUPIED: {
         label: "Đang thuê",
-        dot: "bg-blue-500",
+        dot: "bg-slate-500",
         badge:
-            "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20",
-        card: "border-blue-100 dark:border-blue-500/20 bg-blue-50/80 text-blue-900 dark:text-blue-300",
-        icon: "text-blue-600 dark:text-blue-300",
+            "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-white/10",
+        card: "border-slate-200 dark:border-white/10 bg-slate-100/80 text-slate-900 dark:text-slate-300",
+        icon: "text-slate-600 dark:text-slate-300",
     },
     RESERVED: {
         label: "Đang đặt cọc",
@@ -367,20 +379,11 @@ const STATUS_META = {
         label: "Hết hạn HĐ",
         dot: "bg-purple-500",
         badge:
-            "bg-purple-50 dark:bg-blue-500/10 text-purple-700 dark:text-blue-300 ring-purple-200 dark:ring-blue-500/20",
-        card: "border-purple-100 dark:border-blue-500/20 bg-purple-50/90 text-purple-900 dark:text-blue-300",
-        icon: "text-purple-600 dark:text-blue-300",
+            "bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 ring-purple-200 dark:ring-purple-500/20",
+        card: "border-purple-100 dark:border-purple-500/20 bg-purple-50/90 text-purple-900 dark:text-purple-300",
+        icon: "text-purple-600 dark:text-purple-300",
     },
 };
-
-const STATUS_ORDER = [
-    "DRAFT",
-    "VACANT",
-    "OCCUPIED",
-    "RESERVED",
-    "SOON_VACANT",
-    "EXPIRED",
-];
 
 const ROOM_STATUS_OPTIONS = [
     {value: "DRAFT", label: "Bản nháp"},
@@ -459,98 +462,6 @@ function readPageRows(payload) {
     return [];
 }
 
-function normalizeApiFloorPlanRoom(apiRoom) {
-    const rawCode =
-        apiRoom.roomCode ?? apiRoom.room_code ?? apiRoom.code ?? apiRoom.name ?? "";
-    const floorName =
-        apiRoom.floorName ?? apiRoom.floor_name ?? apiRoom.floor?.name ?? "";
-    const property = apiRoom.property ?? apiRoom.floor?.property ?? null;
-    const floorNumber =
-        Number.parseInt(String(floorName).replace(/\D/g, ""), 10) ||
-        Number.parseInt(String(rawCode).replace(/\D/g, "").slice(0, 1), 10) ||
-        1;
-    const status = normalizeStatus(
-        apiRoom.currentStatus ?? apiRoom.current_status ?? apiRoom.status,
-    );
-    const maxOccupants = Number(
-        apiRoom.maxOccupants ?? apiRoom.max_occupants ?? 3,
-    );
-    const currentOccupants = Number(
-        apiRoom.currentOccupants ??
-        apiRoom.current_occupants ??
-        (status === "OCCUPIED" || status === "EXPIRED"
-            ? Math.min(maxOccupants, 2)
-            : 0),
-    );
-    const imageUrls = normalizeRoomImages(apiRoom);
-    const imageItems = normalizeRoomImageItems(apiRoom, imageUrls);
-    const badges = [];
-
-    if (status === "RESERVED") badges.push("Đã có cọc");
-    if (apiRoom.hasPendingApplication || apiRoom.has_pending_application)
-        badges.push("Có đơn chờ");
-    if (apiRoom.hasDebt || apiRoom.has_debt) badges.push("Nợ");
-
-    return {
-        id: apiRoom.id ? `api-${apiRoom.id}` : `api-${rawCode}`,
-        roomId: apiRoom.id ?? null,
-        roomCode: String(rawCode),
-        floorId: apiRoom.floorId ?? apiRoom.floor_id ?? apiRoom.floor?.id ?? null,
-        floorCode: apiRoom.floorCode ?? apiRoom.floor_code ?? apiRoom.floor?.floorCode ?? apiRoom.floor?.floor_code ?? null,
-        propertyId: apiRoom.propertyId ?? apiRoom.property_id ?? property?.id ?? null,
-        displayCode: formatRoomCode(rawCode),
-        name: apiRoom.name ?? `Phòng ${rawCode}`,
-        floorNumber,
-        floorName: floorName || `Tầng ${floorNumber}`,
-        area: Number(apiRoom.areaM2 ?? apiRoom.area_m2 ?? apiRoom.area ?? 0),
-        listedPrice: Number(
-            apiRoom.listedPrice ?? apiRoom.listed_price ?? apiRoom.price ?? 0,
-        ),
-        currentOccupants,
-        maxOccupants,
-        maxPeople: maxOccupants,
-        sortOrder: apiRoom.sortOrder ?? apiRoom.sort_order ?? 0,
-        status,
-        badges,
-        note: apiRoom.publicNote ?? apiRoom.public_note ?? "",
-        publicNote: apiRoom.publicNote ?? apiRoom.public_note ?? "",
-        image: imageUrls[0] ?? ROOM_PLACEHOLDER_IMAGE,
-        images: imageUrls,
-        imageItems,
-        buildingName:
-            apiRoom.propertyName ?? apiRoom.property_name ?? property?.name ?? "Hải Đăng House",
-        buildingId: apiRoom.propertyId ?? apiRoom.property_id ?? property?.id ?? "hai-dang-house",
-    };
-}
-
-function normalizeRoomImageItems(apiRoom, fallbackUrls = []) {
-    const rawImages = Array.isArray(apiRoom?.images) ? apiRoom.images : [];
-    const items = rawImages
-        .map((image, index) => {
-            const url = normalizeRoomImages({images: [image]})[0];
-            if (!url || url === ROOM_PLACEHOLDER_IMAGE) return null;
-            return {
-                id: typeof image === "object" ? image.id ?? null : null,
-                fileId: typeof image === "object" ? image.fileId ?? image.file_id ?? null : null,
-                url,
-                sortOrder: typeof image === "object" ? image.sortOrder ?? image.sort_order ?? index : index,
-                fallback: Boolean(typeof image === "object" ? image.fallback : false),
-            };
-        })
-        .filter(Boolean);
-
-    if (items.length) return items;
-    return fallbackUrls
-        .filter((url) => url && url !== ROOM_PLACEHOLDER_IMAGE)
-        .map((url, index) => ({
-            id: null,
-            fileId: null,
-            url,
-            sortOrder: index,
-            fallback: true,
-        }));
-}
-
 function getRoomDetailHref(room) {
     const buildingId = encodeURIComponent(room.buildingId || "hai-dang-house");
     const roomCode = encodeURIComponent(room.roomCode || room.displayCode);
@@ -571,23 +482,13 @@ function getRoomDisplayCode(room) {
     return room?.displayCode || formatRoomCode(room?.roomCode ?? room?.id);
 }
 
-function getRoomPropertyId(room, fallback = "") {
-    return room?.propertyId ?? room?.buildingId ?? room?.floor?.property?.id ?? fallback;
-}
-
 function getRoomFloorId(room) {
     return room?.floorId ?? room?.floor?.id ?? "";
 }
 
 function roomToEditForm(room) {
     return {
-        roomCode: String(room?.roomCode ?? room?.id ?? "").trim(),
-        name: String(room?.name ?? room?.roomCode ?? room?.id ?? "").trim(),
-        floorId: String(getRoomFloorId(room) ?? ""),
-        areaM2: String(room?.areaM2 ?? room?.area ?? ""),
         listedPrice: String(room?.listedPrice ?? room?.price ?? ""),
-        maxOccupants: String(room?.maxOccupants ?? room?.maxPeople ?? ""),
-        currentStatus: statusToEditValue(room?.currentStatus ?? room?.status),
         publicNote: String(room?.publicNote ?? room?.note ?? room?.description ?? ""),
     };
 }
@@ -603,170 +504,6 @@ function sortRoomList(rooms) {
         rooms,
         ["createdAt", "created_at", "updatedAt", "updated_at"],
         ["roomId", "id"],
-    );
-}
-
-function FloorTabs({activeFloor, floors, onChange}) {
-    return (
-        <div className="flex flex-wrap gap-2 rounded-2xl bg-white/10 p-1">
-            {floors.map((floor) => (
-                <button
-                    key={floor.id}
-                    type="button"
-                    onClick={() => onChange(floor.id)}
-                    className={`min-w-0 flex-1 basis-28 rounded-xl px-3 py-3 text-sm font-bold transition sm:flex-none sm:px-5 ${
-                        activeFloor === floor.id
-                            ? "bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                            : "text-slate-200 hover:bg-white/10 hover:text-white"
-                    }`}
-                >
-                    {floor.label}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function FloorSummary({rooms}) {
-    const stats = useMemo(() => {
-        const count = (status) =>
-            rooms.filter((room) => room.status === status).length;
-
-        return [
-            {
-                label: "Tổng phòng",
-                value: rooms.length,
-                tone: "bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white",
-                icon: Home,
-            },
-            {
-                label: "Phòng trống",
-                value: count("VACANT"),
-                tone: "bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
-                icon: BedDouble,
-            },
-            {
-                label: "Đang thuê",
-                value: count("OCCUPIED"),
-                tone: "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300",
-                icon: UserRound,
-            },
-            {
-                label: "Đang đặt cọc",
-                value: count("RESERVED"),
-                tone: "bg-amber-50 dark:bg-yellow-500/10 text-amber-700 dark:text-yellow-300",
-                icon: CalendarClock,
-            },
-        ];
-    }, [rooms]);
-
-    return (
-        <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-3">
-            {stats.map(({label, value, tone, icon: Icon}) => (
-                <article
-                    key={label}
-                    className={`flex min-h-[104px] flex-col justify-between rounded-2xl border border-white/70 px-5 py-4 shadow-[0_16px_40px_rgba(6,16,32,0.14)] ${tone}`}
-                >
-                    <div className="flex items-center justify-between gap-3">
-                        <p className="truncate text-[11px] font-bold uppercase">{label}</p>
-                        <Icon className="h-4 w-4 shrink-0"/>
-                    </div>
-                    <p className="text-3xl font-black leading-none">{value}</p>
-                </article>
-            ))}
-        </section>
-    );
-}
-
-function StatusLegend() {
-    return (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {STATUS_ORDER.map((status) => {
-                const meta = mapStatusToColor(status);
-
-                return (
-                    <span
-                        key={status}
-                        className="inline-flex items-center gap-2 text-xs font-bold text-slate-300"
-                    >
-            <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`}/>
-                        {meta.label}
-          </span>
-                );
-            })}
-        </div>
-    );
-}
-
-function RoomCard({room, isSelected, onClick}) {
-    const meta = mapStatusToColor(room.status);
-
-    return (
-        <button
-            type="button"
-            onClick={() => onClick(room)}
-            aria-label={`Mở thông tin ${room.displayCode}`}
-            className={`group flex h-32 min-w-0 flex-col justify-between rounded-2xl border p-4 text-left shadow-[0_14px_28px_rgba(6,16,32,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(6,16,32,0.16)] ${
-                meta.card
-            } ${isSelected ? "ring-2 ring-white ring-offset-2 ring-offset-[#1e40af]" : ""}`}
-        >
-            <div className="flex min-w-0 items-start justify-between gap-3">
-        <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ${meta.icon}`}
-        >
-          <BedDouble className="h-5 w-5"/>
-        </span>
-                <span
-                    className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${meta.badge}`}
-                >
-          {meta.label}
-        </span>
-            </div>
-            <div className="min-w-0">
-                <p className="truncate text-2xl font-black leading-7">
-                    {room.displayCode}
-                </p>
-                <p className="mt-1 truncate text-xs font-bold opacity-70">
-                    {formatMoney(room.listedPrice || 0)}/tháng
-                </p>
-            </div>
-            <div className="flex min-w-0 items-center justify-between gap-3 text-xs font-bold opacity-80">
-                <span className="truncate">{room.area || "--"} m²</span>
-                <span className="shrink-0">
-          {room.currentOccupants}/{room.maxOccupants}
-        </span>
-            </div>
-        </button>
-    );
-}
-
-function RoomGrid({rooms, selectedRoom, onRoomClick}) {
-    if (rooms.length === 0) {
-        return (
-            <div
-                className="flex min-h-[240px] flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-white/5 p-8 text-center">
-                <BedDouble className="h-9 w-9 text-slate-400"/>
-                <p className="mt-4 text-sm font-bold text-white">
-                    Chưa có phòng ở tầng này
-                </p>
-                <p className="mt-1 max-w-md text-sm text-slate-400">
-                    Kiểm tra lại dữ liệu tầng hoặc đồng bộ danh sách phòng từ backend.
-                </p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            {rooms.map((room, index) => (
-                <RoomCard
-                    key={`${room.id}-${room.roomId ?? room.roomCode ?? index}`}
-                    room={room}
-                    isSelected={selectedRoom?.id === room.id}
-                    onClick={onRoomClick}
-                />
-            ))}
-        </div>
     );
 }
 
@@ -842,7 +579,7 @@ function RentalHistoryPanel({history, isLoading, error}) {
     }
 
     return (
-        <div className="mt-5 space-y-4">
+        <div className="space-y-3">
             {contracts.map((contract, index) => {
                 const isCurrent = CURRENT_CONTRACT_STATUSES.has(
                     String(contract.status || "").toUpperCase()
@@ -850,7 +587,11 @@ function RentalHistoryPanel({history, isLoading, error}) {
                 return (
                     <article
                         key={contract.contractId || `${contract.contractCode}-${index}`}
-                        className="rounded-3xl border border-white bg-white dark:bg-[#0f172a] p-5 shadow-[0_16px_40px_rgba(6,16,32,0.08)]"
+                        className={`rounded-2xl border bg-white p-4 dark:bg-[#0f172a] ${
+                            isCurrent
+                                ? "border-emerald-300 shadow-sm dark:border-emerald-500/30"
+                                : "border-slate-200 dark:border-white/10"
+                        }`}
                     >
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -872,7 +613,7 @@ function RentalHistoryPanel({history, isLoading, error}) {
               </span>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                             <div className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3">
                                 <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                                     Thời hạn HĐ
@@ -925,14 +666,14 @@ function RentalHistoryPanel({history, isLoading, error}) {
                             <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">
                                 Người ở trong phòng
                             </p>
-                            <div className="mt-2 space-y-2">
+                            <div className="mt-2 max-h-56 space-y-2 overflow-y-auto pr-1">
                                 {(contract.occupants || []).map((occupant, occupantIndex) => (
                                     <div
                                         key={
                                             occupant.tenantProfileId ||
                                             `${occupant.occupantRole}-${occupant.fullName}-${occupantIndex}`
                                         }
-                                        className="rounded-2xl bg-[#f7f9fb] dark:bg-white/5 p-3 text-sm"
+                                        className="rounded-xl bg-[#f7f9fb] p-3 text-sm dark:bg-white/5"
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
@@ -978,54 +719,14 @@ function RentalHistoryPanel({history, isLoading, error}) {
     );
 }
 
-function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, error, onClose, onSubmit}) {
-    const [floors, setFloors] = useState([]);
-    const [isFloorsLoading, setIsFloorsLoading] = useState(false);
-    const [floorError, setFloorError] = useState("");
+function RoomEditModal({room, isSaving, error, onClose, onSubmit}) {
     const [localError, setLocalError] = useState("");
     const [form, setForm] = useState(() => roomToEditForm(room));
     const [existingImages, setExistingImages] = useState(() => room?.imageItems ?? []);
     const [pendingImages, setPendingImages] = useState([]);
     const [deletedImageIds, setDeletedImageIds] = useState([]);
     const pendingImagesRef = useRef([]);
-    const propertyId = getRoomPropertyId(room, fallbackPropertyId);
     const roomLabel = getRoomDisplayCode(room);
-
-    useEffect(() => {
-        let isMounted = true;
-
-        async function loadFloors() {
-            if (!propertyId) {
-                setFloors([]);
-                return;
-            }
-
-            try {
-                setIsFloorsLoading(true);
-                setFloorError("");
-                const data = await fetchFloors(propertyId);
-                if (!isMounted) return;
-                setFloors(data);
-                setForm((current) => {
-                    if (current.floorId || !data.length) return current;
-                    return {...current, floorId: String(data[0].id)};
-                });
-            } catch (loadError) {
-                if (isMounted) {
-                    setFloors([]);
-                    setFloorError(loadError.message || "Không thể tải danh sách tầng.");
-                }
-            } finally {
-                if (isMounted) setIsFloorsLoading(false);
-            }
-        }
-
-        loadFloors();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [propertyId]);
 
     useEffect(() => {
         pendingImagesRef.current = pendingImages;
@@ -1039,14 +740,8 @@ function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, err
 
     if (!room) return null;
 
-    const fallbackFloorId = getRoomFloorId(room);
-    const floorOptions = floors.length
-        ? floors
-        : fallbackFloorId
-            ? [{id: fallbackFloorId, name: room.floorName || room.floor || "Tầng hiện tại"}]
-            : [];
     const inputClass =
-        "h-11 w-full rounded-lg border border-[#cfd8e3] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20";
+        "h-11 w-full rounded-lg border border-[#cfd8e3] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200 dark:focus:ring-white/10";
 
     function updateField(field, value) {
         setForm((current) => ({...current, [field]: value}));
@@ -1083,40 +778,15 @@ function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, err
         event.preventDefault();
         setLocalError("");
 
-        const roomCode = form.roomCode.trim();
-        const name = form.name.trim();
-        const floorId = Number(form.floorId);
         const listedPrice = toNullableNumber(form.listedPrice);
-        const maxOccupants = toNullableNumber(form.maxOccupants);
-
-        if (!roomCode || !name) {
-            setLocalError("Mã phòng và tên phòng là bắt buộc.");
-            return;
-        }
-
-        if (!Number.isFinite(floorId)) {
-            setLocalError("Vui lòng chọn tầng cho phòng.");
-            return;
-        }
 
         if (listedPrice !== null && listedPrice < 0) {
             setLocalError("Giá niêm yết không được âm.");
             return;
         }
 
-        if (maxOccupants !== null && maxOccupants < 1) {
-            setLocalError("Sức chứa phải lớn hơn 0.");
-            return;
-        }
-
         await onSubmit({
-            floorId,
-            roomCode,
-            name,
-            areaM2: toNullableNumber(form.areaM2),
             listedPrice: listedPrice ?? 0,
-            maxOccupants: maxOccupants ?? 1,
-            currentStatus: form.currentStatus,
             publicNote: form.publicNote.trim(),
             imagesToUpload: pendingImages.map((image) => image.file),
             imageIdsToDelete: deletedImageIds,
@@ -1124,91 +794,44 @@ function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, err
     }
 
     return (
-        <Modal
-            title={`Sửa ${roomLabel}`}
-            onClose={isSaving ? () => {
-            } : onClose}
-            footer={
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <Dialog
+            open={Boolean(room)}
+            onOpenChange={(open) => !open && !isSaving && onClose()}
+        >
+            <DialogContent
+                lockScroll={false}
+                showCloseButton={false}
+                className="max-h-[min(90vh,760px)] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-2xl bg-white p-0 dark:bg-[#0f172a] sm:max-w-2xl"
+            >
+                <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+                    <div>
+                        <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
+                            Sửa {roomLabel}
+                        </DialogTitle>
+                        <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                            Chỉ cập nhật giá niêm yết, ghi chú mô tả và ảnh phòng.
+                        </p>
+                    </div>
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={isSaving}
-                        className="h-10 rounded-lg border border-[#c5c6cd] dark:border-white/10 px-4 text-sm font-bold text-slate-900 dark:text-white disabled:opacity-60"
+                        aria-label="Đóng"
+                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-white/5"
                     >
-                        Hủy
-                    </button>
-                    <button
-                        type="submit"
-                        form="room-edit-form"
-                        disabled={isSaving || isFloorsLoading}
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white disabled:opacity-60"
-                    >
-                        {isSaving ? (
-                            <LoaderCircle className="h-4 w-4 animate-spin"/>
-                        ) : (
-                            <Save className="h-4 w-4"/>
-                        )}
-                        Lưu thay đổi
+                        <X className="h-5 w-5"/>
                     </button>
                 </div>
-            }
-        >
+                <div className="max-h-[calc(min(90vh,760px)-145px)] overflow-y-auto px-6 py-5">
             <form id="room-edit-form" onSubmit={handleSubmit} className="grid gap-5">
-                {(localError || error || floorError) && (
+                {(localError || error) && (
                     <div
                         className="rounded-lg border border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
-                        {localError || error || floorError}
+                        {localError || error}
                     </div>
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Mã phòng
-                        <input
-                            value={form.roomCode}
-                            onChange={(event) => updateField("roomCode", event.target.value)}
-                            className={inputClass}
-                            required
-                        />
-                    </label>
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Tên phòng
-                        <input
-                            value={form.name}
-                            onChange={(event) => updateField("name", event.target.value)}
-                            className={inputClass}
-                            required
-                        />
-                    </label>
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Tầng
-                        <select
-                            value={form.floorId}
-                            onChange={(event) => updateField("floorId", event.target.value)}
-                            className={inputClass}
-                            disabled={isFloorsLoading}
-                            required
-                        >
-                            <option value="">{isFloorsLoading ? "Đang tải tầng..." : "Chọn tầng"}</option>
-                            {floorOptions.map((floor) => (
-                                <option key={floor.id} value={floor.id}>
-                                    {floor.name || floor.floorCode || `Tầng ${floor.sortOrder ?? floor.id}`}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Diện tích (m²)
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.areaM2}
-                            onChange={(event) => updateField("areaM2", event.target.value)}
-                            className={inputClass}
-                        />
-                    </label>
                     <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
                         Giá niêm yết
                         <input
@@ -1219,31 +842,6 @@ function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, err
                             onChange={(event) => updateField("listedPrice", event.target.value)}
                             className={inputClass}
                         />
-                    </label>
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Sức chứa
-                        <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={form.maxOccupants}
-                            onChange={(event) => updateField("maxOccupants", event.target.value)}
-                            className={inputClass}
-                        />
-                    </label>
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                        Trạng thái
-                        <select
-                            value={form.currentStatus}
-                            onChange={(event) => updateField("currentStatus", event.target.value)}
-                            className={inputClass}
-                        >
-                            {ROOM_STATUS_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
                     </label>
                 </div>
 
@@ -1349,7 +947,28 @@ function RoomEditModal({room, propertyId: fallbackPropertyId = "", isSaving, err
                     )}
                 </section>
             </form>
-        </Modal>
+                </div>
+                <div className="flex justify-end gap-3 border-t border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isSaving}
+                        className="h-10 rounded-lg border border-[#c5c6cd] px-4 text-sm font-bold text-slate-700 disabled:opacity-60 dark:border-white/10 dark:text-slate-200"
+                    >
+                        Hủy
+                    </button>
+                    <button
+                        type="submit"
+                        form="room-edit-form"
+                        disabled={isSaving}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-60 dark:bg-white dark:text-slate-900"
+                    >
+                        {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -1446,6 +1065,7 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
 
     const roomLabel = getRoomDisplayCode(room);
     const roomBadges = Array.isArray(room.badges) ? room.badges : [];
+    const historyContracts = rentalHistory?.contracts || [];
     const currentOccupants = Number(room.currentOccupants ?? 0);
     const roomFloorName =
         roomDetail?.floor?.name ?? room.floorName ?? room.floor ?? "Chưa có";
@@ -1460,29 +1080,36 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
     return (
         <Dialog open={!!room} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                className="sm:max-w-4xl p-0 overflow-hidden bg-slate-50 dark:bg-[#020817] border-0 sm:rounded-2xl shadow-2xl">
+                lockScroll={false}
+                showCloseButton={false}
+                style={{
+                    width: "calc(100vw - 32px)",
+                    maxWidth: "1280px",
+                    height: "min(920px, calc(100vh - 32px))",
+                }}
+                className="max-h-[min(94vh,920px)] w-full max-w-none overflow-y-auto rounded-[28px] border border-[#dcd9d2] bg-[#f7f5f0] p-0 text-[#24272b] shadow-[0_30px_100px_rgba(29,32,36,0.28)] dark:border-white/10 dark:bg-[#17191c] dark:text-white sm:rounded-[28px] lg:overflow-hidden">
                 <DialogTitle className="sr-only">Chi tiết phòng {roomLabel}</DialogTitle>
-                <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
+                <div className="grid min-h-0 grid-cols-1 lg:h-full lg:grid-cols-5">
 
                     {/* Cột trái (40%): Ảnh phòng & thông số cơ bản */}
-                    <div className="md:col-span-5 flex flex-col bg-[#1e40af] dark:bg-[#0f172a] text-white">
+                    <div className="flex min-w-0 min-h-0 flex-col bg-[#202328] text-white lg:col-span-2">
                         {/* Ảnh lớn */}
-                        <div className="relative h-64 md:h-72 w-full overflow-hidden shrink-0">
+                        <div className="relative h-[min(52vh,430px)] min-h-[280px] w-full shrink-0 overflow-hidden lg:h-[min(46vh,430px)]">
                             <div
                                 role="img"
                                 aria-label={detail.name}
-                                className="h-full w-full bg-cover bg-center transition-all duration-300"
+                                className="h-full w-full bg-cover bg-center transition duration-500"
                                 style={{
                                     backgroundImage: `url(${displayActiveImage || ROOM_PLACEHOLDER_IMAGE})`,
                                 }}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent"/>
-                            <div className="absolute inset-x-0 bottom-0 p-5">
-                                <p className="flex items-center gap-2 text-xs font-bold uppercase text-white/80">
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#101216]/95 via-[#101216]/15 to-transparent"/>
+                            <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
+                                <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-white/65">
                                     <Home className="h-4 w-4"/>
                                     {room.buildingName}
                                 </p>
-                                <h2 className="mt-1 truncate text-3xl font-black text-white">
+                                <h2 className="mt-2 truncate text-4xl font-black tracking-[-0.04em] text-white">
                                     {detail.name}
                                 </h2>
                             </div>
@@ -1490,14 +1117,14 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
 
                         {/* Danh sách ảnh nhỏ chuyển đổi */}
                         {galleryImages.length > 1 && (
-                            <div className="grid grid-cols-4 gap-2 border-t border-white/10 bg-black/20 p-3 shrink-0">
+                            <div className="flex gap-2 overflow-x-auto border-t border-white/10 bg-black/20 p-4 pb-3">
                                 {galleryImages.map((image, index) => (
                                     <button
                                         key={`${image}-${index}`}
                                         type="button"
                                         onClick={() => setActiveImage(image)}
                                         aria-label={`Xem ảnh ${index + 1}`}
-                                        className={`relative aspect-[4/3] overflow-hidden rounded-lg border transition ${
+                                        className={`relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border transition ${
                                             displayActiveImage === image
                                                 ? "border-white ring-2 ring-white/35"
                                                 : "border-white/10 opacity-70 hover:opacity-100"
@@ -1513,16 +1140,19 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                         )}
 
                         {/* Thông số phòng ở cột trái */}
-                        <div className="flex-1 p-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-3 text-white/90">
-                                <div className="bg-white/10 rounded-2xl p-4">
+                        <div className="min-h-0 flex-1 space-y-5 p-5 sm:p-6">
+                            <div>
+                                <p className="mb-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Thông tin phòng</p>
+                                <div className="grid grid-cols-2 gap-3 text-white/90">
+                                <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4">
                                     <span
                                         className="text-[10px] font-bold uppercase tracking-wider text-white/60">Tầng</span>
                                     <p className="mt-1 text-base font-black">{roomFloorName}</p>
                                 </div>
-                                <div className="bg-white/10 rounded-2xl p-4">
+                                <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">Diện tích</span>
                                     <p className="mt-1 text-base font-black">{detail.area || "--"} m²</p>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -1530,24 +1160,29 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
 
                     {/* Cột pháº£i (60%): Chi tiết phòng, Khách thuê, Lịch sử & Action */}
                     <div
-                        className="md:col-span-7 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#020817] text-slate-900 dark:text-white">
+                        className="flex min-w-0 min-h-0 flex-col overflow-hidden bg-[#fbfaf7] text-[#24272b] dark:bg-[#1b1d20] dark:text-white lg:col-span-3 lg:h-full">
                         {/* Header: Mã phòng & Badge trạng thái */}
                         <div
-                            className="p-6 pb-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between gap-4 shrink-0">
+                            className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e5e1d9] px-5 py-5 sm:px-8 sm:py-6 dark:border-white/10">
                             <div>
                                 <span
-                                    className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mã phòng</span>
-                                <h3 className="text-2xl font-black">{roomLabel}</h3>
+                                    className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8b8b86] dark:text-white/45">Mã phòng</span>
+                                <h3 className="mt-1 text-3xl font-black tracking-[-0.04em] text-[#202328] dark:text-white">{roomLabel}</h3>
                             </div>
-                            <span className={`rounded-full px-3.5 py-1.5 text-xs font-black ring-1 ${meta.badge}`}>
-                {meta.label}
-              </span>
+                            <div className="flex items-center gap-3">
+                                <span className={`rounded-full px-3.5 py-2 text-xs font-black ring-1 ${meta.badge}`}>
+                                    {meta.label}
+                                </span>
+                                <button type="button" onClick={onClose} aria-label="Đóng" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#777a7d] transition hover:bg-black/[0.06] hover:text-[#202328] dark:hover:bg-white/10 dark:hover:text-white">
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Tab selector & Content */}
-                        <div className="p-6 py-4 flex-1 overflow-y-auto custom-scrollbar space-y-4 min-h-0">
-                            <div
-                                className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-200/60 dark:bg-white/5 p-1 shrink-0">
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <div className="shrink-0 border-b border-[#e5e1d9] px-5 pt-4 sm:px-8 dark:border-white/10">
+                            <div className="inline-flex w-full max-w-md rounded-2xl border border-[#e1ded7] bg-[#f0eee8] p-1 dark:border-white/10 dark:bg-white/[0.06]">
                                 {[
                                     ["overview", "Tổng quan"],
                                     ["history", "Lịch sử thuê"],
@@ -1556,36 +1191,43 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                                         key={value}
                                         type="button"
                                         onClick={() => setActiveTab(value)}
-                                        className={`h-10 rounded-xl text-sm font-black transition ${
+                                        className={`h-11 flex-1 rounded-xl text-sm font-black transition ${
                                             activeTab === value
-                                                ? "bg-[#1e40af] dark:bg-[#2563eb] text-white shadow-md"
-                                                : "text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white"
+                                                ? "bg-[#24272b] text-white shadow-[0_6px_16px_rgba(36,39,43,0.18)] dark:bg-white dark:text-[#202328]"
+                                                : "text-[#777a7d] hover:text-[#202328] dark:text-white/55 dark:hover:text-white"
                                         }`}
-                                    >
-                                        {label}
-                                    </button>
+                                        >
+                                            {label}
+                                            {value === "history" && historyContracts.length > 0 && (
+                                                <span className="ml-2 rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] dark:bg-white/10">
+                                                    {historyContracts.length}
+                                                </span>
+                                            )}
+                                        </button>
                                 ))}
+                            </div>
                             </div>
 
                             {/* Nội dung tab */}
+                            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 custom-scrollbar sm:px-8 sm:py-6">
                             {activeTab === "overview" ? (
                                 <div className="space-y-4">
                                     {/* Grid giá cả & sức chứa */}
                                     <div className="grid grid-cols-2 gap-3">
                                         <div
-                                            className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/5 rounded-2xl p-4">
+                                            className="rounded-2xl bg-[#24272b] p-5 text-white shadow-[0_10px_24px_rgba(36,39,43,0.12)]">
                                             <span
-                                                className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Giá thuê</span>
-                                            <p className="mt-1 text-base font-black text-[#1e40af] dark:text-[#3b82f6]">
-                                                {formatMoney(detail.price || 0)}/tháng
+                                                className="text-[10px] font-black uppercase tracking-[0.14em] text-white/50">Giá niêm yết</span>
+                                            <p className="mt-2 text-xl font-black tracking-[-0.03em]">
+                                                {formatMoney(detail.price || 0)}<span className="ml-1 text-xs font-bold text-white/55">/tháng</span>
                                             </p>
                                         </div>
                                         <div
-                                            className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/5 rounded-2xl p-4">
+                                            className="rounded-2xl border border-[#e1ded7] bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
                                             <span
-                                                className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Số người</span>
-                                            <p className="mt-1 text-base font-black">
-                                                {currentOccupants}/{detail.maxOccupants ?? "--"}
+                                                className="text-[10px] font-black uppercase tracking-[0.14em] text-[#999993] dark:text-white/45">Số người</span>
+                                            <p className="mt-2 text-xl font-black tracking-[-0.03em] text-[#24272b] dark:text-white">
+                                                {currentOccupants}<span className="mx-1 text-sm font-bold text-[#999993]">/</span>{detail.maxOccupants ?? "--"}
                                             </p>
                                         </div>
                                     </div>
@@ -1596,7 +1238,7 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                                             {roomBadges.map((badge) => (
                                                 <span
                                                     key={badge}
-                                                    className="rounded-full bg-slate-200 dark:bg-white/10 px-3 py-1 text-xs font-bold text-slate-700 dark:text-slate-200"
+                                                    className="rounded-full border border-[#dedbd3] bg-[#f0eee8] px-3 py-1.5 text-xs font-bold text-[#55595d] dark:border-white/10 dark:bg-white/[0.06] dark:text-white/75"
                                                 >
                           {badge}
                         </span>
@@ -1606,10 +1248,9 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
 
                                     {/* Ghi chú */}
                                     <div
-                                        className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
-                                        <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500">Ghi
-                                            chú</p>
-                                        <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-700 dark:text-slate-200">
+                                        className="rounded-2xl border border-[#e1ded7] bg-white p-5 dark:border-white/10 dark:bg-white/[0.04]">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#999993] dark:text-white/45">Ghi chú mô tả</p>
+                                        <p className="mt-2 text-sm font-semibold leading-7 text-[#55595d] dark:text-white/75">
                                             {detail.note || "Chưa có ghi chú cho phòng này."}
                                         </p>
                                     </div>
@@ -1617,25 +1258,24 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                                     {/* Khách đang thuê (Tenant card) */}
                                     {tenant && (
                                         <div
-                                            className="rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-4 flex items-center justify-between">
+                                            className="flex flex-col gap-4 rounded-2xl border border-[#e1ded7] bg-[#f0eee8] p-5 dark:border-white/10 dark:bg-white/[0.06] sm:flex-row sm:items-center sm:justify-between">
                                             <div className="min-w-0">
-                                                <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400">Khách
-                                                    đang ở</p>
-                                                <p className="mt-1 truncate text-base font-black text-blue-950 dark:text-blue-100">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#999993] dark:text-white/45">Người đang thuê</p>
+                                                <p className="mt-2 truncate text-base font-black text-[#24272b] dark:text-white">
                                                     {tenant.name}
                                                 </p>
                                             </div>
                                             <a
                                                 href={`tel:${tenant.phone}`}
-                                                className="inline-flex h-9 px-4 items-center justify-center gap-1.5 rounded-xl bg-[#1e40af] dark:bg-[#2563eb] text-white hover:bg-blue-700 text-xs font-bold shadow-sm"
+                                                className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-[#24272b] px-4 text-xs font-black text-white transition hover:bg-[#111315]"
                                             >
-                                                Gọi: {tenant.phone}
+                                                Gọi người thuê
                                             </a>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <div>
                                     <RentalHistoryPanel
                                         history={rentalHistory}
                                         isLoading={isHistoryLoading}
@@ -1643,11 +1283,12 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                                     />
                                 </div>
                             )}
+                            </div>
                         </div>
 
                         {/* Footer Actions */}
                         <div
-                            className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-[#0f172a]/50 flex flex-wrap gap-2 justify-end shrink-0">
+                            className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-[#e5e1d9] bg-[#f5f3ee] px-5 py-4 sm:px-8 dark:border-white/10 dark:bg-white/[0.03]">
                             {onEdit && (
                                 <button
                                     type="button"
@@ -1655,7 +1296,7 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                                         onClose();
                                         onEdit(room);
                                     }}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-[#0f172a] px-4 text-xs font-black text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-white/5"
+                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d6d2ca] bg-white px-5 text-sm font-black text-[#55595d] transition hover:border-[#24272b] hover:text-[#24272b] dark:border-white/10 dark:bg-white/[0.05] dark:text-white/75 dark:hover:border-white/30 dark:hover:text-white"
                                 >
                                     <Edit3 className="h-4 w-4"/>
                                     Sửa phòng
@@ -1663,10 +1304,10 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
                             )}
                             <Link
                                 href={getRoomDetailHref(room)}
-                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1e40af] dark:bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-blue-700 dark:hover:bg-blue-700"
+                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#24272b] px-5 text-sm font-black text-white transition hover:bg-[#111315]"
                             >
                                 <Eye className="h-4 w-4"/>
-                                Xem chi tiết
+                                Xem trang phòng
                             </Link>
                         </div>
                     </div>
@@ -1677,220 +1318,16 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
     );
 }
 
-function FloorPlanPage({
-                           tenantList = [],
-                           activeRole = "owner",
-                           propertyId = "1",
-                       }) {
-    const [rooms, setRooms] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [sourceWarning, setSourceWarning] = useState("");
-    const [activeFloor, setActiveFloor] = useState(1);
-    const [selectedRoom, setSelectedRoom] = useState(null);
-    const [editingRoom, setEditingRoom] = useState(null);
-    const [isSavingRoom, setIsSavingRoom] = useState(false);
-    const [editError, setEditError] = useState("");
-
-    useEffect(() => {
-        let isMounted = true;
-
-        async function fetchFloorPlanRooms() {
-            try {
-                setIsLoading(true);
-                setSourceWarning("");
-                const data = await authenticatedFetch(
-                    `/rooms?propertyId=${encodeURIComponent(propertyId || "1")}&size=200`,
-                );
-                const normalizedRooms = readPageRows(data)
-                    .map(normalizeApiFloorPlanRoom)
-                    .sort((a, b) => Number(a.roomCode) - Number(b.roomCode));
-
-                if (isMounted) {
-                    setRooms(normalizedRooms);
-                    if (normalizedRooms.length > 0) {
-                        setActiveFloor(normalizedRooms[0].floorNumber);
-                    }
-                }
-            } catch {
-                if (isMounted) {
-                    setRooms([]);
-                    setSourceWarning("Không thể tải dữ liệu từ API /rooms.");
-                }
-            } finally {
-                if (isMounted) setIsLoading(false);
-            }
-        }
-
-        fetchFloorPlanRooms();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [propertyId]);
-
-    const activeFloorRooms = useMemo(
-        () => rooms.filter((room) => room.floorNumber === activeFloor),
-        [activeFloor, rooms],
-    );
-    const availableFloors = useMemo(
-        () =>
-            [...new Set(rooms.map((room) => room.floorNumber))]
-                .filter(Number.isFinite)
-                .sort((a, b) => a - b)
-                .map((floorNumber) => ({
-                    id: floorNumber,
-                    label: `Tầng ${floorNumber}`,
-                })),
-        [rooms],
-    );
-
-    function handleFloorChange(floor) {
-        setActiveFloor(floor);
-        setSelectedRoom(null);
-    }
-
-    function handleRoomClick(room) {
-        setSelectedRoom(room);
-    }
-
-    function handleEditRoom(room) {
-        setEditError("");
-        setEditingRoom(room);
-    }
-
-    async function handleSaveRoom(payload) {
-        if (!editingRoom?.roomId) {
-            setEditError("Không xác định được phòng cần sửa.");
-            return;
-        }
-
-        try {
-            setIsSavingRoom(true);
-            setEditError("");
-            const {imagesToUpload = [], imageIdsToDelete = [], ...roomPayload} = payload;
-            let data = await updateRoom(editingRoom.roomId, roomPayload);
-            await Promise.all(imageIdsToDelete.map((imageId) => deleteRoomImage(editingRoom.roomId, imageId)));
-            for (const file of imagesToUpload) {
-                const uploaded = await uploadRoomImage(file);
-                await attachRoomImage(editingRoom.roomId, uploaded.fileId);
-            }
-            if (imagesToUpload.length > 0 || imageIdsToDelete.length > 0) {
-                data = await fetchRoomById(editingRoom.roomId);
-            }
-            const normalizedRoom = normalizeApiFloorPlanRoom(data);
-            setRooms((currentRooms) =>
-                currentRooms.map((item) => (isSameRoom(item, normalizedRoom) ? normalizedRoom : item)),
-            );
-            setSelectedRoom((currentRoom) =>
-                isSameRoom(currentRoom, normalizedRoom) ? normalizedRoom : currentRoom,
-            );
-            setActiveFloor(normalizedRoom.floorNumber);
-            setEditingRoom(null);
-        } catch (saveError) {
-            setEditError(saveError.message || "Không thể lưu thay đổi phòng.");
-        } finally {
-            setIsSavingRoom(false);
-        }
-    }
-
-    return (
-        <section
-            className="overflow-hidden rounded-[28px] bg-[#1e40af] dark:bg-[#1e40af] p-4 shadow-[0_24px_80px_rgba(3,10,24,0.28)] sm:p-6">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase text-slate-400">
-                        Hải Đăng House
-                    </p>
-                    <h2 className="mt-2 text-3xl font-black text-white">Sơ đồ phòng</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                        Theo dõi nhanh trạng thái, giá thuê và sức chứa từng phòng theo
-                        tầng.
-                    </p>
-                </div>
-                <FloorTabs
-                    activeFloor={activeFloor}
-                    floors={availableFloors}
-                    onChange={handleFloorChange}
-                />
-            </div>
-
-            {sourceWarning && (
-                <div
-                    className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0"/>
-                    <span>{sourceWarning}</span>
-                </div>
-            )}
-
-            {isLoading ? (
-                <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {Array.from({length: 8}, (_, index) => (
-                        <div
-                            key={index}
-                            className="h-32 animate-pulse rounded-2xl bg-white/10"
-                        />
-                    ))}
-                </div>
-            ) : (
-                <div className="mt-6 space-y-5">
-                    <FloorSummary rooms={activeFloorRooms}/>
-
-                    <div className="rounded-[24px] border border-white/10 bg-white/8 p-4 sm:p-5">
-                        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <p className="text-sm font-black text-white">
-                                    Tầng {activeFloor}
-                                </p>
-                                <p className="text-xs font-semibold text-slate-400">
-                                    {activeFloorRooms.length} phòng đang hiển thị
-                                </p>
-                            </div>
-                            <StatusLegend/>
-                        </div>
-                        <RoomGrid
-                            rooms={activeFloorRooms}
-                            selectedRoom={selectedRoom}
-                            onRoomClick={handleRoomClick}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {selectedRoom && (
-                <RoomDetailDrawer
-                    key={selectedRoom.id}
-                    room={selectedRoom}
-                    tenantList={tenantList}
-                    activeRole={activeRole}
-                    onClose={() => setSelectedRoom(null)}
-                    onEdit={handleEditRoom}
-                />
-            )}
-            {editingRoom && (
-                <RoomEditModal
-                    key={getRoomIdentity(editingRoom)}
-                    room={editingRoom}
-                    propertyId={propertyId}
-                    isSaving={isSavingRoom}
-                    error={editError}
-                    onClose={() => {
-                        if (!isSavingRoom) setEditingRoom(null);
-                    }}
-                    onSubmit={handleSaveRoom}
-                />
-            )}
-        </section>
-    );
-}
+/* Floor-plan view was removed; rooms are managed as a filtered list. */
 
 function RoomsListPage({query, propertyId, activeRole = "owner"}) {
-    const [exportPrompt, setExportPrompt] = useState(false);
     const [page, setPage] = useState(1);
     const [size, setSize] = useState(10);
     const [apiRooms, setApiRooms] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSuccess, setIsSuccess] = useState(false);
     const [isError, setIsError] = useState(false);
+    const [floorFilter, setFloorFilter] = useState("ALL");
+    const [statusFilter, setStatusFilter] = useState("ALL");
     const [selectedRoom, setSelectedRoom] = useState(null);
     const [editingRoom, setEditingRoom] = useState(null);
     const [isSavingRoom, setIsSavingRoom] = useState(false);
@@ -1910,7 +1347,6 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
                 const data = await authenticatedFetch(`/rooms?${params.toString()}`);
                 const rows = sortRoomList(readPageRows(data).map((room) => normalizeApiRoom(room)));
                 setApiRooms(rows);
-                setIsSuccess(true);
             } catch (error) {
                 setIsError(true);
             } finally {
@@ -1920,7 +1356,28 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
         fetchStaffRooms();
     }, [propertyId]);
 
+    const floorOptions = useMemo(() => [
+        {value: "ALL", label: "Tất cả các tầng"},
+        ...Array.from(
+            new Map(
+                apiRooms.map((room) => [
+                    String(room.floorId ?? room.floorName ?? room.floor ?? ""),
+                    room.floorName || room.floor || "Chưa xác định",
+                ]),
+            ).entries(),
+        )
+            .filter(([value]) => value)
+            .sort(([, left], [, right]) => String(left).localeCompare(String(right), "vi"))
+            .map(([value, label]) => ({value, label})),
+    ], [apiRooms]);
+
     const filteredRooms = sortRoomList(apiRooms.filter((room) => {
+        if (floorFilter !== "ALL" && String(room.floorId ?? room.floorName ?? room.floor ?? "") !== floorFilter) {
+            return false;
+        }
+        if (statusFilter !== "ALL" && normalizeStatus(room.status) !== statusFilter) {
+            return false;
+        }
         if (!query?.trim()) return true;
         const q = query.trim().toLowerCase();
         const searchableText = [
@@ -1964,16 +1421,6 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
         downloadTextFile("danh-sach-phong.csv", rows.join("\n"));
     };
 
-    // Map API status strings to internal status keys (matching roomStatus map)
-    function mapApiStatus(status) {
-        if (!status) return "occupied";
-        const s = status.toLowerCase();
-        if (s === "vacant") return "available";
-        if (s === "soon_vacant") return "soonVacant";
-        if (s === "reserved") return "deposited";
-        return "occupied";
-    }
-
     function handleViewRoom(room) {
         setSelectedRoom(room);
     }
@@ -1992,7 +1439,16 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
         try {
             setIsSavingRoom(true);
             setEditError("");
-            const {imagesToUpload = [], imageIdsToDelete = [], ...roomPayload} = payload;
+            const {imagesToUpload = [], imageIdsToDelete = [], ...editablePayload} = payload;
+            const roomPayload = {
+                floorId: getRoomFloorId(editingRoom),
+                roomCode: editingRoom.roomCode,
+                name: editingRoom.name,
+                areaM2: editingRoom.areaM2 ?? editingRoom.area ?? null,
+                maxOccupants: editingRoom.maxOccupants ?? editingRoom.maxPeople ?? 1,
+                currentStatus: statusToEditValue(editingRoom.status),
+                ...editablePayload,
+            };
             let data = await updateRoom(editingRoom.roomId, roomPayload);
             await Promise.all(imageIdsToDelete.map((imageId) => deleteRoomImage(editingRoom.roomId, imageId)));
             for (const file of imagesToUpload) {
@@ -2030,22 +1486,26 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
     return (
         <>
             <FilterBar>
-                <SelectPill icon={Map}>Tất cả các tầng</SelectPill>
-                <SelectPill icon={ListFilter}>Tất cả trạng thái</SelectPill>
-                <button
-                    type="button"
-                    onClick={() => setExportPrompt(true)}
-                    aria-label="Xuất danh sách phòng"
-                    className="ml-auto rounded-lg border border-[#e2e8f0] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]"
-                >
-                    <Download className="h-4 w-4"/>
-                </button>
-                <button
-                    type="button"
-                    className="rounded-lg border border-[#e2e8f0] dark:border-white/10 p-2 text-slate-600 dark:text-slate-300 hover:border-[#1e40af]"
-                >
-                    <Grid3X3 className="h-4 w-4"/>
-                </button>
+                <RoomFilterMenu
+                    label="Tất cả các tầng"
+                    icon={Home}
+                    value={floorOptions.find((option) => option.value === floorFilter)?.label}
+                    options={floorOptions}
+                    onChange={(value) => {
+                        setFloorFilter(value);
+                        setPage(1);
+                    }}
+                />
+                <RoomFilterMenu
+                    label="Tất cả trạng thái"
+                    icon={ListFilter}
+                    value={ROOM_STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label}
+                    options={[{value: "ALL", label: "Tất cả trạng thái"}, ...ROOM_STATUS_OPTIONS]}
+                    onChange={(value) => {
+                        setStatusFilter(value);
+                        setPage(1);
+                    }}
+                />
             </FilterBar>
 
             {isError && (
@@ -2153,19 +1613,6 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
                 </Card>
             )}
 
-            {exportPrompt && (
-                <ExportConfirm
-                    title="Xuất danh sách phòng"
-                    filename="danh-sach-phong.csv"
-                    description="Xuất danh sách phòng theo bộ lọc hiện tại, gồm mã phòng, tầng, diện tích, giá niêm yết và trạng thái."
-                    onClose={() => setExportPrompt(false)}
-                    onConfirm={() => {
-                        exportRooms();
-                        setExportPrompt(false);
-                    }}
-                />
-            )}
-
             {selectedRoom && (
                 <RoomDetailDrawer
                     key={getRoomIdentity(selectedRoom)}
@@ -2181,7 +1628,6 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
                 <RoomEditModal
                     key={getRoomIdentity(editingRoom)}
                     room={editingRoom}
-                    propertyId={propertyId}
                     isSaving={isSavingRoom}
                     error={editError}
                     onClose={() => {
@@ -2196,53 +1642,21 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
 }
 
 export function RoomsManagementContent({
-                                           initialView = "floor-map",
                                            query = "",
                                            activeRole = "owner",
                                            propertyId,
                                            fromFacilities = false,
                                            facilityName = "",
                                        }) {
-    const [view, setView] = useState(initialView);
-
     return (
         <section className="grid gap-6">
             {fromFacilities ? <RoomsBreadcrumb facilityName={facilityName}/> : null}
             <DashboardPageHeader
                 title="Quản lý Phòng & Tầng"
-                description="Theo dõi mặt bằng từng tầng và danh sách phòng trong cùng một khu vực quản trị."
-                actions={
-                    <div
-                        className="flex w-full flex-wrap rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-1 shadow-[0_1px_2px_rgba(9,20,38,0.06)] sm:w-auto">
-                        {views.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = view === item.value;
-
-                            return (
-                                <button
-                                    key={item.value}
-                                    type="button"
-                                    onClick={() => setView(item.value)}
-                                    className={`inline-flex min-h-10 min-w-0 flex-1 basis-36 items-center justify-center gap-2 rounded-md px-3 py-2 text-center text-sm font-bold transition sm:flex-none sm:px-4 ${
-                                        isActive
-                                            ? "bg-[#1e40af] dark:bg-[#2563eb] text-white shadow-sm"
-                                            : "text-slate-600 dark:text-slate-300 hover:bg-[#f2f4f6] dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
-                                    }`}
-                                >
-                                    <Icon className="h-4 w-4"/>
-                                    {item.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                }
+                description="Theo dõi danh sách phòng, giá niêm yết và trạng thái vận hành."
             />
 
-            {view === "floor-map" ? (
-                <FloorPlanPage activeRole={activeRole} propertyId={propertyId}/>
-            ) : (
-                <RoomsListPage query={query} propertyId={propertyId} activeRole={activeRole}/>
-            )}
+            <RoomsListPage query={query} propertyId={propertyId} activeRole={activeRole}/>
         </section>
     );
 }

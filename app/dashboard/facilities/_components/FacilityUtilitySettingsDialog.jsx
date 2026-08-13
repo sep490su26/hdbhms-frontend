@@ -49,13 +49,17 @@ function UtilityMoneyInput({
   return (
     <label className="grid gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
       <span>{label}</span>
-      <VietnameseMoneyInput
-        value={value}
-        disabled={disabled}
-        suffix={suffix}
-        onValueChange={(nextValue) => onChange(name, nextValue)}
-        className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-white/10 dark:bg-[#0b1220] dark:text-white dark:focus:ring-blue-500/10"
-      />
+      <span className="relative block h-11 w-full">
+        <VietnameseMoneyInput
+          value={value}
+          disabled={disabled}
+          onValueChange={(nextValue) => onChange(name, nextValue)}
+          className="box-border h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 pr-24 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#1e40af] focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-white/10 dark:bg-[#0b1220] dark:text-white dark:focus:ring-blue-500/10"
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center whitespace-nowrap text-xs font-bold leading-none text-slate-400">
+          {suffix}
+        </span>
+      </span>
     </label>
   );
 }
@@ -87,10 +91,14 @@ export function FacilityUtilitySettingsDialog({
           onTouchMove: (event) => event.preventDefault(),
           onWheel: (event) => event.preventDefault(),
         }}
-        className="max-h-[90vh] w-full max-w-3xl gap-0 overflow-hidden rounded-xl bg-white p-0 shadow-2xl dark:bg-[#0f172a] sm:max-w-3xl"
+        className="box-border max-h-[90vh] w-[calc(100vw-2rem)] min-w-0 max-w-3xl gap-0 overflow-x-hidden overflow-y-hidden rounded-xl bg-white p-0 shadow-2xl dark:bg-[#0f172a]"
+        style={{
+          width: "min(48rem, calc(100vw - 2rem))",
+          maxWidth: "calc(100vw - 2rem)",
+        }}
       >
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
-          <DialogHeader className="gap-1 text-left">
+        <div className="flex min-w-0 items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+          <DialogHeader className="min-w-0 gap-1 text-left">
             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
               Giá điện & dịch vụ
             </DialogTitle>
@@ -109,20 +117,20 @@ export function FacilityUtilitySettingsDialog({
           </button>
         </div>
 
-        <div className="max-h-[68vh] overflow-y-auto p-6">
+        <div className="min-w-0 max-h-[68vh] overflow-x-hidden overflow-y-auto p-6">
           {state.loading ? (
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-5 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
               Đang tải giá điện và phí dịch vụ...
             </div>
           ) : (
-            <form id="facility-utility-settings-form" className="grid gap-4" onSubmit={onSubmit}>
+            <form id="facility-utility-settings-form" className="grid min-w-0 gap-4" onSubmit={onSubmit}>
               {state.error ? (
                 <div className="rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
                   {state.error}
                 </div>
               ) : null}
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 dark:border-white/10 dark:bg-white/5">
+              <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                <section className="grid min-w-0 gap-4 rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 dark:border-white/10 dark:bg-white/5">
                   <div className="flex items-start gap-3">
                     <span className="rounded-lg bg-amber-50 p-2 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
                       <Zap className="h-5 w-5" />
@@ -154,7 +162,7 @@ export function FacilityUtilitySettingsDialog({
                   />
                 </section>
 
-                <section className="grid gap-4 rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 dark:border-white/10 dark:bg-white/5">
+                <section className="grid min-w-0 gap-4 rounded-lg border border-[#e2e8f0] bg-[#f7f9fb] p-4 dark:border-white/10 dark:bg-white/5">
                   <div className="flex items-start gap-3">
                     <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
                       <HandCoins className="h-5 w-5" />
@@ -182,7 +190,7 @@ export function FacilityUtilitySettingsDialog({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+        <div className="flex min-w-0 justify-end gap-3 border-t border-[#e2e8f0] px-6 py-4 dark:border-white/10">
           <button
             type="button"
             onClick={onClose}

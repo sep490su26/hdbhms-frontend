@@ -94,7 +94,9 @@ const translateType = (type) => {
   const map = {
     ROOM_TRANSFER: "Chuyển phòng",
     MOVE_OUT: "Trả phòng",
-    CONTRACT_RENEWAL: "Gia hạn Hợp Đồng",
+    CONTRACT_RENEWAL: "Gia hạn hợp đồng",
+    CONTRACT_TERMINATION: "Thanh lý hợp đồng",
+    TENANT_PROFILE_ACCESS: "Quyền truy cập hồ sơ khách thuê",
     PERMISSION_ACCESS: "Quyền truy cập",
     METER_READING_CORRECTION: "Điều chỉnh chỉ số",
     INVOICE_ADJUSTMENT: "Điều chỉnh hóa đơn",
@@ -103,15 +105,15 @@ const translateType = (type) => {
     EXPENSE_APPROVAL: "Duyệt khoản chi",
     TRANSFER: "Chuyển phòng",
     MOVEOUT: "Trả phòng",
-    RENEWAL: "Gia hạn Hợp Đồng",
-    TERMINATION: "Thanh lý Hợp Đồng",
-    CONTRACT_LIQUIDATION: "Thanh lý Hợp Đồng",
+    RENEWAL: "Gia hạn hợp đồng",
+    TERMINATION: "Thanh lý hợp đồng",
+    CONTRACT_LIQUIDATION: "Thanh lý hợp đồng",
     ADD_CO_OCCUPANT: "Thêm người ở cùng",
     MAINTENANCE: "Bảo trì",
     COMPLAINT: "Khiếu nại",
     ACCESS: "Yêu cầu thẻ",
   };
-  return map[type] || type;
+  return map[type] || "Loại yêu cầu chưa xác định";
 };
 
 // Map backend request type to frontend type key
@@ -122,6 +124,7 @@ const mapRequestType = (type) => {
     CONTRACT_RENEWAL: "RENEWAL",
     CONTRACT_TERMINATION: "TERMINATION",
     CONTRACT_LIQUIDATION: "TERMINATION",
+    TENANT_PROFILE_ACCESS: "PERMISSION_ACCESS",
     ADD_CO_OCCUPANT: "ADD_CO_OCCUPANT",
     PERMISSION_ACCESS: "PERMISSION_ACCESS",
     METER_READING_CORRECTION: "METER_READING_CORRECTION",
@@ -139,11 +142,14 @@ const mapRequestType = (type) => {
 const translateStatus = (status) => {
   const map = {
     PENDING: "Đang chờ",
+    UNDER_REVIEW: "Đang xem xét",
     PROCESSING: "Đang xử lý",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Đã từ chối",
     COMPLETED: "Hoàn thành",
     CANCELLED: "Đã hủy",
   };
-  return map[status] || status;
+  return map[status] || "Trạng thái chưa xác định";
 };
 
 function formatRequestDateTime(value) {
@@ -306,21 +312,24 @@ const translateTransferStatus = (status) => {
     REQUESTED: "Mới tạo",
     MANAGER_APPROVED: "Quản lý đã duyệt",
     WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
+    WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
     WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
     WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
     WAITING_PAYMENT: "Chờ thanh toán",
     WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
+    WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
     WAITING_SIGNING: "Chờ quản lý upload bản ký",
     WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
     WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
     READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
     WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
     EXECUTED: "Đã chuyển phòng",
+    COMPLETED: "Đã hoàn tất chuyển phòng",
     CANCELLED: "Đã hủy",
     REJECTED: "Đã từ chối",
     EXPIRED: "Đã hết hạn",
   };
-  return map[status] || status || "--";
+  return map[status] || "Trạng thái chuyển phòng chưa xác định";
 };
 
 const getTransferStatusTone = (status) => {

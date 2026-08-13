@@ -387,6 +387,16 @@ export default function BillingPage() {
     [paymentForm.propertyId, paymentForm.roomId, visibleInvoices],
   );
 
+  const totals = invoices.reduce(
+    (summary, invoice) => ({
+      count: summary.count + 1,
+      totalAmount: summary.totalAmount + Number(invoice.totalAmount || 0),
+      paidAmount: summary.paidAmount + Number(invoice.paidAmount || 0),
+      remainingAmount: summary.remainingAmount + Number(invoice.remainingAmount || 0),
+    }),
+    { count: 0, totalAmount: 0, paidAmount: 0, remainingAmount: 0 },
+  );
+
   const totalElements = invoices.length;
   const totalPages = Math.ceil(totalElements / size);
   const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;

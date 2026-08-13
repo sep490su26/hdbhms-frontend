@@ -12,14 +12,12 @@ import {
   Mail,
   RefreshCw,
   Search,
-  Send,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import {
   disableTenantAccountAccess,
   fetchTenantAccountCandidates,
-  sendTenantAccountCredentials,
 } from "@/services/identityAccessService";
 import { formatDate as formatDisplayDate } from "@/lib/dateFormat";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
@@ -200,7 +198,6 @@ export default function AccountsPage() {
   const [stateFilter, setStateFilter] = useState(ALL_VALUE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sendingContractId, setSendingContractId] = useState(null);
   const [disablingKey, setDisablingKey] = useState(null);
   const [message, setMessage] = useState("");
   const [page, setPage] = useState(1);
@@ -392,32 +389,6 @@ export default function AccountsPage() {
     });
   }, []);
 
-  const handleSend = async (contractId) => {
-    if (!contractId || sendingContractId) return;
-    const contractRows = items.filter((item) => item.contractId === contractId);
-    const retry = contractRows.some((item) =>
-      ["FAILED", "SENT"].includes(resolveAccountState(item).key),
-    );
-    const confirmed = window.confirm(
-      retry
-        ? "Hệ thống sẽ gửi lại tài khoản cho người thuê chưa kích hoạt. Tài khoản đã kích hoạt sẽ được bỏ qua."
-        : "Hệ thống sẽ gửi tài khoản cho những người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
-    );
-    if (!confirmed) return;
-    setSendingContractId(contractId);
-    setMessage("");
-    setError("");
-    try {
-      const result = await sendTenantAccountCredentials(contractId, { retry });
-      setMessage(result?.message || "Đã gửi thông tin tài khoản khách thuê.");
-      await loadData();
-    } catch (sendError) {
-      setError(sendError?.message || "Không gửi được tài khoản khách thuê.");
-    } finally {
-      setSendingContractId(null);
-    }
-  };
-
   const handleDisable = async (item) => {
     if (!item?.contractId || !item?.profileId || disablingKey) return;
     const reason = window.prompt(
@@ -539,24 +510,6 @@ export default function AccountsPage() {
           <div className="grid gap-4 p-4">
             {groupedContracts.map((group) => {
               const isExpanded = expandedRooms.has(group.safeKey);
-              const groupStates = group.rows.map(
-                (row) => resolveAccountState(row).key,
-              );
-              const canSend = groupStates.some((state) =>
-                ["NOT_SENT", "FAILED", "SENT"].includes(state),
-              );
-              const hasFailed = groupStates.includes("FAILED");
-              const hasSent = groupStates.includes("SENT");
-              const allActivated = groupStates.every(
-                (state) => state === "ACTIVATED",
-              );
-              const isSending = sendingContractId === group.contractId;
-              const contractCanSend = group.contractStatus === "ACTIVE";
-              const sendDisabled =
-                !contractCanSend ||
-                !group.recipientEmail ||
-                !canSend ||
-                isSending;
 
               return (
                 <article
@@ -594,38 +547,11 @@ export default function AccountsPage() {
                         {group.contractCode || "#"}
                       </p>
                     </div>
-                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[154px_224px_40px] sm:items-center lg:w-[442px]">
+                    <div className="flex w-full items-center justify-end gap-3 lg:w-auto">
                       <span className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-bold text-[#0f1d33] dark:border-white/10 dark:bg-[#0f172a] dark:text-white">
                         <UsersRound className="h-4 w-4 text-blue-600" />
                         {group.occupantCount}/{group.maxOccupants} người
                       </span>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleSend(group.contractId);
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        disabled={sendDisabled}
-                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8] dark:disabled:bg-slate-700"
-                      >
-                        <Send className="h-4 w-4" />
-                        <span className="whitespace-nowrap">
-                          {!contractCanSend
-                            ? "Chỉ gửi khi ACTIVE"
-                            : isSending
-                              ? "Đang gửi..."
-                              : hasFailed
-                                ? "Thử gửi lại"
-                                : hasSent
-                                  ? "Gửi bổ sung"
-                                  : allActivated
-                                    ? "Đã hoàn tất"
-                                    : canSend
-                                      ? "Gửi tài khoản"
-                                      : "Đã gửi tài khoản"}
-                        </span>
-                      </button>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#526179] dark:text-slate-400">
                         {isExpanded ? (
                           <ChevronUp className="h-5 w-5" />

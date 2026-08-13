@@ -55,12 +55,6 @@ export async function fetchAdvisorReport(period) {
   });
 }
 
-export async function refreshAdvisorReport(period) {
-  return authenticatedFetch(`${API_BASE_URL}/advisor/copilot/report/refresh${periodQuery(period)}`, {
-    method: "POST",
-  });
-}
-
 async function fetchReportBlob(url, token) {
   return fetch(url, {
     method: "GET",

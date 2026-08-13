@@ -568,76 +568,6 @@ export default function UtilityManagement() {
         />
       </section>
 
-      <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Kỳ ghi chỉ số đang hoạt động
-            </h2>
-            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Theo dõi kỳ hiện tại, trạng thái và tiến độ nhập chỉ số.
-            </p>
-          </div>
-          {currentPeriod ? <PeriodBadge status={currentPeriod.status} /> : null}
-        </div>
-
-        {!currentPeriod ? (
-          <EmptyPeriodState
-            canStartCurrentPeriod={canStartCurrentPeriod}
-            nextOpenDate={nextOpenDate}
-          />
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="border-b border-[#e2e8f0] pb-4 dark:border-white/10 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
-              <p className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                Kỳ ghi chỉ số
-              </p>
-              <p className="mt-2 text-3xl font-black text-[#3156b6] dark:text-blue-300">
-                {periodValue(currentPeriod)}
-              </p>
-              <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <CalendarDays className="h-4 w-4" />
-                {formatTime(currentPeriod.startDate, currentPeriod.endDate)}
-              </p>
-            </div>
-
-            <div className="grid gap-4">
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                  <span className="font-black text-slate-700 dark:text-slate-200">
-                    Tiến độ nhập chỉ số
-                  </span>
-                  <span className="font-black text-[#3156b6] dark:text-blue-300">
-                    {progress}%
-                  </span>
-                </div>
-                <ProgressBar value={progress} />
-                <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {completedRooms} / {totalRooms} phòng đã nhập
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Đã nhập</p>
-                  <p className="mt-1 text-2xl font-black">{completedRooms}</p>
-                </div>
-                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Chưa nhập</p>
-                  <p className="mt-1 text-2xl font-black">{missingRooms}</p>
-                </div>
-                <div className="rounded-lg border border-[#e2e8f0] p-3 dark:border-white/10">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Cảnh báo</p>
-                  <p className="mt-1 text-2xl font-black text-orange-600 dark:text-orange-300">
-                    {currentPeriod?.anomalyCount || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
       {utilityBillingPeriod ? (
         <UtilityBillingRunsPanel
           key={`${propertyId || "all"}-${periodValue(utilityBillingPeriod) || formatMonthYearPeriod()}`}
@@ -702,7 +632,7 @@ export default function UtilityManagement() {
           </div>
           <ul className="list-disc space-y-2 pl-5 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
             <li>Nhập chỉ số ít nhất 1 lần trước khi chốt kỳ.</li>
-            <li>Sau khi chốt kỳ, bạn có thể xem nhưng không thể chỉnh sửa.</li>
+            <li>Sau khi chốt kỳ, bạn vẫn có thể chỉnh sửa chỉ số cho đến khi hóa đơn được phát hành.</li>
             <li>Các phòng có cảnh báo cần được kiểm tra lại trước khi chốt.</li>
           </ul>
         </div>

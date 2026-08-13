@@ -11,7 +11,6 @@ import {
   DoorOpen,
   Eye,
   Gauge,
-  LayoutGrid,
   Layers3,
   MapPin,
   Pencil,
@@ -135,18 +134,6 @@ function FacilityActionsMenu({
             <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             Chỉnh sửa
           </button>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          asChild
-          className="rounded-lg p-0 focus:bg-transparent"
-        >
-          <Link
-            href={`/dashboard/facilities/${facility.id}/floor-plan-designer`}
-            className={facilityActionItemClass}
-          >
-            <LayoutGrid className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            Sơ đồ tầng
-          </Link>
         </DropdownMenuItem>
         {showMeterReadingsAction ? (
           <DropdownMenuItem

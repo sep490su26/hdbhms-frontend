@@ -16,6 +16,7 @@ function formatVietnameseMoney(value) {
 
 function VietnameseMoneyInput({
   className,
+  containerClassName,
   suffix,
   suffixClassName,
   type = "text",
@@ -37,7 +38,7 @@ function VietnameseMoneyInput({
       inputMode="numeric"
       value={formatVietnameseMoney(value)}
       onChange={handleChange}
-      className={cn(className, suffixPadding)}
+      className={cn("block", className, suffixPadding)}
       {...props}
     />
   );
@@ -45,11 +46,11 @@ function VietnameseMoneyInput({
   if (!suffix) return input;
 
   return (
-    <span className="relative block">
+    <span className={cn("relative block w-full", containerClassName)}>
       {input}
       <span
         className={cn(
-          "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400",
+          "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-xs font-bold leading-none text-slate-400",
           suffixClassName,
         )}
       >

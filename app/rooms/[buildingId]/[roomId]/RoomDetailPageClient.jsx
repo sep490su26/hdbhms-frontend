@@ -266,7 +266,6 @@ function BookingCard({ room }) {
   const holdCountdownLabel = formatHoldCountdown(remainingMs);
   const isCountdownActive = room.status === "onHold" && remainingMs > 0;
   const roomLabel = room.roomCode || room.name || room.id;
-  const vacantDateLabel = formatShortDate(room.expectedVacantDate);
   const tomorrowDate = getTomorrowDateString();
   const soonVacantViewingDate = isSoonVacant
     ? addDaysToDateString(room.expectedVacantDate, 1)
@@ -274,6 +273,7 @@ function BookingCard({ room }) {
   const minViewingDate = isSoonVacant
     ? getLatestDateString(tomorrowDate, soonVacantViewingDate)
     : tomorrowDate;
+  const bookableDateLabel = formatShortDate(soonVacantViewingDate);
   const viewingDateErrorMessage =
     isSoonVacant && soonVacantViewingDate
       ? `Phòng sắp trống chỉ nhận lịch xem từ ${formatShortDate(minViewingDate)} trở đi.`
@@ -453,19 +453,28 @@ function BookingCard({ room }) {
         <div className="mt-6">
           {/* Thanh trạng thái động */}
           <div
-            className={`mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}
+            className={`mb-3 flex w-full flex-col items-center justify-center rounded-xl px-4 py-3 text-sm font-bold ${getStatusClass()}`}
           >
-            <span
-              className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`}
-            />
-            {isAvailable && "Còn trống - Sẵn sàng vào ở"}
-            {isSoonVacant &&
-              `Sắp trống${vacantDateLabel ? ` từ ${vacantDateLabel}` : ""} - có thể đặt cọc theo ngày bàn giao`}
-            {isOnHold && "Đang giữ chỗ"}
-            {isDraft && "Bản nháp - Chưa mở cho thuê"}
-            {isOccupied && "Đã thuê - Không còn trống"}
-            {isDeposited && "Đã đặt cọc - Không còn trống"}
+            <div className="flex items-center justify-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${isAvailable ? "bg-emerald-500" : isSoonVacant ? "bg-orange-500" : isOnHold ? "bg-amber-500" : isDeposited ? "bg-orange-500" : "bg-slate-400"}`}
+              />
+              <span>
+                {isAvailable && "Còn trống - Sẵn sàng vào ở"}
+                {isSoonVacant && "Sắp trống"}
+                {isOnHold && "Đang giữ chỗ"}
+                {isDraft && "Bản nháp - Chưa mở cho thuê"}
+                {isOccupied && "Đã thuê - Không còn trống"}
+                {isDeposited && "Đã đặt cọc - Không còn trống"}
+              </span>
+            </div>
+            {isSoonVacant && bookableDateLabel && (
+              <p className="mt-1 text-center text-sm font-semibold leading-5 text-orange-700">
+                Có thể đặt cọc từ ngày {bookableDateLabel}
+              </p>
+            )}
           </div>
+
 
           <div
             role="note"

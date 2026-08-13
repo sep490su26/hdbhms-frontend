@@ -23,6 +23,7 @@ import {
   Phone,
   RefreshCcw,
   Search,
+  Send,
   UserRound,
   Users,
   X,
@@ -60,6 +61,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { usePermission } from "@/app/dashboard/_hooks/usePermission";
+import {
+  fetchTenantAccountCandidates,
+  sendTenantAccountCredentials,
+} from "@/services/identityAccessService";
 
 const TENANT_PROFILE_FETCH_SIZE = 1000;
 
@@ -154,6 +159,57 @@ const roleClass = (role) =>
   String(role).toUpperCase() === "PRIMARY"
     ? "border-indigo-200 dark:border-blue-500/20 bg-indigo-50 dark:bg-blue-500/10 text-indigo-700 dark:text-blue-300"
     : "border-slate-200 bg-slate-50 text-slate-700";
+
+function resolveAccountState(item) {
+  if (
+    item?.occupantStatus === "DISABLED" ||
+    item?.provisioningStatus === "DISABLED"
+  ) {
+    return {
+      key: "DISABLED",
+      label: "Đã vô hiệu hóa",
+      hint: item?.disabledReason || "Quyền truy cập tenant đã bị vô hiệu hóa.",
+    };
+  }
+
+  if (item?.provisioningStatus === "PENDING") {
+    return {
+      key: "PENDING",
+      label: "Đang gửi",
+      hint: "Hệ thống đang xử lý gửi tài khoản.",
+    };
+  }
+
+  if (item?.provisioningStatus === "FAILED") {
+    return {
+      key: "FAILED",
+      label: "Gửi thất bại",
+      hint: item?.failureReason || "Có thể thử gửi lại.",
+    };
+  }
+
+  if (item?.provisioningStatus === "NOT_PROVISIONED") {
+    return {
+      key: "NOT_SENT",
+      label: "Chưa cấp",
+      hint: "Chưa gửi tài khoản mobile.",
+    };
+  }
+
+  if (item?.provisioningStatus === "SENT") {
+    return {
+      key: "SENT",
+      label: "Đã gửi",
+      hint: "Chờ khách kích hoạt tài khoản.",
+    };
+  }
+
+  return {
+    key: "ACTIVATED",
+    label: "Đã kích hoạt",
+    hint: "Khách đã kích hoạt tài khoản.",
+  };
+}
 
 function FilterDropdown({ label, value, options, onChange, disabled = false }) {
   const selectedOption = options.find(
@@ -1316,8 +1372,11 @@ function PoliceReportExportModal({
 export default function TenantsPage() {
   const { role: activeRole } = usePermission();
   const [profiles, setProfiles] = useState([]);
+  const [accountCandidates, setAccountCandidates] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
+  const [sendingContractId, setSendingContractId] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [selectedContract, setSelectedContract] = useState(null);
   const [contractDetailsLoadingId, setContractDetailsLoadingId] = useState("");
@@ -1339,12 +1398,33 @@ export default function TenantsPage() {
     String(activeRole).toLowerCase(),
   );
 
+  const accountStateFor = (profile) => {
+    const account = accountCandidates.find(
+      (item) =>
+        String(item.contractId) ===
+          String(valueOf(profile, "contractId", "contract_id")) &&
+        String(item.profileId) ===
+          String(valueOf(profile, "id", "profileId", "profile_id")),
+    );
+    if (account) return resolveAccountState(account);
+    return {
+      key: "NOT_SENT",
+      label: "Chưa cấp",
+      hint: "Chưa gửi tài khoản mobile.",
+    };
+  };
+
   const toggleRoomExpanded = (roomKey) => {
     setExpandedRoomKeys((current) =>
       current.includes(roomKey)
         ? current.filter((key) => key !== roomKey)
         : [...current, roomKey],
     );
+  };
+
+  const loadAccountCandidates = async () => {
+    const data = await fetchTenantAccountCandidates({ page: 0, size: 1000 });
+    setAccountCandidates(data.items || []);
   };
 
   const openExportDialog = () => {
@@ -1439,6 +1519,37 @@ export default function TenantsPage() {
     }
   };
 
+  const handleSendAccounts = async (contractId) => {
+    if (!contractId || sendingContractId) return;
+    const contractRows = accountCandidates.filter(
+      (item) => String(item.contractId) === String(contractId),
+    );
+    const retry = contractRows.some((item) =>
+      ["FAILED", "SENT"].includes(resolveAccountState(item).key),
+    );
+    const confirmed = window.confirm(
+      retry
+        ? "Hệ thống sẽ gửi lại tài khoản cho người thuê chưa kích hoạt. Tài khoản đã kích hoạt sẽ được bỏ qua."
+        : "Hệ thống sẽ gửi tài khoản cho những người thuê chưa được cấp. Không gửi lại cho tài khoản đã có.",
+    );
+    if (!confirmed) return;
+
+    setSendingContractId(contractId);
+    setAccountMessage("");
+    setError("");
+    try {
+      const result = await sendTenantAccountCredentials(contractId, { retry });
+      setAccountMessage(
+        result?.message || "Đã gửi thông tin tài khoản khách thuê.",
+      );
+      await Promise.all([loadProfiles(), loadAccountCandidates()]);
+    } catch (sendError) {
+      setError(sendError?.message || "Không gửi được tài khoản khách thuê.");
+    } finally {
+      setSendingContractId(null);
+    }
+  };
+
   const loadProfiles = async () => {
     try {
       setIsLoading(true);
@@ -1461,6 +1572,7 @@ export default function TenantsPage() {
           ]),
         ),
       );
+      await loadAccountCandidates();
     } catch (loadError) {
       setError(loadError?.message || "Không tải được hồ sơ khách thuê.");
     } finally {
@@ -1499,6 +1611,14 @@ export default function TenantsPage() {
       })
       .finally(() => {
         if (isActive) setIsLoading(false);
+      });
+
+    fetchTenantAccountCandidates({ page: 0, size: 1000 })
+      .then((data) => {
+        if (isActive) setAccountCandidates(data.items || []);
+      })
+      .catch(() => {
+        // The profile list remains usable even if account status loading fails.
       });
 
     return () => {
@@ -1703,6 +1823,12 @@ export default function TenantsPage() {
         </section>
       )}
 
+      {accountMessage ? (
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+          {accountMessage}
+        </section>
+      ) : null}
+
       {!isLoading && error && (
         <section className="rounded-xl border border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-10 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-rose-600 dark:text-rose-300" />
@@ -1732,6 +1858,35 @@ export default function TenantsPage() {
         <section className="grid gap-5">
           {groupedByRoom.map((roomProfiles) => {
             const roomProfile = roomProfiles[0];
+            const contractId = valueOf(
+              roomProfile,
+              "contractId",
+              "contract_id",
+            );
+            const accountRows = accountCandidates.filter(
+              (item) => String(item.contractId) === String(contractId),
+            );
+            const accountStates = accountRows.map((item) =>
+              resolveAccountState(item).key,
+            );
+            const canSendAccounts = accountStates.some((state) =>
+              ["NOT_SENT", "FAILED", "SENT"].includes(state),
+            );
+            const hasFailedAccounts = accountStates.includes("FAILED");
+            const hasSentAccounts = accountStates.includes("SENT");
+            const allAccountsActivated =
+              accountStates.length > 0 &&
+              accountStates.every((state) => state === "ACTIVATED");
+            const isSendingAccounts =
+              String(sendingContractId) === String(contractId);
+            const contractCanSend =
+              valueOf(roomProfile, "contractStatus", "contract_status") ===
+              "ACTIVE";
+            const sendAccountsDisabled =
+              !contractId ||
+              !contractCanSend ||
+              !canSendAccounts ||
+              isSendingAccounts;
             const roomKey = `${valueOf(roomProfile, "propertyId", "property_id")}-${valueOf(roomProfile, "roomCode", "room_code")}`;
             const isExpanded = expandedRoomKeys.includes(roomKey);
             const maxOccupants =
@@ -1752,9 +1907,19 @@ export default function TenantsPage() {
                 key={roomKey}
                 className="overflow-hidden rounded-xl border border-[#d8dee8] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]"
               >
-                <button
-                  type="button"
+                <div
                   onClick={() => toggleRoomExpanded(roomKey)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      toggleRoomExpanded(roomKey);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                   aria-expanded={isExpanded}
                   aria-controls={`room-tenants-${roomKey}`}
                   className="flex w-full flex-wrap items-center justify-between gap-4 border-b border-[#d8dee8] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-6 py-4 text-left"
@@ -1787,11 +1952,38 @@ export default function TenantsPage() {
                         "chưa cập nhật"}
                     </p>
                   </div>
-                  <span className="flex items-center gap-2">
+                  <span className="flex w-full flex-wrap items-center justify-end gap-2 lg:w-auto">
                     <span className="flex items-center gap-2 rounded-lg bg-white dark:bg-[#0f172a] px-4 py-2 text-sm font-black text-slate-900 dark:text-white ring-1 ring-[#d8dee8]">
                       <Users className="h-4 w-4 text-[#1e40af] dark:text-[#93c5fd]" />
                       {roomOccupancyText(roomProfile)} người
                     </span>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleSendAccounts(contractId);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      disabled={sendAccountsDisabled}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0f1d33] px-4 text-sm font-bold text-white transition hover:bg-[#172842] disabled:cursor-not-allowed disabled:bg-[#9aa3b2] dark:bg-[#2563eb] dark:hover:bg-[#1d4ed8] dark:disabled:bg-slate-700"
+                    >
+                      <Send className="h-4 w-4" />
+                      <span className="whitespace-nowrap">
+                        {!contractCanSend
+                          ? "Chỉ gửi khi ACTIVE"
+                          : isSendingAccounts
+                            ? "Đang gửi..."
+                            : hasFailedAccounts
+                              ? "Thử gửi lại"
+                              : hasSentAccounts
+                                ? "Gửi bổ sung"
+                                : allAccountsActivated
+                                  ? "Đã hoàn tất"
+                                  : canSendAccounts
+                                    ? "Gửi tài khoản"
+                                    : "Chưa có dữ liệu tài khoản"}
+                      </span>
+                    </button>
                     <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-[#d8dee8] dark:bg-[#0f172a] dark:text-slate-300 dark:ring-white/10">
                       {isExpanded ? (
                         <ChevronUp className="h-5 w-5" />
@@ -1800,7 +1992,7 @@ export default function TenantsPage() {
                       )}
                     </span>
                   </span>
-                </button>
+                </div>
 
                 <AnimatePresence initial={false}>
                   {isExpanded && (
@@ -1879,27 +2071,31 @@ export default function TenantsPage() {
                                   </Badge>
                                 </td>
 
-                                <td
+                              <td
                                   data-label="Tài khoản app"
                                   className="px-6 py-5"
                                 >
-                                  <Badge
-                                    className={accountStatusClass(
-                                      valueOf(
-                                        profile,
-                                        "appStatus",
-                                        "app_status",
-                                      ),
-                                    )}
-                                  >
-                                    {accountStatusLabel(
-                                      valueOf(
-                                        profile,
-                                        "appStatus",
-                                        "app_status",
-                                      ),
-                                    )}
-                                  </Badge>
+                                  {(() => {
+                                    const accountState = accountStateFor(profile);
+                                    return (
+                                      <div className="grid gap-1">
+                                        <Badge
+                                          className={accountStatusClass(
+                                            accountState.key === "ACTIVATED"
+                                              ? "ACTIVE"
+                                              : accountState.key === "DISABLED"
+                                                ? "DISABLED"
+                                                : "PENDING",
+                                          )}
+                                        >
+                                          {accountState.label}
+                                        </Badge>
+                                        <span className="text-xs font-semibold text-slate-500">
+                                          {accountState.hint}
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td
                                   data-label="Thao tác"

@@ -6,6 +6,32 @@ import { InfoField, formatMoney } from "./RequestDetailFields";
 const firstValue = (...values) => values.find((value) => value !== undefined && value !== null && value !== "");
 const REQUEST_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
+const ENUM_LABELS = {
+    AIR_CONDITIONER: "Máy lạnh",
+    CARD: "Thẻ ra vào",
+    CLEANING: "Vệ sinh",
+    DOOR_LOCK: "Khóa cửa",
+    ELECTRICITY: "Điện",
+    FURNITURE: "Nội thất",
+    HIGH: "Cao",
+    INTERNET: "Internet",
+    LOW: "Thấp",
+    MAINTENANCE_COMPENSATION: "Bồi thường chi phí bảo trì",
+    MEDIUM: "Trung bình",
+    NORMAL: "Bình thường",
+    PAINTING: "Sơn sửa",
+    RULE_VIOLATION: "Vi phạm nội quy",
+    RESET_WIFI_PASSWORD: "Tự ý reset mật khẩu modem/wifi",
+    WATER: "Nước",
+    VIOLATION_FINE: "Phạt vi phạm nội quy",
+};
+
+const enumLabel = (value, fallback = "Chưa xác định") => {
+    if (value === undefined || value === null || value === "") return fallback;
+    const text = String(value).trim();
+    return ENUM_LABELS[text.toUpperCase()] || (text.includes("_") ? fallback : text);
+};
+
 const joinObjectValues = (value) => {
     if (!value || typeof value !== "object") return "";
     return Object.values(value).map((item) => String(item || "").trim()).filter(Boolean).join(", ");
@@ -30,7 +56,7 @@ const formatPaymentBranch = (value) => {
         UNSELECTED_POSITIVE_DIFFERENCE: "Chưa chọn phương thức",
         UNSELECTED_NEGATIVE_DIFFERENCE: "Chưa chọn phương thức",
     };
-    return map[String(value || "").trim().toUpperCase()] || value || "";
+    return map[String(value || "").trim().toUpperCase()] || enumLabel(value, "Chưa chọn phương thức");
 };
 
 function formatVnd(value) {
@@ -229,7 +255,7 @@ const formatTransferType = (value) => {
         JOIN_EXISTING_CONTRACT: "Vào hợp đồng hiện có",
         TAKE_OVER_CONTRACT: "Tiếp nhận hợp đồng",
     };
-    return map[value] || value;
+    return map[value] || enumLabel(value);
 };
 
 const formatSettlementType = (value) => {
@@ -238,7 +264,7 @@ const formatSettlementType = (value) => {
         TENANT_PAY_MORE: "Khách thanh toán thêm ngay",
         ADD_TO_NEXT_INVOICE: "Cộng vào hóa đơn kỳ tới",
     };
-    return map[value] || value;
+    return map[value] || enumLabel(value);
 };
 
 export function TransferRequestDetail({ payload, transfer }) {
@@ -419,10 +445,10 @@ export function MaintenanceRequestDetail({ payload }) {
         <div className="grid grid-cols-2 gap-4">
             <InfoField label="Vị trí" value={payload.location || payload.room || payload.roomCode || payload.room_code} icon={<MapPin className="w-4 h-4" />} />
             {(payload.priority || payload.maintenancePriority || payload.maintenance_priority) && (
-                <InfoField label="Độ ưu tiên" value={payload.priority || payload.maintenancePriority || payload.maintenance_priority} />
+                            <InfoField label="Độ ưu tiên" value={enumLabel(payload.priority || payload.maintenancePriority || payload.maintenance_priority)} />
             )}
             {(payload.maintenanceType || payload.maintenance_type || payload.category) && (
-                <InfoField label="Loại bảo trì" value={payload.maintenanceType || payload.maintenance_type || payload.category} />
+                <InfoField label="Loại bảo trì" value={enumLabel(payload.maintenanceType || payload.maintenance_type || payload.category)} />
             )}
         </div>
     );
@@ -434,10 +460,10 @@ export function ComplaintRequestDetail({ payload }) {
     return (
         <div className="space-y-4">
             {(payload.category || payload.complaintType || payload.complaint_type) && (
-                <InfoField label="Loại khiếu nại" value={payload.category || payload.complaintType || payload.complaint_type} />
+                <InfoField label="Loại khiếu nại" value={enumLabel(payload.category || payload.complaintType || payload.complaint_type)} />
             )}
             {(payload.priority || payload.complaintPriority || payload.complaint_priority) && (
-                <InfoField label="Độ ưu tiên" value={payload.priority || payload.complaintPriority || payload.complaint_priority} />
+                <InfoField label="Độ ưu tiên" value={enumLabel(payload.priority || payload.complaintPriority || payload.complaint_priority)} />
             )}
         </div>
     );
@@ -451,7 +477,7 @@ export function MeterReadingCorrectionRequestDetail({ payload }) {
         ? "Điện"
         : lineType === "WATER"
             ? "Nước"
-            : lineType;
+            : enumLabel(lineType);
     const previousValue = firstValue(payload.previousValue, payload.previous_value);
     const currentValue = firstValue(payload.currentValue, payload.current_value);
     const reportedValue = firstValue(payload.reportedCurrentValue, payload.reported_current_value);
@@ -487,7 +513,7 @@ export function AccessRequestDetail({ payload }) {
 
     return (
         <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Loại thẻ" value={payload.accessType || payload.access_type || payload.cardType || payload.card_type} />
+            <InfoField label="Loại thẻ" value={enumLabel(payload.accessType || payload.access_type || payload.cardType || payload.card_type)} />
             {(payload.quantity || payload.cardQuantity || payload.card_quantity) && (
                 <InfoField label="Số lượng" value={payload.quantity || payload.cardQuantity || payload.card_quantity} />
             )}

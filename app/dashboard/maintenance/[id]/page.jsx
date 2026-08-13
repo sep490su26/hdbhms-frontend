@@ -43,23 +43,27 @@ import {
 } from "@/components/ui/dialog";
 
 const STATUS_META = {
-  PENDING: ["Pending", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
-  ACCEPTED: ["Accepted", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
-  IN_PROGRESS: ["In progress", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
-  WAITING_CONFIRMATION: ["Waiting confirmation", "bg-violet-50 text-violet-800 ring-violet-200"],
-  COMPLETED: ["Completed", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
-  REJECTED: ["Rejected", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
+  PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
+  ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
+  WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
+  COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
+  REJECTED: ["Từ chối", "bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 ring-rose-200 dark:ring-rose-500/20"],
 };
 
 const CATEGORY_LABELS = {
   ELECTRICITY: "Điện",
   WATER: "Nước",
   AIR_CONDITIONER: "Máy lạnh",
+  DOOR_LOCK: "Khóa cửa",
   INTERNET: "Internet",
   FURNITURE: "Nội thất",
+  PAINTING: "Sơn sửa",
+  CLEANING: "Vệ sinh",
   SANITARY: "Vệ sinh",
   SECURITY: "An ninh",
   COMMON_EQUIPMENT: "Thiết bị chung",
+  RULE_VIOLATION: "Vi phạm nội quy",
   OTHER: "Khác",
 };
 
@@ -92,21 +96,24 @@ const BILLING_STATUS_LABELS = {
   VOIDED: "Đã hủy",
 };
 const ACTION_LABELS = {
-  CREATE: "Create",
-  SUBMIT: "Submit",
-  ACCEPT: "Accept",
-  START_PROGRESS: "Start progress",
-  CONFIRM_COMPLETED: "Confirm completed",
-  COMPLETE: "Complete",
-  REJECT: "Reject",
-  DECLINE: "Decline",
-  REPORT_NOT_FIXED: "Report not fixed",
-  REVIEW: "Review",
+  CREATE: "Tạo phiếu",
+  SUBMIT: "Gửi phiếu",
+  ACCEPT: "Tiếp nhận",
+  START_PROGRESS: "Bắt đầu xử lý",
+  UPDATE_REPAIR_INFO: "Cập nhật thông tin sửa chữa",
+  ATTACH_FILE: "Đính kèm tệp",
+  REQUEST_CONFIRMATION: "Yêu cầu xác nhận",
+  CONFIRM_COMPLETED: "Xác nhận hoàn tất",
+  COMPLETE: "Hoàn tất xử lý",
+  REJECT: "Từ chối",
+  DECLINE: "Từ chối",
+  REPORT_NOT_FIXED: "Báo chưa xử lý xong",
+  REVIEW: "Đánh giá",
 };
 
 const TIMELINE_NOTE_LABELS = {
-  "Người thuê tạo phiếu": "Tenant submitted the ticket.",
-  "Khách thuê tạo phiếu": "Tenant submitted the ticket.",
+  "Người thuê tạo phiếu": "Khách thuê đã tạo phiếu.",
+  "Khách thuê tạo phiếu": "Khách thuê đã tạo phiếu.",
 };
 
 function formatDateTime(value) {
@@ -141,16 +148,16 @@ function parseMoneyInput(value) {
 
 function formatActionLabel(action) {
   const normalized = String(action || "").trim().toUpperCase();
-  return ACTION_LABELS[normalized] || normalized.replaceAll("_", " ").toLowerCase().replace(/^\p{L}/u, (char) => char.toUpperCase()) || "Update status";
+  return ACTION_LABELS[normalized] || "Cập nhật trạng thái";
 }
 
 function statusMeta(status) {
-  return STATUS_META[status] || [status || "Unknown", "bg-slate-100 text-slate-700 ring-slate-200"];
+  return STATUS_META[status] || ["Trạng thái chưa xác định", "bg-slate-100 text-slate-700 ring-slate-200"];
 }
 
 function formatTimelineNote(note) {
   const text = String(note || "").trim();
-  return TIMELINE_NOTE_LABELS[text] || text || "No note.";
+  return TIMELINE_NOTE_LABELS[text] || text || "Không có ghi chú.";
 }
 
 function formatBillingPeriod(value) {
@@ -448,7 +455,7 @@ export default function MaintenanceTicketDetailPage() {
     if (ticket.ticketScope === "ROOM" || ticket.roomCode || ticket.roomName) {
       return [ticket.roomCode || ticket.roomName || "Phòng thuê", ticket.propertyName].filter(Boolean).join(" · ");
     }
-    return [SCOPE_LABELS[ticket.ticketScope] || ticket.ticketScope, ticket.propertyName].filter(Boolean).join(" · ");
+    return [SCOPE_LABELS[ticket.ticketScope] || "Phạm vi chưa xác định", ticket.propertyName].filter(Boolean).join(" · ");
   }, [ticket]);
 
   const loadTicket = useCallback(async () => {
@@ -674,7 +681,7 @@ export default function MaintenanceTicketDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-4">
         <InfoItem label="Vị trí" value={locationText} />
-        <InfoItem label="Hạng mục" value={CATEGORY_LABELS[ticket.category] || ticket.category} />
+        <InfoItem label="Hạng mục" value={CATEGORY_LABELS[ticket.category] || "Khác"} />
         <InfoItem label="Mong muốn xử lý" value={ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"} />
         <InfoItem label="Ngày tạo" value={formatDateTime(ticket.createdAt)} />
       </div>

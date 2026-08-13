@@ -1533,9 +1533,7 @@ export default function MaintenancePage() {
                             Bảo trì nội bộ
                           </span>
                           <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                            {CATEGORY_LABELS[ticket.category] ||
-                              ticket.category ||
-                              "Khác"}
+                            {CATEGORY_LABELS[ticket.category] || "Khác"}
                           </span>
                         </span>
                       ) : ticket.category === "RULE_VIOLATION" ? (
@@ -1550,9 +1548,7 @@ export default function MaintenancePage() {
                       ) : (
                         <span className="inline-flex flex-col gap-1">
                           <span>
-                            {CATEGORY_LABELS[ticket.category] ||
-                              ticket.category ||
-                              "Khác"}
+                            {CATEGORY_LABELS[ticket.category] || "Khác"}
                           </span>
                           <span
                             className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${

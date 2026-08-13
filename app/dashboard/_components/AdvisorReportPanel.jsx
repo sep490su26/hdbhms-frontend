@@ -15,7 +15,6 @@ import {
   currentAdvisorPeriod,
   downloadAdvisorReportDocx,
   fetchAdvisorReport,
-  refreshAdvisorReport,
 } from "@/services/advisorService";
 import { MarkdownContent } from "./MarkdownContent";
 import { MonthYearField } from "./MonthYearField";
@@ -65,14 +64,14 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
     });
   };
 
-  const loadReport = async ({ refresh = false } = {}) => {
+  const loadReport = async () => {
     if (isLoading || !selectedPeriod) return;
 
     const reportPeriod = selectedPeriod;
     setLoading(true);
     setError("");
     try {
-      const data = refresh ? await refreshAdvisorReport(reportPeriod) : await fetchAdvisorReport(reportPeriod);
+      const data = await fetchAdvisorReport(reportPeriod);
       saveReport(reportPeriod, data);
     } catch (loadError) {
       setError(loadError?.message || "Không tạo được báo cáo AI.");
@@ -180,7 +179,7 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
         <DialogFooter className="flex-row flex-wrap justify-end border-t border-[#dce2ec] px-5 py-4">
           <button
             type="button"
-            onClick={() => loadReport({ refresh: true })}
+            onClick={loadReport}
             disabled={isLoading || !selectedPeriod}
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-[#0f1d33] hover:bg-[#f8fafc] disabled:opacity-50"
           >

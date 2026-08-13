@@ -1,9 +1,8 @@
 "use client";
 
 import {useState, useEffect, useCallback, useRef} from "react";
-import {useRouter, useSearchParams} from "next/navigation";
+import {useSearchParams} from "next/navigation";
 import {
-    confirmBatch as confirmMeterReadingBatch,
     downloadMeterReadingImportTemplate,
     fetchBatchMeterReadingsStatus,
     importMeterReadingsFromExcel,
@@ -12,6 +11,7 @@ import {
     startBatchReading,
     uploadMeterReadingPhoto,
 } from "@/services/meterReadingService";
+import {createUtilityBillingRun} from "@/services/billingService";
 import {
     cacheBatchMeterReadingsStatus,
     getCachedBatchMeterReadingsStatus,
@@ -151,8 +151,6 @@ const STATUS_CONFIG = {
 };
 
 
-const LOCKED_BATCH_STATUSES = new Set(["CONFIRMED"]);
-
 function getPeriodParts(value) {
     const text = String(value || "").trim();
     const canonical = text.match(/^(\d{4})-(\d{1,2})$/);
@@ -185,6 +183,11 @@ function normalizeBatchStatus(source) {
     return String(readField(source, "status", "batchStatus", "batch_status") || "").toUpperCase();
 }
 
+function normalizeBoolean(value) {
+    if (typeof value === "boolean") return value;
+    return ["true", "1", "yes"].includes(String(value || "").toLowerCase());
+}
+
 function numberOrNull(value) {
     if (value === undefined || value === null || value === "") return null;
     const parsed = Number(value);
@@ -212,6 +215,15 @@ function normalizeReadingWarnings(warnings) {
 
 function firstWarningMessage(room) {
     return Array.isArray(room?.warnings) ? room.warnings.find((warning) => warning?.message)?.message || "" : "";
+}
+
+function requiresMeterReadingCorrection(room) {
+    const current = numberOrNull(room?.elecCurr);
+    const previous = numberOrNull(room?.elecPrev);
+    const hasNegativeUsage = current !== null && previous !== null && current < previous;
+    const hasNegativeUsageWarning = Array.isArray(room?.warnings)
+        && room.warnings.some((warning) => String(warning?.type || "").toUpperCase() === "NEGATIVE_USAGE");
+    return hasNegativeUsage || hasNegativeUsageWarning;
 }
 
 function normalizePropertyId(value) {
@@ -291,16 +303,6 @@ function meterPeriodToBillingPeriod(value) {
     return "";
 }
 
-function getBillingHref(propertyId, meterPeriod) {
-    const params = new URLSearchParams();
-    const billingPeriod = meterPeriodToBillingPeriod(meterPeriod);
-    if (billingPeriod) params.set("billingPeriod", billingPeriod);
-    if (propertyId) params.set("propertyId", propertyId);
-    params.set("from", "meter-readings");
-    const query = params.toString();
-    return `/dashboard/billing${query ? `?${query}` : ""}`;
-}
-
 function MeterPhoto({src}) {
     return (
         <div
@@ -322,7 +324,6 @@ export default function MeterReadings() {
     const [importingExcel, setImportingExcel] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [resolvingWarningRoomId, setResolvingWarningRoomId] = useState(null);
-    const [confirmBatchDialogOpen, setConfirmBatchDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState("all");
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -330,6 +331,10 @@ export default function MeterReadings() {
     const [focusRoomId, setFocusRoomId] = useState(null);
     const [batchId, setBatchId] = useState(null);
     const [batchStatus, setBatchStatus] = useState("");
+    const [billingRunStatus, setBillingRunStatus] = useState("");
+    const [readingsLocked, setReadingsLocked] = useState(false);
+    const [billingRunRefreshToken, setBillingRunRefreshToken] = useState(0);
+    const [billingRunOpenToken, setBillingRunOpenToken] = useState(0);
     const [cameraTarget, setCameraTarget] = useState(null);
     const [capturedPhotos, setCapturedPhotos] = useState({}); // { roomId: { electricity } }
     const [electricityTariff, setElectricityTariff] = useState(DEFAULT_UTILITY_TARIFFS.electricity);
@@ -343,7 +348,6 @@ export default function MeterReadings() {
     const syncingOfflineRef = useRef(false);
     const excelInputRef = useRef(null);
 
-    const router = useRouter();
     const {user} = useAuth();
     const searchParams = useSearchParams();
     const queryPeriod = searchParams.get("period") || "";
@@ -386,6 +390,8 @@ export default function MeterReadings() {
         const fetchedBatchId = res.batchId || res.batch_id || null;
         setBatchId(fetchedBatchId);
         setBatchStatus(normalizeBatchStatus(res));
+        setBillingRunStatus(String(readField(res, "billingRunStatus", "billing_run_status") || "").toUpperCase());
+        setReadingsLocked(normalizeBoolean(readField(res, "readingsLocked", "readings_locked")));
         setElectricityTariff(normalizeUtilityTariff(
             readField(res, "electricityTariff", "electricity_tariff"),
             DEFAULT_UTILITY_TARIFFS.electricity,
@@ -407,7 +413,9 @@ export default function MeterReadings() {
                     offlineElectricityPhotoQueued: false,
                     offlineQueuedAt: null,
                     offlineSyncError: "",
-                    status: readField(r, "status") || (warnings.length > 0 ? "warning" : "pending"),
+                    status: warnings.length > 0
+                        ? "warning"
+                        : readField(r, "status") || "pending",
                     syncTime: formatDateTime(syncTime, null),
                     photos: Number(Boolean(readField(r, "electricityPhotoId", "electricity_photo_id"))),
                     warnings,
@@ -433,6 +441,8 @@ export default function MeterReadings() {
                 const fetchedBatchId = res.batchId || res.batch_id || null;
                 setBatchId(fetchedBatchId);
                 setBatchStatus(normalizeBatchStatus(res));
+                setBillingRunStatus(String(readField(res, "billingRunStatus", "billing_run_status") || "").toUpperCase());
+                setReadingsLocked(normalizeBoolean(readField(res, "readingsLocked", "readings_locked")));
                     setElectricityTariff(normalizeUtilityTariff(
                         readField(res, "electricityTariff", "electricity_tariff"),
                         DEFAULT_UTILITY_TARIFFS.electricity,
@@ -454,7 +464,9 @@ export default function MeterReadings() {
                             offlineElectricityPhotoQueued: false,
                             offlineQueuedAt: null,
                             offlineSyncError: "",
-                            status: readField(r, "status") || (warnings.length > 0 ? "warning" : "pending"),
+                            status: warnings.length > 0
+                                ? "warning"
+                                : readField(r, "status") || "pending",
                             syncTime: formatDateTime(syncTime, null),
                             photos: Number(Boolean(readField(r, "electricityPhotoId", "electricity_photo_id"))),
                             warnings,
@@ -556,16 +568,17 @@ export default function MeterReadings() {
     const completed = rooms.filter((r) => r.status === "synced").length;
     const pending = rooms.filter((r) => r.status === "pending" || !r.status).length;
     const unsynced = rooms.filter((r) => r.status === "local").length;
-    const warnings = rooms.filter((r) => r.status === "warning").length;
+    const warnings = rooms.filter((r) => r.status === "warning" || r.warnings?.length > 0).length;
     const errors = rooms.filter((r) => r.status === "error").length;
     const total = rooms.length;
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-    const isBatchLocked = LOCKED_BATCH_STATUSES.has(batchStatus);
-    const canConfirmBatch = !isBatchLocked && Boolean(batchId) && total > 0 && pending === 0 && errors === 0 && warnings === 0 && unsynced === 0;
+    const isBatchLocked = readingsLocked;
+    const hasBillingRun = Boolean(billingRunStatus);
+    const canCreateBilling = !isBatchLocked && Boolean(propertyId) && total > 0 && pending === 0 && errors === 0 && warnings === 0 && unsynced === 0;
 
     const handleCurrChange = (roomId, field, val) => {
         if (isBatchLocked) {
-            toast.info("Kỳ ghi chỉ số đã chốt, không thể chỉnh sửa.");
+            toast.info("Hóa đơn kỳ này đã phát hành, không thể chỉnh sửa chỉ số.");
             return;
         }
 
@@ -638,7 +651,7 @@ export default function MeterReadings() {
         event.target.value = "";
         if (!file) return;
         if (isBatchLocked) {
-            toast.info("Kỳ ghi chỉ số đã chốt, không thể nhập thêm dữ liệu.");
+            toast.info("Hóa đơn kỳ này đã phát hành, không thể nhập thêm dữ liệu.");
             return;
         }
         if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -653,6 +666,7 @@ export default function MeterReadings() {
         try {
             const result = await importMeterReadingsFromExcel(activeBatchId, file);
             toast.success(`Đã nhập ${result?.importedRows || 0} phòng từ Excel.`);
+            setBillingRunRefreshToken((value) => value + 1);
             await loadData();
         } catch (error) {
             toast.error(error?.details || error?.message || "Không thể nhập dữ liệu Excel.");
@@ -672,8 +686,13 @@ export default function MeterReadings() {
 
     const handleResolveWarning = async (room) => {
         if (!room || resolvingWarningRoomId) return;
+        if (requiresMeterReadingCorrection(room)) {
+            toast.error("Chỉ số mới thấp hơn chỉ số cũ. Vui lòng sửa lại trước khi xác nhận.");
+            setFocusRoomId(room.id);
+            return;
+        }
         if (isBatchLocked) {
-            toast.info("Kỳ ghi chỉ số đã chốt.");
+            toast.info("Hóa đơn kỳ này đã phát hành, chỉ có thể xem lại.");
             return;
         }
         if (!batchId || !room.roomId) {
@@ -687,7 +706,16 @@ export default function MeterReadings() {
 
         setResolvingWarningRoomId(room.id);
         try {
+            // Missing-reading warnings need a current-period reading before they can be resolved.
+            if (room.elecCurr === null || room.elecCurr === undefined) {
+                throw new Error("Vui lòng nhập chỉ số điện trước khi xác nhận.");
+            }
+            await saveProgressiveRoomReading(batchId, room.roomId, {
+                electricityValue: room.elecCurr,
+                electricityPhotoId: getExistingPhotoId(room),
+            });
             await resolveMeterReadingAnomalies(batchId, room.roomId);
+            setBillingRunRefreshToken((value) => value + 1);
             setRooms((prev) => prev.map((item) => item.id === room.id ? {
                 ...item,
                 status: "synced",
@@ -794,7 +822,7 @@ export default function MeterReadings() {
     const handleSaveAndNext = async () => {
         if (saving) return;
         if (isBatchLocked) {
-            toast.info("Kỳ ghi chỉ số đã chốt, không thể chỉnh sửa.");
+            toast.info("Hóa đơn kỳ này đã phát hành, không thể chỉnh sửa.");
             return;
         }
 
@@ -845,6 +873,7 @@ export default function MeterReadings() {
                 electricityValue: room.elecCurr,
                 electricityPhotoId: savedElectricityPhotoId,
             });
+            setBillingRunRefreshToken((value) => value + 1);
 
             // local update status
             setRooms(prev => prev.map(r => r.id === focusRoomId ? {
@@ -874,44 +903,35 @@ export default function MeterReadings() {
         }
     };
 
-    const requestConfirmBatch = () => {
-        if (isBatchLocked) {
-            toast.info("Kỳ ghi chỉ số đã chốt.");
-            return;
-        }
-
-        if (!batchId) {
-            toast.error("Chưa có kỳ ghi chỉ số để chốt");
-            return;
-        }
-
-        if (pending > 0 || errors > 0 || warnings > 0 || unsynced > 0) {
-            toast.error(warnings > 0
-                ? "Vui lòng kiểm tra và xác nhận các chỉ số bất thường trước khi chốt kỳ"
-                : "Vui lòng hoàn tất và đồng bộ tất cả phòng trước khi chốt kỳ");
-            return;
-        }
-
-        setConfirmBatchDialogOpen(true);
-    };
-
-    const handleConfirmBatch = async () => {
+    const handleCreateOrUpdateBilling = async () => {
         if (confirming) return;
         if (isBatchLocked) {
-            setConfirmBatchDialogOpen(false);
+            toast.info("Kỳ này đã xuất hóa đơn và được chốt nhập.");
+            return;
+        }
+        if (!canCreateBilling) {
+            toast.error(warnings > 0
+                ? "Vui lòng xử lý các cảnh báo trước khi tạo hóa đơn."
+                : "Vui lòng hoàn tất và lưu đủ chỉ số trước khi tạo hóa đơn.");
+            return;
+        }
+
+        const billingPeriod = meterPeriodToBillingPeriod(period);
+        if (!billingPeriod) {
+            toast.error("Không xác định được kỳ hóa đơn.");
             return;
         }
 
         setConfirming(true);
         try {
-            await confirmMeterReadingBatch(batchId);
-            setBatchStatus("CONFIRMED");
-            toast.success("Đã chốt kỳ ghi chỉ số. Đang mở batch hóa đơn nháp.");
-            setConfirmBatchDialogOpen(false);
+            const run = await createUtilityBillingRun({propertyId, billingPeriod});
+            setBillingRunStatus(String(run?.status || "PREVIEWED").toUpperCase());
+            setBillingRunRefreshToken((value) => value + 1);
+            setBillingRunOpenToken((value) => value + 1);
+            toast.success("Đã tạo/cập nhật bản nháp hóa đơn.");
             await loadData();
-            router.push(getBillingHref(propertyId, period));
         } catch (error) {
-            toast.error(error?.details || error?.message || "Không thể chốt kỳ ghi chỉ số");
+            toast.error(error?.details || error?.message || "Không thể tạo/cập nhật hóa đơn.");
             console.error(error);
         } finally {
             setConfirming(false);
@@ -1005,19 +1025,25 @@ export default function MeterReadings() {
                                     <span
                                         className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                                         <CheckCircle2 className="h-4 w-4"/>
-                                        Kỳ đã chốt, chỉ có thể xem lại
+                                        Hóa đơn đã phát hành, chỉ có thể xem lại
+                                    </span>
+                                ) : hasBillingRun ? (
+                                    <span
+                                        className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                                        <CheckCircle2 className="h-4 w-4"/>
+                                        Đã có bản nháp hóa đơn, vẫn có thể cập nhật
                                     </span>
                                 ) : (pending > 0 || errors > 0 || warnings > 0 || unsynced > 0) ? (
                                     <span
                                         className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-300">
                                         <AlertTriangle className="h-4 w-4"/>
-                                        {pending + errors + warnings + unsynced} phòng chưa đủ điều kiện. Chưa thể chốt kỳ.
+                                        {pending + errors + warnings + unsynced} phòng chưa đủ điều kiện. Chưa thể tạo hóa đơn.
                                     </span>
                                 ) : (
                                     <span
                                         className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                                         <CheckCircle2 className="h-4 w-4"/>
-                                        Đã đủ điều kiện chốt kỳ
+                                        Đã đủ điều kiện tạo hóa đơn
                                     </span>
                                 )}
                             </div>
@@ -1062,12 +1088,12 @@ export default function MeterReadings() {
                                     Bắt đầu nhập
                                 </Button>
                                 <Button
-                                    onClick={requestConfirmBatch}
-                                    disabled={!canConfirmBatch || confirming}
+                                    onClick={handleCreateOrUpdateBilling}
+                                    disabled={!canCreateBilling || confirming}
                                     className="flex items-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <CheckCircle2 className="h-4 w-4"/>
-                                    {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
+                                    {confirming ? "Đang cập nhật..." : isBatchLocked ? "Đã chốt nhập" : "Tạo/Cập nhật hóa đơn"}
                                 </Button>
                             </div>
                         </div>
@@ -1084,12 +1110,19 @@ export default function MeterReadings() {
                 <DashboardStatCard icon={UploadCloud} label="Chưa đồng bộ" value={unsynced} tone="amber"/>
             </div>
 
-            {isBatchLocked ? (
+            {hasBillingRun || isBatchLocked ? (
                 <div className="mb-6">
                     <UtilityBillingRunsPanel
-                        key={`${propertyId || "all"}-${period || formatMonthYearPeriod()}`}
+                        key={`${propertyId || "all"}-${period || formatMonthYearPeriod()}-${billingRunStatus || "none"}`}
                         propertyId={propertyId}
                         defaultPeriod={period || formatMonthYearPeriod()}
+                        refreshToken={billingRunRefreshToken}
+                        openToken={billingRunOpenToken}
+                        showTrigger={false}
+                        onPublished={async (run) => {
+                            setBillingRunStatus(String(run?.status || "INVOICES_CREATED").toUpperCase());
+                            await loadData();
+                        }}
                     />
                 </div>
             ) : null}
@@ -1282,7 +1315,9 @@ export default function MeterReadings() {
                                                                             className="text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
                                                                         >
                                                                             <CheckCircle2 className="h-3.5 w-3.5"/>
-                                                                            {resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
+                                                                            {requiresMeterReadingCorrection(room)
+                                                                                ? "Sửa chỉ số"
+                                                                                : resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
                                                                         </Button>
                                                                     ) : null}
                                                                     <button
@@ -1339,7 +1374,9 @@ export default function MeterReadings() {
                                                                     className="text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
                                                                 >
                                                                     <CheckCircle2 className="h-3.5 w-3.5"/>
-                                                                    {resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
+                                                                    {requiresMeterReadingCorrection(room)
+                                                                        ? "Sửa chỉ số"
+                                                                        : resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
                                                                 </Button>
                                                             ) : null}
                                                             <button
@@ -1453,12 +1490,12 @@ export default function MeterReadings() {
                     </div>
                 </div>
                 <Button
-                    onClick={requestConfirmBatch}
-                    disabled={!canConfirmBatch || confirming}
+                    onClick={handleCreateOrUpdateBilling}
+                    disabled={!canCreateBilling || confirming}
                     className="flex w-full items-center justify-center gap-2 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
                 >
                     <CheckCircle2 className="h-4 w-4"/>
-                    {confirming ? "Đang chốt..." : isBatchLocked ? "Đã chốt kỳ" : "Chốt kỳ"}
+                    {confirming ? "Đang cập nhật..." : isBatchLocked ? "Đã chốt nhập" : "Tạo/Cập nhật hóa đơn"}
                 </Button>
             </div>
 
@@ -1496,7 +1533,9 @@ export default function MeterReadings() {
                                                 className="bg-white/80 text-amber-700 hover:text-amber-800 dark:bg-[#0f172a] dark:text-amber-300 dark:hover:text-amber-200"
                                             >
                                                 <CheckCircle2 className="h-3.5 w-3.5"/>
-                                                {resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
+                                                {requiresMeterReadingCorrection(room)
+                                                    ? "Sửa chỉ số"
+                                                    : resolvingWarningRoomId === room.id ? "Đang lưu" : "Đã kiểm tra"}
                                             </Button>
                                         </div>
                                     </div>
@@ -1592,56 +1631,6 @@ export default function MeterReadings() {
                     })()}
                 </DialogContent>
                 ) : null}
-            </Dialog>
-
-            <Dialog open={confirmBatchDialogOpen}
-                    onOpenChange={(open) => !confirming && setConfirmBatchDialogOpen(open)}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Xác nhận chốt kỳ điện</DialogTitle>
-                        <DialogDescription>
-                            Sau khi chốt, kỳ ghi chỉ số sẽ bị khóa và hệ thống sẽ mở batch hóa đơn nháp để review trước
-                            khi phát hành.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div
-                        className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                        <div className="flex items-center justify-between gap-3">
-                            <span>Kỳ nhập</span>
-                            <span className="font-black">{formatPeriodLabel(period)}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                            <span>Đã nhập</span>
-                            <span className="font-black">{completed} / {total} phòng</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                            <span>Cần kiểm tra</span>
-                            <span className="font-black">{warnings} phòng</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                            <span>Chưa đồng bộ</span>
-                            <span className="font-black">{unsynced} phòng</span>
-                        </div>
-                    </div>
-                    <DialogFooter className="gap-2 sm:justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setConfirmBatchDialogOpen(false)}
-                            disabled={confirming}
-                        >
-                            Kiểm tra lại
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={handleConfirmBatch}
-                            disabled={confirming || isBatchLocked}
-                            className="bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                            {confirming ? "Đang chốt..." : "Xác nhận chốt kỳ"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
             </Dialog>
 
             <CameraCapture

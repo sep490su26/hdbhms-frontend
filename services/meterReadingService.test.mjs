@@ -44,15 +44,30 @@ test("meter reading period history has a dedicated dashboard route", () => {
   assert.match(historySource, /DashboardPagination/);
 });
 
-test("confirmed meter reading batches lock entry actions", () => {
+test("issued meter reading invoices lock entry actions", () => {
   const source = readFileSync(
     new URL("../app/dashboard/meter-readings/batch/page.jsx", import.meta.url),
     "utf8",
   );
 
-  assert.match(source, /LOCKED_BATCH_STATUSES = new Set\(\["CONFIRMED"\]\)/);
-  assert.match(source, /const isBatchLocked = LOCKED_BATCH_STATUSES\.has\(batchStatus\)/);
-  assert.match(source, /const canConfirmBatch = !isBatchLocked/);
+  assert.doesNotMatch(source, /LOCKED_BATCH_STATUSES = new Set\(\["CONFIRMED"\]\)/);
+  assert.match(source, /const isBatchLocked = readingsLocked/);
+  assert.match(source, /readingsLocked/);
+  assert.match(source, /const canCreateBilling = !isBatchLocked/);
+  assert.match(source, /Tạo\/Cập nhật hóa đơn/);
+  assert.doesNotMatch(source, /confirmMeterReadingBatch/);
   assert.match(source, /disabled=\{isBatchLocked\}/);
   assert.match(source, /disabled=\{saving \|\| isBatchLocked\}/);
+});
+
+test("negative meter usage cannot be confirmed as reviewed", () => {
+  const source = readFileSync(
+    new URL("../app/dashboard/meter-readings/batch/page.jsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /requiresMeterReadingCorrection/);
+  assert.match(source, /NEGATIVE_USAGE/);
+  assert.match(source, /Chỉ số mới thấp hơn chỉ số cũ/);
+  assert.match(source, /Sửa chỉ số/);
 });

@@ -4,6 +4,13 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {CheckCircle2, CircleDollarSign, Loader2, X} from "lucide-react";
 import {toast} from "sonner";
 
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import ContractHandoverSection from "@/app/dashboard/contract-management/ContractHandoverSection";
 import {fetchContractHandover} from "@/services/contractHandoverService";
 import {
@@ -21,16 +28,19 @@ const TRANSFER_STATUS_LABELS = {
     REQUESTED: "Mới tạo",
     MANAGER_APPROVED: "Quản lý đã duyệt",
     WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
+    WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
     WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
     WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
     WAITING_PAYMENT: "Chờ thanh toán",
     WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
+    WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
     WAITING_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
     WAITING_CONTRACT_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
     WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
     READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
     WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
     EXECUTED: "Đã chuyển phòng",
+    COMPLETED: "Đã hoàn tất chuyển phòng",
     CANCELLED: "Đã hủy",
     REJECTED: "Đã từ chối",
     EXPIRED: "Đã hết hạn",
@@ -45,7 +55,7 @@ function requiresFullMoveIn(transfer) {
 }
 
 function getStatusLabel(status) {
-    return TRANSFER_STATUS_LABELS[status] || status || "Chưa rõ";
+    return TRANSFER_STATUS_LABELS[status] || "Trạng thái chuyển phòng chưa xác định";
 }
 
 function getTransferOutScopeTitle(transfer) {
@@ -303,26 +313,38 @@ export default function TransferExecutionModal({
     );
 
     return (
-        <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-[#091426]/70 p-2 backdrop-blur-sm sm:p-3"
-            onClick={() => !disabled && onClose?.()}
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (!nextOpen && !disabled) onClose?.();
+            }}
         >
-            <section
-                className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-                onClick={(event) => event.stopPropagation()}
+            <DialogContent
+                showCloseButton={false}
+                className="z-[70] flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0 shadow-2xl sm:max-h-[94vh]"
+                overlayClassName="z-[70] bg-[#091426]/70 backdrop-blur-sm"
+                onEscapeKeyDown={(event) => {
+                    if (disabled) event.preventDefault();
+                }}
+                onPointerDownOutside={(event) => {
+                    if (disabled) event.preventDefault();
+                }}
             >
-                <header className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+                <header className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
                     <div>
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
                             {isMoveOutPhase ? "Chốt phòng cũ" : "Hoàn tất chuyển phòng"}
                         </p>
-                        <h3 className="mt-1 text-lg font-extrabold text-gray-950">
+                        <DialogTitle className="mt-1 text-lg font-extrabold text-gray-950">
                             {loading
                                 ? "Đang tải yêu cầu chuyển phòng"
                                 : isMoveOutPhase
                                     ? getTransferOutScopeTitle(transfer)
                                     : "Hoàn tất chuyển phòng"}
-                        </h3>
+                        </DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Biểu mẫu bàn giao và hoàn tất chuyển phòng.
+                        </DialogDescription>
                         {isMoveOutPhase && (
                             <p className="mt-1 max-w-2xl text-sm font-semibold leading-5 text-gray-600">
                                 {getTransferOutScopeDescription(transfer)}
@@ -332,25 +354,29 @@ export default function TransferExecutionModal({
                             {transfer?.requestCode || requestCode || `#${transfer?.id || effectiveRequestId || ""}`}
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={disabled}
-                        aria-label="Đóng"
-                        className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-60"
-                    >
-                        <X className="h-5 w-5"/>
-                    </button>
+                    <DialogClose asChild>
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            aria-label="Đóng"
+                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-60"
+                        >
+                            <X className="h-5 w-5"/>
+                        </button>
+                    </DialogClose>
                 </header>
 
                 {loading ? (
-                    <div className="flex min-h-64 items-center justify-center gap-3 px-5 py-10 text-sm font-semibold text-gray-600">
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        <div className="flex min-h-64 items-center justify-center gap-3 px-5 py-10 text-sm font-semibold text-gray-600">
                         <Loader2 className="h-5 w-5 animate-spin"/>
                         Đang tải dữ liệu chuyển phòng...
+                        </div>
                     </div>
                 ) : (
                     <>
-                        <div className="space-y-5 px-5 py-5">
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                            <div className="space-y-5 px-5 py-5">
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                                 <div className="rounded-xl bg-gray-50 p-4">
                                     <p className="mb-1 text-xs font-semibold text-gray-500">Phòng cũ</p>
@@ -473,9 +499,10 @@ export default function TransferExecutionModal({
                                     )}
                                 </div>
                             )}
+                            </div>
                         </div>
 
-                        <footer className="flex flex-col-reverse gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:justify-end">
+                        <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-gray-200 bg-white px-5 py-4 sm:flex-row sm:justify-end">
                             <button
                                 type="button"
                                 onClick={onClose}
@@ -500,7 +527,7 @@ export default function TransferExecutionModal({
                         </footer>
                     </>
                 )}
-            </section>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

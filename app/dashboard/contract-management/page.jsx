@@ -179,16 +179,19 @@ const TRANSFER_STATUS_LABELS = {
   REQUESTED: "Mới tạo",
   MANAGER_APPROVED: "Quản lý đã duyệt",
   WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
+  WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
   WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
   WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
   WAITING_PAYMENT: "Chờ thanh toán",
   WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
+  WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
   WAITING_SIGNING: "Chờ quản lý upload bản ký",
   WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
   WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
   READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
   WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
   EXECUTED: "Đã chuyển phòng",
+  COMPLETED: "Đã hoàn tất chuyển phòng",
   CANCELLED: "Đã hủy",
   REJECTED: "Đã từ chối",
   EXPIRED: "Đã hết hạn",
@@ -907,7 +910,7 @@ function isTransferSigningStatus(status) {
 }
 
 function getTransferStatusLabel(status) {
-  return TRANSFER_STATUS_LABELS[status] || status || "Chưa rõ";
+  return TRANSFER_STATUS_LABELS[status] || "Trạng thái chuyển phòng chưa xác định";
 }
 
 function getTransferContractStatusLabel(item = {}) {

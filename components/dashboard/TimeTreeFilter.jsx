@@ -2,6 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { vi } from "date-fns/locale";
+
+import { Calendar } from "@/components/ui/calendar";
 
 /**
  * Generates the tree data structure from viewing customer records.
@@ -207,7 +210,7 @@ export default function TimeTreeFilter({
   /* ---------- render ---------- */
   return (
     <aside
-      className={`flex shrink-0 flex-col overflow-y-auto border-r border-[#E5E7EB] bg-[#F9FAFB] dark:border-white/10 dark:bg-[#0f172a]/50 w-[250px] ${className}`}
+      className={`flex w-[320px] min-w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[#E5E7EB] bg-[#F9FAFB] dark:border-white/10 dark:bg-[#0f172a]/50 ${className}`}
       aria-label="Bộ lọc thời gian"
     >
       {/* Header */}
@@ -223,7 +226,13 @@ export default function TimeTreeFilter({
           const yearExpanded = isYearExpanded(yearNode.value);
 
           return (
-            <div key={yearNode.value} role="treeitem" aria-expanded={yearExpanded} className="flex flex-col gap-1">
+            <div
+              key={yearNode.value}
+              role="treeitem"
+              aria-expanded={yearExpanded}
+              aria-selected={isYearSelected(yearNode.value)}
+              className="flex flex-col gap-1"
+            >
               {/* ── Level 1: Year ── */}
               <button
                 type="button"
@@ -271,6 +280,7 @@ export default function TimeTreeFilter({
                         key={quarterNode.value}
                         role="treeitem"
                         aria-expanded={quarterExpanded}
+                        aria-selected={quarterSelected}
                         className="flex flex-col gap-1"
                       >
                         {/* Level 2: Quarter */}
@@ -336,6 +346,7 @@ export default function TimeTreeFilter({
                                   key={monthNode.value}
                                   role="treeitem"
                                   aria-expanded={monthExpanded}
+                                  aria-selected={monthSelected}
                                   className="flex flex-col gap-1"
                                 >
                                   {/* Level 3: Month */}
@@ -385,41 +396,47 @@ export default function TimeTreeFilter({
                                     )}
                                   </button>
 
-                                  {/* ── Day list (Level 4) ── */}
+                                  {/* Use a calendar so the day filter stays compact as data grows. */}
                                   {maxDepth !== "month" && monthExpanded && (
-                                    <div className="flex flex-col gap-1" role="group">
-                                      {monthNode.days.map((dayNode) => {
-                                        const daySelected = isDaySelected(
-                                          yearNode.value,
-                                          quarterNode.value,
-                                          monthNode.value,
-                                          dayNode.value,
-                                        );
-
-                                        return (
-                                          <button
-                                            key={dayNode.value}
-                                            type="button"
-                                            role="treeitem"
-                                            onClick={() =>
-                                              selectDay(
-                                                yearNode.value,
-                                                quarterNode.value,
-                                                monthNode.value,
-                                                dayNode.value,
-                                              )
-                                            }
-                                            className={`flex w-full items-center justify-between rounded-[6px] pl-[56px] pr-3 py-2 text-left text-sm leading-5 transition-colors duration-150 ${
-                                              daySelected
-                                                ? "bg-[#1e40af] font-medium text-white shadow-sm dark:bg-blue-600"
-                                                : "font-normal text-[#6B7280] hover:bg-[#F3F4F6] dark:text-slate-400 dark:hover:bg-white/5"
-                                            }`}
-                                            aria-selected={daySelected}
-                                          >
-                                            <span>{dayNode.label}</span>
-                                          </button>
-                                        );
-                                      })}
+                                    <div className="ml-8 min-w-[248px] rounded-lg border border-[#e2e8f0] bg-white dark:border-white/10 dark:bg-[#0f172a]">
+                                      <Calendar
+                                        mode="single"
+                                        locale={vi}
+                                        fixedWeeks
+                                        month={new Date(yearNode.value, monthNode.value - 1, 1)}
+                                        selected={
+                                          selected?.year === yearNode.value &&
+                                          selected?.month === monthNode.value &&
+                                          selected?.day !== "all"
+                                            ? new Date(yearNode.value, monthNode.value - 1, Number(selected.day))
+                                            : undefined
+                                        }
+                                        onSelect={(date) => {
+                                          if (!date) return;
+                                          selectDay(
+                                            yearNode.value,
+                                            quarterNode.value,
+                                            monthNode.value,
+                                            date.getDate(),
+                                          );
+                                        }}
+                                        disabled={(date) =>
+                                          date.getFullYear() !== yearNode.value ||
+                                          date.getMonth() !== monthNode.value - 1 ||
+                                          !Array.isArray(monthNode.days) ||
+                                          !monthNode.days.some((day) => day.value === date.getDate())
+                                        }
+                                        classNames={{
+                                          month_caption: "hidden",
+                                          nav: "hidden",
+                                        }}
+                                        components={{
+                                          // The tree already identifies the selected month; keep only the day grid here.
+                                          MonthCaption: () => null,
+                                          Nav: () => null,
+                                        }}
+                                        className="mx-auto w-full min-w-[248px] p-2"
+                                      />
                                     </div>
                                   )}
                                 </div>

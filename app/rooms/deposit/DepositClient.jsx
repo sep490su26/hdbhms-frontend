@@ -1300,10 +1300,9 @@ function RoomSummary({ room }) {
   const isSoonVacant = room?.status === "soonVacant";
   const statusCopy = isSoonVacant ? "Sắp trống" : "Còn trống";
   const statusClassName = isSoonVacant ? "bg-[#5b6472]" : "bg-[#006c49]";
-  const expectedVacantDateLabel = formatDateForMessage(
-    scheduleWindow.expectedVacantDate,
+  const availableForDepositDateLabel = formatDateForMessage(
+    scheduleWindow.minDate,
   );
-
   return (
     <aside className="overflow-hidden rounded-xl border border-[#c5c6cd] bg-[#fbf8fa] shadow-[0_4px_10px_rgba(9,20,38,0.04)]">
       <div className="relative h-48 overflow-hidden">
@@ -1336,10 +1335,10 @@ function RoomSummary({ room }) {
         <p className="mt-3 text-sm leading-6 text-[#45474c]">
           {room.description}
         </p>
-        {isSoonVacant && expectedVacantDateLabel && (
+        {isSoonVacant && availableForDepositDateLabel && (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800">
-            Sắp trống từ {expectedVacantDateLabel}. Chỉ đặt cọc với ngày ký/vào
-            ở sau ngày này và trong vòng 14 ngày.
+            Phòng sắp trống. Có thể đặt cọc với ngày hẹn ký và ngày dự kiến vào ở
+            từ {availableForDepositDateLabel}, trong vòng 14 ngày.
           </div>
         )}
 
@@ -1378,8 +1377,8 @@ function DepositInfoForm({
   const todayDate = getTodayDateString();
   const minScheduleDate = scheduleWindow.minDate;
   const maxScheduleDate = scheduleWindow.maxDate;
-  const expectedVacantDateLabel = formatDateForMessage(
-    scheduleWindow.expectedVacantDate,
+  const availableForDepositDateLabel = formatDateForMessage(
+    scheduleWindow.minDate,
   );
   const formRef = useRef(null);
   const handleCccdExtractedRef = useRef(null);
@@ -2541,11 +2540,11 @@ function DepositInfoForm({
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
               />
-              {scheduleWindow.isSoonVacant && expectedVacantDateLabel && (
+              {scheduleWindow.isSoonVacant && availableForDepositDateLabel && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
-                  Phòng sắp trống từ {expectedVacantDateLabel}. Ngày hẹn ký hợp
-                  đồng và ngày dự kiến vào ở phải sau ngày này, tối đa trong
-                  vòng 14 ngày.
+                  Phòng sắp trống. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở
+                  có thể bắt đầu từ {availableForDepositDateLabel}, tối đa
+                  trong vòng 14 ngày.
                 </div>
               )}
               <label className="flex flex-col gap-1.5">

@@ -137,33 +137,22 @@ function resolveAccountState(item) {
   };
 }
 
-function MetricCard({ icon: Icon, label, value, tone }) {
-  const toneClass = {
-    slate: "bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300",
-    amber:
-      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
-    blue: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
-    emerald:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
-    rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
-  }[tone];
-
+function SelectFilter({ value, options, onChange, label }) {
   return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-      <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
+    <label className="grid gap-1.5">
+      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 rounded-lg border border-[#c8ceda] bg-white px-3 text-sm font-semibold text-[#0f1d33] outline-none transition focus:border-[#0f2748] focus:ring-2 focus:ring-[#0f2748]/10 dark:border-white/10 dark:bg-[#020817] dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/20"
       >
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184] dark:text-slate-400">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33] dark:text-white">
-          {value}
-        </p>
-      </div>
-    </article>
+        {options.map((option) => (
+          <option key={option} value={option} className="bg-white text-[#0f1d33] dark:bg-[#020817] dark:text-white">
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -314,25 +303,6 @@ export default function AccountsPage() {
     ];
   }, [items, propertyFilter]);
 
-  const metrics = useMemo(() => {
-    const contractIds = new Set(
-      items.map((item) => item.contractId).filter(Boolean),
-    );
-    return {
-      contracts: contractIds.size,
-      notSent: items.filter(
-        (item) => resolveAccountState(item).key === "NOT_SENT",
-      ).length,
-      sent: items.filter((item) => resolveAccountState(item).key === "SENT")
-        .length,
-      activated: items.filter(
-        (item) => resolveAccountState(item).key === "ACTIVATED",
-      ).length,
-      missingEmail: items.filter(
-        (item) => resolveAccountState(item).key === "MISSING_EMAIL",
-      ).length,
-    };
-  }, [items]);
 
   const filteredItems = useMemo(() => {
     const keyword = normalize(query);
@@ -490,35 +460,7 @@ export default function AccountsPage() {
     <div className="grid gap-7 text-[#0f1d33] dark:text-white">
       <DashboardPageHeader
         title="Quản lý tài khoản khách thuê"
-        description="Cấp tài khoản mobile cho người thuê trong hợp đồng thuê đang ACTIVE."
       />
-
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
-        <MetricCard
-          icon={Home}
-          label="Hợp đồng hiệu lực"
-          value={metrics.contracts}
-          tone="slate"
-        />
-        <MetricCard
-          icon={KeyRound}
-          label="Chưa cấp"
-          value={metrics.notSent}
-          tone="amber"
-        />
-        <MetricCard
-          icon={Mail}
-          label="Đã gửi"
-          value={metrics.sent}
-          tone="blue"
-        />
-        <MetricCard
-          icon={ShieldCheck}
-          label="Đã kích hoạt"
-          value={metrics.activated}
-          tone="emerald"
-        />
-      </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_190px_180px_190px] xl:items-end">
@@ -580,15 +522,6 @@ export default function AccountsPage() {
       ) : null}
 
       <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="border-b border-[#d4dbe8] px-5 py-4 dark:border-white/10">
-          <h2 className="text-lg font-extrabold text-[#0f1d33] dark:text-white">
-            Danh sách cấp tài khoản
-          </h2>
-          <p className="mt-1 text-sm text-[#526179] dark:text-slate-400">
-            Dữ liệu lấy từ hợp đồng thuê ACTIVE trong database. Một lần gửi sẽ
-            cấp tài khoản cho người ký chính và người ở cùng.
-          </p>
-        </div>
 
         {loading ? (
           <div className="flex min-h-[240px] items-center justify-center text-sm font-semibold text-[#526179] dark:text-slate-400">

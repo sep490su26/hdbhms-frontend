@@ -2645,7 +2645,7 @@ function DepositInfoForm({
                 disabled={isLoadingPreview}
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-[#091426] px-5 text-sm font-bold text-[#091426] transition hover:bg-[#091426] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoadingPreview ? "Đang tạo..." : "Xem hợp đồng đặt cọc"}
+                {isLoadingPreview ? "Đang tạo..." : "Xem hợp đồng"}
               </button>
             </div>
             <div

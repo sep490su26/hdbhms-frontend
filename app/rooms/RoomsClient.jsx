@@ -127,7 +127,6 @@ async function fetchRoomsData(facilityId, filters) {
 
 function guestStatusCopy(status) {
   const copy = {
-    draft: "Bản nháp",
     available: "Trống",
     occupied: "Đã thuê",
     soonVacant: "Sắp trống",
@@ -149,16 +148,10 @@ function publicStatusClass(status) {
     return "border-purple-200 bg-purple-50 text-purple-700";
   if (status === "onHold" || status === "deposited")
     return "border-amber-200 bg-amber-50 text-amber-700";
-  if (status === "draft") return "border-slate-200 bg-slate-100 text-slate-600";
   return "border-slate-200 bg-slate-100 text-slate-600";
 }
 
 function floorPlanStatusStyle(status) {
-  if (status === "draft")
-    return {
-      box: "border-2 border-slate-300 bg-slate-50 text-slate-600",
-      dot: "bg-slate-400",
-    };
   if (status === "available")
     return {
       box: "border-2 border-emerald-400 bg-emerald-50 text-emerald-800",
@@ -176,15 +169,8 @@ function floorPlanStatusStyle(status) {
 }
 
 const FLOOR_PLAN_STATUS_META = {
-  DRAFT: {
-    label: "Bản nháp",
-    dot: "bg-slate-400",
-    fill: "#f8fafc",
-    stroke: "#94a3b8",
-    text: "text-slate-600",
-  },
   VACANT: {
-    label: "Còn trống",
+    label: "Trống",
     dot: "bg-emerald-500",
     fill: "#ecfdf5",
     stroke: "#10b981",
@@ -224,7 +210,6 @@ function getFloorPlanStatus(room) {
   ).trim();
   const normalized = status.toLowerCase();
 
-  if (!normalized || normalized === "draft") return "DRAFT";
   if (normalized === "available" || normalized === "vacant") return "VACANT";
   if (normalized === "soonvacant" || normalized === "soon_vacant")
     return "SOON_VACANT";
@@ -1256,7 +1241,6 @@ function SavedMiniFloorOverview({
               ),
             };
             const statusKey = getFloorPlanStatus(statusSource);
-            if (statusKey === "DRAFT") return null;
 
             const meta =
               FLOOR_PLAN_STATUS_META[statusKey] ??

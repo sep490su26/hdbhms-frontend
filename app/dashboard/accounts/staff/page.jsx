@@ -113,34 +113,7 @@ function getInitials(name) {
     .toUpperCase();
 }
 
-function MetricCard({ icon: Icon, label, value, tone = "slate" }) {
-  const toneClass = {
-    slate: "bg-slate-100 text-slate-700 dark:bg-white/5 dark:text-slate-300",
-    amber:
-      "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
-    emerald:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
-    rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
-  }[tone];
 
-  return (
-    <article className="flex min-h-[96px] items-center gap-4 rounded-xl border border-[#d4dbe8] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-      <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[#687184] dark:text-slate-400">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-extrabold leading-none text-[#0f1d33] dark:text-white">
-          {value}
-        </p>
-      </div>
-    </article>
-  );
-}
 
 function StatusBadge({ status }) {
   const meta = statusMeta(status);
@@ -412,15 +385,7 @@ export default function StaffAccountsPage() {
     };
   }, []);
 
-  const metrics = useMemo(
-    () => ({
-      total: items.length,
-      active: items.filter((item) => item.status === "ACTIVE").length,
-      firstPassword: items.filter((item) => item.mustChangePassword).length,
-      inactive: items.filter((item) => item.status === "INACTIVE").length,
-    }),
-    [items],
-  );
+ 
 
   const statusOptions = useMemo(
     () => [{ value: ALL_VALUE, label: "Tất cả trạng thái" }, ...STATUS_OPTIONS],
@@ -589,7 +554,6 @@ export default function StaffAccountsPage() {
     <div className="grid gap-7 text-[#0f1d33] dark:text-white">
       <DashboardPageHeader
         title="Quản lý tài khoản nhân viên"
-        description="Tạo tài khoản web cho quản lý; theo dõi trạng thái đăng nhập và cơ sở phụ trách của tài khoản nhân viên."
         actions={
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
@@ -608,32 +572,6 @@ export default function StaffAccountsPage() {
           </div>
         }
       />
-
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-4">
-        <MetricCard
-          icon={UsersRound}
-          label="Tổng nhân viên"
-          value={metrics.total}
-        />
-        <MetricCard
-          icon={ShieldCheck}
-          label="Đang hoạt động"
-          value={metrics.active}
-          tone="emerald"
-        />
-        <MetricCard
-          icon={KeyRound}
-          label="Chưa đổi mật khẩu"
-          value={metrics.firstPassword}
-          tone="amber"
-        />
-        <MetricCard
-          icon={LockKeyhole}
-          label="Tạm khóa"
-          value={metrics.inactive}
-          tone="rose"
-        />
-      </section>
 
       <section className="rounded-xl border border-[#c8ceda] bg-white px-5 py-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_220px_220px] md:items-end">
@@ -668,12 +606,6 @@ export default function StaffAccountsPage() {
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 
       <section className="overflow-hidden rounded-xl border border-[#c8ceda] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="border-b border-[#d4dbe8] px-5 py-4 dark:border-white/10">
-          <h2 className="text-lg font-extrabold text-[#0f1d33] dark:text-white">
-            Danh sách tài khoản nhân viên
-          </h2>
-        </div>
-
         {loading ? (
           <div className="flex min-h-[260px] items-center justify-center text-sm font-semibold text-[#526179] dark:text-slate-400">
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />

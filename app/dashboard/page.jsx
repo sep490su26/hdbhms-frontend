@@ -77,13 +77,7 @@ function billingPeriodLabel(value) {
   return year && month ? `${month.padStart(2, "0")}/${year}` : "hiện tại";
 }
 
-function UnitBadge() {
-  return (
-    <p className="shrink-0 rounded-md border border-[#dce2ec] bg-white px-3 py-2 text-xs font-bold text-[#5f6b7c] shadow-sm dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-300">
-      Đơn vị: Nghìn VND
-    </p>
-  );
-}
+
 
 function ActionCard({
   icon: Icon,
@@ -638,7 +632,6 @@ export default function DashboardPage() {
         className="mb-5"
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <UnitBadge />
             {canUseAiReport ? <AdvisorReportPanel /> : null}
           </div>
         }

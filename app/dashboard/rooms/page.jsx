@@ -2062,9 +2062,7 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
                             <thead className="bg-[#f2f4f6] dark:bg-white/5">
                             <tr className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">
                                 <th className="px-6 py-4">Mã phòng</th>
-                                <th className="px-6 py-4">Đặc điểm</th>
                                 <th className="px-6 py-4">Tầng</th>
-                                <th className="px-6 py-4">Diện tích</th>
                                 <th className="px-6 py-4">Giá niêm yết</th>
                                 <th className="px-6 py-4">Trạng thái</th>
                                 <th className="px-6 py-4 text-right">Thao tác</th>
@@ -2101,22 +2099,12 @@ function RoomsListPage({query, propertyId, activeRole = "owner"}) {
                                         >
                                             {room.roomCode || room.id}
                                         </td>
-                                        <td data-label="Đặc điểm" className="px-6 py-4">
-                        <span className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-[#3c475a]">
-                          Dành cho {room.maxPeople ?? room.maxOccupants ?? 0} người ở
-                        </span>
-                                        </td>
+                                       
                                         <td
                                             data-label="Tầng"
                                             className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
                                         >
                                             {room.floor}
-                                        </td>
-                                        <td
-                                            data-label="Diện tích"
-                                            className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300"
-                                        >
-                                            {room.area} m²
                                         </td>
                                         <td
                                             data-label="Giá niêm yết"

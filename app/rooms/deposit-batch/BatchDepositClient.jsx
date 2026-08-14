@@ -72,6 +72,7 @@ const IDENTITY_FIELD_DEFAULTS = {
   permanentAddress: "",
 };
 const IDENTITY_FIELD_NAMES = Object.keys(IDENTITY_FIELD_DEFAULTS);
+const EMPTY_ROOMS = [];
 
 const cccdFilesSignature = (frontFile, backFile) =>
   [frontFile, backFile]
@@ -370,7 +371,7 @@ function createDefaultRoomForms(rooms) {
   );
 }
 
-export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
+export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomIdsParam = searchParams.get("roomIds") || "";
@@ -446,10 +447,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   }, [checkout]);
 
   const isCccdScanMode = identityEntryMode === "scan";
-  const initialRoomKey = useMemo(
-    () => initialRooms.map((room) => String(room.roomId)).join(","),
-    [initialRooms],
-  );
+  const initialRoomKey = initialRooms.map((room) => String(room.roomId)).join(",");
 
   const handleSessionExpired = useCallback((message) => {
     setRemainingMs(0);
@@ -498,11 +496,7 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
           Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
         ),
       }));
-      setContractReviews((current) => Object.fromEntries(
-        Object.entries(current).filter(([roomId]) => nextRoomIds.has(String(roomId))),
-      ));
       setUnavailableRooms((current) => current.filter((room) => nextRoomIds.has(String(room.roomId))));
-      setActiveContractRoomId((current) => (nextRoomIds.has(String(current)) ? current : null));
     });
     return () => {
       cancelled = true;
@@ -957,7 +951,6 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
 
   const clearIdentityFieldsForCccdScan = () => {
     setForm((current) => ({ ...current, ...IDENTITY_FIELD_DEFAULTS }));
-    setContractReviews({});
     setError("");
     setFieldErrors((current) => ({
       ...current,
@@ -1213,11 +1206,6 @@ export function BatchDepositClient({ initialRooms = [], initialError = "" }) {
   const removeRoom = (roomId) => {
     setRooms((current) => current.filter((room) => room.roomId !== roomId));
     setUnavailableRooms((current) => current.filter((room) => String(room.roomId) !== String(roomId)));
-    setContractReviews((current) => {
-      const next = { ...current };
-      delete next[roomId];
-      return next;
-    });
   };
 
   const metadata = useMemo(() => ({

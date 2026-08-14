@@ -242,6 +242,41 @@ export async function fetchHandoverDraftPdfFile(
   };
 }
 
+export async function fetchHandoverDraftDocxFile(
+  contractId,
+  handoverType = "MOVE_IN",
+) {
+  if (!contractId) throw new Error("Missing contractId");
+  const response = await fetchWithAuth(
+    `${BASE}/lease-contracts/${encodeURIComponent(contractId)}/handover/draft-docx?type=${encodeURIComponent(handoverType)}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Unable to download handover draft DOCX."));
+  }
+  const contentDisposition = response.headers?.get?.("content-disposition") || "";
+  return {
+    blob: await response.blob(),
+    filename: extractFilenameFromContentDisposition(contentDisposition),
+  };
+}
+
+export async function downloadHandoverDraftDocx(
+  contractId,
+  handoverType = "MOVE_IN",
+  filename = DEFAULT_HANDOVER_DOCUMENT_FILENAME.replace(/\.pdf$/i, ".docx"),
+) {
+  const { blob, filename: serverFilename } = await fetchHandoverDraftDocxFile(contractId, handoverType);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = serverFilename || filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function fetchHandoverDraftPdfBlob(
   contractId,
   handoverType = "MOVE_IN",

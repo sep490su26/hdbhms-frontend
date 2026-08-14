@@ -122,10 +122,7 @@ test("handover download fallbacks do not use legacy bien-ban filenames", () => {
     stepperSource,
     /downloadHandoverDraftPdf\(\s*contractId,\s*"MOVE_IN",\s*buildHandoverDocumentFilename\(contractDetails\),?\s*\)/,
   );
-  assert.doesNotMatch(
-    stepperSource,
-    /downloadHandoverDraftPdf\(contractId, "MOVE_IN"\);/,
-  );
+  assert.doesNotMatch(stepperSource, /downloadHandoverDraftDocx\(/);
 });
 
 test("fetchLatestReadings treats optional API errors as unavailable readings", async () => {

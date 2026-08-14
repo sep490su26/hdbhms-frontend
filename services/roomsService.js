@@ -324,17 +324,18 @@ function roomMatchesProperty(room, propertyId) {
 export async function fetchPublicRoomById(roomIdentifier, { propertyId } = {}) {
   if (!roomIdentifier) return null;
 
-  try {
-    const response = await fetch(`${PUBLIC_ROOMS_API_URL}/${encodeURIComponent(roomIdentifier)}`, { cache: "no-store" });
-    const data = await readApiResponse(response, "Không thể tải chi tiết phòng");
+  if (!propertyId) {
+    try {
+      const response = await fetch(`${PUBLIC_ROOMS_API_URL}/${encodeURIComponent(roomIdentifier)}`, { cache: "no-store" });
+      const data = await readApiResponse(response, "Không thể tải chi tiết phòng");
 
-    if (data) {
-      if (!isPublicRoomVisible(data)) return null;
-      if (!roomMatchesProperty(data, propertyId)) return null;
-      return data;
+      if (data) {
+        if (!isPublicRoomVisible(data)) return null;
+        return data;
+      }
+    } catch {
+      // Fall back to the catalog for older room links or unavailable detail routes.
     }
-  } catch {
-    // Fall back to the catalog for older room links or unavailable detail routes.
   }
 
   if (propertyId) {

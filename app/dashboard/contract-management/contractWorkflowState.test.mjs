@@ -78,3 +78,16 @@ test("renewal activation does not require handover documents", () => {
     ["lease"],
   );
 });
+
+test("activation reading checklist uses UTF-8 Vietnamese text", () => {
+  const readiness = getContractActivationReadiness({
+    leaseSignedFileId: 12,
+    requiresMoveInHandover: true,
+    activationReadingReady: false,
+  });
+
+  assert.equal(
+    readiness.requirements.find((item) => item.key === "activation-reading")?.label,
+    "Chỉ số điện đầu kỳ",
+  );
+});

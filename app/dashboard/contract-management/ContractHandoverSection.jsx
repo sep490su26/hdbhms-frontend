@@ -179,6 +179,7 @@ export default function ContractHandoverSection({
   const effectiveReadonly = readonly || isConfirmed;
   const assetEditingDisabled = effectiveReadonly || saving || loadingAssets;
   const readingLabel = meterReadingLabel(handoverType);
+  const requiresElectricity = handoverType !== "MOVE_IN";
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
@@ -272,9 +273,11 @@ export default function ContractHandoverSection({
               const hDate = data.handover_date || data.handoverDate;
               if (hDate) setHandoverDate(hDate.split("T")[0]);
               
-              const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
-              setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
-              setElectricPhotoFileId(data.electricity?.photoFileId ?? data.electricity?.photo_file_id ?? null);
+              if (requiresElectricity) {
+                const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
+                setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
+                setElectricPhotoFileId(data.electricity?.photoFileId ?? data.electricity?.photo_file_id ?? null);
+              }
               if (data.note) setNote(data.note);
               if (showCompensation && Array.isArray(data.items) && data.items.length > 0) {
                 setAssets(
@@ -302,21 +305,21 @@ export default function ContractHandoverSection({
             } else {
               setIsConfirmed(false);
               onLoaded?.(null);
-              if (electricReading === "") loadReadings(controller.signal);
+              if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
             }
           })
           .catch((err) => {
             if (controller.signal.aborted) return;
             onLoaded?.(null);
-            if (electricReading === "") loadReadings(controller.signal);
+            if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
           });
     } else {
       onLoaded?.(null);
-      if (electricReading === "") loadReadings(controller.signal);
+      if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, showCompensation]);
+  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, showCompensation, requiresElectricity]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -433,8 +436,10 @@ export default function ContractHandoverSection({
 
   const isValid =
     Boolean(contractId && handoverDate) &&
-    electricReading !== "" &&
-    Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0 &&
+    (!requiresElectricity || (
+      electricReading !== "" &&
+      Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0
+    )) &&
     (!showAssets || assets.every((a) =>
       a.assetName.trim() &&
       a.assetCategory.trim() &&
@@ -448,8 +453,12 @@ export default function ContractHandoverSection({
   function validateBeforeSave() {
     if (!isValid) {
       toast.error(showAssets
-        ? "Vui lòng nhập đủ ngày bàn giao, chỉ số điện và thông tin thiết bị."
-        : "Vui lòng nhập đủ ngày bàn giao và chỉ số điện."
+        ? requiresElectricity
+          ? "Vui lòng nhập đủ ngày bàn giao, chỉ số điện và thông tin thiết bị."
+          : "Vui lòng nhập đủ ngày bàn giao và thông tin thiết bị."
+        : requiresElectricity
+          ? "Vui lòng nhập đủ ngày bàn giao và chỉ số điện."
+          : "Vui lòng nhập đủ ngày bàn giao."
       );
       return false;
     }
@@ -478,8 +487,8 @@ export default function ContractHandoverSection({
 
     try {
       // 1. Upload meter photos
-      let electricPhotoId = electricPhotoFileId;
-      if (electricImageFile) {
+      let electricPhotoId = requiresElectricity ? electricPhotoFileId : null;
+      if (requiresElectricity && electricImageFile) {
         const res = await uploadFile(electricImageFile, "METER_PHOTO");
         electricPhotoId = res?.fileId || res?.id;
       }
@@ -552,11 +561,13 @@ export default function ContractHandoverSection({
         handoverType,
         handoverDate: handoverDate || new Date().toISOString().split("T")[0],
         note: note.trim(),
-        electricity: {
-          currentValue: (electricReading != null && electricReading !== "" && !isNaN(Number(electricReading))) ? Number(electricReading) : 0,
-          photoFileId: electricPhotoId,
-          readingDate: electricReadingDate || undefined,
-        },
+        ...(requiresElectricity ? {
+          electricity: {
+            currentValue: Number(electricReading),
+            photoFileId: electricPhotoId,
+            readingDate: electricReadingDate || undefined,
+          },
+        } : {}),
         assets: showAssets ? assetPayloads : undefined,
         deletedAssetIds,
       });
@@ -636,7 +647,7 @@ export default function ContractHandoverSection({
       </div>
 
       {/* Meter Readings */}
-      <div className="mt-4 max-w-xl">
+      {requiresElectricity && <div className="mt-4 max-w-xl">
         {/* Electric Card */}
         <div className="flex flex-col gap-4 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
           <h4 className="font-extrabold text-slate-900 dark:text-white">Đồng hồ điện</h4>
@@ -676,7 +687,7 @@ export default function ContractHandoverSection({
           </div>
         </div>
 
-      </div>
+      </div>}
 
       {/* Assets Table */}
       {showAssets && (

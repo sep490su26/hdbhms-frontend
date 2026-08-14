@@ -27,9 +27,11 @@ function loadLeaseContractsService() {
 return {
   uploadSignedLeaseContractFile,
   fetchLeaseContractSignedFileBlob,
+  fetchLeaseContractDraftPdfFile,
   downloadLeaseContractSignedFile,
   downloadLeaseContractDraftPdf,
   normalizeLeaseContractItem,
+  updateLeaseContractActivationReading,
   buildLeaseContractDocumentFilename,
 };`,
   );
@@ -162,6 +164,43 @@ test("downloadLeaseContractDraftPdf prefers backend content-disposition filename
   }
 });
 
+test("normalizeLeaseContractItem restores the activation reading draft", () => {
+  const { normalizeLeaseContractItem } = loadLeaseContractsService();
+  const item = normalizeLeaseContractItem({
+    activation_electricity_value: "1234.500",
+    activation_reading_date: "2026-08-14",
+  });
+
+  assert.equal(item.activationElectricityValue, "1234.500");
+  assert.equal(item.activationReadingDate, "2026-08-14");
+});
+
+test("draft lease download forwards the entered electricity reading", async () => {
+  const { fetchLeaseContractDraftPdfFile } = loadLeaseContractsService();
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+
+  globalThis.fetch = async (url) => {
+    requestedUrl = String(url);
+    return {
+      status: 200,
+      ok: true,
+      headers: { get: () => null },
+      blob: async () => new Blob(["pdf"], { type: "application/pdf" }),
+    };
+  };
+
+  try {
+    await fetchLeaseContractDraftPdfFile(9, { electricityValue: 1234.5 });
+    assert.equal(
+      requestedUrl,
+      "https://api.test/api/v1/lease-contracts/9/draft-pdf?electricityValue=1234.5",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("downloadLeaseContractDraftPdf uses caller fallback when header is unavailable", async () => {
   const { downloadLeaseContractDraftPdf } = loadLeaseContractsService();
   const originalFetch = globalThis.fetch;
@@ -222,7 +261,7 @@ test("contract workflow lease action passes generated HDT filename fallback", ()
 
   assert.match(
     source,
-    /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),?\s*\);/,
+    /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),\s*requiresMoveInHandover/,
   );
   assert.doesNotMatch(
     source,

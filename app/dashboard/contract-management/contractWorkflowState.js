@@ -12,6 +12,7 @@ export function getContractActivationReadiness({
   requiresMoveInHandover = true,
   hasHandoverData = false,
   handoverSignedFileId = null,
+  activationReadingReady = undefined,
 } = {}) {
   const requirements = [
     /* ...(hasDeposit
@@ -28,6 +29,15 @@ export function getContractActivationReadiness({
       label: "Hợp đồng thuê đã ký",
       complete: Boolean(leaseSignedFileId),
     },
+    ...(requiresMoveInHandover && activationReadingReady !== undefined
+      ? [
+          {
+            key: "activation-reading",
+            label: "Chỉ số điện đầu kỳ",
+            complete: Boolean(activationReadingReady),
+          },
+        ]
+      : []),
     ...(requiresMoveInHandover
       ? [
           {

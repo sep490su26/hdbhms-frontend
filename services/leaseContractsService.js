@@ -217,6 +217,12 @@ export function normalizeLeaseContractItem(item = {}) {
     startDate: item.startDate ?? item.start_date ?? null,
     endDate: item.endDate ?? item.end_date ?? null,
     rentStartDate: item.rentStartDate ?? item.rent_start_date ?? null,
+    activationElectricityValue:
+      item.activationElectricityValue ??
+      item.activation_electricity_value ??
+      null,
+    activationReadingDate:
+      item.activationReadingDate ?? item.activation_reading_date ?? null,
     monthlyRent: item.monthlyRent ?? item.monthly_rent ?? null,
     paymentCycleMonths:
       item.paymentCycleMonths ?? item.payment_cycle_months ?? null,
@@ -501,7 +507,7 @@ export async function uploadSignedLeaseContractFile(
   );
 }
 
-export async function activateLeaseContract(leaseContractId) {
+export async function activateLeaseContract(leaseContractId, payload = undefined) {
   if (!leaseContractId) {
     throw new Error(
       "Hợp đồng chưa được tạo. Vui lòng upload file hợp đồng trước.",
@@ -511,7 +517,32 @@ export async function activateLeaseContract(leaseContractId) {
     `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activate`,
     {
       method: "POST",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(payload ? { body: JSON.stringify(payload) } : {}),
+    },
+  );
+  return normalizeLeaseContractItem(data);
+}
+
+export async function updateLeaseContractActivationReading(
+  leaseContractId,
+  payload = {},
+) {
+  if (!leaseContractId) {
+    throw new Error("Không xác định được hợp đồng cần lưu chỉ số điện.");
+  }
+  const data = await authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/activation-reading`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentValue: payload.currentValue ?? null,
+        readingDate: payload.readingDate || null,
+      }),
     },
   );
   return normalizeLeaseContractItem(data);
@@ -636,13 +667,28 @@ export async function fetchLeaseContractFileObjectUrl(fileId) {
   return URL.createObjectURL(blob);
 }
 
-export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
+export async function fetchLeaseContractDraftPdfFile(
+  leaseContractId,
+  { electricityValue } = {},
+) {
   if (!leaseContractId) {
     throw new Error("Không xác định được hợp đồng cần tải.");
   }
 
+  const query = new URLSearchParams();
+  if (
+    electricityValue !== null &&
+    electricityValue !== undefined &&
+    String(electricityValue).trim() !== ""
+  ) {
+    query.set("electricityValue", String(electricityValue));
+  }
+  const queryString = query.toString();
+
   const response = await fetchWithAuth(
-    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf`,
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/draft-pdf${
+      queryString ? `?${queryString}` : ""
+    }`,
     {
       method: "GET",
     },
@@ -663,17 +709,21 @@ export async function fetchLeaseContractDraftPdfFile(leaseContractId) {
   };
 }
 
-export async function fetchLeaseContractDraftPdfBlob(leaseContractId) {
-  const file = await fetchLeaseContractDraftPdfFile(leaseContractId);
+export async function fetchLeaseContractDraftPdfBlob(
+  leaseContractId,
+  options,
+) {
+  const file = await fetchLeaseContractDraftPdfFile(leaseContractId, options);
   return file.blob;
 }
 
 export async function downloadLeaseContractDraftPdf(
   leaseContractId,
   filename = DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME,
+  options,
 ) {
   const { blob, filename: serverFilename } =
-    await fetchLeaseContractDraftPdfFile(leaseContractId);
+    await fetchLeaseContractDraftPdfFile(leaseContractId, options);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

@@ -31,7 +31,13 @@ import {
     updateRoom,
     uploadRoomImage,
 } from "@/services/floorRoomService";
-import {Dialog, DialogContent, DialogTitle} from "@/components/ui/dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -1080,16 +1086,15 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
     return (
         <Dialog open={!!room} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                lockScroll={false}
                 showCloseButton={false}
-                style={{
-                    width: "calc(100vw - 32px)",
-                    maxWidth: "1280px",
-                    height: "min(920px, calc(100vh - 32px))",
-                }}
-                className="max-h-[min(94vh,920px)] w-full max-w-none overflow-y-auto rounded-[28px] border border-[#dcd9d2] bg-[#f7f5f0] p-0 text-[#24272b] shadow-[0_30px_100px_rgba(29,32,36,0.28)] dark:border-white/10 dark:bg-[#17191c] dark:text-white sm:rounded-[28px] lg:overflow-hidden">
-                <DialogTitle className="sr-only">Chi tiết phòng {roomLabel}</DialogTitle>
-                <div className="grid min-h-0 grid-cols-1 lg:h-full lg:grid-cols-5">
+                className="flex max-h-[min(94dvh,920px)] w-[calc(100vw-2rem)] max-w-[1280px] flex-col overflow-hidden rounded-[28px] border border-[#dcd9d2] bg-[#f7f5f0] p-0 text-[#24272b] shadow-[0_30px_100px_rgba(29,32,36,0.28)] dark:border-white/10 dark:bg-[#17191c] dark:text-white sm:w-[calc(100vw-3rem)] sm:rounded-[28px]">
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Chi tiết phòng {roomLabel}</DialogTitle>
+                    <DialogDescription>
+                        Thông tin phòng, khách thuê và lịch sử thuê phòng.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:h-full lg:grid-cols-5 lg:overflow-hidden">
 
                     {/* Cột trái (40%): Ảnh phòng & thông số cơ bản */}
                     <div className="flex min-w-0 min-h-0 flex-col bg-[#202328] text-white lg:col-span-2">

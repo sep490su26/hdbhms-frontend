@@ -1,5 +1,10 @@
 export function getHandoverDocumentState(handover) {
-  const hasHandoverData = Boolean(handover?.electricity);
+  const hasHandoverData = Boolean(
+    handover?.handoverRecordId ??
+      handover?.handover_record_id ??
+      handover?.status ??
+      handover?.electricity,
+  );
   const signedDocumentId =
     handover?.signedDocumentId ?? handover?.signed_document_id ?? null;
 

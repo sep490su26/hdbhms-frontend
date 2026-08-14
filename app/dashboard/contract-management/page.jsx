@@ -976,7 +976,11 @@ function unwrapHandoverResponse(response) {
 }
 
 function hasHandoverReadings(handover) {
-  return Boolean(handover?.electricity);
+  return Boolean(
+    handover?.handoverRecordId ??
+      handover?.handover_record_id ??
+      handover?.status,
+  );
 }
 
 function getSignedHandoverDocumentId(handover = {}) {
@@ -2159,7 +2163,7 @@ export default function ContractTemplatePage() {
     handleContractUpdated();
   }
 
-  async function handleActivate(item) {
+  async function handleActivate(item, payload) {
     if (!item?.leaseContractId) return;
 
     if (isRoomTransferManagedContract(item)) {
@@ -2193,15 +2197,13 @@ export default function ContractTemplatePage() {
             return;
           }
         } catch (err) {
-          window.alert(
-            "Vui lòng nhập chỉ số điện và hoàn thành bàn giao phòng với khách trước khi kích hoạt hợp đồng.",
-          );
+          window.alert("Vui lòng hoàn thành bàn giao phòng và upload biên bản đã ký trước khi kích hoạt hợp đồng.");
           setActionLoading("");
           return;
         }
       }
 
-      const activated = await activateLeaseContract(item.leaseContractId);
+      const activated = await activateLeaseContract(item.leaseContractId, payload);
       const activatedStatus = activated.status ?? activated.contractStatus;
 
       setSelected((current) =>
@@ -3695,7 +3697,7 @@ export default function ContractTemplatePage() {
                   onCreateDraft={handleCreateDraft}
                   onContractUpdated={handleContractUpdated}
                   onHandoverSaved={handleHandoverSaved}
-                  onActivate={() => handleActivate(mergedSelected)}
+                  onActivate={(payload) => handleActivate(mergedSelected, payload)}
                   onReadinessChange={setActivationReadiness}
                 />
               ) : (

@@ -1199,17 +1199,17 @@ export default function MeterReadings() {
                                                     >Phòng
                                                     </TableHead>
                                                     <TableHead
-                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
+                                                        className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
                                                     >Điện (kWh)
                                                     </TableHead>
                                                     <TableHead
-                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
+                                                        className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                     >Ảnh (tùy chọn)
                                                     </TableHead>
                                                     <TableHead
-                                                        className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
+                                                        className=" text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
                                                     >
-                                                    <span className="flex items-center gap-1">
+                                                    <span className="flex items-center gap-1 text-center justify-center">
                                                         Trạng thái
                                                         <Info
                                                             className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500"/>
@@ -1233,11 +1233,11 @@ export default function MeterReadings() {
                                                         <TableRow key={room.id}
                                                                   className="border-b border-gray-100 dark:border-white/10 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                                             <TableCell
-                                                                className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
+                                                                className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100">{room.id}</TableCell>
 
                                                             {/* Electricity Compact */}
-                                                            <TableCell className="px-4 py-3">
-                                                                <div className="flex items-center gap-2">
+                                                            <TableCell className="px-4 py-3 text-center">
+                                                                <div className="flex items-center gap-2 justify-center">
                                                                 <span
                                                                     className="text-slate-500 dark:text-slate-400 w-12 text-right">{room.elecPrev.toLocaleString()}</span>
                                                                     <ArrowRight
@@ -1260,7 +1260,7 @@ export default function MeterReadings() {
 
                                                             {/* Photos */}
                                                             <TableCell
-                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
                                                                 <PhotoGallery
                                                                     photos={room.photos > 0 ? [MOCK_PHOTOS[0]] : []}
                                                                     renderTrigger={(openPhoto) => (
@@ -1278,8 +1278,8 @@ export default function MeterReadings() {
 
                                                             {/* Status */}
                                                             <TableCell
-                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10">
-                                                                <div className="flex items-start gap-1.5">
+                                                                className="px-4 py-3 border-l border-gray-100 dark:border-white/10 text-center">
+                                                                <div className="flex items-start gap-1.5 justify-center">
                                                                 <span
                                                                     className={`w-2 h-2 rounded-full mt-1 shrink-0 ${st.dot}`}></span>
                                                                     <div>

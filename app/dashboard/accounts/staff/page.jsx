@@ -625,7 +625,7 @@ export default function StaffAccountsPage() {
                 <tr>
                   <th className="px-5 py-4">Nhân viên</th>
                   <th className="px-5 py-4">Trạng thái</th>
-                  <th className="px-5 py-4">Cơ sở phụ trách</th>
+                  <th className="px-5 py-4 text-center">Cơ sở phụ trách</th>
                   <th className="px-5 py-4">Đăng nhập gần nhất</th>
                   <th className="px-5 py-4">Ngày tạo</th>
                   <th className="px-5 py-4 text-center">Thao tác</th>
@@ -684,7 +684,7 @@ export default function StaffAccountsPage() {
                         {formatDateTime(account.createdAt, "Chưa cập nhật")}
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(account)}

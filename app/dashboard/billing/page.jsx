@@ -469,20 +469,20 @@ export default function BillingPage() {
     setTimeFilter(dateSelection);
     if (!dateSelection) {
       setBillingPeriodText("");
-      setFilters((prev) => ({ ...prev, billingPeriod: "" }));
+      setFilters((prev) => ({ ...prev, status: "ALL", billingPeriod: "" }));
       return;
     }
     const { year, quarter, month } = dateSelection;
     if (month === "all" || month == null) {
       // Year or Quarter selected – clear month filter so all invoices in that range show
       setBillingPeriodText("");
-      setFilters((prev) => ({ ...prev, billingPeriod: "" }));
+      setFilters((prev) => ({ ...prev, status: "ALL", billingPeriod: "" }));
     } else {
       // Specific month selected → filter by that billing period
       const mm = String(month).padStart(2, "0");
       const period = `${year}-${mm}`;
       setBillingPeriodText(billingPeriodToVietnameseDate(period));
-      setFilters((prev) => ({ ...prev, billingPeriod: period }));
+      setFilters((prev) => ({ ...prev, status: "ALL", billingPeriod: period }));
     }
     setPage(1);
   }, []);

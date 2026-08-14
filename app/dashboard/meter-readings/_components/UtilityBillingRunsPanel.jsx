@@ -282,11 +282,11 @@ export function UtilityBillingRunsPanel({
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-[#f2f4f6] text-xs uppercase text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3">Phòng</th>
-                    <th className="px-4 py-3 text-right">Điện</th>
-                    <th className="px-4 py-3 text-right">Dịch vụ</th>
-                    <th className="px-4 py-3">Trạng thái</th>
-                    <th className="px-4 py-3 text-right">Tổng</th>
+                    <th className="px-4 py-3 text-center">Phòng</th>
+                    <th className="px-4 py-3 text-center">Điện</th>
+                    <th className="px-4 py-3 text-center">Dịch vụ</th>
+                    <th className="px-4 py-3 text-center">Trạng thái</th>
+                    <th className="px-4 py-3 text-center">Tổng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -299,7 +299,7 @@ export function UtilityBillingRunsPanel({
                   ) : (
                     runItems.map((item) => (
                       <tr key={item.itemId} className="border-t border-[#e2e8f0] dark:border-white/10">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center">
                           <p className="font-black">{displayRoomCode(item.roomCode)}</p>
                           {item.warningMessage ? (
                             <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
@@ -307,17 +307,17 @@ export function UtilityBillingRunsPanel({
                             </p>
                           ) : null}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-center">
                           <p className="font-bold">{item.electricityUsage}</p>
                           <p className="text-xs text-slate-500">{formatMoney(item.electricityAmount)}</p>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
+                        <td className="px-4 py-3 text-center">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(item.status)}`}>
                             {billingBatchItemStatusLabel(item.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-black">{formatMoney(item.totalAmount)}</td>
+                        <td className="px-4 py-3 font-black text-center">{formatMoney(item.totalAmount)}</td>
                       </tr>
                     ))
                   )}

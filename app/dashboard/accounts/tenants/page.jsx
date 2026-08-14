@@ -633,9 +633,9 @@ export default function AccountsPage() {
                                 </td>
                                 <td
                                   data-label="Trạng thái"
-                                  className="px-5 py-4"
+                                  className="px-5 py-4 text-center"
                                 >
-                                  <div className="grid gap-1">
+                                  <div className="flex flex-col items-center gap-1 justify-center">
                                     <StatusBadge item={item} />
                                     <span className="text-xs text-[#687184] dark:text-slate-400">
                                       {state.hint}
@@ -643,7 +643,7 @@ export default function AccountsPage() {
                                   </div>
                                 </td>
                                 <td data-label="Thao tác" className="px-5 py-4">
-                                  <div className="flex justify-end">
+                                  <div className="flex justify-center">
                                     <button
                                       type="button"
                                       onClick={() => handleDisable(item)}

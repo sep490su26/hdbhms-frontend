@@ -2004,18 +2004,16 @@ export default function TenantsPage() {
                       transition={{ duration: 0.22, ease: "easeOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="dashboard-table overflow-x-auto">
+                      <div className="dashboard-table overflow-x-auto table-fixed w-full">
                         <table className="w-full text-left">
                           <thead className="bg-white dark:bg-[#0f172a] text-xs font-black uppercase tracking-[0.05em] text-slate-500 dark:text-slate-400">
                             <tr className="hover:bg-[#f8fafc] dark:hover:bg-white/5">
-                              <th className="px-6 py-4">Họ tên</th>
-                              <th className="px-6 py-4 text-center">SĐT</th>
-                              <th className="px-6 py-4 text-center">Email</th>
-                              <th className="px-6 py-4 text-center">Vai trò</th>
-                              <th className="px-6 py-4">Tài khoản app</th>
-                              <th className="px-6 py-4 text-center">
-                                Thao tác
-                              </th>
+                              <th className="w-[28%] px-6 py-3 text-left">Họ tên</th>
+                              <th className="w-[14%] px-6 py-3 text-center">SĐT</th>
+                              <th className="w-[22%] px-6 py-3 text-center">Email</th>
+                              <th className="w-[14%] px-6 py-3 text-center">Vai trò</th>
+                              <th className="w-[16%] px-6 py-3 text-center">Tài khoản app</th>
+                              <th className="w-[6%] px-6 py-3 text-center">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#e2e8f0]">
@@ -2045,13 +2043,13 @@ export default function TenantsPage() {
                                 </td>
                                 <td
                                   data-label="SĐT"
-                                  className="px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                                  className="px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200 text-center"
                                 >
                                   {valueOf(profile, "phone") || "Chưa cập nhật"}
                                 </td>
                                 <td
                                   data-label="Email"
-                                  className="break-words px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                                  className="break-words px-6 py-5 text-sm font-semibold text-slate-700 dark:text-slate-200 text-center"
                                 >
                                   {valueOf(profile, "email") || "Chưa cập nhật"}
                                 </td>
@@ -2072,31 +2070,31 @@ export default function TenantsPage() {
                                 </td>
 
                               <td
-                                  data-label="Tài khoản app"
-                                  className="px-6 py-5"
-                                >
-                                  {(() => {
-                                    const accountState = accountStateFor(profile);
-                                    return (
-                                      <div className="grid gap-1">
-                                        <Badge
-                                          className={accountStatusClass(
-                                            accountState.key === "ACTIVATED"
-                                              ? "ACTIVE"
-                                              : accountState.key === "DISABLED"
-                                                ? "DISABLED"
-                                                : "PENDING",
-                                          )}
-                                        >
-                                          {accountState.label}
-                                        </Badge>
-                                        <span className="text-xs font-semibold text-slate-500">
-                                          {accountState.hint}
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
+  data-label="Tài khoản app"
+  className="px-6 py-5 text-center"
+>
+  {(() => {
+    const accountState = accountStateFor(profile);
+    return (
+      <div className="flex flex-col items-center gap-1 justify-center">
+        <Badge
+          className={accountStatusClass(
+            accountState.key === "ACTIVATED"
+              ? "ACTIVE"
+              : accountState.key === "DISABLED"
+                ? "DISABLED"
+                : "PENDING",
+          )}
+        >
+          {accountState.label}
+        </Badge>
+        <span className="text-xs font-semibold text-slate-500">
+          {accountState.hint}
+        </span>
+      </div>
+    );
+  })()}
+</td>
                                 <td
                                   data-label="Thao tác"
                                   className="px-6 py-5 text-left"

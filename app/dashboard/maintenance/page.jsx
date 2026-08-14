@@ -632,7 +632,7 @@ export default function MaintenancePage() {
     setPage(1);
 
     if (!dateSelection) {
-      setFilters((current) => ({ ...current, fromDate: "", toDate: "" }));
+      setFilters((current) => ({ ...current, status: "all", fromDate: "", toDate: "" }));
       return;
     }
 
@@ -659,7 +659,7 @@ export default function MaintenancePage() {
       toDate = date;
     }
 
-    setFilters((current) => ({ ...current, fromDate, toDate }));
+    setFilters((current) => ({ ...current, status: "all", fromDate, toDate }));
   }, []);
 
   function updateInternalForm(name, value) {
@@ -1471,12 +1471,12 @@ export default function MaintenancePage() {
           <table className="w-full border-collapse text-left">
             <thead className="bg-[#f2f4f6] dark:bg-white/5">
               <tr className="text-xs font-bold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300">
-                <th className="px-5 py-4">Phiếu</th>
-                <th className="px-5 py-4">Phòng</th>
-                <th className="px-5 py-4">Hạng mục</th>
-                <th className="px-5 py-4">Trạng thái</th>
-                <th className="px-5 py-4">Cập nhật</th>
-                <th className="px-5 py-4 text-right">Thao tác</th>
+                <th className="px-5 py-4 text-center">Phiếu</th>
+                <th className="px-5 py-4 text-center">Phòng</th>
+                <th className="px-5 py-4 text-center">Hạng mục</th>
+                <th className="px-5 py-4 text-center">Trạng thái</th>
+                <th className="px-5 py-4 text-center">Cập nhật</th>
+                <th className="px-5 py-4 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -1524,59 +1524,59 @@ export default function MaintenancePage() {
                       </p>
                     </td>
                     <td
-                      data-label="Hạng mục"
-                      className="px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-200"
-                    >
-                      {ticket.ticketScope === "PROPERTY_OPERATION" ? (
-                        <span className="inline-flex flex-col gap-1">
-                          <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
-                            Bảo trì nội bộ
-                          </span>
-                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                            {CATEGORY_LABELS[ticket.category] || "Khác"}
-                          </span>
-                        </span>
-                      ) : ticket.category === "RULE_VIOLATION" ? (
-                        <span className="inline-flex flex-col gap-1">
-                          <span className="inline-flex w-fit rounded-full bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 text-xs font-black text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20">
-                            Vi phạm nội quy
-                          </span>
-                          <span className="text-xs font-black text-slate-500 dark:text-slate-400">
-                            Reset wifi · Phạt vi phạm nội quy
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex flex-col gap-1">
-                          <span>
-                            {CATEGORY_LABELS[ticket.category] || "Khác"}
-                          </span>
-                          <span
-                            className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${
-                              ticket.repairRequested === false
-                                ? "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"
-                                : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
-                            }`}
-                          >
-                            {ticket.repairRequested === false
-                              ? "Chỉ báo sự cố"
-                              : "Cần sửa chữa"}
-                          </span>
-                        </span>
-                      )}
-                    </td>
-                    <td data-label="Trạng thái" className="px-5 py-4">
+  data-label="Hạng mục"
+  className="px-5 py-4 text-center text-sm font-bold text-slate-700 dark:text-slate-200 align-middle"
+>
+  {ticket.ticketScope === "PROPERTY_OPERATION" ? (
+    <span className="inline-flex flex-col items-center gap-1">
+      <span className="inline-flex w-fit rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-200">
+        Bảo trì nội bộ
+      </span>
+      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+        {CATEGORY_LABELS[ticket.category] || "Khác"}
+      </span>
+    </span>
+  ) : ticket.category === "RULE_VIOLATION" ? (
+    <span className="inline-flex flex-col items-center gap-1">
+      <span className="inline-flex w-fit rounded-full bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 text-xs font-black text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20">
+        Vi phạm nội quy
+      </span>
+      <span className="text-xs font-black text-slate-500 dark:text-slate-400">
+        Reset wifi · Phạt vi phạm nội quy
+      </span>
+    </span>
+  ) : (
+    <span className="inline-flex flex-col items-center gap-1">
+      <span>
+        {CATEGORY_LABELS[ticket.category] || "Khác"}
+      </span>
+      <span
+        className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${
+          ticket.repairRequested === false
+            ? "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"
+            : "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+        }`}
+      >
+        {ticket.repairRequested === false
+          ? "Chỉ báo sự cố"
+          : "Cần sửa chữa"}
+      </span>
+    </span>
+  )}
+</td>
+                    <td data-label="Trạng thái" className="px-5 py-4 align-middle text-center">
                       <StatusBadge
                         status={ticket.ticketStatus || ticket.status}
                       />
                     </td>
                     <td
                       data-label="Cập nhật"
-                      className="px-5 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300"
+                      className="px-5 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 align-middle text-center"
                     >
                       {formatDateTime(ticket.updatedAt || ticket.createdAt)}
                     </td>
-                    <td data-label="Thao tác" className="px-5 py-4">
-                      <div className="flex justify-end">
+                    <td data-label="Thao tác" className="px-5 py-4 align-middle ">
+                      <div className="flex justify-center">
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <button

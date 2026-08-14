@@ -657,7 +657,7 @@ export default function ViewingCustomersClient() {
   const handleTimeFilterSelect = useCallback((dateSelection) => {
     setTimeFilter(dateSelection);
     if (!dateSelection) {
-      setFilters((prev) => ({ ...prev, fromDate: "", toDate: "" }));
+      setFilters((prev) => ({ ...prev, status: "all", fromDate: "", toDate: "" }));
       return;
     }
     const { year, quarter, month, day } = dateSelection;
@@ -666,6 +666,7 @@ export default function ViewingCustomersClient() {
       // Select entire year
       setFilters((prev) => ({
         ...prev,
+        status: "all",
         fromDate: `${year}-01-01`,
         toDate: `${year}-12-31`,
       }));
@@ -678,6 +679,7 @@ export default function ViewingCustomersClient() {
       const lastDay = new Date(year, endMonth, 0).getDate();
       setFilters((prev) => ({
         ...prev,
+        status: "all",
         fromDate: `${year}-${mmStart}-01`,
         toDate: `${year}-${mmEnd}-${String(lastDay).padStart(2, "0")}`,
       }));
@@ -687,6 +689,7 @@ export default function ViewingCustomersClient() {
       const lastDay = new Date(year, month, 0).getDate();
       setFilters((prev) => ({
         ...prev,
+        status: "all",
         fromDate: `${year}-${mm}-01`,
         toDate: `${year}-${mm}-${String(lastDay).padStart(2, "0")}`,
       }));
@@ -696,6 +699,7 @@ export default function ViewingCustomersClient() {
       const dd = String(day).padStart(2, "0");
       setFilters((prev) => ({
         ...prev,
+        status: "all",
         fromDate: `${year}-${mm}-${dd}`,
         toDate: `${year}-${mm}-${dd}`,
       }));

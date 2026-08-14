@@ -817,6 +817,7 @@ export default function ApprovalCenter() {
 
   const handleTimeFilterSelect = useCallback((dateSelection) => {
     setTimeFilter(dateSelection);
+    setStatusFilter("ALL");
     if (!dateSelection) {
       setFromDate("");
       setToDate("");

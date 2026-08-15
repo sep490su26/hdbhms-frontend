@@ -34,6 +34,10 @@ import { getAuthToken } from "@/services/identityAccessService";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import MaintenanceCompletionImageSection from "@/components/dashboard/MaintenanceCompletionImageSection";
 import VietnameseMonthPicker from "@/components/dashboard/VietnameseMonthPicker";
+import CostResponsibilityDropdown, {
+  COST_RESPONSIBILITY_LABELS,
+  normalizeCostResponsibility,
+} from "@/components/dashboard/CostResponsibilityDropdown";
 import { toDate } from "@/lib/dateFormat";
 import {
   Dialog,
@@ -65,7 +69,6 @@ const CATEGORY_LABELS = {
   SANITARY: "Vệ sinh",
   SECURITY: "An ninh",
   COMMON_EQUIPMENT: "Thiết bị chung",
-  RULE_VIOLATION: "Vi phạm nội quy",
   OTHER: "Khác",
 };
 
@@ -75,15 +78,6 @@ const SCOPE_LABELS = {
   PROPERTY_OPERATION: "Vận hành cơ sở",
 };
 
-const COST_RESPONSIBILITY_OPTIONS = [
-  ["UNDECIDED", "Chưa xác định"],
-  ["PROPERTY", "Chủ trọ chịu"],
-  ["OWNER", "Chủ trọ chịu"],
-  ["TENANT", "Khách thuê chịu"],
-  ["OPERATION", "Chi phí vận hành"],
-];
-
-const COST_RESPONSIBILITY_LABELS = Object.fromEntries(COST_RESPONSIBILITY_OPTIONS);
 const MONEY_FORMAT = new Intl.NumberFormat("vi-VN");
 const BILLING_STATUS_LABELS = {
   NO_CHARGE: "Không thu khách",
@@ -451,9 +445,11 @@ function buildCompleteForm(ticket) {
     rootCause: ticket?.rootCause || "",
     repairItems: ticket?.repairItems || "",
     actualCost: ticket?.costAmount ? formatMoneyInput(ticket.costAmount) : "",
-    costResponsibility: ticket?.ticketScope === "PROPERTY_OPERATION"
-      ? "OWNER"
-      : ticket?.costResponsibility || "UNDECIDED",
+    costResponsibility: normalizeCostResponsibility(
+      ticket?.ticketScope === "PROPERTY_OPERATION"
+        ? "OWNER"
+        : ticket?.costResponsibility,
+    ),
     collectionMethod: "MONTHLY_SCHEDULED",
     billingPeriod: nextPeriod.toISOString().slice(0, 7),
     completionNote: "",
@@ -837,6 +833,7 @@ export default function MaintenanceTicketDetailPage() {
       </div>
 
       <Dialog
+        modal={false}
         open={isCompleteDialogOpen}
         onOpenChange={(open) => {
           if (actionLoading === "complete") return;
@@ -845,6 +842,7 @@ export default function MaintenanceTicketDetailPage() {
         }}
       >
         <DialogContent
+          lockScroll={false}
           className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] !max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full"
         >
           <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -877,16 +875,11 @@ export default function MaintenanceTicketDetailPage() {
               </div>
             </Field>
             <Field label="Trách nhiệm chi phí">
-              <select
+              <CostResponsibilityDropdown
                 value={ticket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionCostResponsibility}
-                onChange={(event) => updateCompleteForm("costResponsibility", event.target.value)}
+                onChange={(value) => updateCompleteForm("costResponsibility", value)}
                 disabled={!isEditingRepairDetails || ticket.ticketScope === "PROPERTY_OPERATION"}
-                className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
-              >
-                {COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+              />
             </Field>
           </div>
               {ticket.status !== "ACCEPTED" && completionCostResponsibility === "TENANT" && (
@@ -1031,7 +1024,10 @@ export default function MaintenanceTicketDetailPage() {
             <InfoItem label="Người sửa" value={ticket.workerName} />
             <InfoItem label="SĐT thợ" value={ticket.repairmanPhone} />
             <InfoItem label="Chi phí" value={formatMoney(ticket.costAmount)} />
-            <InfoItem label="Trách nhiệm" value={COST_RESPONSIBILITY_LABELS[ticket.costResponsibility] || "Chưa xác định"} />
+            <InfoItem
+              label="Trách nhiệm"
+              value={COST_RESPONSIBILITY_LABELS[normalizeCostResponsibility(ticket.costResponsibility)] || "Chủ trọ chịu"}
+            />
           </div>
           {ticket.rootCause && <InfoItem label="Nguyên nhân" value={ticket.rootCause} />}
           {ticket.repairItems && <InfoItem label={ticket.status === "WAITING_TENANT_DECISION" ? "Hạng mục dự kiến sửa" : "Hạng mục đã sửa"} value={ticket.repairItems} />}

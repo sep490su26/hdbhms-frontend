@@ -29,17 +29,16 @@ const TRANSFER_STATUS_LABELS = {
     MANAGER_APPROVED: "Quản lý đã duyệt",
     WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
     WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
-    WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
-    WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
+    WAITING_TARGET_HOLDER_APPROVAL: "Đang xử lý chuyển phòng",
     WAITING_PAYMENT: "Chờ thanh toán",
     WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
     WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
     WAITING_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
     WAITING_CONTRACT_SIGNING: "Chờ xác nhận đủ bộ hợp đồng đã ký",
-    WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
-    READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
-    WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
-    EXECUTED: "Đã chuyển phòng",
+    WAITING_TRANSFER_DATE: "Chờ đến ngày chuyển phòng",
+    READY_FOR_HANDOVER: "Sẵn sàng bàn giao phòng cũ",
+    WAITING_EXECUTION: "Đã bàn giao phòng cũ, chờ hoàn tất",
+    EXECUTED: "Đã hoàn tất chuyển phòng",
     COMPLETED: "Đã hoàn tất chuyển phòng",
     CANCELLED: "Đã hủy",
     REJECTED: "Đã từ chối",
@@ -54,18 +53,43 @@ function requiresFullMoveIn(transfer) {
     return transfer?.targetTransferType === "NEW_CONTRACT";
 }
 
-function getStatusLabel(status) {
+function getStatusLabel(status, transfer = null) {
+    if (status === "READY_FOR_HANDOVER" && transfer?.sourceRoomWillBeEmptyAfterTransfer === false) {
+        return "Sẵn sàng xác nhận người chuyển đi";
+    }
+    if (status === "WAITING_EXECUTION" && transfer?.sourceRoomWillBeEmptyAfterTransfer === false) {
+        return "Chờ hoàn tất chuyển phòng";
+    }
     return TRANSFER_STATUS_LABELS[status] || "Trạng thái chuyển phòng chưa xác định";
 }
 
+const LEASE_STATUS_LABELS = {
+    DRAFT: "Bản nháp",
+    CONFIRMED: "Đã xác nhận",
+    SIGNED: "Đã ký",
+    PENDING_SIGNATURE: "Chờ ký",
+    ACTIVE: "Đang hiệu lực",
+    EXPIRING_SOON: "Sắp hết hạn",
+    TERMINATION_PENDING: "Chờ thanh lý",
+    LIQUIDATED: "Đã thanh lý",
+    TRANSFERRED: "Đã chuyển đi",
+    EXPIRED: "Đã hết hạn",
+    AUTO_TERMINATED: "Đã tự kết thúc",
+    CANCELLED: "Đã hủy",
+};
+
+function getLeaseStatusLabel(status) {
+    return LEASE_STATUS_LABELS[status] || "Chưa xác định";
+}
+
 function getTransferOutScopeTitle(transfer) {
-    return requiresFullMoveOut(transfer) ? "Checkout toàn bộ phòng cũ" : "Chốt rời phòng cũ";
+    return requiresFullMoveOut(transfer) ? "Bàn giao toàn bộ phòng cũ" : "Bàn giao người rời phòng";
 }
 
 function getTransferOutScopeDescription(transfer) {
     return requiresFullMoveOut(transfer)
-        ? "Lưu bàn giao phòng cũ bằng luồng bàn giao hợp đồng, sau đó chốt để hệ thống tạo hóa đơn điện cuối kỳ."
-        : "Phòng cũ vẫn còn người ở, chỉ chốt chỉ số điện cho người chuyển đi; không cập nhật tài sản phòng.";
+        ? "Ghi nhận hiện trạng, tài sản và chỉ số điện phòng cũ để hệ thống lập hóa đơn cuối kỳ nếu cần."
+        : "Phòng cũ vẫn còn người ở; chỉ ghi nhận chỉ số điện của người chuyển đi và không cập nhật tài sản phòng.";
 }
 
 function isConfirmedHandover(handover) {
@@ -178,10 +202,15 @@ export default function TransferExecutionModal({
 
                 const phase = transfer.status === "WAITING_EXECUTION" ? "COMPLETE_TRANSFER" : "MOVE_OUT";
                 const targetContractId = transfer.newContractId || transfer.targetContractId || null;
+                // Use the backend decision. Older responses can still infer
+                // the scope from whether the source room becomes empty.
+                const transferOutRequired = transfer.transferOutHandoverRequired == null
+                    ? transfer.sourceRoomWillBeEmptyAfterTransfer === true
+                    : transfer.transferOutHandoverRequired === true;
                 const [transferOutReady, transferInState] = await Promise.all([
-                    phase === "MOVE_OUT"
+                    phase === "MOVE_OUT" && transferOutRequired
                         ? loadConfirmedHandover(transfer.oldContractId, "TRANSFER_OUT")
-                        : Promise.resolve(false),
+                        : Promise.resolve(!transferOutRequired),
                     phase === "COMPLETE_TRANSFER" && requiresFullMoveIn(transfer)
                         ? loadTransferInHandover(targetContractId)
                         : Promise.resolve({ready: false, type: null}),
@@ -190,7 +219,8 @@ export default function TransferExecutionModal({
                 setExecution({
                     transfer,
                     phase,
-                    transferOutReady,
+                    transferOutRequired,
+                    transferOutReady: transferOutRequired ? transferOutReady : true,
                     transferInReady: transferInState.ready,
                     transferInHandoverType: transferInState.type,
                 });
@@ -275,10 +305,10 @@ export default function TransferExecutionModal({
                     return;
                 }
             }
-            if (!execution.transferOutReady) {
+            if (execution.transferOutRequired && !execution.transferOutReady) {
                 const saveTransferOut = transferOutActionRef.current?.save;
                 if (!saveTransferOut) {
-                    toast.error("Form bàn giao phòng cũ chưa sẵn sàng.");
+                    toast.error("Biểu mẫu bàn giao phòng cũ chưa sẵn sàng.");
                     return;
                 }
                 const saved = await saveTransferOut();
@@ -291,13 +321,17 @@ export default function TransferExecutionModal({
                     oldRoomCompensationAmount: compensationAmount,
                     oldRoomCompensationNote: oldRoomCompensationNote.trim() || null,
                 });
-                await refreshAfterAction(compensationAmount > 0
-                    ? "Đã chốt phòng cũ và tạo hóa đơn bồi thường."
-                    : "Đã chốt phòng cũ."
+                await refreshAfterAction(!requiresFullMoveOut(currentTransfer)
+                    ? "Đã xác nhận nhóm người chuyển đi."
+                    : compensationAmount > 0
+                        ? "Đã bàn giao phòng cũ và tạo hóa đơn bồi thường."
+                        : "Đã ghi nhận bàn giao phòng cũ."
                 );
             } catch (error) {
                 console.error(error);
-                toast.error(error?.message || "Không thể chốt phòng cũ.");
+                toast.error(error?.message || (!requiresFullMoveOut(currentTransfer)
+                    ? "Không thể tiếp tục chuyển phòng."
+                    : "Không thể ghi nhận bàn giao phòng cũ."));
                 setSubmitting(false);
             }
             return;
@@ -306,7 +340,7 @@ export default function TransferExecutionModal({
         if (requiresFullMoveIn(currentTransfer) && !execution.transferInReady) {
             const saveTransferIn = transferInActionRef.current?.save;
             if (!saveTransferIn) {
-                toast.error("Form bàn giao phòng mới chưa sẵn sàng.");
+                toast.error("Biểu mẫu bàn giao phòng mới chưa sẵn sàng.");
                 return;
             }
             const saved = await saveTransferIn();
@@ -343,7 +377,7 @@ export default function TransferExecutionModal({
         >
             <DialogContent
                 showCloseButton={false}
-                className="z-[70] flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0 shadow-2xl sm:max-h-[94vh]"
+                className="z-[70] flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0 shadow-2xl sm:max-h-[94vh] sm:max-w-5xl"
                 overlayClassName="z-[70] bg-[#091426]/70 backdrop-blur-sm"
                 onEscapeKeyDown={(event) => {
                     if (disabled) event.preventDefault();
@@ -355,13 +389,19 @@ export default function TransferExecutionModal({
                 <header className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
                     <div>
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
-                            {isMoveOutPhase ? "Chốt phòng cũ" : "Hoàn tất chuyển phòng"}
+                            {isMoveOutPhase
+                                ? execution?.transferOutRequired
+                                    ? "Bàn giao phòng cũ"
+                                    : "Xác nhận người chuyển phòng"
+                                : "Hoàn tất chuyển phòng"}
                         </p>
                         <DialogTitle className="mt-1 text-lg font-extrabold text-gray-950">
                             {loading
                                 ? "Đang tải yêu cầu chuyển phòng"
                                 : isMoveOutPhase
-                                    ? getTransferOutScopeTitle(transfer)
+                                    ? execution?.transferOutRequired
+                                        ? getTransferOutScopeTitle(transfer)
+                                        : "Chuyển người sang phòng mới"
                                     : "Hoàn tất chuyển phòng"}
                         </DialogTitle>
                         <DialogDescription className="sr-only">
@@ -369,7 +409,9 @@ export default function TransferExecutionModal({
                         </DialogDescription>
                         {isMoveOutPhase && (
                             <p className="mt-1 max-w-2xl text-sm font-semibold leading-5 text-gray-600">
-                                {getTransferOutScopeDescription(transfer)}
+                                {execution?.transferOutRequired
+                                    ? getTransferOutScopeDescription(transfer)
+                                    : "Phòng cũ vẫn còn người ở; không cần chốt phòng cũ hoặc nhập lại chỉ số phòng."}
                             </p>
                         )}
                         <p className="mt-1 text-sm font-semibold text-gray-500">
@@ -413,8 +455,8 @@ export default function TransferExecutionModal({
                                     </p>
                                 </div>
                                 <div className="rounded-xl bg-gray-50 p-4">
-                                    <p className="mb-1 text-xs font-semibold text-gray-500">Trạng thái</p>
-                                    <p className="text-sm font-extrabold text-gray-950">{getStatusLabel(transfer?.status)}</p>
+                                    <p className="mb-1 text-xs font-semibold text-gray-500">Tiến trình chuyển phòng</p>
+                                    <p className="text-sm font-extrabold text-gray-950">{getStatusLabel(transfer?.status, transfer)}</p>
                                 </div>
                                 <div className="rounded-xl bg-gray-50 p-4">
                                     <p className="mb-1 text-xs font-semibold text-gray-500">Phạm vi chốt</p>
@@ -423,10 +465,16 @@ export default function TransferExecutionModal({
                                     </p>
                                 </div>
                             </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                                <span>Trạng thái hợp đồng cũ: {getLeaseStatusLabel(transfer?.oldContractStatus)}</span>
+                                <span className="mx-2 text-slate-300">•</span>
+                                <span>Hợp đồng mới: {getLeaseStatusLabel(transfer?.newContractStatus || transfer?.targetContractStatus)}</span>
+                            </div>
 
                             {isMoveOutPhase ? (
                                 <div className="space-y-4">
-                                    <ContractHandoverSection
+                                    {execution?.transferOutRequired ? (
+                                        <ContractHandoverSection
                                         contractId={transfer?.oldContractId}
                                         roomId={transfer?.oldRoomId}
                                         roomCode={transfer?.oldRoomName || transfer?.oldRoomCode}
@@ -440,7 +488,21 @@ export default function TransferExecutionModal({
                                         confirmOnSave={false}
                                         onLoaded={handleTransferOutLoaded}
                                         onSaved={handleTransferOutSaved}
-                                    />
+                                        />
+                                    ) : (
+                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                                            <p className="text-sm font-extrabold text-emerald-900">
+                                                {requiresFullMoveOut(transfer)
+                                                    ? "Phòng cũ đã được xử lý trước đó."
+                                                    : "Phòng cũ vẫn còn người ở; không cần chốt phòng cũ."}
+                                            </p>
+                                            <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
+                                                {requiresFullMoveOut(transfer)
+                                                    ? "Hệ thống đã đối chiếu trạng thái hợp đồng và dữ liệu chốt phòng; không cần nhập lại chỉ số điện cũ."
+                                                    : "Hệ thống chỉ xử lý nhóm người chuyển đi và giữ nguyên dữ liệu vận hành của phòng cũ cho những người ở lại."}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {requiresFullMoveOut(transfer) && (
                                         <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -501,7 +563,7 @@ export default function TransferExecutionModal({
                                     {requiresFullMoveIn(transfer) ? (
                                         execution?.transferInReady ? (
                                             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                                                Ban giao phong moi da duoc xac nhan trong buoc kich hoat hop dong. Khong can nhap lai khi hoan tat yeu cau.
+                                                Bàn giao phòng mới đã được xác nhận trong bước kích hoạt hợp đồng. Không cần nhập lại khi hoàn tất yêu cầu.
                                             </div>
                                         ) : (
                                             <ContractHandoverSection
@@ -511,7 +573,7 @@ export default function TransferExecutionModal({
                                             readonly={submitting}
                                             actionRef={transferInActionRef}
                                             handoverType="TRANSFER_IN"
-                                            title="Check-in phòng mới"
+                                            title="Nhận phòng mới"
                                             description="Lưu bàn giao phòng mới bằng luồng bàn giao hợp đồng trước khi hoàn tất chuyển phòng."
                                             showAssets
                                             hideSaveButton
@@ -522,7 +584,7 @@ export default function TransferExecutionModal({
                                         )
                                     ) : (
                                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-                                            Ca này không cần check-in phòng mới dạng hợp đồng mới. Bấm hoàn tất để chuyển trạng thái theo backend.
+                                            Trường hợp này không cần nhập thông tin nhận phòng mới. Bấm “Hoàn tất chuyển phòng” để cập nhật trạng thái.
                                         </div>
                                     )}
                                 </div>
@@ -550,7 +612,11 @@ export default function TransferExecutionModal({
                                 ) : (
                                     <CheckCircle2 className="h-4 w-4"/>
                                 )}
-                                {isMoveOutPhase ? "Chốt phòng cũ" : "Hoàn tất chuyển phòng"}
+                                {isMoveOutPhase
+                                    ? execution?.transferOutRequired
+                                        ? "Bàn giao phòng cũ"
+                                        : "Tiếp tục chuyển phòng"
+                                    : "Hoàn tất chuyển phòng"}
                             </button>
                         </footer>
                     </>

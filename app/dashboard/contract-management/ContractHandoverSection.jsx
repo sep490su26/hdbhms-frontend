@@ -4,6 +4,8 @@ import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "r
 import {
   AlertTriangle,
   Camera,
+  Download,
+  FileSpreadsheet,
   Gauge,
   Loader2,
   Plus,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  ASSET_CONDITION_LABELS,
   ASSET_CONDITION_VALUES,
   fetchRoomAssets,
   normalizeAsset,
@@ -52,6 +56,35 @@ const CONDITION_OPTIONS = [
 ];
 
 const CONFIRMED_STATUSES = new Set(["CONFIRMED", "CONFIRMED_BY_TENANT"]);
+
+function normalizeSpreadsheetHeader(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function spreadsheetCell(row, aliases) {
+  const aliasSet = new Set(aliases.map(normalizeSpreadsheetHeader));
+  const entry = Object.entries(row).find(([key]) =>
+    aliasSet.has(normalizeSpreadsheetHeader(key)),
+  );
+  return entry?.[1];
+}
+
+function normalizeImportedCondition(value) {
+  const raw = String(value ?? "").trim();
+  const normalized = normalizeSpreadsheetHeader(raw);
+  const option = CONDITION_OPTIONS.find(
+    ({ value: optionValue, label }) =>
+      optionValue === raw || normalizeSpreadsheetHeader(label) === normalized,
+  );
+  return option?.value || ASSET_CONDITION_VALUES[raw] || "GOOD";
+}
 
 function defaultDescription(roomCode) {
   return `Ghi nhận chỉ số ban đầu và hiện trạng thiết bị của phòng ${roomCode || "chưa cập nhật"}.`;
@@ -93,13 +126,15 @@ function ImageUploadButton({ imageUrl, fileId, label, disabled, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       <label
-        className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 px-3 text-xs font-bold ${disabled
+        className={`inline-flex h-9 w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 px-3 text-xs font-bold ${disabled
             ? "cursor-not-allowed bg-slate-100 text-slate-400"
             : "cursor-pointer text-slate-500 dark:text-slate-400 hover:border-[#1e40af] hover:bg-[#f8fafc] dark:hover:bg-white/5"
           }`}
       >
         <Camera className="h-3.5 w-3.5 shrink-0" />
-        {imageUrl ? "Đổi ảnh" : label}
+        <span className="min-w-0 truncate whitespace-nowrap">
+          {imageUrl ? "Đổi ảnh" : label}
+        </span>
         <input
           type="file"
           accept="image/*"
@@ -141,15 +176,20 @@ export default function ContractHandoverSection({
   description,
   showAssets = true,
   showCompensation = false,
+  blocked = false,
+  blockedReason = "",
   hideSaveButton = false,
   confirmOnSave = true,
   actionRef,
   onLoaded,
   onSaved,
+  onDraftChange,
+  embedded = false,
 }) {
   /* meter readings -------------------------------------------------- */
   const [handoverDate, setHandoverDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricReading, setElectricReading] = useState("");
+  const [electricPreviousReading, setElectricPreviousReading] = useState("");
   const [electricReadingDate, setElectricReadingDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [electricImageFile, setElectricImageFile] = useState(null);
   const [electricImageUrl, setElectricImageUrl] = useState("");
@@ -175,11 +215,45 @@ export default function ContractHandoverSection({
 
   const previewUrlsRef = useRef(new Set());
   const newAssetInputRef = useRef(null);
+  const assetExcelInputRef = useRef(null);
   const newAssetSequenceRef = useRef(0);
+  // Block submission until the liquidation prerequisites are ready, but keep
+  // the fields editable so the whole exit flow can be completed from one form.
   const effectiveReadonly = readonly || isConfirmed;
   const assetEditingDisabled = effectiveReadonly || saving || loadingAssets;
   const readingLabel = meterReadingLabel(handoverType);
   const requiresElectricity = handoverType !== "MOVE_IN";
+
+  useEffect(() => {
+    if (handoverType !== "MOVE_OUT" || !onDraftChange) return;
+    onDraftChange({
+      handoverType,
+      handoverDate,
+      electricity: requiresElectricity
+        ? {
+            previousValue: electricPreviousReading,
+            currentValue: electricReading,
+            photoFileId: electricPhotoFileId,
+          }
+        : null,
+      items: showCompensation
+        ? assets.map((asset) => ({
+            assetName: asset.assetName,
+            compensationAmount: Number(asset.compensationAmount || 0),
+          }))
+        : [],
+    });
+  }, [
+    assets,
+    electricPhotoFileId,
+    electricPreviousReading,
+    electricReading,
+    handoverDate,
+    handoverType,
+    onDraftChange,
+    requiresElectricity,
+    showCompensation,
+  ]);
 
   /* Fetch assets from API ------------------------------------------- */
   const loadAssets = useCallback((signal) => {
@@ -243,6 +317,7 @@ export default function ContractHandoverSection({
         const elecValue = elec.suggested_value ?? elec.suggestedValue;
         const elecDate = elec.last_reading_date ?? elec.lastReadingDate;
 
+        setElectricPreviousReading(String(elecValue ?? 0));
         setElectricReading(prev => prev === "" ? String(elecValue ?? 0) : prev);
         if (elecDate) setElectricReadingDate(prev => prev === new Date().toISOString().split("T")[0] ? elecDate : prev);
 
@@ -274,8 +349,19 @@ export default function ContractHandoverSection({
               if (hDate) setHandoverDate(hDate.split("T")[0]);
               
               if (requiresElectricity) {
+                const previousValue =
+                  data.electricity?.previous_value ??
+                  data.electricity?.previousValue ??
+                  data.electricity?.suggested_value ??
+                  data.electricity?.suggestedValue ??
+                  0;
                 const elecValue = data.electricity?.current_value ?? data.electricity?.currentValue;
-                setElectricReading(prev => elecValue != null ? String(elecValue) : (prev === "" ? "0" : prev));
+                if (elecValue != null) {
+                  setElectricPreviousReading(String(previousValue));
+                  setElectricReading(String(elecValue));
+                } else {
+                  loadReadings(controller.signal);
+                }
                 setElectricPhotoFileId(data.electricity?.photoFileId ?? data.electricity?.photo_file_id ?? null);
               }
               if (data.note) setNote(data.note);
@@ -305,21 +391,21 @@ export default function ContractHandoverSection({
             } else {
               setIsConfirmed(false);
               onLoaded?.(null);
-              if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
+              if (requiresElectricity) loadReadings(controller.signal);
             }
           })
           .catch((err) => {
             if (controller.signal.aborted) return;
             onLoaded?.(null);
-            if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
+            if (requiresElectricity) loadReadings(controller.signal);
           });
     } else {
       onLoaded?.(null);
-      if (requiresElectricity && electricReading === "") loadReadings(controller.signal);
+      if (requiresElectricity) loadReadings(controller.signal);
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId, handoverType, onLoaded, electricReading, showCompensation, requiresElectricity]);
+  }, [loadReadings, readonly, contractId, handoverType, onLoaded, showCompensation, requiresElectricity]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -399,6 +485,152 @@ export default function ContractHandoverSection({
     setRemovedAssets((prev) => prev.slice(0, -1));
   }
 
+  function downloadAssetTemplate() {
+    const headers = [
+      "Tên thiết bị",
+      "Danh mục",
+      "Số lượng",
+      "Tình trạng",
+      "Mô tả",
+      ...(showCompensation ? ["Bồi thường", "Thiệt hại"] : []),
+    ];
+    const rows = assets.map((asset) => ({
+      "Tên thiết bị": asset.assetName || "",
+      "Danh mục": asset.assetCategory || "",
+      "Số lượng": Number(asset.quantity || 0),
+      "Tình trạng":
+        ASSET_CONDITION_LABELS[asset.currentCondition] ||
+        asset.currentCondition ||
+        "",
+      "Mô tả": asset.description || "",
+      ...(showCompensation
+        ? {
+            "Bồi thường": Number(asset.compensationAmount || 0),
+            "Thiệt hại": asset.damageNote || "",
+          }
+        : {}),
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+    worksheet["!cols"] = headers.map((header) => ({
+      wch:
+        header === "Tên thiết bị"
+          ? 34
+          : header === "Danh mục"
+            ? 24
+            : header === "Mô tả" || header === "Thiệt hại"
+              ? 42
+              : 18,
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Thiết bị");
+    XLSX.writeFile(
+      workbook,
+      "mau-ban-giao-thiet-bi-" + handoverType.toLowerCase() + ".xlsx",
+    );
+  }
+
+  async function handleAssetExcelImport(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || assetEditingDisabled) return;
+    if (!/\.(xlsx|xls)$/i.test(file.name)) {
+      toast.error("Vui lòng chọn file Excel .xlsx hoặc .xls.");
+      return;
+    }
+
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = firstSheet
+        ? XLSX.utils.sheet_to_json(firstSheet, { defval: "" })
+        : [];
+      const importedRows = rows
+        .map((row, index) => {
+          const assetName = String(
+            spreadsheetCell(row, ["Tên thiết bị", "Thiết bị", "Asset name"]) ||
+              "",
+          ).trim();
+          if (!assetName) return null;
+
+          const existing = assets.find(
+            (asset) =>
+              normalizeSpreadsheetHeader(asset.assetName) ===
+              normalizeSpreadsheetHeader(assetName),
+          );
+          const rawQuantity = Number(
+            spreadsheetCell(row, ["Số lượng", "SL", "Quantity"]) ?? 1,
+          );
+          const quantity =
+            Number.isFinite(rawQuantity) && rawQuantity >= 0
+              ? Math.trunc(rawQuantity)
+              : 1;
+          const rawCompensation = Number(
+            spreadsheetCell(row, ["Bồi thường", "Compensation"]) ?? 0,
+          );
+
+          return {
+            ...createEmptyHandoverAsset(),
+            id: existing?.id ?? null,
+            assetName,
+            assetCategory: String(
+              spreadsheetCell(row, ["Danh mục", "Loại thiết bị", "Category"]) ||
+                existing?.assetCategory ||
+                "Thiết bị",
+            ).trim(),
+            quantity,
+            currentCondition: normalizeImportedCondition(
+              spreadsheetCell(row, ["Tình trạng", "Condition"]),
+            ),
+            description: String(
+              spreadsheetCell(row, ["Mô tả", "Description"]) ||
+                existing?.description ||
+                "",
+            ).trim(),
+            compensationAmount:
+              Number.isFinite(rawCompensation) && rawCompensation >= 0
+                ? rawCompensation
+                : 0,
+            damageNote: String(
+              spreadsheetCell(row, [
+                "Thiệt hại",
+                "Ghi chú thiệt hại",
+                "Damage",
+              ]) || "",
+            ).trim(),
+            fileImageId: existing?.fileImageId ?? null,
+            imageUrl: existing?.imageUrl ?? "",
+            sourceAssets: existing?.sourceAssets ?? [],
+            _excelRow: index + 2,
+          };
+        })
+        .filter(Boolean);
+
+      if (importedRows.length === 0) {
+        throw new Error("File Excel không có dòng thiết bị hợp lệ.");
+      }
+
+      const importedIds = new Set(
+        importedRows
+          .filter((asset) => asset.id != null)
+          .map((asset) => String(asset.id)),
+      );
+      setRemovedAssets(
+        assets
+          .filter(
+            (asset) =>
+              asset.id != null && !importedIds.has(String(asset.id)),
+          )
+          .map((asset, index) => ({ asset, index })),
+      );
+      setAssets(withAssetRowKeys(importedRows, "excel-" + Date.now()));
+      setFromApi(false);
+      setSaveSuccess(false);
+      toast.success("Đã nhập " + importedRows.length + " thiết bị từ Excel.");
+    } catch (error) {
+      toast.error(error?.message || "Không thể đọc file Excel thiết bị.");
+    }
+  }
+
   function handleAssetImageChange(index, file) {
     if (!file) return;
     const url = makeBlobUrl(file);
@@ -475,8 +707,14 @@ export default function ContractHandoverSection({
   }
 
   /* Save — single atomic call via /handover/submit ----------------- */
-  async function handleSave() {
-    if (effectiveReadonly) return true;
+  async function handleSave({ ignoreBlocked = false } = {}) {
+    if (blocked && !ignoreBlocked) {
+      const message = blockedReason || "Chưa đủ điều kiện để bàn giao trả phòng.";
+      setSaveError(message);
+      toast.error(message);
+      return false;
+    }
+    if (readonly || isConfirmed) return true;
     if (saving || !validateBeforeSave()) return false;
 
     setSaveConfirmationOpen(false);
@@ -578,8 +816,22 @@ export default function ContractHandoverSection({
       setSaveSuccess(true);
       setIsConfirmed(true);
       setElectricPhotoFileId(electricPhotoId ?? null);
-      onSaved?.(response || {status: "CONFIRMED", handoverType});
-      return true;
+      const savedResponse = {
+        ...(response || {}),
+        status: response?.status || "CONFIRMED",
+        handoverType,
+        handoverDate,
+        electricity: requiresElectricity
+          ? {
+              ...(response?.electricity || {}),
+              previousValue: Number(electricPreviousReading || 0),
+              currentValue: Number(electricReading || 0),
+              photoFileId: electricPhotoId ?? null,
+            }
+          : response?.electricity,
+      };
+      onSaved?.(savedResponse);
+      return savedResponse;
     } catch (err) {
       setSaveError(err?.message ?? "Lưu thông tin thất bại.");
       toast.error(err?.message ?? "Lưu thông tin thất bại.");
@@ -590,14 +842,22 @@ export default function ContractHandoverSection({
   }
 
   useImperativeHandle(actionRef, () => ({
-    save: handleSave,
+    save: (options) => handleSave(options),
   }));
 
   /* ----------------------------------------------------------------- */
   /*  Render                                                            */
   /* ----------------------------------------------------------------- */
+  const HandoverContainer = embedded ? "div" : "section";
+  const handoverContainerClassName = embedded
+    ? "mt-6 border-t border-[#dfe5ef] pt-6"
+    : "rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-[#fbfbfe] dark:bg-white/5 p-4 lg:col-span-2 xl:p-5";
+
   return (
-    <section id="handover-entry-section" className="rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-[#fbfbfe] dark:bg-white/5 p-4 lg:col-span-2 xl:p-5">
+    <HandoverContainer
+      id="handover-entry-section"
+      className={handoverContainerClassName}
+    >
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -627,6 +887,13 @@ export default function ContractHandoverSection({
           )}
         </div>
       </div>
+
+      {blocked && !isConfirmed && (
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{blockedReason || "Chưa đủ điều kiện để bàn giao trả phòng."}</span>
+        </div>
+      )}
 
       {/* Handover Date */}
       <div className="mt-5 rounded-xl border border-[#dfe5ef] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
@@ -663,6 +930,14 @@ export default function ContractHandoverSection({
               placeholder="VD: 1234"
               className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
+            <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+              Chỉ số điện cũ:{" "}
+              <span className="font-bold text-slate-700 dark:text-slate-200">
+                {electricPreviousReading === ""
+                  ? "Đang tải..."
+                  : `${electricPreviousReading} kWh`}
+              </span>
+            </p>
           </div>
 
           <div className="grid gap-1.5">
@@ -680,7 +955,7 @@ export default function ContractHandoverSection({
             <ImageUploadButton
               imageUrl={electricImageUrl}
               fileId={electricPhotoFileId}
-              label="Upload ảnh bằng chứng điện"
+              label="Tải ảnh bằng chứng điện lên"
               disabled={effectiveReadonly}
               onChange={(e) => handleMeterImage("electric", e.target.files?.[0])}
             />
@@ -707,6 +982,28 @@ export default function ContractHandoverSection({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadAssetTemplate}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Tải mẫu Excel
+            </button>
+            {!effectiveReadonly && (
+              <label className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Nhập Excel
+                <input
+                  ref={assetExcelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  disabled={assetEditingDisabled}
+                  className="hidden"
+                  onChange={handleAssetExcelImport}
+                />
+              </label>
+            )}
             {!effectiveReadonly && (
               <button
                 type="button"
@@ -761,27 +1058,27 @@ export default function ContractHandoverSection({
         )}
 
         <div className="overflow-x-auto">
-          <table className={`w-full ${showCompensation ? "min-w-[1380px]" : "min-w-[980px]"} text-left text-xs xl:text-sm`}>
+          <table className={`w-full ${showCompensation ? "min-w-[1700px]" : "min-w-[1250px]"} text-left text-xs xl:text-sm`}>
             <thead className="bg-[#f7f9fe] dark:bg-white/5 text-[10px] font-extrabold uppercase tracking-[0.03em] text-slate-500 dark:text-slate-400 xl:text-xs">
               <tr>
-                <th className="w-10 px-3 py-3">STT</th>
-                <th className="min-w-52 px-3 py-3">Tên thiết bị</th>
-                <th className="min-w-36 px-3 py-3">Danh mục</th>
-                <th className="w-20 px-3 py-3">SL</th>
-                <th className="min-w-44 px-3 py-3">Tình trạng</th>
-                <th className="min-w-44 px-3 py-3">Mô tả</th>
-                <th className="w-32 px-3 py-3">Ảnh</th>
+                <th className="w-12 min-w-[52px] px-3 py-3">STT</th>
+                <th className="min-w-[220px] px-3 py-3">Tên thiết bị</th>
+                <th className="min-w-[160px] px-3 py-3">Danh mục</th>
+                <th className="w-20 min-w-[84px] px-3 py-3">SL</th>
+                <th className="min-w-[190px] px-3 py-3">Tình trạng</th>
+                <th className="min-w-[220px] px-3 py-3">Mô tả</th>
+                <th className="w-32 min-w-[112px] px-3 py-3">Ảnh</th>
                 {showCompensation && (
                   <>
-                    <th className="w-40 px-3 py-3">Bồi thường</th>
-                    <th className="min-w-56 px-3 py-3">Thiệt hại</th>
+                    <th className="w-40 min-w-[150px] px-3 py-3">Bồi thường</th>
+                    <th className="min-w-[240px] px-3 py-3">Thiệt hại</th>
                   </>
                 )}
                 {showCompensation && (
-                  <th className="w-36 px-3 py-3">Minh chứng</th>
+                  <th className="w-44 min-w-[176px] px-3 py-3">Minh chứng</th>
                 )}
                 {!effectiveReadonly && (
-                  <th className="w-20 px-3 py-3 text-center">Thao tác</th>
+                  <th className="w-20 min-w-[88px] px-3 py-3 text-center">Thao tác</th>
                 )}
               </tr>
             </thead>
@@ -908,7 +1205,7 @@ export default function ContractHandoverSection({
                       <ImageUploadButton
                         imageUrl={asset.evidenceImageUrl}
                         fileId={asset.evidenceFileId}
-                        label="Upload ảnh minh chứng"
+                        label="Minh chứng"
                         disabled={assetEditingDisabled}
                         onChange={(e) => handleAssetEvidenceImageChange(index, e.target.files?.[0])}
                       />
@@ -1060,6 +1357,6 @@ export default function ContractHandoverSection({
           </div>
         </DialogContent>
       </Dialog>
-    </section>
+    </HandoverContainer>
   );
 }

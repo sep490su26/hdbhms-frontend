@@ -136,6 +136,11 @@ const DEFAULT_LIQUIDATION_CHARGES = [
   ["OTHER", "Chi phí phát sinh"],
 ];
 
+const HANDOVER_DERIVED_LINE_TYPES = [
+  "ELECTRICITY",
+  "MAINTENANCE_COMPENSATION",
+];
+
 const ACTIVATION_FLOW_WORKFLOWS = new Set([
   "DRAFT",
   "PENDING_SIGNATURE",
@@ -145,7 +150,7 @@ const ACTIVATION_FLOW_WORKFLOWS = new Set([
 
 const WORKFLOW_LABELS = {
   PENDING_SIGNATURE: "Chờ ký",
-  MISSING_FILE: "Chưa upload",
+  MISSING_FILE: "Chưa tải lên",
   PENDING_ACTIVATION: "Chờ kích hoạt",
   ACTIVE: "Đang hiệu lực",
   EXPIRING_SOON: "Sắp hết hạn",
@@ -180,17 +185,16 @@ const TRANSFER_STATUS_LABELS = {
   MANAGER_APPROVED: "Quản lý đã duyệt",
   WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
   WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
-  WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
-  WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
+  WAITING_TARGET_HOLDER_APPROVAL: "Đang xử lý chuyển phòng",
   WAITING_PAYMENT: "Chờ thanh toán",
   WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
   WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
-  WAITING_SIGNING: "Chờ quản lý upload bản ký",
-  WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
-  WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
-  READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
-  WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
-  EXECUTED: "Đã chuyển phòng",
+  WAITING_SIGNING: "Chờ quản lý tải lên bản đã ký",
+  WAITING_CONTRACT_SIGNING: "Chờ quản lý tải lên bản đã ký",
+  WAITING_TRANSFER_DATE: "Chờ đến ngày chuyển phòng",
+  READY_FOR_HANDOVER: "Sẵn sàng bàn giao phòng cũ",
+  WAITING_EXECUTION: "Đã bàn giao phòng cũ, chờ hoàn tất",
+  EXECUTED: "Đã hoàn tất chuyển phòng",
   COMPLETED: "Đã hoàn tất chuyển phòng",
   CANCELLED: "Đã hủy",
   REJECTED: "Đã từ chối",
@@ -389,6 +393,33 @@ function isShortTermEarlyTerminationPreview(item = {}, liquidationDateValue) {
   const oneMonthBeforeEnd = new Date(endDate);
   oneMonthBeforeEnd.setMonth(oneMonthBeforeEnd.getMonth() - 1);
   return liquidation > oneMonthBeforeEnd;
+}
+
+function areLiquidationSettlementsConfirmed(item = {}) {
+  const refundAmount = Number(item?.liquidationDepositRefundAmount ?? 0);
+  const deductionAmount = Number(
+    item?.liquidationDepositDeductionAmount ?? 0,
+  );
+  const refundConfirmed =
+    refundAmount <= 0 ||
+    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+      item?.liquidationDepositRefundStatus,
+    );
+  const forfeitureConfirmed =
+    deductionAmount <= 0 ||
+    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+      item?.liquidationDepositForfeitureStatus,
+    );
+  return refundConfirmed && forfeitureConfirmed;
+}
+
+function isLiquidationInvoiceSettled(item = {}) {
+  if (!item?.liquidationFinalInvoiceId) return false;
+  if (item?.liquidationFinalInvoiceStatus === "PAID") return true;
+  const remainingAmount = Number(
+    item?.liquidationFinalInvoiceRemainingAmount ?? NaN,
+  );
+  return Number.isFinite(remainingAmount) && remainingAmount <= 0;
 }
 
 function buildTermsForm(item = {}) {
@@ -598,7 +629,11 @@ function buildLiquidationCharges(
     }));
   }
   return applyAutoLiquidationRoomRent(
-    DEFAULT_LIQUIDATION_CHARGES.map(([lineType, description]) =>
+    DEFAULT_LIQUIDATION_CHARGES.filter(([lineType]) =>
+      ["ELECTRICITY", "ROOM_RENT", "MAINTENANCE_COMPENSATION"].includes(
+        lineType,
+      ),
+    ).map(([lineType, description]) =>
       createLiquidationCharge(lineType, description, tariffs),
     ),
     item,
@@ -669,6 +704,133 @@ function getLiquidationChargeSubtotal(charges = []) {
     (total, charge) => total + charge.quantity * charge.unitPrice,
     0,
   );
+}
+
+function toOptionalNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getHandoverElectricity(handover = {}) {
+  const source = handover?.electricity || handover?.electricityReading || {};
+  return {
+    previousValue: toOptionalNumber(
+      source.previousValue ??
+        source.previous_value ??
+        handover.previousElectricityValue ??
+        handover.previous_electricity_value,
+    ),
+    currentValue: toOptionalNumber(
+      source.currentValue ??
+        source.current_value ??
+        handover.electricReading ??
+        handover.electric_reading,
+    ),
+    photoFileId:
+      source.photoFileId ?? source.photo_file_id ?? handover.electricityPhotoFileId ?? null,
+  };
+}
+
+function getHandoverCompensationAmount(handover = {}) {
+  const responseAmount = toOptionalNumber(
+    handover.compensationAmount ?? handover.compensation_amount,
+  );
+  const itemAmount = Array.isArray(handover.items)
+    ? handover.items.reduce(
+        (total, item) =>
+          total + Math.max(0, toOptionalNumber(item?.compensationAmount ?? item?.compensation_amount) || 0),
+        0,
+      )
+    : 0;
+  return Math.max(0, responseAmount || 0, itemAmount);
+}
+
+function buildHandoverChargeSummary(
+  handover = {},
+  tariffs = DEFAULT_LIQUIDATION_TARIFFS,
+) {
+  const charges = [];
+  const electricity = getHandoverElectricity(handover);
+  if (
+    electricity.previousValue !== null &&
+    electricity.currentValue !== null &&
+    electricity.currentValue >= electricity.previousValue
+  ) {
+    charges.push({
+      ...createLiquidationCharge(
+        "ELECTRICITY",
+        "Tiền điện chốt phòng",
+        tariffs,
+      ),
+      previousValue: String(electricity.previousValue),
+      currentValue: String(electricity.currentValue),
+      photoFileId: electricity.photoFileId,
+      readOnly: true,
+    });
+  }
+
+  const compensationAmount = getHandoverCompensationAmount(handover);
+  if (compensationAmount > 0) {
+    charges.push({
+      ...createLiquidationCharge(
+        "MAINTENANCE_COMPENSATION",
+        "Bồi thường thiệt hại khi bàn giao trả phòng",
+        tariffs,
+      ),
+      quantity: "1",
+      unitPrice: String(compensationAmount),
+      readOnly: true,
+    });
+  }
+  return charges;
+}
+
+function mergeHandoverResponses(primary, secondary) {
+  const first = primary || {};
+  const second = secondary || {};
+  const firstElectricity = first.electricity || first.electricityReading || {};
+  const secondElectricity =
+    second.electricity || second.electricityReading || {};
+  return {
+    ...first,
+    ...second,
+    electricity: {
+      ...firstElectricity,
+      ...secondElectricity,
+      previousValue:
+        secondElectricity.previousValue ??
+        secondElectricity.previous_value ??
+        firstElectricity.previousValue ??
+        firstElectricity.previous_value,
+      currentValue:
+        secondElectricity.currentValue ??
+        secondElectricity.current_value ??
+        firstElectricity.currentValue ??
+        firstElectricity.current_value,
+      photoFileId:
+        secondElectricity.photoFileId ??
+        secondElectricity.photo_file_id ??
+        firstElectricity.photoFileId ??
+        firstElectricity.photo_file_id ??
+        null,
+    },
+    items: Array.isArray(second.items)
+      ? second.items
+      : Array.isArray(first.items)
+        ? first.items
+        : [],
+    compensationAmount:
+      second.compensationAmount ??
+      second.compensation_amount ??
+      first.compensationAmount ??
+      first.compensation_amount,
+    compensationInvoiceId:
+      second.compensationInvoiceId ??
+      second.compensation_invoice_id ??
+      first.compensationInvoiceId ??
+      first.compensation_invoice_id,
+  };
 }
 
 function addDays(value, days) {
@@ -915,11 +1077,17 @@ function getTransferStatusLabel(status) {
 
 function getTransferContractStatusLabel(item = {}) {
   const status = item?.transferStatus;
+  if (status === "READY_FOR_HANDOVER" && item?.sourceRoomWillBeEmptyAfterTransfer === false) {
+    return "Sẵn sàng xác nhận người chuyển đi";
+  }
+  if (status === "WAITING_EXECUTION" && item?.sourceRoomWillBeEmptyAfterTransfer === false) {
+    return "Chờ hoàn tất chuyển phòng";
+  }
   if (isTransferSigningStatus(status) && item?.status === "SIGNED") {
     return "Đã xác nhận ký, chờ đủ bộ";
   }
   if (isTransferSigningStatus(status) && getLeaseSignedFileId(item)) {
-    return "Đã upload bản ký, chờ xác nhận đủ bộ";
+    return "Đã tải lên bản ký, chờ xác nhận đủ bộ";
   }
   return getTransferStatusLabel(status);
 }
@@ -971,17 +1139,24 @@ function getTransferContractNotice(item) {
   const code = item.transferRequestCode || `#${item.transferRequestId}`;
   if (isTransferSigningStatus(item.transferStatus)) {
     if (getLeaseSignedFileId(item)) {
-      return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Bản đã ký của hợp đồng này đã được upload; bước xác nhận đủ bộ thực hiện ở chi tiết yêu cầu chuyển phòng.`;
+      return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Bản đã ký của hợp đồng này đã được tải lên; bước xác nhận đủ bộ thực hiện ở chi tiết yêu cầu chuyển phòng.`;
     }
-    return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Quản lý có thể upload bản đã ký của riêng hợp đồng này tại đây.`;
+    return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Quản lý có thể tải lên bản đã ký của riêng hợp đồng này tại đây.`;
   }
   if (item.transferStatus === "WAITING_TRANSFER_DATE") {
-    return `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; có thể bấm Chốt phòng cũ ngay trong màn hợp đồng khi tenant và quản lý có mặt thực tế.`;
+    return item.sourceRoomWillBeEmptyAfterTransfer === false
+      ? `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; phòng cũ vẫn còn người ở nên không cần chốt phòng cũ.`
+      : `Hợp đồng này được tạo từ yêu cầu chuyển phòng ${code}. Ngày dự kiến chuyển là ${requestedDate}; khi khách thuê và quản lý có mặt thực tế, có thể bắt đầu bàn giao phòng cũ.`;
   }
-  if (
-    ["READY_FOR_HANDOVER", "WAITING_EXECUTION"].includes(item.transferStatus)
-  ) {
-    return `Đã tới bước vận hành của yêu cầu chuyển phòng ${code}. Hoàn tất chốt phòng cũ/nhận phòng mới ngay tại màn hợp đồng để chuyển trạng thái.`;
+  if (item.transferStatus === "READY_FOR_HANDOVER") {
+    return item.sourceRoomWillBeEmptyAfterTransfer === false
+      ? `Yêu cầu chuyển phòng ${code} đã kích hoạt đủ hai hợp đồng. Phòng cũ vẫn còn người ở; bước tiếp theo là xác nhận nhóm người chuyển đi.`
+      : `Yêu cầu chuyển phòng ${code} đã kích hoạt đủ hai hợp đồng. Bước tiếp theo là bàn giao phòng cũ để ghi nhận người rời phòng và chỉ số điện.`;
+  }
+  if (item.transferStatus === "WAITING_EXECUTION") {
+    return item.sourceRoomWillBeEmptyAfterTransfer === false
+      ? `Yêu cầu chuyển phòng ${code} đã xác nhận nhóm người chuyển đi. Không có bước chốt phòng cũ; hãy hoàn tất chuyển phòng theo hướng dẫn.`
+      : `Yêu cầu chuyển phòng ${code} đã bàn giao phòng cũ. Hãy xử lý hóa đơn điện phát sinh (nếu có), sau đó hoàn tất chuyển phòng theo hướng dẫn.`;
   }
   if (item.transferStatus === "EXECUTED") {
     return `Hợp đồng này đã được xử lý qua yêu cầu chuyển phòng ${code}.`;
@@ -1280,32 +1455,51 @@ function LiquidationProofPreview({ file, fileId }) {
 
 function LiquidationChargeRows({
   charges = [],
+  derivedCharges = [],
   onAdd,
   onChange,
   onProofChange,
   onRemove,
+  derivedLineTypes = [],
 }) {
-  const electricityCharges = charges
+  const visibleCharges = charges
     .map((charge, index) => ({ charge, index }))
-    .filter(({ charge }) => charge.lineType === "ELECTRICITY");
-  const otherCharges = charges
-    .map((charge, index) => ({ charge, index }))
-    .filter(({ charge }) => !isMeterLiquidationCharge(charge.lineType));
-  const renderChargeRow = (charge, index) => (
+    .filter(({ charge }) => !derivedLineTypes.includes(charge.lineType));
+  const electricityCharges = visibleCharges.filter(
+    ({ charge }) => charge.lineType === "ELECTRICITY",
+  );
+  const otherCharges = visibleCharges.filter(
+    ({ charge }) => !isMeterLiquidationCharge(charge.lineType),
+  );
+  const visibleDerivedCharges = derivedCharges.filter(
+    (charge) => !isMeterLiquidationCharge(charge.lineType) || charge.lineType === "ELECTRICITY",
+  );
+  const renderChargeRow = (charge, index, { readOnly = false } = {}) => (
     <div
       key={charge.id || index}
-      className={`grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 ${
-        isMeterLiquidationCharge(charge.lineType)
-          ? "xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_95px_95px_125px_220px_auto]"
-          : "xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_100px_120px_130px_auto]"
+      className={`grid gap-3 rounded-lg border border-[#dfe5ef] ${
+        readOnly ? "bg-[#f8fafc]" : "bg-white"
+      } p-3 ${
+        readOnly
+          ? isMeterLiquidationCharge(charge.lineType)
+            ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_110px_110px_160px]"
+            : "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_100px_140px_160px]"
+          : isMeterLiquidationCharge(charge.lineType)
+            ? "xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_95px_95px_125px_220px_auto]"
+            : "xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_100px_120px_130px_auto]"
       }`}
     >
       <label className="grid min-w-0 gap-1.5">
         <span className="text-[11px] font-bold text-[#58667c]">Loại phí</span>
         <select
           value={charge.lineType}
-          onChange={(event) => onChange(index, "lineType", event.target.value)}
-          className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+          disabled={readOnly}
+          onChange={
+            readOnly
+              ? undefined
+              : (event) => onChange(index, "lineType", event.target.value)
+          }
+          className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#eef2f7] disabled:text-[#607089]"
         >
           {LIQUIDATION_CHARGE_TYPES.map((type) => (
             <option key={type.value} value={type.value}>
@@ -1318,10 +1512,13 @@ function LiquidationChargeRows({
         <span className="text-[11px] font-bold text-[#58667c]">Diễn giải</span>
         <input
           value={charge.description}
-          onChange={(event) =>
-            onChange(index, "description", event.target.value)
+          disabled={readOnly}
+          onChange={
+            readOnly
+              ? undefined
+              : (event) => onChange(index, "description", event.target.value)
           }
-          className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+          className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#eef2f7] disabled:text-[#607089]"
         />
       </label>
       {isMeterLiquidationCharge(charge.lineType) ? (
@@ -1335,10 +1532,13 @@ function LiquidationChargeRows({
               min="0"
               step="1"
               value={charge.previousValue}
-              onChange={(event) =>
-                onChange(index, "previousValue", event.target.value)
+              disabled={readOnly}
+              onChange={
+                readOnly
+                  ? undefined
+                  : (event) => onChange(index, "previousValue", event.target.value)
               }
-              className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+              className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#eef2f7] disabled:text-[#607089]"
             />
           </label>
           <label className="grid min-w-0 gap-1.5">
@@ -1350,10 +1550,13 @@ function LiquidationChargeRows({
               min="0"
               step="1"
               value={charge.currentValue}
-              onChange={(event) =>
-                onChange(index, "currentValue", event.target.value)
+              disabled={readOnly}
+              onChange={
+                readOnly
+                  ? undefined
+                  : (event) => onChange(index, "currentValue", event.target.value)
               }
-              className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
+              className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#eef2f7] disabled:text-[#607089]"
             />
           </label>
         </>
@@ -1365,9 +1568,11 @@ function LiquidationChargeRows({
             min="1"
             step="1"
             value={charge.quantity}
-            disabled={charge.lineType === "ROOM_RENT"}
-            onChange={(event) =>
-              onChange(index, "quantity", event.target.value)
+            disabled={readOnly || charge.lineType === "ROOM_RENT"}
+            onChange={
+              readOnly
+                ? undefined
+                : (event) => onChange(index, "quantity", event.target.value)
             }
             className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
           />
@@ -1381,9 +1586,11 @@ function LiquidationChargeRows({
             min="0"
             step="1000"
             value={charge.unitPrice}
-            disabled={charge.lineType === "ROOM_RENT"}
-            onChange={(event) =>
-              onChange(index, "unitPrice", event.target.value)
+            disabled={readOnly || charge.lineType === "ROOM_RENT"}
+            onChange={
+              readOnly
+                ? undefined
+                : (event) => onChange(index, "unitPrice", event.target.value)
             }
             className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426] disabled:bg-[#f8fafc] disabled:text-[#607089]"
           />
@@ -1397,7 +1604,7 @@ function LiquidationChargeRows({
             : formatMoney(getLiquidationChargeLiveAmount(charge))}
         </div>
       </div>
-      {isMeterLiquidationCharge(charge.lineType) && (
+      {isMeterLiquidationCharge(charge.lineType) && !readOnly && (
         <label className="grid min-w-0 gap-1.5">
           <span className="text-[11px] font-bold text-[#58667c]">
             Ảnh bằng chứng
@@ -1406,7 +1613,7 @@ function LiquidationChargeRows({
             <Upload className="h-3.5 w-3.5" />
             <span className="truncate">
               {charge.proofFile?.name ||
-                (charge.photoFileId ? "Đã có ảnh" : "Upload ảnh")}
+                (charge.photoFileId ? "Đã có ảnh" : "Tải ảnh lên")}
             </span>
           </span>
           <input
@@ -1423,20 +1630,22 @@ function LiquidationChargeRows({
           />
         </label>
       )}
-      <div className="flex items-end justify-end">
-        <button
-          type="button"
-          onClick={() => onRemove(index)}
-          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-red-600 hover:bg-red-50"
-        >
-          <X className="h-3.5 w-3.5" />
-          Xóa
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex items-end justify-end">
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-red-600 hover:bg-red-50"
+          >
+            <X className="h-3.5 w-3.5" />
+            Xóa
+          </button>
+        </div>
+      )}
     </div>
   );
 
-  if (!charges.length) {
+  if (!visibleCharges.length && !visibleDerivedCharges.length) {
     return (
       <div className="grid gap-3 rounded-lg border border-dashed border-[#dfe5ef] bg-white p-3 sm:col-span-2">
         <div className="flex items-center justify-between gap-3">
@@ -1460,6 +1669,21 @@ function LiquidationChargeRows({
   }
   return (
     <div className="grid gap-3 sm:col-span-2">
+      {visibleDerivedCharges.length > 0 && (
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">
+              Chi phí khác từ bàn giao
+            </p>
+            <span className="text-[11px] font-semibold text-[#607089]">
+              Lấy từ chỉ số điện và biên bản bồi thường
+            </span>
+          </div>
+          {visibleDerivedCharges.map((charge, index) =>
+            renderChargeRow(charge, `handover-${index}`, { readOnly: true }),
+          )}
+        </div>
+      )}
       {electricityCharges.length > 0 && (
         <div className="grid gap-3">
           <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#58667c]">
@@ -1524,12 +1748,14 @@ export default function ContractTemplatePage() {
   const [termsError, setTermsError] = useState("");
   const [termsFieldErrors, setTermsFieldErrors] = useState({});
   const [isEditingLiquidation, setIsEditingLiquidation] = useState(false);
+  const [exitFlowOpen, setExitFlowOpen] = useState(false);
   const [liquidationForm, setLiquidationForm] = useState(
     buildLiquidationForm(),
   );
   const [liquidationTariffs, setLiquidationTariffs] = useState(
     DEFAULT_LIQUIDATION_TARIFFS,
   );
+  const [handoverChargeSummary, setHandoverChargeSummary] = useState([]);
   const [liquidationError, setLiquidationError] = useState("");
   const [renewModalOpen, setRenewModalOpen] = useState(false);
   const [renewForm, setRenewForm] = useState(buildRenewForm());
@@ -1544,6 +1770,7 @@ export default function ContractTemplatePage() {
   const [intentionError, setIntentionError] = useState("");
   const [printWizard, setPrintWizard] = useState(null);
   const [handoverRefreshKey, setHandoverRefreshKey] = useState(0);
+  const exitHandoverActionRef = useRef(null);
   const [activationReadiness, setActivationReadiness] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -1551,6 +1778,7 @@ export default function ContractTemplatePage() {
   const [cleanupStep, setCleanupStep] = useState(1);
   const [transferExecutionModal, setTransferExecutionModal] = useState(null);
   const selectedYear = searchParams.get("year") || "all";
+  const requestedContractId = searchParams.get("contractId");
 
   const loadContracts = useCallback(async () => {
     setLoading(true);
@@ -1562,12 +1790,26 @@ export default function ContractTemplatePage() {
       });
       const visibleContracts = data.items.filter(isVisibleLeaseContract);
       setContracts(visibleContracts);
-      setSelected((current) =>
-        isVisibleLeaseContract(current) ? current : null,
-      );
-      setDetails((current) =>
-        isVisibleLeaseContract(current) ? current : null,
-      );
+      const requestedContract = requestedContractId
+        ? visibleContracts.find(
+            (item) =>
+              String(item.leaseContractId ?? item.contractId) ===
+              String(requestedContractId),
+          )
+        : null;
+      setSelected((current) => {
+        if (requestedContract) return requestedContract;
+        return isVisibleLeaseContract(current) ? current : null;
+      });
+      setDetails((current) => {
+        if (
+          requestedContract &&
+          String(current?.contractId) !== String(requestedContractId)
+        ) {
+          return null;
+        }
+        return isVisibleLeaseContract(current) ? current : null;
+      });
       return visibleContracts;
     } catch (err) {
       setError(err?.message || "Không tải được danh sách hợp đồng thuê.");
@@ -1575,7 +1817,7 @@ export default function ContractTemplatePage() {
       setLoading(false);
     }
     return [];
-  }, []);
+  }, [requestedContractId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1873,16 +2115,89 @@ export default function ContractTemplatePage() {
         details.liquidationDepositRefundTransactionRef ??
         selected.liquidationDepositRefundTransactionRef ??
         null,
+      liquidationDepositForfeitureRequestId:
+        details.liquidationDepositForfeitureRequestId ??
+        selected.liquidationDepositForfeitureRequestId ??
+        null,
+      liquidationDepositForfeitureStatus:
+        details.liquidationDepositForfeitureStatus ??
+        selected.liquidationDepositForfeitureStatus ??
+        null,
+      liquidationDepositForfeitureConfirmedBy:
+        details.liquidationDepositForfeitureConfirmedBy ??
+        selected.liquidationDepositForfeitureConfirmedBy ??
+        null,
+      liquidationDepositForfeitureConfirmedAt:
+        details.liquidationDepositForfeitureConfirmedAt ??
+        selected.liquidationDepositForfeitureConfirmedAt ??
+        null,
     };
   }, [details, selected]);
+
+  const exitFlowWorkflow = mergedSelected ? getWorkflow(mergedSelected) : null;
+  const showExitFlow = Boolean(
+    mergedSelected?.leaseContractId &&
+      !isRoomTransferManagedContract(mergedSelected) &&
+      !isRenewalContract(mergedSelected) &&
+      (exitFlowOpen ||
+        exitFlowWorkflow === "TERMINATION_PENDING" ||
+        mergedSelected.liquidationId),
+  );
+
+  const liquidationRefundAmount = Number(
+    mergedSelected?.liquidationDepositRefundAmount ?? 0,
+  );
+  const liquidationDeductionAmount = Number(
+    mergedSelected?.liquidationDepositDeductionAmount ?? 0,
+  );
+  const refundSettlementConfirmed =
+    liquidationRefundAmount <= 0 ||
+    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+      mergedSelected?.liquidationDepositRefundStatus,
+    );
+  const forfeitureSettlementConfirmed =
+    liquidationDeductionAmount <= 0 ||
+    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+      mergedSelected?.liquidationDepositForfeitureStatus,
+    );
+  const liquidationInvoiceSettled =
+    isLiquidationInvoiceSettled(mergedSelected);
+  const exitFlowCanComplete = Boolean(
+    mergedSelected?.liquidationId &&
+      refundSettlementConfirmed &&
+      forfeitureSettlementConfirmed &&
+      liquidationInvoiceSettled,
+  );
+  const exitFlowEditable = Boolean(
+    showExitFlow &&
+      user?.role === ROLES.OWNER &&
+      mergedSelected?.liquidationStatus !== "CONFIRMED",
+  );
+  const liquidationEditorVisible = exitFlowEditable || isEditingLiquidation;
+  // Handover is the source of truth for the closing reading and damage data.
+  // Deposit and invoice checks belong to the final liquidation step.
+  const handoverBlocked = false;
+  const handoverBlockedReason = "";
 
   const liquidationDraftCharges = useMemo(
     () => liquidationForm.charges || [],
     [liquidationForm.charges],
   );
+  const liquidationDraftInvoiceCharges = useMemo(
+    () => [
+      ...liquidationDraftCharges.filter(
+        (charge) =>
+          !HANDOVER_DERIVED_LINE_TYPES.includes(charge.lineType),
+      ),
+      ...handoverChargeSummary.filter(
+        (charge) => charge.lineType !== "MAINTENANCE_COMPENSATION",
+      ),
+    ],
+    [handoverChargeSummary, liquidationDraftCharges],
+  );
   const liquidationDraftSubtotal = useMemo(
-    () => getLiquidationChargeSubtotal(liquidationDraftCharges),
-    [liquidationDraftCharges],
+    () => getLiquidationChargeSubtotal(liquidationDraftInvoiceCharges),
+    [liquidationDraftInvoiceCharges],
   );
   const liquidationDraftDeposit = Number(
     mergedSelected?.liquidationDepositAmount ??
@@ -1977,9 +2292,12 @@ export default function ContractTemplatePage() {
     setActionMessage("");
     setTermsForm(buildTermsForm(item));
     setIsEditingTerms(false);
+    setIsEditingLiquidation(false);
+    setExitFlowOpen(false);
     setTermsFieldErrors({});
     setTermsError("");
     setLiquidationForm(buildLiquidationForm(item));
+    setHandoverChargeSummary([]);
     setIsEditingLiquidation(false);
     setLiquidationError("");
     setRenewModalOpen(false);
@@ -2176,7 +2494,17 @@ export default function ContractTemplatePage() {
     }
   }
 
-  function handleHandoverSaved() {
+  const handleHandoverDraftChange = useCallback(
+    (handoverData) => {
+      setHandoverChargeSummary(
+        buildHandoverChargeSummary(handoverData, liquidationTariffs),
+      );
+    },
+    [liquidationTariffs],
+  );
+
+  function handleHandoverSaved(handoverResponse) {
+    handleHandoverDraftChange(unwrapHandoverResponse(handoverResponse));
     setHandoverRefreshKey((v) => v + 1);
     handleContractUpdated();
   }
@@ -2192,7 +2520,7 @@ export default function ContractTemplatePage() {
     }
 
     if (!getLeaseSignedFileId(item)) {
-      window.alert("Vui lòng upload file hợp đồng đã ký trước khi kích hoạt.");
+      window.alert("Vui lòng tải lên file hợp đồng đã ký trước khi kích hoạt.");
       return;
     }
 
@@ -2209,13 +2537,13 @@ export default function ContractTemplatePage() {
           }
           if (!getSignedHandoverDocumentId(handoverData)) {
             window.alert(
-              "Vui lòng upload biên bản bàn giao đã ký trước khi kích hoạt hợp đồng.",
+               "Vui lòng tải lên biên bản bàn giao đã ký trước khi kích hoạt hợp đồng.",
             );
             setActionLoading("");
             return;
           }
         } catch (err) {
-          window.alert("Vui lòng hoàn thành bàn giao phòng và upload biên bản đã ký trước khi kích hoạt hợp đồng.");
+          window.alert("Vui lòng hoàn thành bàn giao phòng và tải lên biên bản đã ký trước khi kích hoạt hợp đồng.");
           setActionLoading("");
           return;
         }
@@ -2293,7 +2621,9 @@ export default function ContractTemplatePage() {
         );
         }
       } else {
-        toast.success("Da kich hoat hop dong tai phong chuyen den.");
+        toast.success(
+          "Đã kích hoạt hợp đồng phòng mới. Tiếp theo, hãy bàn giao phòng cũ để hoàn tất chuyển phòng.",
+        );
       }
     } catch (err) {
       setError(err?.message || "Không kích hoạt được hợp đồng.");
@@ -2332,7 +2662,7 @@ export default function ContractTemplatePage() {
       return;
     }
     if (!getLeaseSignedFileId(item)) {
-      toast.warning("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
+      toast.warning("Vui lòng tải lên file hợp đồng đã ký trước khi xác nhận.");
       return;
     }
 
@@ -2402,10 +2732,13 @@ export default function ContractTemplatePage() {
     }
   }
 
-  async function refreshSelectedContract(contract) {
+  async function refreshSelectedContract(
+    contract,
+    { resetLiquidationForm = true } = {},
+  ) {
     if (!contract?.leaseContractId) {
       await loadContracts();
-      return;
+      return null;
     }
     const refreshedContracts = await loadContracts();
     const refreshedItem = refreshedContracts.find(
@@ -2421,9 +2754,13 @@ export default function ContractTemplatePage() {
     const refreshedDetails = await fetchManagementLeaseContractDetails(
       contract.leaseContractId,
     );
+    const latestContract = { ...selectedUpdate, ...refreshedDetails };
     setDetails(refreshedDetails);
     setTermsForm(buildTermsForm(refreshedDetails));
-    setLiquidationForm(buildLiquidationForm(selectedUpdate));
+    if (resetLiquidationForm) {
+      setLiquidationForm(buildLiquidationForm(latestContract));
+    }
+    return latestContract;
   }
 
   async function handleRetrySendAccount(item) {
@@ -2583,7 +2920,7 @@ export default function ContractTemplatePage() {
         "Không xác định được cơ sở để tải đơn giá điện.",
       );
       toast.error("Không xác định được cơ sở để tải đơn giá điện.");
-      return;
+      return false;
     }
     let tariffs = DEFAULT_LIQUIDATION_TARIFFS;
     try {
@@ -2601,16 +2938,48 @@ export default function ContractTemplatePage() {
       toast.error(
         err?.message || "Không tải được đơn giá điện của cơ sở.",
       );
-      return;
+      return false;
     }
     setLiquidationTariffs(tariffs);
     const initialForm = buildLiquidationForm(item, tariffs);
     setLiquidationForm(initialForm);
+    setHandoverChargeSummary([]);
     setLiquidationError("");
     setIsEditingLiquidation(true);
+    setExitFlowOpen(true);
+
+    try {
+      let handoverData = await fetchContractHandover(
+        item.leaseContractId,
+        "MOVE_OUT",
+      );
+      const electricity = getHandoverElectricity(handoverData);
+      if (
+        item.roomId &&
+        electricity.currentValue !== null &&
+        electricity.previousValue === null
+      ) {
+        const latestReadings = await fetchLatestReadings(item.roomId);
+        const latestElectricity = latestReadings?.electricity || {};
+        handoverData = mergeHandoverResponses(handoverData, {
+          electricity: {
+            previousValue:
+              latestElectricity.previousValue ??
+              latestElectricity.previous_value,
+            currentValue: electricity.currentValue,
+          },
+        });
+      }
+      setHandoverChargeSummary(
+        buildHandoverChargeSummary(handoverData, tariffs),
+      );
+    } catch {
+      // The handover card can still be completed manually if no record exists yet.
+      setHandoverChargeSummary([]);
+    }
 
     if (!item?.roomId || (item.liquidationFinalInvoiceLines || []).length > 0) {
-      return;
+      return true;
     }
 
     try {
@@ -2656,51 +3025,22 @@ export default function ContractTemplatePage() {
                   getLiquidationTariff(charge.lineType, tariffs).freeAllowance,
                 ),
               }
-            : charge,
+          : charge,
         ),
       }));
     }
+    return true;
   }
 
   async function handleLiquidate(item) {
     if (!item?.leaseContractId) return;
-    if (!item.liquidationFinalInvoiceId) {
-      await openLiquidationEditor(item);
-      setLiquidationError(
-        "Vui lòng nhập và lưu hồ sơ thanh lý trước khi hoàn tất.",
-      );
-      return;
-    }
-    const validationPayload = await buildLiquidationPayload();
-    if (!validationPayload) {
-      return;
-    }
-    const confirmed = window.confirm(
-      "Bạn chắc chắn muốn hoàn tất thanh lý hợp đồng này?",
+    const opened = await openLiquidationEditor(item);
+    if (!opened) return;
+    setLiquidationError(
+      item.liquidationId
+        ? "Hãy kiểm tra thông tin thanh lý và bàn giao, sau đó bấm nút xử lý chung."
+        : "Hãy nhập thông tin thanh lý và bàn giao, sau đó bấm nút xử lý chung.",
     );
-    if (!confirmed) return;
-    setActionLoading(`liquidate-${item.leaseContractId}`);
-    setError("");
-    setLiquidationError("");
-    try {
-      const payload = await buildLiquidationPayload({ uploadPhotos: true });
-      if (!payload) return;
-      const updated = await liquidateLeaseContract(
-        item.leaseContractId,
-        payload,
-      );
-      await refreshSelectedContract(updated);
-      setIsEditingLiquidation(false);
-      toast.success("Đã hoàn tất thanh lý hợp đồng.");
-    } catch (err) {
-      setError(err?.message || "Không thanh lý được hợp đồng.");
-      setLiquidationError(
-        err?.details || err?.message || "Không thanh lý được hợp đồng.",
-      );
-      toast.error(err?.message || "Không thanh lý được hợp đồng.");
-    } finally {
-      setActionLoading("");
-    }
   }
 
   function updateLiquidationField(field, value) {
@@ -2788,13 +3128,46 @@ export default function ContractTemplatePage() {
     }));
   }
 
-  async function buildLiquidationPayload({ uploadPhotos = false } = {}) {
-    if (!liquidationForm.liquidationDate) {
+  async function buildLiquidationPayload({
+    uploadPhotos = false,
+    handoverData = null,
+  } = {}) {
+    const handoverDate = toDateInputValue(
+      handoverData?.handoverDate ?? handoverData?.handover_date,
+    );
+    const liquidationDate = handoverDate || liquidationForm.liquidationDate;
+    if (!liquidationDate) {
       setLiquidationError("Vui lòng chọn ngày thanh lý.");
       return null;
     }
-    let uploadedCharges = liquidationForm.charges || [];
-    for (const charge of liquidationForm.charges || []) {
+    let sourceCharges = (liquidationForm.charges || []).filter(
+      (charge) =>
+        !["ELECTRICITY", "ROOM_RENT", "MAINTENANCE_COMPENSATION"].includes(
+          charge.lineType,
+        ),
+    );
+    const handoverElectricity = getHandoverElectricity(handoverData);
+    const previousValue = handoverElectricity.previousValue;
+    const currentValue = handoverElectricity.currentValue;
+    if (
+      Number.isFinite(previousValue) &&
+      Number.isFinite(currentValue) &&
+      currentValue >= previousValue
+    ) {
+      const electricityCharge = createLiquidationCharge(
+        "ELECTRICITY",
+        "Tiền điện chốt phòng",
+        liquidationTariffs,
+      );
+      sourceCharges.unshift({
+        ...electricityCharge,
+        previousValue: String(previousValue),
+        currentValue: String(currentValue),
+        photoFileId: handoverElectricity.photoFileId,
+      });
+    }
+    let uploadedCharges = sourceCharges;
+    for (const charge of sourceCharges) {
       const meterCharge = isMeterLiquidationCharge(charge.lineType);
       const quantity = meterCharge
         ? getLiquidationMeterEstimate(charge)?.billableUsage
@@ -2828,7 +3201,7 @@ export default function ContractTemplatePage() {
     }
     if (uploadPhotos) {
       uploadedCharges = [];
-      for (const charge of liquidationForm.charges || []) {
+      for (const charge of sourceCharges) {
         if (isMeterLiquidationCharge(charge.lineType) && charge.proofFile) {
           const uploaded = await uploadFile(charge.proofFile, "METER_PHOTO");
           uploadedCharges.push({
@@ -2847,32 +3220,110 @@ export default function ContractTemplatePage() {
     }
     const charges = normalizeLiquidationCharges(uploadedCharges);
     return {
-      liquidationDate: liquidationForm.liquidationDate,
+      liquidationDate,
       reason: liquidationForm.reason,
       charges,
     };
   }
 
-  async function handleSaveLiquidationDraft(item) {
+  async function handleSubmitExitFlow(item) {
     if (!item?.leaseContractId) return;
-    setActionLoading(`liquidation-draft-${item.leaseContractId}`);
-    setLiquidationError("");
+    const actionKey = `exit-flow-${item.leaseContractId}`;
+    setActionLoading(actionKey);
     setError("");
+    setLiquidationError("");
+
     try {
-      const payload = await buildLiquidationPayload({ uploadPhotos: true });
-      if (!payload) return;
-      const updated = await updateLeaseContractLiquidationDraft(
+      // Save the handover first. It is the source of truth for the closing
+      // meter reading, handover date, and compensation data.
+      let currentItem =
+        (await refreshSelectedContract(item, {
+          resetLiquidationForm: false,
+        })) || item;
+      const saveHandover = exitHandoverActionRef.current?.save;
+      if (!saveHandover) {
+        throw new Error("Biểu mẫu bàn giao trả phòng chưa sẵn sàng.");
+      }
+      const savedHandover = await saveHandover({ ignoreBlocked: true });
+      if (!savedHandover) return;
+
+      let handoverData = unwrapHandoverResponse(savedHandover);
+      try {
+        const fetchedHandover = unwrapHandoverResponse(
+          await fetchContractHandover(item.leaseContractId, "MOVE_OUT"),
+        );
+        handoverData = mergeHandoverResponses(handoverData, fetchedHandover);
+      } catch {
+        // The submit response already contains the values needed as fallback.
+      }
+      setHandoverChargeSummary(
+        buildHandoverChargeSummary(handoverData, liquidationTariffs),
+      );
+
+      let payload = {
+        liquidationDate:
+          toDateInputValue(
+            handoverData?.handoverDate ?? handoverData?.handover_date,
+          ) || liquidationForm.liquidationDate,
+        reason: liquidationForm.reason,
+        charges: [],
+      };
+      if (!currentItem.liquidationId || !isLiquidationInvoiceSettled(currentItem)) {
+        payload = await buildLiquidationPayload({
+          uploadPhotos: true,
+          handoverData,
+        });
+        if (!payload) return;
+
+        setLiquidationForm((current) => ({
+          ...current,
+          liquidationDate: payload.liquidationDate,
+        }));
+        const draft = await updateLeaseContractLiquidationDraft(
+          item.leaseContractId,
+          payload,
+        );
+        const refreshedDraft = await refreshSelectedContract(draft);
+        currentItem = {
+          ...currentItem,
+          ...draft,
+          ...(refreshedDraft || {}),
+        };
+      }
+
+      if (!currentItem.liquidationId) {
+        toast.info(
+          "Đã lưu hồ sơ thanh lý. Hãy hoàn tất các điều kiện còn thiếu rồi tiếp tục.",
+        );
+        return;
+      }
+
+      if (!areLiquidationSettlementsConfirmed(currentItem)) {
+        toast.info(
+          "Đã lưu bàn giao và hồ sơ thanh lý. Hãy hoàn tất xử lý tiền cọc rồi tiếp tục.",
+        );
+        return;
+      }
+
+      if (!isLiquidationInvoiceSettled(currentItem)) {
+        toast.info(
+          "Đã lưu bàn giao và hồ sơ thanh lý. Hãy chờ khách thuê thanh toán hóa đơn chốt rồi tiếp tục.",
+        );
+        return;
+      }
+
+      const updated = await liquidateLeaseContract(
         item.leaseContractId,
         payload,
       );
       await refreshSelectedContract(updated);
       setIsEditingLiquidation(false);
-      toast.success("Đã lưu hồ sơ thanh lý.");
+      toast.success("Đã hoàn tất quy trình thanh lý và bàn giao trả phòng.");
     } catch (err) {
-      setLiquidationError(
-        err?.details || err?.message || "Không lưu được hồ sơ thanh lý.",
-      );
-      toast.error(err?.message || "Không lưu được hồ sơ thanh lý.");
+      const message = err?.details || err?.message || "Không hoàn tất được quy trình thanh lý và bàn giao.";
+      setError(message);
+      setLiquidationError(message);
+      toast.error(message);
     } finally {
       setActionLoading("");
     }
@@ -3596,7 +4047,7 @@ export default function ContractTemplatePage() {
                           value={
                             getLeaseSignedFileId(mergedSelected)
                               ? selectedSignedLeaseContractFilename
-                              : "Chưa upload"
+                              : "Chưa tải lên"
                           }
                         />
                       </div>
@@ -3618,7 +4069,9 @@ export default function ContractTemplatePage() {
                             {mergedSelected.transferStatus ===
                             "WAITING_EXECUTION"
                               ? "Hoàn tất chuyển phòng"
-                              : "Chốt phòng cũ"}
+                              : mergedSelected.sourceRoomWillBeEmptyAfterTransfer === false
+                                ? "Tiếp tục chuyển phòng"
+                                : "Bàn giao phòng cũ"}
                           </button>
                         )}
                         {mergedSelected.transferStatus ===
@@ -4157,13 +4610,13 @@ export default function ContractTemplatePage() {
                     )}
                   </DetailCard>
 
-                  {(mergedSelected.liquidationId ||
-                    getWorkflow(mergedSelected) === "TERMINATION_PENDING") && (
+                  {showExitFlow && (
                     <DetailCard
-                      title="Hồ sơ thanh lý"
+                      title="Hồ sơ thanh lý và bàn giao trả phòng"
                       icon={FileWarning}
                       className="lg:col-span-2"
                       action={
+                        !exitFlowEditable &&
                         canUseLiquidationActions &&
                         mergedSelected.liquidationStatus !== "CONFIRMED" ? (
                           <button
@@ -4192,24 +4645,39 @@ export default function ContractTemplatePage() {
                         ) : null
                       }
                     >
+                      {showExitFlow && (
+                        <ContractHandoverSection
+                          key={`${mergedSelected.leaseContractId}-move-out`}
+                          contractId={mergedSelected.leaseContractId}
+                          tenantId={mergedSelected.tenantId || null}
+                          roomId={mergedSelected.roomId || null}
+                          roomCode={
+                            mergedSelected.roomCode ||
+                            mergedSelected.room?.roomCode
+                          }
+                          handoverType="MOVE_OUT"
+                          title="Bàn giao trả phòng"
+                          description="Nhập ngày bàn giao, chốt chỉ số điện cuối, hiện trạng phòng và khoản bồi thường nếu có."
+                          showCompensation
+                          blocked={handoverBlocked}
+                          blockedReason={handoverBlockedReason}
+                          actionRef={exitHandoverActionRef}
+                          hideSaveButton={exitFlowEditable}
+                          confirmOnSave={false}
+                          onDraftChange={handleHandoverDraftChange}
+                          readonly={[
+                            "LIQUIDATED",
+                            "RENEWED",
+                            "CANCELLED",
+                            "AUTO_TERMINATED",
+                          ].includes(getWorkflow(mergedSelected))}
+                          onSaved={handleHandoverSaved}
+                          embedded
+                        />
+                      )}
                       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:gap-5">
-                        {isEditingLiquidation ? (
+                        {liquidationEditorVisible ? (
                           <>
-                            <label className="grid min-w-0 gap-1.5">
-                              <span className="text-xs font-bold text-[#58667c]">
-                                Ngày thanh lý *
-                              </span>
-                              <DateInput
-                                value={liquidationForm.liquidationDate}
-                                onChange={(event) =>
-                                  updateLiquidationField(
-                                    "liquidationDate",
-                                    event.target.value,
-                                  )
-                                }
-                                className="h-10 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm font-semibold outline-none focus:border-[#091426]"
-                              />
-                            </label>
                             {shortTermDepositForfeiture && (
                               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold leading-6 text-red-700 sm:col-span-2">
                                 Hợp đồng còn dưới 1 tháng và khách trả phòng
@@ -4219,10 +4687,16 @@ export default function ContractTemplatePage() {
                             )}
                             <LiquidationChargeRows
                               charges={liquidationDraftCharges}
+                              derivedCharges={handoverChargeSummary}
                               onAdd={addLiquidationCharge}
                               onChange={updateLiquidationCharge}
                               onProofChange={updateLiquidationChargeProof}
                               onRemove={removeLiquidationCharge}
+                              derivedLineTypes={[
+                                "ELECTRICITY",
+                                "ROOM_RENT",
+                                "MAINTENANCE_COMPENSATION",
+                              ]}
                             />
                             <div className="grid gap-3 rounded-lg border border-[#dfe5ef] bg-white p-3 sm:col-span-2 sm:grid-cols-4">
                               <InfoValue
@@ -4382,16 +4856,16 @@ export default function ContractTemplatePage() {
                                 }
                               />
                             </div>
-                            {Number(
-                              mergedSelected.liquidationDepositRefundAmount ||
-                                0,
-                            ) > 0 &&
-                              mergedSelected.liquidationDepositRefundStatus !==
-                                "TENANT_CONFIRMED" && (
+                            {(!refundSettlementConfirmed ||
+                              !forfeitureSettlementConfirmed ||
+                              !liquidationInvoiceSettled) && (
                                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 sm:col-span-2">
-                                  Cần hoàn cọc qua yêu cầu chi, upload minh
-                                  chứng và chờ khách thuê xác nhận trước khi
-                                  hoàn tất thanh lý.
+                                  {liquidationDeductionAmount > 0 &&
+                                  !forfeitureSettlementConfirmed
+                                    ? "Cần chờ khách thuê xác nhận khoản mất cọc trước khi tiếp tục."
+                                    : !liquidationInvoiceSettled
+                                      ? "Cần chờ khách thuê thanh toán hóa đơn chốt trước khi tiếp tục."
+                                    : "Cần hoàn cọc qua yêu cầu chi, tải ảnh minh chứng lên và chờ khách thuê xác nhận trước khi tiếp tục."}
                                 </p>
                               )}
                           </>
@@ -4409,64 +4883,33 @@ export default function ContractTemplatePage() {
                           {liquidationError}
                         </p>
                       )}
-                      {canUseLiquidationActions &&
-                        mergedSelected.liquidationStatus !== "CONFIRMED" && (
-                          <div className="mt-5 flex flex-wrap justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleSaveLiquidationDraft(mergedSelected)
-                              }
-                              disabled={isBusy}
-                              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
-                            >
-                              {actionLoading ===
-                              `liquidation-draft-${mergedSelected.leaseContractId}` ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Save className="h-4 w-4" />
-                              )}
-                              Lưu hồ sơ
-                            </button>
-                            {!isEditingLiquidation &&
-                              mergedSelected.liquidationFinalInvoiceId && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleLiquidate(mergedSelected)
-                                  }
-                                  disabled={
-                                    isBusy ||
-                                    (Number(
-                                      mergedSelected.liquidationDepositRefundAmount ||
-                                        0,
-                                    ) > 0 &&
-                                      mergedSelected.liquidationDepositRefundStatus !==
-                                        "TENANT_CONFIRMED")
-                                  }
-                                  title={
-                                    Number(
-                                      mergedSelected.liquidationDepositRefundAmount ||
-                                        0,
-                                    ) > 0 &&
-                                    mergedSelected.liquidationDepositRefundStatus !==
-                                      "TENANT_CONFIRMED"
-                                      ? "Cần hoàn cọc và chờ khách thuê xác nhận trước."
-                                      : undefined
-                                  }
-                                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
-                                >
-                                  {actionLoading ===
-                                  `liquidate-${mergedSelected.leaseContractId}` ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="h-4 w-4" />
-                                  )}
-                                  Hoàn tất thanh lý
-                                </button>
-                              )}
-                          </div>
-                        )}
+                      {exitFlowEditable && (
+                        <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+                          {!exitFlowCanComplete && (
+                            <p className="max-w-2xl text-xs font-semibold leading-5 text-amber-700">
+                              Nút này sẽ lưu toàn bộ thông tin đã nhập. Khi hoàn cọc
+                              hoặc xác nhận mất cọc và hóa đơn chốt đã xử lý xong,
+                              bấm lại để hệ thống tiếp tục bàn giao và hoàn tất thanh lý.
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleSubmitExitFlow(mergedSelected)}
+                            disabled={isBusy}
+                            className="ml-auto inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {actionLoading ===
+                            `exit-flow-${mergedSelected.leaseContractId}` ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4" />
+                            )}
+                            {exitFlowCanComplete
+                              ? "Lưu và hoàn tất thanh lý"
+                              : "Lưu hồ sơ và tiếp tục"}
+                          </button>
+                        </div>
+                      )}
                     </DetailCard>
                   )}
 
@@ -4592,33 +5035,7 @@ export default function ContractTemplatePage() {
                   </DetailCard>
 
                   {mergedSelected.leaseContractId &&
-                    getWorkflow(mergedSelected) === "TERMINATION_PENDING" &&
-                    !isRoomTransferManagedContract(mergedSelected) &&
-                    !isRenewalContract(mergedSelected) && (
-                      <ContractHandoverSection
-                        key={`${mergedSelected.leaseContractId}-move-out`}
-                        contractId={mergedSelected.leaseContractId}
-                        tenantId={mergedSelected.tenantId || null}
-                        roomId={mergedSelected.roomId || null}
-                        roomCode={
-                          mergedSelected.roomCode ||
-                          mergedSelected.room?.roomCode
-                        }
-                        handoverType="MOVE_OUT"
-                        title="Bàn giao trả phòng"
-                        description="Chốt chỉ số, hiện trạng phòng và khoản bồi thường nếu có trước khi hoàn tất thanh lý."
-                        showCompensation
-                        readonly={[
-                          "LIQUIDATED",
-                          "RENEWED",
-                          "CANCELLED",
-                          "AUTO_TERMINATED",
-                        ].includes(getWorkflow(mergedSelected))}
-                        onSaved={handleHandoverSaved}
-                      />
-                    )}
-
-                  {mergedSelected.leaseContractId &&
+                    !showExitFlow &&
                     getWorkflow(mergedSelected) !== "TERMINATION_PENDING" &&
                     !isRoomTransferManagedContract(mergedSelected) &&
                     !isRenewalContract(mergedSelected) && (
@@ -4664,7 +5081,7 @@ export default function ContractTemplatePage() {
                               {selectedSignedLeaseContractFilename}
                             </p>
                             <p className="mt-1 text-sm text-[#607089]">
-                              Upload:{" "}
+                              Tải lên:{" "}
                               {formatDate(mergedSelected.signedFileUploadedAt)}
                             </p>
                             <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -4724,7 +5141,7 @@ export default function ContractTemplatePage() {
                               disabled={isBusy}
                               className="mt-4 rounded-lg bg-[#091426] px-4 py-3 text-sm font-extrabold text-white hover:bg-[#16253a] disabled:opacity-60"
                             >
-                              Upload hợp đồng đã ký
+                              Tải lên hợp đồng đã ký
                             </button>
                           </div>
                         )}
@@ -4828,6 +5245,9 @@ export default function ContractTemplatePage() {
                       </button>
                     )}
                     {canUseLiquidationActions &&
+                      !isRoomTransferManagedContract(mergedSelected) &&
+                      !isRenewalContract(mergedSelected) &&
+                      !showExitFlow &&
                       (details?.canLiquidate ??
                         ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(
                           getWorkflow(mergedSelected),

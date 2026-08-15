@@ -84,7 +84,7 @@ test("billing API helpers send numeric override and manual payment payloads", as
   await applyRentOverride({
     roomId: "12",
     billingPeriod: "2026-07",
-    overrideMonthlyRent: "3200000",
+    discountAmount: "300000",
     reason: "one month discount",
   });
   const payment = await confirmManualPayment(7, { amount: "500000", payerName: "Cash", note: "received" });
@@ -93,7 +93,8 @@ test("billing API helpers send numeric override and manual payment payloads", as
   assert.deepEqual(calls[0].body, {
     roomId: 12,
     billingPeriod: "2026-07",
-    overrideMonthlyRent: 3200000,
+    overrideMonthlyRent: null,
+    discountAmount: 300000,
     reason: "one month discount",
   });
   assert.equal(calls[1].url, "https://api.test/api/v1/admin/invoices/7/manual-payments");

@@ -178,6 +178,127 @@ function formatRequestDate(value) {
     : "--";
 }
 
+function getRequestDeadline(request) {
+  const payload = parseRequestPayload(request?.requestPayload) || {};
+  const commonCandidates = [
+    request?.deadlineAt,
+    request?.deadline,
+    request?.dueDate,
+    request?.due_date,
+    payload.deadlineAt,
+    payload.deadline_at,
+    payload.deadline,
+    payload.dueDate,
+    payload.due_date,
+  ];
+  const typeCandidates = {
+    ROOM_TRANSFER: [
+      payload.expectedTransferDate,
+      payload.expected_transfer_date,
+      payload.transferDate,
+      payload.transfer_date,
+      payload.requestedDate,
+      payload.requested_date,
+    ],
+    MOVE_OUT: [
+      payload.moveOutDate,
+      payload.move_out_date,
+      payload.expectedDate,
+      payload.expected_date,
+    ],
+    CONTRACT_LIQUIDATION: [
+      payload.liquidationDate,
+      payload.liquidation_date,
+      payload.terminationDate,
+      payload.termination_date,
+    ],
+    CONTRACT_RENEWAL: [
+      payload.renewalDeadline,
+      payload.renewal_deadline,
+      payload.oldEndDate,
+      payload.old_end_date,
+    ],
+  };
+
+  return [...commonCandidates, ...(typeCandidates[request?.requestType] || [])].find(
+    (value) => toDate(value),
+  );
+}
+
+function getVietnamDayNumber(value) {
+  const date = toDate(value);
+  if (!date) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: REQUEST_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(date)
+    .reduce((result, part) => {
+      if (part.type !== "literal") result[part.type] = part.value;
+      return result;
+    }, {});
+  return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+}
+
+function getRequestDeadlineMeta(request) {
+  const deadline = getRequestDeadline(request);
+  if (!deadline) {
+    return {
+      date: null,
+      label: "Chưa có hạn",
+      className: "text-slate-400 dark:text-slate-500",
+    };
+  }
+
+  if (["APPROVED", "COMPLETED", "REJECTED", "CANCELLED"].includes(request?.status)) {
+    return {
+      date: deadline,
+      label: "Đã xử lý",
+      className: "text-slate-400 dark:text-slate-500",
+    };
+  }
+
+  const deadlineDay = getVietnamDayNumber(deadline);
+  const todayDay = getVietnamDayNumber(new Date());
+  const daysLeft = Math.floor((deadlineDay - todayDay) / 86400000);
+  if (daysLeft < 0) {
+    return {
+      date: deadline,
+      label: "Quá hạn",
+      className: "text-red-500 dark:text-red-300",
+    };
+  }
+  if (daysLeft === 0) {
+    return {
+      date: deadline,
+      label: "Hạn hôm nay",
+      className: "text-orange-500 dark:text-orange-300",
+    };
+  }
+  return {
+    date: deadline,
+    label: `Còn ${daysLeft} ngày`,
+    className: "text-orange-500 dark:text-orange-300",
+  };
+}
+
+async function hydrateRequestDeadline(request) {
+  if (request?.requestType !== "ROOM_TRANSFER" || !request?.targetId) {
+    return request;
+  }
+
+  try {
+    const transfer = await getRoomTransferById(request.targetId);
+    const deadline =
+      transfer?.expectedTransferDate || transfer?.requestedTransferDate;
+    return deadline ? { ...request, deadlineAt: deadline } : request;
+  } catch {
+    return request;
+  }
+}
+
 function formatRequestTime(value) {
   const date = toDate(value);
   return date
@@ -307,23 +428,28 @@ const TYPE_CONFIG = {
   },
 };
 
-const translateTransferStatus = (status) => {
+const translateTransferStatus = (status, transfer = null) => {
+  if (status === "READY_FOR_HANDOVER" && transfer?.sourceRoomWillBeEmptyAfterTransfer === false) {
+    return "Sẵn sàng xác nhận người chuyển đi";
+  }
+  if (status === "WAITING_EXECUTION" && transfer?.sourceRoomWillBeEmptyAfterTransfer === false) {
+    return "Chờ hoàn tất chuyển phòng";
+  }
   const map = {
     REQUESTED: "Mới tạo",
     MANAGER_APPROVED: "Quản lý đã duyệt",
     WAITING_MANAGER_APPROVAL: "Chờ quản lý duyệt",
     WAITING_HOLDER_RESPONSE: "Chờ người đại diện phòng phản hồi",
-    WAITING_TARGET_HOLDER_APPROVAL: "Chờ chủ phòng đích duyệt",
-    WAITING_TENANT_CONFIRMATION: "Chờ khách xác nhận",
+    WAITING_TARGET_HOLDER_APPROVAL: "Đang xử lý chuyển phòng",
     WAITING_PAYMENT: "Chờ thanh toán",
     WAITING_CONTRACT_CONFIRMATION: "Chờ quản lý xác nhận hợp đồng",
     WAITING_NEW_CONTRACT: "Chờ tạo hợp đồng mới",
-    WAITING_SIGNING: "Chờ quản lý upload bản ký",
-    WAITING_CONTRACT_SIGNING: "Chờ quản lý upload bản ký",
-    WAITING_TRANSFER_DATE: "Sẵn sàng chuyển phòng",
-    READY_FOR_HANDOVER: "Sẵn sàng chuyển phòng",
-    WAITING_EXECUTION: "Đang trong phiên chuyển phòng",
-    EXECUTED: "Đã chuyển phòng",
+    WAITING_SIGNING: "Chờ quản lý tải lên bản đã ký",
+    WAITING_CONTRACT_SIGNING: "Chờ quản lý tải lên bản đã ký",
+    WAITING_TRANSFER_DATE: "Chờ đến ngày chuyển phòng",
+    READY_FOR_HANDOVER: "Sẵn sàng bàn giao phòng cũ",
+    WAITING_EXECUTION: "Đã bàn giao phòng cũ, chờ hoàn tất",
+    EXECUTED: "Đã hoàn tất chuyển phòng",
     COMPLETED: "Đã hoàn tất chuyển phòng",
     CANCELLED: "Đã hủy",
     REJECTED: "Đã từ chối",
@@ -362,10 +488,12 @@ const isTransferSigningStatus = (status) =>
 const getTransferTimingNote = (transfer) => {
   if (!transfer) return "";
   const moveOutNote =
-    "Chỉ thực hiện full move-out khi sau chuyển phòng cũ trở thành phòng trống. Nếu phòng cũ vẫn còn người ở thì chỉ xử lý phần occupant rời đi, không làm room-level move-out đầy đủ.";
-  const moveInNote = requiresFullMoveIn(transfer)
-    ? "Chốt phòng cũ chỉ ghi nhận người rời phòng và tạo hóa đơn điện nếu phát sinh; sau khi hóa đơn này đã thanh toán, manager mới nhập check-in phòng mới và hoàn tất chuyển phòng."
-    : "Ca này không cần full move-in kiểu nhận phòng trống vì tenant đi vào hợp đồng/phòng đang có người.";
+    "Chỉ thực hiện trả phòng toàn bộ khi phòng cũ trở thành phòng trống. Nếu phòng cũ vẫn còn người ở thì chỉ xử lý người rời đi, không cần hoàn tất bàn giao cả phòng.";
+  const moveInNote = transfer.sourceRoomWillBeEmptyAfterTransfer === false
+    ? "Phòng cũ vẫn còn người ở nên không cần chốt phòng cũ; sau khi xác nhận người chuyển đi, quản lý hoàn tất cập nhật hợp đồng chuyển phòng."
+    : requiresFullMoveIn(transfer)
+    ? "Sau khi chốt phòng cũ và thanh toán hóa đơn điện phát sinh, quản lý mới nhập thông tin nhận phòng mới và hoàn tất chuyển phòng."
+    : "Trường hợp này không cần thực hiện quy trình nhận phòng trống vì khách chuyển vào hợp đồng hoặc phòng đang có người.";
   return `${moveOutNote} ${moveInNote}`;
 };
 
@@ -374,7 +502,7 @@ const getTransferActionMeta = (transfer) => {
     return {
       primaryAction: null,
       helperText:
-        "Chưa tải được chi tiết transfer từ backend. Màn này vẫn hiển thị thông tin cơ bản từ yêu cầu để tránh chặn quản lý.",
+        "Chưa tải được chi tiết chuyển phòng. Màn hình vẫn hiển thị thông tin cơ bản từ yêu cầu để quản lý tiếp tục kiểm tra.",
     };
   }
 
@@ -396,26 +524,36 @@ const getTransferActionMeta = (transfer) => {
       return {
         primaryAction: null,
         helperText:
-          "Đang chờ khách thuê ký hợp đồng. Chưa nên thực hiện move-out/move-in.",
+          "Đang chờ khách thuê ký hợp đồng. Chưa nên thực hiện trả phòng hoặc nhận phòng.",
       };
     case "WAITING_TRANSFER_DATE":
       return {
         primaryAction: "execute-transfer",
         helperText:
-          "Hồ sơ đã sẵn sàng. Manager có thể bấm Chốt phòng cũ khi tenant và quản lý có mặt.",
+          transfer.sourceRoomWillBeEmptyAfterTransfer === false
+            ? "Hồ sơ đã sẵn sàng. Khi đến ngày chuyển phòng, quản lý chỉ cần xác nhận nhóm người chuyển đi; phòng cũ vẫn còn người ở nên không cần chốt lại."
+            : "Hồ sơ đã sẵn sàng. Khi đến ngày chuyển phòng và khách thuê có mặt, quản lý có thể bắt đầu bàn giao phòng cũ.",
       };
     case "READY_FOR_HANDOVER":
       return {
         primaryAction: "execute-transfer",
         helperText:
-          "Hồ sơ đã sẵn sàng. Manager bấm Chốt phòng cũ để ghi nhận người rời phòng và chỉ số điện.",
+          transfer.sourceRoomWillBeEmptyAfterTransfer === false
+            ? "Hai hợp đồng đã được kích hoạt. Phòng cũ vẫn còn người ở nên không cần chốt phòng; bước tiếp theo là xác nhận nhóm người chuyển đi."
+            : "Hai hợp đồng đã được kích hoạt. Bước tiếp theo là bàn giao phòng cũ để chốt phòng và ghi nhận chỉ số điện.",
       };
-    case "WAITING_EXECUTION":
+    case "WAITING_EXECUTION": {
+      const completionNote = requiresFullMoveIn(transfer)
+        ? "sau đó nhập thông tin nhận phòng mới và hoàn tất chuyển phòng"
+        : "sau đó hoàn tất chuyển phòng";
       return {
         primaryAction: "complete-transfer",
         helperText:
-          "Phiên chuyển phòng đang diễn ra. Nếu có hóa đơn điện chốt chuyển phòng thì cần thanh toán trước, sau đó nhập check-in phòng mới và bấm Complete Transfer.",
+          transfer.sourceRoomWillBeEmptyAfterTransfer === false
+            ? `Đã xác nhận nhóm người chuyển đi; không thực hiện chốt phòng cũ. ${completionNote}.`
+            : `Đã bàn giao phòng cũ. Nếu có hóa đơn điện phát sinh, hãy thanh toán trước, ${completionNote}.`,
       };
+    }
     case "EXECUTED":
       return {
         primaryAction: null,
@@ -655,7 +793,7 @@ async function hydrateTransferSigningDocuments(transfer) {
   return { ...transfer, signingDocuments };
 }
 
-function RequestDetailContent({ req, detailTransfer }) {
+function RequestDetailContent({ req, detailTransfer, onOpenContract }) {
   const mappedType = mapRequestType(req.requestType);
   const payload = parseRequestPayload(req.requestPayload);
   const TypeDetailComponent = TYPE_DETAIL_COMPONENTS[mappedType];
@@ -663,6 +801,9 @@ function RequestDetailContent({ req, detailTransfer }) {
   const isPositiveStatus =
     req.status === "APPROVED" || req.status === "COMPLETED";
   const isProcessingStatus = req.status === "PROCESSING";
+  const transferActionMeta = detailTransfer
+    ? getTransferActionMeta(detailTransfer)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -712,7 +853,38 @@ function RequestDetailContent({ req, detailTransfer }) {
           payload={payload}
           transfer={mappedType === "TRANSFER" ? detailTransfer : null}
           request={req}
+          onOpenContract={onOpenContract}
         />
+      )}
+
+      {mappedType === "TRANSFER" && detailTransfer && transferActionMeta && (
+        <div
+          className={`rounded-xl border p-4 ${getTransferStatusTone(detailTransfer.status)}`}
+        >
+          <div className="flex items-start gap-3">
+            <ArrowRightLeft className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-extrabold">
+                  Tiến trình chuyển phòng
+                </p>
+                <Badge variant="outline" className="border-current bg-white/60">
+                  {translateTransferStatus(detailTransfer.status, detailTransfer)}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm font-semibold leading-6">
+                {transferActionMeta.helperText}
+              </p>
+              <p className="mt-2 text-xs leading-5 opacity-80">
+                {getTransferTimingNote(detailTransfer)}
+              </p>
+              <p className="mt-2 text-xs leading-5 opacity-80">
+                “{translateStatus(req.status)}” là trạng thái của phiếu yêu cầu;
+                tiến trình chuyển phòng được cập nhật riêng ở trên.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Resolution info */}
@@ -867,7 +1039,14 @@ export default function ApprovalCenter() {
         }),
         fetchChangeRequestStats(),
       ]);
-      setData(sortByNewest(dataRes.requests, ["createdAt", "created_at"]));
+      const sortedRequests = sortByNewest(dataRes.requests, [
+        "createdAt",
+        "created_at",
+      ]);
+      const requestsWithDeadlines = await Promise.all(
+        sortedRequests.map(hydrateRequestDeadline),
+      );
+      setData(requestsWithDeadlines);
       setTotal(dataRes.total || 0);
       setTotalPages(dataRes.totalPages || 1);
 
@@ -994,7 +1173,7 @@ export default function ApprovalCenter() {
       return;
     }
     if (!paymentForm.proofFile) {
-      window.alert("Vui lòng upload ảnh minh chứng đã hoàn tiền.");
+      window.alert("Vui lòng tải lên ảnh minh chứng đã hoàn tiền.");
       return;
     }
     setActionLoading(`mark-paid-${paymentModal.id}`);
@@ -1072,6 +1251,14 @@ export default function ApprovalCenter() {
     setDetailTransfer(null);
   };
 
+  const handleOpenRequestContract = (contractId) => {
+    if (!contractId) return;
+    closeDetailModal();
+    router.push(
+      `/dashboard/contract-management?contractId=${encodeURIComponent(contractId)}`,
+    );
+  };
+
   const openExecuteModal = (req, preloadedTransfer = null) => {
     setExecuteModal({ request: req, transfer: preloadedTransfer });
   };
@@ -1128,7 +1315,7 @@ export default function ApprovalCenter() {
 
   const handleDownloadTransferContractDraft = async (contractId) => {
     if (!contractId) {
-      window.alert("Chua co hop dong de tai.");
+      window.alert("Chưa có hợp đồng để tải xuống.");
       return;
     }
     setActionLoading(`download-transfer-contract-${contractId}`);
@@ -1136,7 +1323,7 @@ export default function ApprovalCenter() {
       await downloadLeaseContractDraftPdf(contractId);
     } catch (e) {
       console.error(e);
-      window.alert(e?.message || "Khong the tai hop dong chuyen phong.");
+      window.alert(e?.message || "Không thể tải hợp đồng chuyển phòng.");
     } finally {
       setActionLoading(null);
     }
@@ -1157,7 +1344,7 @@ export default function ApprovalCenter() {
       await loadData();
     } catch (e) {
       console.error(e);
-      window.alert(e?.message || "Khong the upload hop dong da ky.");
+      window.alert(e?.message || "Không thể tải lên hợp đồng đã ký.");
     } finally {
       event.target.value = "";
       setSelectedTransferContractId(null);
@@ -1168,7 +1355,7 @@ export default function ApprovalCenter() {
   const handleSignTransferContractDocument = async (document) => {
     if (!detailModal || !detailTransfer || !document?.id) return;
     if (!document.signedFileId) {
-      window.alert("Vui lòng upload file hợp đồng đã ký trước khi xác nhận.");
+      window.alert("Vui lòng tải lên file hợp đồng đã ký trước khi xác nhận.");
       return;
     }
     setActionLoading(`sign-transfer-contract-document-${document.id}`);
@@ -1223,8 +1410,6 @@ export default function ApprovalCenter() {
     "WAITING_HOLDER",
     "WAITING_PAYMENT",
     "WAITING_MANAGER_APPROVAL",
-    "WAITING_TARGET_HOLDER_APPROVAL",
-    "WAITING_TENANT_CONFIRMATION",
     "WAITING_CONTRACT_CONFIRMATION",
     "WAITING_SIGNING",
     "WAITING_CONTRACT_SIGNING",
@@ -1382,6 +1567,7 @@ export default function ApprovalCenter() {
                         const tc =
                           TYPE_CONFIG[mapRequestType(req.requestType)] ||
                           TYPE_CONFIG.ACCESS;
+                        const deadlineMeta = getRequestDeadlineMeta(req);
                         return (
                           <TableRow
                             key={req.id}
@@ -1425,18 +1611,12 @@ export default function ApprovalCenter() {
                             </TableCell>
                             <TableCell className="hidden min-[1650px]:table-cell px-3 py-3 align-top text-sm text-center">
                               <p
-                                className={`${req.status === "REJECTED" ? "text-red-500 dark:text-red-300" : "text-slate-900 dark:text-white"}`}
+                                className="text-slate-900 dark:text-white"
                               >
-                                {formatRequestDate(req.createdAt)}
+                                {formatRequestDate(deadlineMeta.date)}
                               </p>
-                              <p
-                                className={`mt-2 ${req.status === "PENDING" ? "text-orange-500 dark:text-orange-300" : req.status === "REJECTED" ? "text-red-500 dark:text-red-300" : "text-slate-400 dark:text-slate-500"}`}
-                              >
-                                {req.status === "PENDING"
-                                  ? "Còn 1 ngày"
-                                  : req.status === "REJECTED"
-                                    ? "Quá hạn"
-                                    : "Đúng hạn"}
+                              <p className={`mt-2 ${deadlineMeta.className}`}>
+                                {deadlineMeta.label}
                               </p>
                             </TableCell>
                             <TableCell className="px-2 py-3 align-top">
@@ -1621,6 +1801,7 @@ export default function ApprovalCenter() {
               <RequestDetailContent
                 req={detailModal}
                 detailTransfer={detailTransfer}
+                onOpenContract={handleOpenRequestContract}
               />
             </div>
             {(canResolveRequest(detailModal, isOwner) ||
@@ -1714,8 +1895,8 @@ export default function ApprovalCenter() {
                                   {isTransferSigningDocumentSigned(document)
                                     ? "Đã xác nhận ký"
                                     : document.signedFileId
-                                      ? "Đã upload, chờ xác nhận"
-                                      : "Chưa upload"}
+                                      ? "Đã tải lên, chờ xác nhận"
+                                      : "Chưa tải lên"}
                                 </Badge>
                               </div>
                               {(document.signedFileName ||
@@ -1756,7 +1937,7 @@ export default function ApprovalCenter() {
                               ) : (
                                 <Upload className="w-4 h-4" />
                               )}
-                              {document.signedFileId ? "Upload lại" : "Upload"}
+                              {document.signedFileId ? "Tải lại" : "Tải lên"}
                             </Button>
                             <Button
                               type="button"
@@ -1850,7 +2031,9 @@ export default function ApprovalCenter() {
                     >
                       {detailTransfer?.status === "WAITING_EXECUTION"
                         ? "Hoàn tất chuyển phòng"
-                        : "Chốt phòng cũ"}
+                        : detailTransfer.sourceRoomWillBeEmptyAfterTransfer === false
+                          ? "Tiếp tục chuyển phòng"
+                          : "Bàn giao phòng cũ"}
                     </Button>
                   )}
               </div>

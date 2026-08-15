@@ -196,6 +196,7 @@ function InvoiceActionsMenu({
   onConfirmPayment,
   onSendWarning,
 }) {
+  const canAdjustDiscount = invoice?.invoiceType === "RENT";
   const canConfirmPayment = isPendingInvoice(invoice);
   const canSendWarning = isExpiredInvoice(invoice);
 
@@ -216,12 +217,12 @@ function InvoiceActionsMenu({
         sideOffset={8}
         className="w-64 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
       >
-        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+        {canAdjustDiscount ? <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
           <button type="button" onClick={() => onAdjustPrice(invoice)} className={invoiceActionItemClass}>
             <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            Điều chỉnh giá
+            Giảm giá tiền phòng
           </button>
-        </DropdownMenuItem>
+        </DropdownMenuItem> : null}
         {canConfirmPayment ? (
           <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
             <button type="button" onClick={() => onConfirmPayment(invoice)} className={invoiceActionItemClass}>
@@ -291,7 +292,7 @@ export default function BillingPage() {
   const [overrideForm, setOverrideForm] = useState({
     roomId: "",
     billingPeriod: currentMonth(),
-    overrideMonthlyRent: "",
+    discountAmount: "",
     reason: "",
   });
   const [overrideInvoice, setOverrideInvoice] = useState(null);
@@ -545,14 +546,14 @@ export default function BillingPage() {
       const result = await applyRentOverride(overrideForm);
       setMessage(
         result?.invoiceApplied
-          ? "Đã lưu giá khuyến mãi và cập nhật hóa đơn tháng đã chọn."
-          : "Đã lưu giá khuyến mãi cho tháng đã chọn.",
+          ? "Đã lưu giảm giá và cập nhật hóa đơn tiền phòng."
+          : "Đã lưu giảm giá cho kỳ đã chọn.",
       );
       setIsOverrideModalOpen(false);
       setOverrideInvoice(null);
       await loadInvoices();
     } catch (saveError) {
-      setError(saveError?.message || "Không lưu được giá khuyến mãi.");
+      setError(saveError?.message || "Không lưu được giảm giá.");
     } finally {
       setSaving("");
     }
@@ -590,10 +591,7 @@ export default function BillingPage() {
   }
 
   function openOverrideModal(invoice) {
-    if (!invoice) return;
-    const rentLine = invoice.lines?.find(
-      (line) => line.lineType === "ROOM_RENT",
-    );
+    if (!invoice || invoice.invoiceType !== "RENT") return;
     const billingPeriod = invoice.billingPeriod || currentMonth();
 
     setSelectedInvoiceId(invoice.id || "");
@@ -601,10 +599,8 @@ export default function BillingPage() {
     setOverrideForm({
       roomId: invoice.roomId ? String(invoice.roomId) : "",
       billingPeriod,
-      overrideMonthlyRent: rentLine?.unitPrice
-        ? String(rentLine.unitPrice)
-        : "",
-      reason: "",
+      discountAmount: invoice.discountAmount > 0 ? String(invoice.discountAmount) : "",
+      reason: invoice.discountReason || "",
     });
     setIsOverrideModalOpen(true);
   }
@@ -945,10 +941,10 @@ export default function BillingPage() {
             <DialogHeader className="border-b border-slate-200 px-5 py-4 text-left dark:border-white/10">
               <DialogTitle className="flex items-center gap-2 pr-8 text-base font-black text-slate-900 dark:text-white">
                 <RefreshCw className="h-4 w-4 text-[#3156b6]" />
-                Điều chỉnh giá khuyến mãi
+                Giảm giá tiền phòng
               </DialogTitle>
               <DialogDescription className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">
-                Chỉ thay đổi giá thuê áp dụng cho kỳ này. Giá niêm yết trong hợp đồng không thay đổi.
+                Khoản giảm chỉ được trừ trên hóa đơn tiền phòng của kỳ này. Giá niêm yết trong hợp đồng không thay đổi.
               </DialogDescription>
             </DialogHeader>
 
@@ -980,7 +976,7 @@ export default function BillingPage() {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Giá hiện tại
+                    Giá niêm yết
                   </p>
                   <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
                     {overrideRentLine?.unitPrice != null
@@ -991,34 +987,34 @@ export default function BillingPage() {
               </div>
 
               <label className="grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
-                Giá khuyến mãi/tháng
+                Số tiền giảm
                 <div className="relative">
                   <input
                     required
-                    min="1"
+                    min="0"
                     step="1000"
                     type="number"
-                    value={overrideForm.overrideMonthlyRent}
+                    value={overrideForm.discountAmount}
                     onChange={(event) =>
                       setOverrideForm((current) => ({
                         ...current,
-                        overrideMonthlyRent: event.target.value,
+                        discountAmount: event.target.value,
                       }))
                     }
                     className={`${FORM_CONTROL_CLASS} w-full pr-16`}
-                    placeholder="Ví dụ: 2500000"
+                    placeholder="Ví dụ: 300000"
                   />
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-bold text-slate-400">
                     VNĐ
                   </span>
                 </div>
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Giá này phải thấp hơn giá niêm yết của phòng.
+                  Không được lớn hơn tiền phòng của hóa đơn.
                 </span>
               </label>
 
               <label className="grid gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
-                Lý do áp dụng
+                Ghi chú giảm giá
                 <textarea
                   rows={3}
                   value={overrideForm.reason}
@@ -1053,7 +1049,7 @@ export default function BillingPage() {
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                Lưu giá khuyến mãi
+                Lưu giảm giá
               </button>
             </DialogFooter>
           </form>
@@ -1282,6 +1278,21 @@ export default function BillingPage() {
                       </td>
                     </tr>
                   ))}
+                  {selectedInvoice.invoiceType === "RENT" && selectedInvoice.discountAmount > 0 ? (
+                    <tr className="border-t border-[#e2e8f0] dark:border-white/10">
+                      <td className="px-3 py-2 font-bold text-emerald-700 dark:text-emerald-300">
+                        Giảm giá tiền phòng
+                        {selectedInvoice.discountReason ? (
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                            {selectedInvoice.discountReason}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-right font-black text-emerald-700 dark:text-emerald-300">
+                        -{formatMoney(selectedInvoice.discountAmount)}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>

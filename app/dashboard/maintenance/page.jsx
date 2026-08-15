@@ -38,6 +38,9 @@ import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader"
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import VietnameseMonthPicker from "@/components/dashboard/VietnameseMonthPicker";
 import TimeTreeFilter, { buildTreeFromData } from "@/components/dashboard/TimeTreeFilter";
+import CostResponsibilityDropdown, {
+  normalizeCostResponsibility,
+} from "@/components/dashboard/CostResponsibilityDropdown";
 import {
   Dialog,
   DialogContent,
@@ -100,7 +103,6 @@ const STATUS_META = {
 
 const CATEGORY_OPTIONS = [
   ["all", "Tất cả hạng mục"],
-  ["RULE_VIOLATION", "Vi phạm nội quy"],
   ["ELECTRICITY", "Điện"],
   ["WATER", "Nước"],
   ["AIR_CONDITIONER", "Máy lạnh"],
@@ -385,14 +387,6 @@ function buildDefaultInternalForm(propertyId = "") {
   };
 }
 
-const COMPLETE_COST_RESPONSIBILITY_OPTIONS = [
-  ["UNDECIDED", "Chưa xác định"],
-  ["PROPERTY", "Chủ trọ chịu"],
-  ["OWNER", "Chủ trọ chịu"],
-  ["TENANT", "Khách thuê chịu"],
-  ["OPERATION", "Chi phí vận hành"],
-];
-
 function buildCompleteForm(ticket) {
   const nextPeriod = new Date();
   nextPeriod.setMonth(nextPeriod.getMonth() + 1, 1);
@@ -402,10 +396,11 @@ function buildCompleteForm(ticket) {
     rootCause: ticket?.rootCause || "",
     repairItems: ticket?.repairItems || "",
     actualCost: ticket?.costAmount ? MONEY_FORMAT.format(ticket.costAmount) : "",
-    costResponsibility:
+    costResponsibility: normalizeCostResponsibility(
       ticket?.ticketScope === "PROPERTY_OPERATION"
         ? "OWNER"
-        : ticket?.costResponsibility || "UNDECIDED",
+        : ticket?.costResponsibility,
+    ),
     collectionMethod: "MONTHLY_SCHEDULED",
     billingPeriod: nextPeriod.toISOString().slice(0, 7),
     completionNote: "",
@@ -1106,9 +1101,10 @@ export default function MaintenancePage() {
                       onChange={(value) =>
                         updateInternalForm("category", value)
                       }
-                      options={CATEGORY_OPTIONS.slice(1)
-                        .filter(([value]) => value !== "RULE_VIOLATION")
-                        .map(([value, label]) => ({ value, label }))}
+                      options={CATEGORY_OPTIONS.slice(1).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
                     />
                   </Field>
                 </div>
@@ -1265,6 +1261,7 @@ export default function MaintenancePage() {
 
       {completionTicket && (
         <Dialog
+          modal={false}
           open={isCompletionOpen}
           onOpenChange={(open) => {
             if (actionLoading === `complete-${completionTicket.id}`) return;
@@ -1275,7 +1272,10 @@ export default function MaintenancePage() {
             }
           }}
         >
-          <DialogContent className="w-[calc(100%-1rem)] !max-w-4xl overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full">
+          <DialogContent
+            lockScroll={false}
+            className="w-[calc(100%-1rem)] !max-w-4xl overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full"
+          >
             <form onSubmit={handleCompleteTicket} className="flex max-h-[calc(100dvh-1rem)] min-w-0 flex-col">
               <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
                 <DialogHeader className="gap-1 text-left">
@@ -1318,16 +1318,11 @@ export default function MaintenancePage() {
                     </div>
                   </Field>
                   <Field label="Trách nhiệm chi phí">
-                    <select
+                    <CostResponsibilityDropdown
                       value={completionTicket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionCostResponsibility}
-                      onChange={(event) => updateCompletionForm("costResponsibility", event.target.value)}
+                      onChange={(value) => updateCompletionForm("costResponsibility", value)}
                       disabled={!completionRepairDetailsEditable || completionTicket.ticketScope === "PROPERTY_OPERATION"}
-                      className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
-                    >
-                      {COMPLETE_COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+                    />
                   </Field>
                 </div>
 
@@ -1585,15 +1580,6 @@ export default function MaintenancePage() {
       </span>
       <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
         {CATEGORY_LABELS[ticket.category] || "Khác"}
-      </span>
-    </span>
-  ) : ticket.category === "RULE_VIOLATION" ? (
-    <span className="inline-flex flex-col items-center gap-1">
-      <span className="inline-flex w-fit rounded-full bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 text-xs font-black text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/20">
-        Vi phạm nội quy
-      </span>
-      <span className="text-xs font-black text-slate-500 dark:text-slate-400">
-        Reset wifi · Phạt vi phạm nội quy
       </span>
     </span>
   ) : (

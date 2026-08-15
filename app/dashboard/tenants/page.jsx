@@ -361,8 +361,18 @@ const roomOccupancyText = (profile) => {
   return `${current}/${max}`;
 };
 
+const getTenantProfileId = (profile) =>
+  valueOf(
+    profile,
+    "id",
+    "tenantProfileId",
+    "tenant_profile_id",
+    "profileId",
+    "profile_id",
+  );
+
 const profileRowKey = (profile, index) => {
-  const profileId = valueOf(profile, "id", "profileId", "profile_id");
+  const profileId = getTenantProfileId(profile);
   if (profileId) return `profile-${profileId}`;
   return [
     "profile-row",
@@ -1399,12 +1409,13 @@ export default function TenantsPage() {
   );
 
   const accountStateFor = (profile) => {
+    const profileId = getTenantProfileId(profile);
     const account = accountCandidates.find(
       (item) =>
         String(item.contractId) ===
           String(valueOf(profile, "contractId", "contract_id")) &&
         String(item.profileId) ===
-          String(valueOf(profile, "id", "profileId", "profile_id")),
+          String(profileId),
     );
     if (account) return resolveAccountState(account);
     return {

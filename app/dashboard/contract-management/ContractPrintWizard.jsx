@@ -22,13 +22,13 @@ const CONTRACT_STATUS_LABELS = {
 };
 
 const OWNER_INFO = {
-    fullName: "ĐẶNG VĂN NHUẬN",
+    fullName: "CẤN VĂN LÂM",
     birthDate: "06/08/1978",
-    identityNumber: "036078008683",
-    identityIssuedDate: "01/04/2020",
-    identityIssuedPlace: "Cục cảnh sát QLHCVT",
+    identityNumber: "001091021090",
+    identityIssuedDate: "10/4/2021",
+    identityIssuedPlace: "Cục trưởng cục Cảnh sát, Quản lý hành chính về Trật tự xã hội",
     phone: "0914.339.682; 0846.557.999",
-    bankAccount: "3213888869999 - Ngân hàng Agribank Chủ tài khoản: ĐẶNG VĂN NHUẬN",
+    bankAccount: "3213888869999 - Ngân hàng Agribank Chủ tài khoản: CẤN VĂN LÂM",
     address: "Số 70A1, Thôn 4, xã Thạch Hoà, Thạch Thất, Hà Nội",
 };
 

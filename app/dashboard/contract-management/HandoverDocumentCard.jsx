@@ -197,10 +197,10 @@ export default function HandoverDocumentCard({
             ? "Biên bản có chữ ký đã được lưu"
             : documentState.key === "PENDING_SIGNED_FILE"
               ? "Dữ liệu bàn giao đã chốt, có thể bổ sung bản scan bất cứ lúc nào."
-              : "Hoàn tất dữ liệu bàn giao trước khi tạo và upload bản ký."}
+              : "Hoàn tất dữ liệu bàn giao trước khi tạo và tải lên bản ký."}
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-          Chấp nhận PDF tối đa 15 MB. Upload lại sẽ thay thế bản đang lưu.
+          Chấp nhận PDF tối đa 15 MB. Tải lại sẽ thay thế bản đang lưu.
         </p>
 
         <div

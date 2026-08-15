@@ -59,6 +59,7 @@ export function normalizeInvoice(raw = {}) {
     dueDate: read(raw, "dueDate", "due_date") || "",
     subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
     discountAmount: Number(read(raw, "discountAmount", "discount_amount") || 0),
+    discountReason: read(raw, "discountReason", "discount_reason") || "",
     totalAmount: Number(read(raw, "totalAmount", "total_amount") || 0),
     paidAmount: Number(read(raw, "paidAmount", "paid_amount") || 0),
     remainingAmount: Number(read(raw, "remainingAmount", "remaining_amount") || 0),
@@ -224,7 +225,10 @@ export async function applyRentOverride(payload) {
     body: JSON.stringify({
       roomId: Number(payload.roomId),
       billingPeriod: payload.billingPeriod,
-      overrideMonthlyRent: Number(payload.overrideMonthlyRent),
+      overrideMonthlyRent: payload.overrideMonthlyRent == null || payload.overrideMonthlyRent === ""
+        ? null
+        : Number(payload.overrideMonthlyRent),
+      discountAmount: Number(payload.discountAmount || 0),
       reason: payload.reason || "",
     }),
   });

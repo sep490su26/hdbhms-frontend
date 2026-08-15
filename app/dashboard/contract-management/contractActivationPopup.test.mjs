@@ -28,8 +28,21 @@ test("activation popup renders the two-stage onboarding workflow", () => {
   assert.match(workflowSource, /Chuẩn bị hồ sơ/);
   assert.match(workflowSource, /Lưu bản đã ký/);
   assert.match(workflowSource, /Tải bản in và nhập thông tin bàn giao/);
-  assert.match(workflowSource, /Upload các bản PDF đã ký/);
+  assert.match(workflowSource, /Tải lên các bản PDF đã ký/);
   assert.match(workflowSource, /Đảm bảo đủ điều kiện kích hoạt/);
+});
+
+test("activation popup shows the previous electricity reading below the input", () => {
+  assert.match(workflowSource, /previousElectricityReading/);
+  assert.match(workflowSource, /electricity\.previousValue/);
+  assert.match(workflowSource, /Chỉ số điện cũ:/);
+});
+
+test("activation popup hides account provisioning text for existing accounts", () => {
+  assert.match(workflowSource, /accountProvisioningStatus/);
+  assert.match(workflowSource, /accountAlreadyExists/);
+  assert.match(workflowSource, /"Kích hoạt hợp đồng"/);
+  assert.match(workflowSource, /"Kích hoạt hợp đồng và cấp tài khoản"/);
 });
 
 test("handover is an internal popup view instead of a nested dialog", () => {
@@ -64,7 +77,7 @@ test("transfer target activation owns the new-room handover", () => {
 test("transfer completion reuses the handover saved during activation", () => {
   assert.match(transferExecutionModalSource, /fetchContractHandover\(contractId, "MOVE_IN"\)/);
   assert.match(transferExecutionModalSource, /execution\?\.transferInReady/);
-  assert.match(transferExecutionModalSource, /Khong can nhap lai khi hoan tat yeu cau/);
+  assert.match(transferExecutionModalSource, /Không cần nhập lại khi hoàn tất yêu cầu/);
 });
 
 test("contract list activation action opens the integrated dialog", () => {
@@ -159,4 +172,14 @@ test("contract extension updates the current contract instead of creating a rene
   assert.doesNotMatch(pageSource, /Mã hợp đồng mới/);
   assert.doesNotMatch(pageSource, /Tạo hợp đồng mới/);
   assert.doesNotMatch(pageSource, /Tái ký \/ Gia hạn/);
+});
+
+test("liquidation and move-out handover use one resumable workflow", () => {
+  assert.match(pageSource, /const showExitFlow = Boolean\(/);
+  assert.match(pageSource, /showExitFlow && \(\s*<DetailCard/);
+  assert.match(pageSource, /updateLeaseContractLiquidationDraft/);
+  assert.match(pageSource, /exitHandoverActionRef\.current\?\.save/);
+  assert.match(pageSource, /isLiquidationInvoiceSettled/);
+  assert.match(pageSource, /resetLiquidationForm: false/);
+  assert.doesNotMatch(pageSource, /handleSaveLiquidationDraft/);
 });

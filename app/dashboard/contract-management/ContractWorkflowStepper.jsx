@@ -22,6 +22,7 @@ import {
     buildHandoverDocumentFilename,
     downloadHandoverDraftPdf,
     fetchContractHandover,
+    fetchLatestReadings,
     uploadFile,
     uploadHandoverSignedDocument,
 } from "@/services/contractHandoverService";
@@ -347,9 +348,16 @@ export default function ContractWorkflowStepper({
     );
     const [activationPhotoFile, setActivationPhotoFile] = useState(null);
     const [activationPhotoFileId, setActivationPhotoFileId] = useState(null);
+    const [activationReadingLoading, setActivationReadingLoading] = useState(false);
+    const [previousElectricityReading, setPreviousElectricityReading] = useState(null);
 
     const contractId =
         contractDetails?.contractId || contractDetails?.leaseContractId;
+    const roomId =
+        contractDetails?.roomId ??
+        contractDetails?.room_id ??
+        contractDetails?.room?.id ??
+        null;
     const leaseSignedFileId =
         contractDetails?.signedFileId ?? contractDetails?.signed_file_id ?? null;
     const isRenewalContract = Boolean(
@@ -365,6 +373,17 @@ export default function ContractWorkflowStepper({
         !isRenewalContract || isTransferReSignContract;
     const requiresMoveInHandover =
         !isRenewalContract || isTransferTargetContract;
+    const accountProvisioningStatus = String(
+        contractDetails?.accountProvisioningStatus ??
+        contractDetails?.account_provisioning_status ??
+        "",
+    ).toUpperCase();
+    const accountAlreadyExists =
+        isTransferReSignContract ||
+        ["ACTIVE", "SENT"].includes(accountProvisioningStatus) ||
+        (!accountProvisioningStatus &&
+            (contractDetails?.accountProvisioned === true ||
+                contractDetails?.account_provisioned === true));
 
     useEffect(() => {
         const persistedValue =
@@ -385,6 +404,72 @@ export default function ContractWorkflowStepper({
         contractDetails?.activationReadingDate,
         contractDetails?.activation_electricity_value,
         contractDetails?.activation_reading_date,
+    ]);
+
+    useEffect(() => {
+        if (!roomId || !requiresActivationReading) return undefined;
+
+        const controller = new AbortController();
+        const persistedValue =
+            contractDetails?.activationElectricityValue ??
+            contractDetails?.activation_electricity_value;
+        const persistedDate =
+            contractDetails?.activationReadingDate ??
+            contractDetails?.activation_reading_date;
+
+        async function loadLatestReading() {
+            setActivationReadingLoading(true);
+            setPreviousElectricityReading(null);
+            try {
+                const response = await fetchLatestReadings(roomId);
+                if (controller.signal.aborted) return;
+
+                const electricity = response?.electricity || {};
+                const previousValue =
+                    electricity.previousValue ??
+                    electricity.previous_value ??
+                    electricity.suggestedValue ??
+                    electricity.suggested_value;
+                const suggestedValue =
+                    electricity.suggestedValue ??
+                    electricity.suggested_value ??
+                    electricity.previousValue ??
+                    electricity.previous_value;
+                const latestDate =
+                    electricity.lastReadingDate ??
+                    electricity.last_reading_date;
+
+                setPreviousElectricityReading(
+                    previousValue == null ? null : String(previousValue),
+                );
+                if (persistedValue == null && suggestedValue != null) {
+                    setActivationReading((current) =>
+                        current.trim() === "" ? String(suggestedValue) : current,
+                    );
+                }
+                if (persistedDate == null && latestDate) {
+                    setActivationReadingDate((current) =>
+                        current === new Date().toISOString().split("T")[0]
+                            ? latestDate
+                            : current,
+                    );
+                }
+            } catch {
+                // The field remains editable manually if the latest reading is unavailable.
+            } finally {
+                if (!controller.signal.aborted) setActivationReadingLoading(false);
+            }
+        }
+
+        loadLatestReading();
+        return () => controller.abort();
+    }, [
+        contractDetails?.activationElectricityValue,
+        contractDetails?.activationReadingDate,
+        contractDetails?.activation_electricity_value,
+        contractDetails?.activation_reading_date,
+        requiresActivationReading,
+        roomId,
     ]);
 
     useEffect(() => {
@@ -418,7 +503,7 @@ export default function ContractWorkflowStepper({
                     readingDate: currentValue === null ? null : activationReadingDate,
                 });
             } catch (error) {
-                toast.error(error?.message || "Khong luu duoc chi so dien dau ky.");
+                toast.error(error?.message || "Không lưu được chỉ số điện đầu kỳ.");
             }
         }, 450);
 
@@ -501,8 +586,8 @@ export default function ContractWorkflowStepper({
     const signedHandoverReady =
         Boolean(handoverSignedFileId) && handoverMatchesLease;
     const signedHandoverDescription = handoverHasData
-        ? "PDF toi da 15 MB - can upload truoc khi kich hoat"
-        : "Mo sau khi hoan tat thong tin ban giao";
+        ? "PDF tối đa 15 MB - có thể tải lên trước khi kích hoạt"
+        : "Mở sau khi hoàn tất thông tin bàn giao";
     const activationReadingReady =
         !requiresActivationReading ||
         (activationReading !== "" &&
@@ -612,7 +697,7 @@ export default function ContractWorkflowStepper({
     async function handleDownloadLease() {
         if (!contractId) return;
         if (requiresActivationReading && !activationReadingReady) {
-            toast.error("Nhap chi so dien dau ky truoc khi tai hop dong.");
+            toast.error("Vui lòng nhập chỉ số điện đầu kỳ trước khi tải hợp đồng.");
             return;
         }
         try {
@@ -748,7 +833,7 @@ export default function ContractWorkflowStepper({
                             Lưu bản đã ký
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                            Upload PDF và kích hoạt hợp đồng
+                            Tải tài liệu lên và kích hoạt hợp đồng
                         </p>
                     </div>
                 </div>
@@ -762,8 +847,16 @@ export default function ContractWorkflowStepper({
                         description="Chỉ số này được lưu làm chỉ số bắt đầu hợp đồng; biên bản bàn giao chỉ quản lý thiết bị và hiện trạng phòng."
                     />
                     <div className="grid items-start gap-3 border-t border-blue-200 px-4 py-4 dark:border-blue-400/20 sm:grid-cols-3 sm:items-center sm:px-5">
-                        <label className="grid gap-1.5">
-                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Chỉ số điện (kWh) *</span>
+                            <label className="grid gap-1.5">
+                             <span className="flex items-center justify-between gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                 <span>Chỉ số điện (kWh) *</span>
+                                 {activationReadingLoading && (
+                                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-300">
+                                         <Loader2 className="h-3 w-3 animate-spin"/>
+                                         Đang tải số gần nhất
+                                     </span>
+                                 )}
+                             </span>
                             <input
                                 type="number"
                                 min="0"
@@ -774,6 +867,16 @@ export default function ContractWorkflowStepper({
                                 className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-blue-600 disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a]"
                                 placeholder="VD: 1234.5"
                             />
+                            <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                                Chỉ số điện cũ:{" "}
+                                <span className="font-bold text-slate-700 dark:text-slate-200">
+                                    {previousElectricityReading == null
+                                        ? activationReadingLoading
+                                            ? "Đang tải..."
+                                            : "Chưa có dữ liệu"
+                                        : `${previousElectricityReading} kWh`}
+                                </span>
+                            </p>
                         </label>
                         <label className="grid gap-1.5">
                             <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Ngày ghi chỉ số *</span>
@@ -907,7 +1010,7 @@ export default function ContractWorkflowStepper({
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#0d182c]">
                 <PanelHeader
                     kicker="Lưu bản đã ký"
-                    title="Upload các bản PDF đã ký"
+                    title="Tải lên các bản PDF đã ký"
                     description="Chọn đúng loại tài liệu; có thể thay từng file nếu bản scan cần chỉnh lại."
                     count={`${requiredUploadedCount}/${requiredUploadTotal}`}
                 />
@@ -953,7 +1056,7 @@ export default function ContractWorkflowStepper({
                     <div
                         className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-4 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300 sm:mx-5">
                         <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0"/>
-                        Cần nhập thông tin bàn giao trước khi upload biên bản đã ký.
+                        Cần nhập thông tin bàn giao trước khi tải lên biên bản đã ký.
                     </div>
                 )}
             </section>
@@ -963,15 +1066,19 @@ export default function ContractWorkflowStepper({
                 <PanelHeader
                     kicker="Kiểm tra trước khi kích hoạt"
                     title="Đảm bảo đủ điều kiện kích hoạt"
-                    description={`Hoàn tất đủ ${readiness.totalCount} điều kiện trước khi kích hoạt hợp đồng và cấp tài khoản.`}
+                    description={
+                        accountAlreadyExists
+                            ? `Hoàn tất đủ ${readiness.totalCount} điều kiện trước khi kích hoạt hợp đồng.`
+                            : `Hoàn tất đủ ${readiness.totalCount} điều kiện trước khi kích hoạt hợp đồng và cấp tài khoản.`
+                    }
                 />
                 <div className="grid border-t border-slate-200 px-4 dark:border-white/10 sm:grid-cols-2 sm:px-1">
                     {readiness.requirements.map((item) => {
                         const descriptions = {
-                            lease: "Upload đúng file PDF có đầy đủ chữ ký.",
+                            lease: "Tải lên đúng file PDF có đầy đủ chữ ký.",
                             "handover-data": "Danh sách thiết bị và hiện trạng phòng đã được chốt.",
                             "activation-reading": "Nhập chỉ số điện đầu kỳ trước khi kích hoạt.",
-                            "handover-signed-file": "Upload biên bản bàn giao PDF có chữ ký.",
+                            "handover-signed-file": "Tải lên biên bản bàn giao PDF có chữ ký.",
                         };
                         return (
                             <ChecklistItem
@@ -1005,11 +1112,15 @@ export default function ContractWorkflowStepper({
                         )}
                         {isActivating
                             ? "Đang kích hoạt..."
-                            : "Kích hoạt hợp đồng và cấp tài khoản"}
+                            : accountAlreadyExists
+                                ? "Kích hoạt hợp đồng"
+                                : "Kích hoạt hợp đồng và cấp tài khoản"}
                     </button>
                     <p className="mt-2 text-center text-[10.5px] leading-4 text-slate-500 dark:text-slate-400">
                         {readiness.ready
-                            ? "Hồ sơ đã đủ điều kiện. Có thể kích hoạt hợp đồng và cấp tài khoản."
+                            ? accountAlreadyExists
+                                ? "Hồ sơ đã đủ điều kiện. Có thể kích hoạt hợp đồng."
+                                : "Hồ sơ đã đủ điều kiện. Có thể kích hoạt hợp đồng và cấp tài khoản."
                             : `Còn thiếu ${missingCount} điều kiện. Nút kích hoạt chỉ mở khi hồ sơ hoàn tất.`}
                     </p>
                 </div>

@@ -184,7 +184,7 @@ const FLOOR_PLAN_STATUS_META = {
     text: "text-purple-700",
   },
   HOLDING: {
-    label: "Đang đặt cọc",
+    label: "Đang/Đã đặt cọc",
     dot: "bg-amber-500",
     fill: "#fffbeb",
     stroke: "#f59e0b",

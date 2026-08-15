@@ -18,6 +18,11 @@ export default function ContractActivationFlow({
   onReadinessChange,
 }) {
   const contractId = contract?.leaseContractId || contract?.contractId;
+  const roomId =
+    contract?.roomId ??
+    contract?.room_id ??
+    contract?.room?.id ??
+    null;
   const depositFormId =
     contract?.depositFormId ??
     contract?.deposit_form_id ??
@@ -126,7 +131,7 @@ export default function ContractActivationFlow({
             <ContractHandoverSection
               key={`${contractId}-${leaseSignedFileId}-${handoverRefreshKey}`}
               contractId={contractId}
-              roomId={contract?.roomId || null}
+              roomId={roomId}
               roomCode={contract?.roomCode || contract?.room?.roomCode}
               onSaved={handleHandoverSaved}
             />

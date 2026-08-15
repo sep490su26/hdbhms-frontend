@@ -403,6 +403,22 @@ export function normalizeLeaseContractItem(item = {}) {
       item.liquidationDepositRefundTransactionRef ??
       item.liquidation_deposit_refund_transaction_ref ??
       null,
+    liquidationDepositForfeitureRequestId:
+      item.liquidationDepositForfeitureRequestId ??
+      item.liquidation_deposit_forfeiture_request_id ??
+      null,
+    liquidationDepositForfeitureStatus:
+      item.liquidationDepositForfeitureStatus ??
+      item.liquidation_deposit_forfeiture_status ??
+      null,
+    liquidationDepositForfeitureConfirmedBy:
+      item.liquidationDepositForfeitureConfirmedBy ??
+      item.liquidation_deposit_forfeiture_confirmed_by ??
+      null,
+    liquidationDepositForfeitureConfirmedAt:
+      item.liquidationDepositForfeitureConfirmedAt ??
+      item.liquidation_deposit_forfeiture_confirmed_at ??
+      null,
     transferRequestId: item.transferRequestId ?? null,
     transferRequestCode: item.transferRequestCode ?? null,
     transferStatus: item.transferStatus ?? null,
@@ -1012,6 +1028,22 @@ function normalizeLeaseContractDetails(details = {}) {
     liquidationDepositRefundTransactionRef:
       details.liquidationDepositRefundTransactionRef ??
       details.liquidation_deposit_refund_transaction_ref ??
+      null,
+    liquidationDepositForfeitureRequestId:
+      details.liquidationDepositForfeitureRequestId ??
+      details.liquidation_deposit_forfeiture_request_id ??
+      null,
+    liquidationDepositForfeitureStatus:
+      details.liquidationDepositForfeitureStatus ??
+      details.liquidation_deposit_forfeiture_status ??
+      null,
+    liquidationDepositForfeitureConfirmedBy:
+      details.liquidationDepositForfeitureConfirmedBy ??
+      details.liquidation_deposit_forfeiture_confirmed_by ??
+      null,
+    liquidationDepositForfeitureConfirmedAt:
+      details.liquidationDepositForfeitureConfirmedAt ??
+      details.liquidation_deposit_forfeiture_confirmed_at ??
       null,
     previousContractCode:
       details.previousContractCode ?? details.previous_contract_code ?? null,

@@ -80,6 +80,10 @@ function normalizeUtilityBillingRunItem(raw = {}) {
     electricityUsage: Number(read(raw, "electricityUsage", "electricity_usage") || 0),
     electricityAmount: Number(read(raw, "electricityAmount", "electricity_amount") || 0),
     serviceFeeAmount: Number(read(raw, "serviceFeeAmount", "service_fee_amount") || 0),
+    roomRentAmount: Number(read(raw, "roomRentAmount", "room_rent_amount") || 0),
+    payablePeriods: Array.isArray(read(raw, "payablePeriods", "payable_periods"))
+      ? read(raw, "payablePeriods", "payable_periods")
+      : [],
     subtotalAmount: Number(read(raw, "subtotalAmount", "subtotal_amount") || 0),
     discountAmount: Number(read(raw, "discountAmount", "discount_amount") || 0),
     totalAmount: Number(read(raw, "totalAmount", "total_amount") || 0),

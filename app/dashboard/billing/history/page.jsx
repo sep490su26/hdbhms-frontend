@@ -27,7 +27,7 @@ const money = new Intl.NumberFormat("vi-VN");
 const TYPE_LABELS = {
   DEPOSIT: "Cọc",
   RENT: "Tiền phòng",
-  UTILITY: "Điện nước",
+  UTILITY: "Tiền điện",
   FINAL_SETTLEMENT: "Tất toán",
   COMPENSATION: "Bồi thường",
   OPERATING_REIMBURSEMENT: "Hoàn chi",

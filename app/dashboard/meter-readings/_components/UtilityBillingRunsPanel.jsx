@@ -146,7 +146,7 @@ export function UtilityBillingRunsPanel({
         setBillingRunDetail(detail);
       }
     } catch (error) {
-      toast.error(error?.message || "Không tải được bản nháp hóa đơn điện.");
+      toast.error(error?.message || "Không tải được bản nháp hóa đơn.");
     } finally {
       setLoadingRun(false);
     }
@@ -159,23 +159,23 @@ export function UtilityBillingRunsPanel({
 
   async function generateBillingBatch() {
     if (!propertyId) {
-      toast.error("Vui lòng chọn cơ sở trước khi tạo bản nháp hóa đơn điện.");
+      toast.error("Vui lòng chọn cơ sở trước khi tạo bản nháp hóa đơn.");
       return;
     }
     if (!billingPeriod) {
-      toast.error("Không xác định được kỳ ghi chỉ số để tạo hóa đơn điện.");
+      toast.error("Không xác định được kỳ ghi chỉ số để tạo bản nháp hóa đơn.");
       return;
     }
 
     setSaving("generate-batch");
     try {
       const run = await createUtilityBillingRun({ propertyId, billingPeriod });
-      toast.success("Đã tạo bản nháp hóa đơn điện để quản lý review.");
+      toast.success("Đã tạo bản nháp hóa đơn điện, tiền phòng và dịch vụ.");
       setBillingRun(run);
       setBillingRunDetail(run);
       setDialogOpen(true);
     } catch (error) {
-      toast.error(error?.message || "Không tạo được bản nháp hóa đơn điện.");
+      toast.error(error?.message || "Không tạo được bản nháp hóa đơn.");
     } finally {
       setSaving("");
     }
@@ -187,12 +187,12 @@ export function UtilityBillingRunsPanel({
     setSaving(`publish-batch-${activeRun.runId}`);
     try {
       const run = await publishUtilityBillingRun(activeRun.runId);
-      toast.success("Đã xuất hóa đơn điện và gửi thông báo cho khách thuê.");
+      toast.success("Đã phát hành hóa đơn điện và hóa đơn tiền phòng + dịch vụ.");
       setBillingRun(run);
       setBillingRunDetail(run);
       await onPublished?.(run);
     } catch (error) {
-      toast.error(error?.message || "Không phát hành được hóa đơn điện.");
+      toast.error(error?.message || "Không phát hành được hóa đơn.");
     } finally {
       setSaving("");
     }
@@ -207,9 +207,9 @@ export function UtilityBillingRunsPanel({
         <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
           <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">Gửi hóa đơn điện</h2>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">Phát hành hóa đơn</h2>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Xem lại dữ liệu hóa đơn cho kỳ {formatBillingPeriod(billingPeriod)}.
+                Xem lại dữ liệu hóa đơn điện, tiền phòng và dịch vụ cho kỳ {formatBillingPeriod(billingPeriod)}.
               </p>
             </div>
             <button
@@ -218,7 +218,7 @@ export function UtilityBillingRunsPanel({
               disabled={!propertyId || !activeRun}
               className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Mở khu vực gửi hóa đơn
+              Mở khu vực phát hành hóa đơn
             </button>
           </div>
         </section>
@@ -281,11 +281,12 @@ export function UtilityBillingRunsPanel({
             ) : null}
 
             <div className="overflow-x-auto rounded-lg border border-[#e2e8f0] dark:border-white/10">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="bg-[#f2f4f6] text-xs uppercase text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3 text-center">Phòng</th>
                     <th className="px-4 py-3 text-center">Điện</th>
+                    <th className="px-4 py-3 text-center">Tiền phòng</th>
                     <th className="px-4 py-3 text-center">Dịch vụ</th>
                     <th className="px-4 py-3 text-center">Trạng thái</th>
                     <th className="px-4 py-3 text-center">Tổng</th>
@@ -294,7 +295,7 @@ export function UtilityBillingRunsPanel({
                 <tbody>
                   {runItems.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      <td colSpan={6} className="px-4 py-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
                         Chưa có phòng trong bản nháp.
                       </td>
                     </tr>
@@ -312,8 +313,18 @@ export function UtilityBillingRunsPanel({
                           ) : null}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <p className="font-bold">{item.electricityUsage}</p>
-                          <p className="text-xs text-slate-500">{formatMoney(item.electricityAmount)}</p>
+                          <p className="font-bold">{formatMoney(item.electricityAmount)}</p>
+                          <p className="text-xs text-slate-500">{item.electricityUsage || 0} số</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <p className="font-bold">{formatMoney(item.roomRentAmount)}</p>
+                          {item.payablePeriods?.length > 0 ? (
+                            <p className="text-xs text-slate-500">
+                              {item.payablePeriods.length} kỳ
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400">Không thu kỳ này</p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
                         <td className="px-4 py-3 text-center">

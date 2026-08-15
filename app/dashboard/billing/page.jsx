@@ -7,6 +7,7 @@ import {
   Banknote,
   Bell,
   Check,
+  Eye,
   FileSpreadsheet,
   History,
   Loader2,
@@ -58,7 +59,7 @@ const STATUS_LABELS = {
 
 const TYPE_LABELS = {
   RENT: "Tiền phòng",
-  UTILITY: "Điện nước",
+  UTILITY: "Tiền điện",
   OTHER: "Khác",
   DEPOSIT: "Đặt cọc",
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
@@ -148,6 +149,11 @@ function formatMoney(value) {
   return `${money.format(Number(value || 0))} VNĐ`;
 }
 
+function formatMoneyInput(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits ? money.format(Number(digits)) : "";
+}
+
 
 
 function statusLabel(value) {
@@ -192,6 +198,7 @@ const invoiceActionItemClass =
 function InvoiceActionsMenu({
   invoice,
   saving,
+  onViewDetails,
   onAdjustPrice,
   onConfirmPayment,
   onSendWarning,
@@ -217,6 +224,12 @@ function InvoiceActionsMenu({
         sideOffset={8}
         className="w-64 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white p-2 shadow-[0_12px_16px_-4px_rgba(16,24,40,0.08),0_4px_6px_-2px_rgba(16,24,40,0.03)] dark:border-white/10 dark:bg-[#0f172a]"
       >
+        <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
+          <button type="button" onClick={() => onViewDetails(invoice)} className={invoiceActionItemClass}>
+            <Eye className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            Xem chi tiết
+          </button>
+        </DropdownMenuItem>
         {canAdjustDiscount ? <DropdownMenuItem asChild className="rounded-lg p-0 focus:bg-transparent">
           <button type="button" onClick={() => onAdjustPrice(invoice)} className={invoiceActionItemClass}>
             <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
@@ -310,6 +323,7 @@ export default function BillingPage() {
   const [message, setMessage] = useState("");
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isInvoiceDetailOpen, setIsInvoiceDetailOpen] = useState(false);
   const [warningInvoice, setWarningInvoice] = useState(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -590,6 +604,12 @@ export default function BillingPage() {
     setIsPaymentModalOpen(true);
   }
 
+  function openInvoiceDetails(invoice) {
+    if (!invoice?.id) return;
+    setSelectedInvoiceId(invoice.id);
+    setIsInvoiceDetailOpen(true);
+  }
+
   function openOverrideModal(invoice) {
     if (!invoice || invoice.invoiceType !== "RENT") return;
     const billingPeriod = invoice.billingPeriod || currentMonth();
@@ -599,7 +619,10 @@ export default function BillingPage() {
     setOverrideForm({
       roomId: invoice.roomId ? String(invoice.roomId) : "",
       billingPeriod,
-      discountAmount: invoice.discountAmount > 0 ? String(invoice.discountAmount) : "",
+      discountAmount:
+        Number(invoice.discountAmount) > 0
+          ? String(Math.trunc(Number(invoice.discountAmount)))
+          : "",
       reason: invoice.discountReason || "",
     });
     setIsOverrideModalOpen(true);
@@ -859,12 +882,7 @@ export default function BillingPage() {
                 paginatedInvoices.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    onClick={() => setSelectedInvoiceId(invoice.id || "")}
-                    className={`cursor-pointer border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5 ${
-                      String(selectedInvoiceId) === String(invoice.id)
-                        ? "bg-blue-50/60 dark:bg-blue-500/10"
-                        : ""
-                    }`}
+                    className="border-t border-[#e2e8f0] bg-white transition hover:bg-slate-50 dark:border-white/10 dark:bg-[#0f172a] dark:hover:bg-white/5"
                   >
                     <td className="px-4 py-3">
                       <p className="font-black">
@@ -895,6 +913,7 @@ export default function BillingPage() {
                         <InvoiceActionsMenu
                           invoice={invoice}
                           saving={saving}
+                          onViewDetails={openInvoiceDetails}
                           onAdjustPrice={openOverrideModal}
                           onConfirmPayment={openManualPayment}
                           onSendWarning={setWarningInvoice}
@@ -943,9 +962,6 @@ export default function BillingPage() {
                 <RefreshCw className="h-4 w-4 text-[#3156b6]" />
                 Giảm giá tiền phòng
               </DialogTitle>
-              <DialogDescription className="text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">
-                Khoản giảm chỉ được trừ trên hóa đơn tiền phòng của kỳ này. Giá niêm yết trong hợp đồng không thay đổi.
-              </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 px-5 py-5">
@@ -993,16 +1009,17 @@ export default function BillingPage() {
                     required
                     min="0"
                     step="1000"
-                    type="number"
-                    value={overrideForm.discountAmount}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatMoneyInput(overrideForm.discountAmount)}
                     onChange={(event) =>
                       setOverrideForm((current) => ({
                         ...current,
-                        discountAmount: event.target.value,
+                        discountAmount: event.target.value.replace(/\D/g, ""),
                       }))
                     }
                     className={`${FORM_CONTROL_CLASS} w-full pr-16`}
-                    placeholder="Ví dụ: 300000"
+                    placeholder="Ví dụ: 300.000"
                   />
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-bold text-slate-400">
                     VNĐ
@@ -1245,12 +1262,24 @@ export default function BillingPage() {
         </div>
       )}
 
-      {selectedInvoice && (
-        <section className="rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
-          <h2 className="text-sm font-black">
-            Chi tiết {selectedInvoice.invoiceCode}
-          </h2>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <Dialog
+        open={isInvoiceDetailOpen && Boolean(selectedInvoice)}
+        onOpenChange={setIsInvoiceDetailOpen}
+      >
+        {selectedInvoice ? (
+          <DialogContent
+            lockScroll={false}
+            className="max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-[#0f172a] sm:max-w-5xl"
+          >
+          <DialogHeader className="border-b border-slate-200 px-5 py-4 text-left dark:border-white/10">
+            <DialogTitle className="pr-8 text-base font-black text-slate-900 dark:text-white">
+              Chi tiết {selectedInvoice.invoiceCode}
+            </DialogTitle>
+            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              {displayRoomCode(selectedInvoice.roomCode)} · {typeLabel(selectedInvoice.invoiceType)} · Kỳ {formatBillingPeriod(selectedInvoice.billingPeriod)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 p-5 lg:grid-cols-2">
             <div className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10">
               <table className="w-full text-left text-sm">
                 <thead className="bg-[#f8fafc] dark:bg-white/5 text-xs uppercase text-slate-500 dark:text-slate-400">
@@ -1340,8 +1369,9 @@ export default function BillingPage() {
               </table>
             </div>
           </div>
-        </section>
-      )}
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </div>
   );
 }

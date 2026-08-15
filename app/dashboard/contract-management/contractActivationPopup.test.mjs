@@ -11,6 +11,10 @@ const activationFlowSource = readFileSync(
   "utf8",
 );
 const pageSource = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
+const transferExecutionModalSource = readFileSync(
+  new URL("../_components/TransferExecutionModal.jsx", import.meta.url),
+  "utf8",
+);
 const handoverDocumentCardSource = readFileSync(
   new URL("./HandoverDocumentCard.jsx", import.meta.url),
   "utf8",
@@ -48,6 +52,19 @@ test("signed handover upload is required only for non-renewal activation", () =>
   assert.match(pageSource, /isRenewalContract/);
   assert.match(pageSource, /getSignedHandoverDocumentId/);
   assert.doesNotMatch(workflowSource, /optional\s*fileName="Bi/);
+});
+
+test("transfer target activation owns the new-room handover", () => {
+  assert.match(workflowSource, /transferContractRole/);
+  assert.match(activationFlowSource, /transferContractRole/);
+  assert.match(pageSource, /REPLACEMENT_OLD_CONTRACT/);
+  assert.match(pageSource, /requiresMoveInHandover\(item\)/);
+});
+
+test("transfer completion reuses the handover saved during activation", () => {
+  assert.match(transferExecutionModalSource, /fetchContractHandover\(contractId, "MOVE_IN"\)/);
+  assert.match(transferExecutionModalSource, /execution\?\.transferInReady/);
+  assert.match(transferExecutionModalSource, /Khong can nhap lai khi hoan tat yeu cau/);
 });
 
 test("contract list activation action opens the integrated dialog", () => {

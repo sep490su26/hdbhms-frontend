@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { fetchDebtSummary } from "@/services/debtService";
+import { enumLabel } from "@/lib/enumLabels";
 
 const CACHE_KEY = "debt_summary_cache";
 const money = new Intl.NumberFormat("vi-VN");
@@ -33,7 +34,7 @@ function formatThousandMoney(value) {
 }
 
 function debtTypeLabel(value) {
-  return DEBT_TYPE_LABELS[value] || value || "Nợ khác";
+  return enumLabel(value, DEBT_TYPE_LABELS, "Nợ khác");
 }
 
 function UnitBadge() {

@@ -95,7 +95,7 @@ function statusMeta(status) {
   };
   return (
     map[status] || {
-      label: status || "Chưa rõ",
+      label: "Chưa xác định",
       className:
         "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300",
     }

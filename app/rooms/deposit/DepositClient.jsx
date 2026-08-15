@@ -807,6 +807,15 @@ const validateDepositValue = (
     return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
   }
 
+  if (
+    (name === "contractTermMonths" || name === "paymentCycleMonths") &&
+    /^\d+$/.test(String(relatedValues.contractTermMonths || "").trim()) &&
+    ["1", "3"].includes(String(relatedValues.paymentCycleMonths || "").trim()) &&
+    Number(relatedValues.contractTermMonths) % Number(relatedValues.paymentCycleMonths) !== 0
+  ) {
+    return "Thời hạn hợp đồng phải là bội số của chu kỳ thanh toán.";
+  }
+
   if (name === "gender" && !GENDER_OPTIONS.includes(normalizedValue)) {
     return REQUIRED_DEPOSIT_MESSAGES.gender;
   }
@@ -1687,19 +1696,43 @@ function DepositInfoForm({
   };
 
   const validateDepositField = (name, value, relatedValues = null) => {
+    const currentValues = formRef.current
+      ? collectDepositFormData(formRef.current)
+      : {};
     return validateDepositValue(
       name,
       value,
       scheduleWindow,
-      relatedValues || getScheduleDateValues({ [name]: value }),
+      relatedValues || {
+        ...currentValues,
+        ...getScheduleDateValues({ [name]: value }),
+        [name]: value,
+      },
     );
   };
 
   const validateAndSetDepositField = (name, value) => {
-    const message = validateDepositField(name, value);
+    const relatedValues = formRef.current
+      ? { ...collectDepositFormData(formRef.current), [name]: value }
+      : { [name]: value };
+    const message = validateDepositField(name, value, relatedValues);
+    const pairedField =
+      name === "contractTermMonths"
+        ? "paymentCycleMonths"
+        : name === "paymentCycleMonths"
+          ? "contractTermMonths"
+          : null;
+    const pairedMessage = pairedField
+      ? validateDepositField(
+          pairedField,
+          relatedValues[pairedField],
+          relatedValues,
+        )
+      : "";
     setFieldErrors((currentErrors) => ({
       ...currentErrors,
       [name]: message,
+      ...(pairedField ? { [pairedField]: pairedMessage } : {}),
     }));
     return !message;
   };

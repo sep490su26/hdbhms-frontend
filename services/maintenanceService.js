@@ -39,6 +39,7 @@ function maintenanceDisplayText(value) {
     .replaceAll("VOIDED", "Đã hủy")
     .replaceAll("PENDING_PAYMENT", "Chờ thanh toán")
     .replaceAll("PAID", "Đã thanh toán")
+    .replaceAll("ISSUED", "Chờ thanh toán")
     .replaceAll("NOT_INVOICED", "Chưa tạo hóa đơn");
 }
 
@@ -122,20 +123,20 @@ export function normalizeTicket(raw = {}) {
     roomCode: readField(raw, "roomCode", "room_code") || "",
     roomName: readField(raw, "roomName", "room_name") || "",
     ticketScope: normalizeScope(readField(raw, "scope", "ticketScope", "ticket_scope")),
-    category: readField(raw, "category") || "OTHER",
+    category: String(readField(raw, "category") || "OTHER").toUpperCase(),
     title: maintenanceDisplayText(readField(raw, "title") || "Phiếu sự cố"),
     description: maintenanceDisplayText(readField(raw, "description") || ""),
     repairRequested: readField(raw, "repairRequested", "repair_requested") !== false,
     status: normalizeStatus(readField(raw, "status")),
     ticketStatus: normalizeStatus(readField(raw, "ticketStatus", "ticket_status", "status")),
     ticketStatusLabel: readField(raw, "ticketStatusLabel", "ticket_status_label") || "",
-    billingStatus: readField(raw, "billingStatus", "billing_status") || "",
+    billingStatus: String(readField(raw, "billingStatus", "billing_status") || "").toUpperCase(),
     billingStatusLabel: readField(raw, "billingStatusLabel", "billing_status_label") || "",
     billingPeriod: readField(raw, "billingPeriod", "billing_period") || "",
     invoiceId: readField(raw, "invoiceId", "invoice_id"),
     invoiceCode: readField(raw, "invoiceCode", "invoice_code") || "",
-    invoiceStatus: readField(raw, "invoiceStatus", "invoice_status") || "",
-    paymentStatus: readField(raw, "paymentStatus", "payment_status") || "",
+    invoiceStatus: String(readField(raw, "invoiceStatus", "invoice_status") || "").toUpperCase(),
+    paymentStatus: String(readField(raw, "paymentStatus", "payment_status") || "").toUpperCase(),
     chargeToTenant: Boolean(readField(raw, "chargeToTenant", "charge_to_tenant")),
     payer: readField(raw, "payer", "paidBy", "paid_by") || "",
     lineType: readField(raw, "lineType", "line_type") || "",
@@ -149,7 +150,7 @@ export function normalizeTicket(raw = {}) {
     rootCause: readField(raw, "rootCause", "root_cause") || "",
     costAmount: toNumber(readField(raw, "actualCost", "actual_cost", "costAmount", "cost_amount")),
     costDescription: maintenanceDisplayText(readField(raw, "costDescription", "cost_description") || ""),
-    costResponsibility: readField(raw, "costResponsibility", "cost_responsibility") || "UNDECIDED",
+    costResponsibility: String(readField(raw, "costResponsibility", "cost_responsibility") || "UNDECIDED").toUpperCase(),
     rejectionReason: readField(raw, "rejectionReason", "rejection_reason") || "",
     createdAt: readField(raw, "createdAt", "created_at") || "",
     updatedAt: readField(raw, "updatedAt", "updated_at") || "",
@@ -313,6 +314,16 @@ export async function updateMaintenanceRepairInfo(id, payload = {}) {
   return normalizeTicket(await request(`/maintenance/tickets/${id}/repair-info`, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  }));
+}
+
+export async function decideMaintenanceRepair(id, approved, reason = "") {
+  return normalizeTicket(await request(`/maintenance/tickets/${id}/repair-decision`, {
+    method: "POST",
+    body: JSON.stringify({
+      approved: Boolean(approved),
+      reason: reason || null,
+    }),
   }));
 }
 

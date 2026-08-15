@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { enumLabel } from "@/lib/enumLabels";
 
 const money = new Intl.NumberFormat("vi-VN");
 const PUBLISHED_STATUS = "INVOICES_CREATED";
@@ -67,11 +68,11 @@ function formatMoney(value) {
 }
 
 function billingBatchStatusLabel(value) {
-  return BILLING_BATCH_STATUS_LABELS[value] || value || "Chưa rõ";
+  return enumLabel(value, BILLING_BATCH_STATUS_LABELS, "Chưa rõ");
 }
 
 function billingBatchItemStatusLabel(value) {
-  return BILLING_BATCH_ITEM_STATUS_LABELS[value] || value || "Chưa rõ";
+  return enumLabel(value, BILLING_BATCH_ITEM_STATUS_LABELS, "Chưa rõ");
 }
 
 function billingBatchStatusClasses(status) {
@@ -118,11 +119,12 @@ export function UtilityBillingRunsPanel({
 
   const activeRun = billingRunDetail || billingRun;
   const runItems = activeRun?.items || [];
-  const warningRunItems = runItems.filter((item) => item.status === "WARNING");
+  const warningRunItems = runItems.filter((item) => item.status === "WARNING" || item.warningMessage);
   const publishBlocked =
     !activeRun?.runId ||
     activeRun.status === PUBLISHED_STATUS ||
-    Number(activeRun.warningCount || 0) > 0;
+    Number(activeRun.warningCount || 0) > 0 ||
+    warningRunItems.length > 0;
 
   const loadBillingRun = useCallback(async () => {
     if (!propertyId || !billingPeriod) {
@@ -133,7 +135,7 @@ export function UtilityBillingRunsPanel({
 
     setLoadingRun(true);
     try {
-      const runs = await fetchUtilityBillingRuns({ billingPeriod, propertyId });
+      const runs = await fetchUtilityBillingRuns({ billingPeriod, propertyId, invoiceReason: "MONTHLY" });
       const nextRun = runs.find((run) => run.status === PUBLISHED_STATUS) || runs[0] || null;
 
       setBillingRun(nextRun);
@@ -297,7 +299,9 @@ export function UtilityBillingRunsPanel({
                       </td>
                     </tr>
                   ) : (
-                    runItems.map((item) => (
+                    runItems.map((item) => {
+                      const itemStatus = item.warningMessage ? "WARNING" : item.status;
+                      return (
                       <tr key={item.itemId} className="border-t border-[#e2e8f0] dark:border-white/10">
                         <td className="px-4 py-3 text-center">
                           <p className="font-black">{displayRoomCode(item.roomCode)}</p>
@@ -313,13 +317,14 @@ export function UtilityBillingRunsPanel({
                         </td>
                         <td className="px-4 py-3 text-center font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(item.status)}`}>
-                            {billingBatchItemStatusLabel(item.status)}
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(itemStatus)}`}>
+                            {billingBatchItemStatusLabel(itemStatus)}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-black text-center">{formatMoney(item.totalAmount)}</td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>

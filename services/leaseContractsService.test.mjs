@@ -261,7 +261,7 @@ test("contract workflow lease action passes generated HDT filename fallback", ()
 
   assert.match(
     source,
-    /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),\s*requiresMoveInHandover/,
+    /await downloadLeaseContractDraftPdf\(\s*contractId,\s*buildLeaseContractDocumentFilename\(contractDetails\),\s*requiresActivationReading/,
   );
   assert.doesNotMatch(
     source,

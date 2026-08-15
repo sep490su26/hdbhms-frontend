@@ -23,10 +23,11 @@ import {
   approveMaintenanceTicket,
   completeMaintenanceTicket,
   confirmMaintenanceTicket,
+  decideMaintenanceRepair,
   declineMaintenanceTicket,
   fetchMaintenanceTicket,
   issueMaintenanceInvoice,
-  startMaintenanceProgress,
+  updateMaintenanceRepairInfo,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import { getAuthToken } from "@/services/identityAccessService";
@@ -45,6 +46,7 @@ import {
 const STATUS_META = {
   PENDING: ["Chờ tiếp nhận", "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20"],
   ACCEPTED: ["Đã tiếp nhận", "bg-blue-50 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 ring-blue-200 dark:ring-blue-500/20"],
+  WAITING_TENANT_DECISION: ["Chờ khách quyết định sửa", "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20"],
   IN_PROGRESS: ["Đang xử lý", "bg-indigo-50 dark:bg-blue-500/10 text-indigo-800 dark:text-blue-300 ring-indigo-200 dark:ring-blue-500/20"],
   WAITING_CONFIRMATION: ["Chờ xác nhận", "bg-violet-50 text-violet-800 ring-violet-200"],
   COMPLETED: ["Hoàn tất xử lý", "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 ring-emerald-200 dark:ring-emerald-500/20"],
@@ -75,6 +77,7 @@ const SCOPE_LABELS = {
 
 const COST_RESPONSIBILITY_OPTIONS = [
   ["UNDECIDED", "Chưa xác định"],
+  ["PROPERTY", "Chủ trọ chịu"],
   ["OWNER", "Chủ trọ chịu"],
   ["TENANT", "Khách thuê chịu"],
   ["OPERATION", "Chi phí vận hành"],
@@ -99,6 +102,9 @@ const ACTION_LABELS = {
   CREATE: "Tạo phiếu",
   SUBMIT: "Gửi phiếu",
   ACCEPT: "Tiếp nhận",
+  SEND_REPAIR_PROPOSAL: "Gửi phương án sửa chữa",
+  TENANT_APPROVE_REPAIR: "Khách đồng ý sửa chữa",
+  TENANT_REJECT_REPAIR: "Khách không đồng ý sửa",
   START_PROGRESS: "Bắt đầu xử lý",
   UPDATE_REPAIR_INFO: "Cập nhật thông tin sửa chữa",
   ATTACH_FILE: "Đính kèm tệp",
@@ -147,7 +153,11 @@ function parseMoneyInput(value) {
 }
 
 function formatActionLabel(action) {
-  const normalized = String(action || "").trim().toUpperCase();
+  // Accept legacy event values that use spaces or hyphens instead of enum underscores.
+  const normalized = String(action || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
   return ACTION_LABELS[normalized] || "Cập nhật trạng thái";
 }
 
@@ -157,7 +167,14 @@ function statusMeta(status) {
 
 function formatTimelineNote(note) {
   const text = String(note || "").trim();
-  return TIMELINE_NOTE_LABELS[text] || text || "Không có ghi chú.";
+  const normalized = text.toUpperCase().replace(/[\s-]+/g, "_");
+  return (
+    TIMELINE_NOTE_LABELS[text] ||
+    ACTION_LABELS[normalized] ||
+    BILLING_STATUS_LABELS[normalized] ||
+    text ||
+    "Không có ghi chú."
+  );
 }
 
 function formatBillingPeriod(value) {
@@ -173,7 +190,13 @@ function billingBadgeLabel(status, label, billingPeriod) {
       ? `Đã lên lịch gộp hóa đơn đầu tháng ${formattedPeriod}`
       : "Đã lên lịch gộp hóa đơn đầu tháng";
   }
-  return label || BILLING_STATUS_LABELS[normalized] || "Không thu khách";
+  const normalizedLabel = String(label || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return (
+    BILLING_STATUS_LABELS[normalizedLabel] ||
+    label ||
+    BILLING_STATUS_LABELS[normalized] ||
+    "Trạng thái thu chưa xác định"
+  );
 }
 
 function StatusBadge({ status }) {
@@ -378,7 +401,7 @@ function Timeline({ events }) {
   if (!events.length) {
     return (
       <div className="rounded-lg border border-dashed border-[#cbd5e1] dark:border-white/10 bg-[#f8fafc] dark:bg-white/5 px-4 py-8 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
-        No activity yet.
+        Chưa có hoạt động nào.
       </div>
     );
   }
@@ -443,12 +466,16 @@ export default function MaintenanceTicketDetailPage() {
   const ticketId = params?.id;
   const { activeRole } = useDashboardLayout();
   const canManage = ["owner", "manager"].includes(activeRole);
+  const isTenant = activeRole === "tenant";
   const [ticket, setTicket] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState("");
   const [completeForm, setCompleteForm] = useState(buildCompleteForm());
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [editRepairDetails, setEditRepairDetails] = useState(false);
+  const [repairDecision, setRepairDecision] = useState(null);
+  const [repairDecisionReason, setRepairDecisionReason] = useState("");
 
   const locationText = useMemo(() => {
     if (!ticket) return "";
@@ -517,55 +544,102 @@ export default function MaintenanceTicketDetailPage() {
     runAction("decline", () => declineMaintenanceTicket(ticketId, reason.trim()));
   }
 
-  async function handleStartProgress() {
-    const started = await runAction("progress", () =>
-      startMaintenanceProgress(ticketId, { note: "Đã bắt đầu xử lý sự cố" }),
+  function openTenantRepairDecision(approved) {
+    setRepairDecision(approved ? "APPROVED" : "REJECTED");
+    setRepairDecisionReason("");
+  }
+
+  async function submitTenantRepairDecision(event) {
+    event.preventDefault();
+    const rejected = repairDecision === "REJECTED";
+    if (rejected && !repairDecisionReason.trim()) {
+      setError("Vui lòng nhập lý do không đồng ý sửa chữa.");
+      return;
+    }
+    const decided = await runAction(
+      "repair-decision",
+      () => decideMaintenanceRepair(ticketId, !rejected, repairDecisionReason.trim()),
     );
-    if (started) setIsCompleteDialogOpen(true);
+    if (decided) {
+      setRepairDecision(null);
+      setRepairDecisionReason("");
+    }
+  }
+
+  async function handleStartProgress() {
+    setError("");
+    setEditRepairDetails(true);
+    setCompleteForm(buildCompleteForm(ticket));
+    setIsCompleteDialogOpen(true);
+  }
+
+  function handleOpenCompletion() {
+    setError("");
+    setEditRepairDetails(false);
+    setCompleteForm(buildCompleteForm(ticket));
+    setIsCompleteDialogOpen(true);
   }
 
   async function handleComplete(event) {
     event.preventDefault();
-    if (!completeForm.repairItems.trim()) {
-      setError("Vui lòng nhập hạng mục đã sửa.");
+    const isProposal = ticket.status === "ACCEPTED";
+    const isEditingRepairDetails = isProposal || editRepairDetails;
+    if (isEditingRepairDetails && !completeForm.repairItems.trim()) {
+      setError(isProposal ? "Vui lòng nhập hạng mục dự kiến sửa." : "Vui lòng nhập hạng mục đã sửa.");
       return;
     }
-    if (ticket.ticketScope === "PROPERTY_OPERATION" && !completeForm.repairmanName.trim()) {
+    if (isEditingRepairDetails && !completeForm.repairmanName.trim()) {
       setError("Vui lòng nhập tên thợ sửa hoặc nhân sự xử lý.");
       return;
     }
-    if ((ticket.afterAttachments?.length || 0) === 0 && completeForm.images.length === 0) {
+    if (isEditingRepairDetails && !completeForm.actualCost.trim()) {
+      setError(isProposal ? "Vui lòng nhập chi phí dự kiến." : "Vui lòng nhập chi phí thực tế.");
+      return;
+    }
+    if (!isProposal && (ticket.afterAttachments?.length || 0) === 0 && completeForm.images.length === 0) {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
       return;
     }
-    if ((ticket.afterAttachments?.length || 0) + completeForm.images.length > 3) {
+    if (!isProposal && (ticket.afterAttachments?.length || 0) + completeForm.images.length > 3) {
       setError("Ảnh sau sửa tối đa 3 ảnh.");
       return;
     }
     const amount = parseMoneyInput(completeForm.actualCost);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError("Chi phí thực tế không hợp lệ.");
-      return;
-    }
-    if (ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
-      setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
-      return;
+    if (isEditingRepairDetails) {
+      if (!Number.isFinite(amount) || amount < 0) {
+        setError("Chi phí thực tế không hợp lệ.");
+        return;
+      }
+      if (!isProposal && ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
+        setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
+        return;
+      }
     }
 
     const completed = await runAction("complete", async () => {
+      const basePayload = isEditingRepairDetails
+        ? {
+            repairmanName: completeForm.repairmanName.trim(),
+            repairmanPhone: completeForm.repairmanPhone.trim(),
+            rootCause: completeForm.rootCause.trim(),
+            repairItems: completeForm.repairItems.trim(),
+            actualCost: amount,
+            costResponsibility: completeForm.costResponsibility,
+            costDescription: completeForm.repairItems.trim(),
+            completionNote: completeForm.completionNote.trim(),
+          }
+        : {};
+      if (isProposal) {
+        await updateMaintenanceRepairInfo(ticketId, basePayload);
+        return;
+      }
       const uploaded = await Promise.all(completeForm.images.map((file) => uploadMaintenanceImage(file)));
       await completeMaintenanceTicket(ticketId, {
-        repairmanName: completeForm.repairmanName.trim(),
-        repairmanPhone: completeForm.repairmanPhone.trim(),
-        rootCause: completeForm.rootCause.trim(),
-        repairItems: completeForm.repairItems.trim(),
-        actualCost: amount,
-        costResponsibility: completeForm.costResponsibility,
-        collectionMethod: completeForm.costResponsibility === "TENANT" ? completeForm.collectionMethod : null,
-        billingPeriod: completeForm.costResponsibility === "TENANT" && completeForm.collectionMethod === "MONTHLY_SCHEDULED"
+        ...basePayload,
+        collectionMethod: (isEditingRepairDetails ? completeForm.costResponsibility : ticket.costResponsibility || completeForm.costResponsibility) === "TENANT" ? completeForm.collectionMethod : null,
+        billingPeriod: (isEditingRepairDetails ? completeForm.costResponsibility : ticket.costResponsibility || completeForm.costResponsibility) === "TENANT" && completeForm.collectionMethod === "MONTHLY_SCHEDULED"
           ? completeForm.billingPeriod
           : null,
-        costDescription: completeForm.repairItems.trim(),
         completionNote: completeForm.completionNote.trim(),
         attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
         phase: "AFTER",
@@ -606,9 +680,15 @@ export default function MaintenanceTicketDetailPage() {
   }
 
   const incidentalBillingStatus = String(ticket.billingStatus || ticket.invoiceStatus || "").toUpperCase();
-  const shouldShowIncidentalPayment = Boolean(ticket.invoiceId)
+  const shouldShowIncidentalPayment = ticket.status !== "REJECTED" && (
+    Boolean(ticket.invoiceId)
     || ["SCHEDULED", "SCHEDULE_FAILED", "DRAFT", "PENDING_PAYMENT", "ISSUED", "PARTIALLY_PAID", "PAID", "OVERDUE", "VOIDED"]
-      .includes(incidentalBillingStatus);
+      .includes(incidentalBillingStatus)
+  );
+  const isEditingRepairDetails = ticket.status === "ACCEPTED" || editRepairDetails;
+  const completionCostResponsibility = editRepairDetails
+    ? completeForm.costResponsibility
+    : ticket.costResponsibility || completeForm.costResponsibility;
 
   return (
     <section className="grid gap-6">
@@ -657,8 +737,19 @@ export default function MaintenanceTicketDetailPage() {
                 disabled={Boolean(actionLoading)}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-4 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
               >
-                {actionLoading === "progress" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
-                Xử lý
+                <Wrench className="h-4 w-4" />
+                Lập phương án sửa
+              </button>
+            )}
+            {ticket.status === "IN_PROGRESS" && (
+              <button
+                type="button"
+                onClick={handleOpenCompletion}
+                disabled={Boolean(actionLoading)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                <TimerReset className="h-4 w-4" />
+                Hoàn tất xử lý
               </button>
             )}
             {ticket.status === "WAITING_CONFIRMATION" && ticket.ticketScope !== "ROOM" && (
@@ -672,6 +763,27 @@ export default function MaintenanceTicketDetailPage() {
                 Xác nhận hoàn tất
               </button>
             )}
+            </div>
+          ) : isTenant && ticket.status === "WAITING_TENANT_DECISION" ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openTenantRepairDecision(true)}
+                disabled={Boolean(actionLoading)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {actionLoading === "repair-decision" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Đồng ý sửa chữa
+              </button>
+              <button
+                type="button"
+                onClick={() => openTenantRepairDecision(false)}
+                disabled={Boolean(actionLoading)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300"
+              >
+                <X className="h-4 w-4" />
+                Không đồng ý sửa
+              </button>
             </div>
           ) : null}
         />
@@ -738,35 +850,37 @@ export default function MaintenanceTicketDetailPage() {
           <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
             <DialogHeader className="gap-1 text-left">
               <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
-                Hoàn tất xử lý
+                {ticket.status === "ACCEPTED" ? "Lập phương án sửa chữa" : "Hoàn tất xử lý"}
               </DialogTitle>
               <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố.
+                {ticket.status === "ACCEPTED"
+                  ? "Nhập thông tin thợ và chi phí để gửi khách thuê quyết định."
+                  : "Ghi nhận kết quả sửa chữa và hoàn tất phiếu sự cố."}
               </DialogDescription>
             </DialogHeader>
             {error && <div className="mt-3"><Notice type="error">{error}</Notice></div>}
           </div>
           <div className="min-h-0 overflow-y-auto p-5">
-      {canManage && ticket.status === "IN_PROGRESS" && (
+      {canManage && ["ACCEPTED", "IN_PROGRESS"].includes(ticket.status) && (
         <form onSubmit={handleComplete} className="grid gap-5">
           <div className="grid gap-4 lg:grid-cols-3">
             <Field label="Người sửa">
               <div className="relative">
                 <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-                <input value={completeForm.repairmanName} onChange={(event) => updateCompleteForm("repairmanName", event.target.value)} className={`${inputClassName()} w-full pl-9`} placeholder="Tên thợ hoặc nhân sự" />
+                <input value={completeForm.repairmanName} onChange={(event) => updateCompleteForm("repairmanName", event.target.value)} readOnly={!isEditingRepairDetails} className={`${inputClassName()} w-full pl-9 ${!isEditingRepairDetails ? "bg-slate-50 dark:bg-white/5" : ""}`} placeholder="Tên thợ hoặc nhân sự" />
               </div>
             </Field>
             <Field label="Số điện thoại">
               <div className="relative">
                 <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
-                <input value={completeForm.repairmanPhone} onChange={(event) => updateCompleteForm("repairmanPhone", event.target.value)} className={`${inputClassName()} w-full pl-9`} placeholder="SĐT liên hệ" />
+                <input value={completeForm.repairmanPhone} onChange={(event) => updateCompleteForm("repairmanPhone", event.target.value)} readOnly={!isEditingRepairDetails} className={`${inputClassName()} w-full pl-9 ${!isEditingRepairDetails ? "bg-slate-50 dark:bg-white/5" : ""}`} placeholder="SĐT liên hệ" />
               </div>
             </Field>
             <Field label="Trách nhiệm chi phí">
               <select
-                value={ticket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completeForm.costResponsibility}
+                value={ticket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionCostResponsibility}
                 onChange={(event) => updateCompleteForm("costResponsibility", event.target.value)}
-                disabled={ticket.ticketScope === "PROPERTY_OPERATION"}
+                disabled={!isEditingRepairDetails || ticket.ticketScope === "PROPERTY_OPERATION"}
                 className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
               >
                 {COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
@@ -775,7 +889,7 @@ export default function MaintenanceTicketDetailPage() {
               </select>
             </Field>
           </div>
-          {completeForm.costResponsibility === "TENANT" && (
+              {ticket.status !== "ACCEPTED" && completionCostResponsibility === "TENANT" && (
             <div className="grid gap-4 lg:grid-cols-2">
               <Field label="Cách thu tiền *">
                 <select value={completeForm.collectionMethod} onChange={(event) => updateCompleteForm("collectionMethod", event.target.value)} className={inputClassName()}>
@@ -795,41 +909,52 @@ export default function MaintenanceTicketDetailPage() {
           )}
           <div className="grid gap-4 lg:grid-cols-2">
             <Field label="Nguyên nhân">
-              <textarea value={completeForm.rootCause} onChange={(event) => updateCompleteForm("rootCause", event.target.value)} className={textareaClassName()} placeholder="Nguyên nhân sự cố" />
+              <textarea value={completeForm.rootCause} onChange={(event) => updateCompleteForm("rootCause", event.target.value)} readOnly={!isEditingRepairDetails} className={`${textareaClassName()} ${!isEditingRepairDetails ? "bg-slate-50 dark:bg-white/5" : ""}`} placeholder="Nguyên nhân sự cố" />
             </Field>
-            <Field label="Hạng mục đã sửa">
-              <textarea value={completeForm.repairItems} onChange={(event) => updateCompleteForm("repairItems", event.target.value)} className={textareaClassName()} placeholder="Các việc đã xử lý" />
+            <Field label={ticket.status === "ACCEPTED" ? "Hạng mục dự kiến sửa *" : "Hạng mục đã sửa *"}>
+              <textarea value={completeForm.repairItems} onChange={(event) => updateCompleteForm("repairItems", event.target.value)} readOnly={!isEditingRepairDetails} className={`${textareaClassName()} ${!isEditingRepairDetails ? "bg-slate-50 dark:bg-white/5" : ""}`} placeholder={ticket.status === "ACCEPTED" ? "Các việc dự kiến thực hiện" : "Các việc đã xử lý"} />
             </Field>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Chi phí thực tế (VNĐ)">
-              <input value={completeForm.actualCost} onChange={(event) => updateCompleteForm("actualCost", event.target.value)} className={`${inputClassName()} tabular-nums`} inputMode="numeric" placeholder="0" />
+            <Field label={ticket.status === "ACCEPTED" ? "Chi phí dự kiến (VNĐ) *" : "Chi phí thực tế (VNĐ)"}>
+              <input value={completeForm.actualCost} onChange={(event) => updateCompleteForm("actualCost", event.target.value)} readOnly={!isEditingRepairDetails} className={`${inputClassName()} tabular-nums ${!isEditingRepairDetails ? "bg-slate-50 dark:bg-white/5" : ""}`} inputMode="numeric" placeholder="0" />
             </Field>
-            <Field label="Ghi chú hoàn tất">
-              <input value={completeForm.completionNote} onChange={(event) => updateCompleteForm("completionNote", event.target.value)} className={inputClassName()} placeholder="Ghi chú hoàn tất nếu có" />
+            <Field label={ticket.status === "ACCEPTED" ? "Ghi chú gửi khách" : "Ghi chú hoàn tất"}>
+              <input value={completeForm.completionNote} onChange={(event) => updateCompleteForm("completionNote", event.target.value)} className={inputClassName()} placeholder={ticket.status === "ACCEPTED" ? "Thông tin thêm cho khách thuê" : "Ghi chú hoàn tất nếu có"} />
             </Field>
           </div>
           <div className="grid gap-3">
-            <MaintenanceCompletionImageSection
-              existingAttachments={ticket.afterAttachments}
-              files={completeForm.images}
-              onChange={handleAfterImages}
-              onRemove={(index) =>
-                setCompleteForm((current) => ({
-                  ...current,
-                  images: current.images.filter(
-                    (_, fileIndex) => fileIndex !== index,
-                  ),
-                }))
-              }
-            />
+            {ticket.status !== "ACCEPTED" && !editRepairDetails && (
+              <button
+                type="button"
+                onClick={() => setEditRepairDetails(true)}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                Chỉnh sửa thông tin thực tế
+              </button>
+            )}
+            {ticket.status !== "ACCEPTED" && (
+              <MaintenanceCompletionImageSection
+                existingAttachments={ticket.afterAttachments}
+                files={completeForm.images}
+                onChange={handleAfterImages}
+                onRemove={(index) =>
+                  setCompleteForm((current) => ({
+                    ...current,
+                    images: current.images.filter(
+                      (_, fileIndex) => fileIndex !== index,
+                    ),
+                  }))
+                }
+              />
+            )}
             <button
               type="submit"
               disabled={Boolean(actionLoading)}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
-              Xác nhận hoàn tất
+              {ticket.status === "ACCEPTED" ? "Gửi phương án cho khách" : "Xác nhận hoàn tất"}
             </button>
           </div>
         </form>
@@ -839,20 +964,77 @@ export default function MaintenanceTicketDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {(ticket.status === "WAITING_CONFIRMATION" || ticket.status === "COMPLETED") && (
+      <Dialog
+        open={repairDecision !== null}
+        onOpenChange={(open) => {
+          if (actionLoading === "repair-decision") return;
+          if (!open) {
+            setRepairDecision(null);
+            setRepairDecisionReason("");
+            setError("");
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100%-1rem)] max-w-lg rounded-xl border border-[#d8dee8] bg-white dark:border-white/10 dark:bg-[#0f172a]">
+          <form onSubmit={submitTenantRepairDecision} className="grid gap-5">
+            <DialogHeader className="gap-1 text-left">
+              <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
+                {repairDecision === "APPROVED" ? "Đồng ý sửa chữa" : "Không đồng ý sửa chữa"}
+              </DialogTitle>
+              <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {repairDecision === "APPROVED"
+                  ? "Bạn xác nhận đồng ý với phương án và chi phí dự kiến của quản lý?"
+                  : "Vui lòng cho biết lý do để quản lý tiếp tục xử lý phiếu. "}
+              </DialogDescription>
+            </DialogHeader>
+            {repairDecision === "REJECTED" && (
+              <textarea
+                value={repairDecisionReason}
+                onChange={(event) => setRepairDecisionReason(event.target.value)}
+                className={textareaClassName()}
+                placeholder="Lý do không đồng ý sửa chữa"
+                autoFocus
+              />
+            )}
+            {error && <Notice type="error">{error}</Notice>}
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRepairDecision(null)}
+                disabled={actionLoading === "repair-decision"}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:bg-[#0f172a] dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={actionLoading === "repair-decision"}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white disabled:opacity-60 ${repairDecision === "APPROVED" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"}`}
+              >
+                {actionLoading === "repair-decision" && <Loader2 className="h-4 w-4 animate-spin" />}
+                {repairDecision === "APPROVED" ? "Xác nhận đồng ý" : "Gửi quyết định"}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {(ticket.status === "WAITING_TENANT_DECISION" || ticket.status === "WAITING_CONFIRMATION" || ticket.status === "COMPLETED") && (
         <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
           <div className="flex items-center gap-3">
             <Clock3 className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">Kết quả xử lý</h2>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">
+              {ticket.status === "WAITING_TENANT_DECISION" ? "Phương án sửa chữa" : "Kết quả xử lý"}
+            </h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <InfoItem label="Người sửa" value={ticket.workerName} />
             <InfoItem label="SĐT thợ" value={ticket.repairmanPhone} />
             <InfoItem label="Chi phí" value={formatMoney(ticket.costAmount)} />
-            <InfoItem label="Trách nhiệm" value={COST_RESPONSIBILITY_LABELS[ticket.costResponsibility] || ticket.costResponsibility} />
+            <InfoItem label="Trách nhiệm" value={COST_RESPONSIBILITY_LABELS[ticket.costResponsibility] || "Chưa xác định"} />
           </div>
           {ticket.rootCause && <InfoItem label="Nguyên nhân" value={ticket.rootCause} />}
-          {ticket.repairItems && <InfoItem label="Hạng mục đã sửa" value={ticket.repairItems} />}
+          {ticket.repairItems && <InfoItem label={ticket.status === "WAITING_TENANT_DECISION" ? "Hạng mục dự kiến sửa" : "Hạng mục đã sửa"} value={ticket.repairItems} />}
         </section>
       )}
 

@@ -27,7 +27,7 @@ import {
   createInternalMaintenanceTicket,
   declineMaintenanceTicket,
   fetchMaintenanceTickets,
-  startMaintenanceProgress,
+  updateMaintenanceRepairInfo,
   uploadMaintenanceImage,
 } from "@/services/maintenanceService";
 import {
@@ -55,6 +55,7 @@ import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { toDate } from "@/lib/dateFormat";
 
 const STATUS_OPTIONS = [
+  ["WAITING_TENANT_DECISION", "Chờ khách quyết định"],
   ["all", "Tất cả"],
   ["PENDING", "Chờ tiếp nhận"],
   ["ACCEPTED", "Đã tiếp nhận"],
@@ -62,9 +63,14 @@ const STATUS_OPTIONS = [
   ["WAITING_CONFIRMATION", "Chờ xác nhận"],
   ["COMPLETED", "Hoàn tất"],
   ["REJECTED", "Từ chối"],
+  ["CANCELLED", "Đã hủy"],
 ];
 
 const STATUS_META = {
+  WAITING_TENANT_DECISION: [
+    "Chờ khách quyết định",
+    "bg-orange-50 dark:bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-200 dark:ring-orange-500/20",
+  ],
   PENDING: [
     "Chờ tiếp nhận",
     "bg-amber-50 dark:bg-yellow-500/10 text-amber-800 dark:text-yellow-300 ring-amber-200 dark:ring-yellow-500/20",
@@ -118,6 +124,16 @@ const SCOPE_OPTIONS = [
 
 const CATEGORY_LABELS = Object.fromEntries(CATEGORY_OPTIONS.slice(1));
 const SCOPE_LABELS = Object.fromEntries(SCOPE_OPTIONS.slice(1));
+const ROOM_STATUS_LABELS = {
+  DRAFT: "Chưa kích hoạt",
+  VACANT: "Phòng trống",
+  ON_HOLD: "Tạm giữ",
+  RESERVED: "Đã đặt",
+  RESERVED_FOR_TRANSFER: "Giữ chuyển phòng",
+  OCCUPIED: "Đang ở",
+  SOON_VACANT: "Sắp trống",
+  EXPIRED: "Đã hết hạn",
+};
 
 const MONEY_FORMAT = new Intl.NumberFormat("vi-VN");
 
@@ -143,10 +159,15 @@ function formatMoney(value) {
 function statusMeta(status) {
   return (
     STATUS_META[status] || [
-      status || "Không rõ",
+      "Trạng thái chưa xác định",
       "bg-slate-100 text-slate-700 ring-slate-200",
     ]
   );
+}
+
+function roomStatusLabel(status) {
+  const normalized = String(status || "").trim().toUpperCase();
+  return ROOM_STATUS_LABELS[normalized] || "Chưa rõ trạng thái phòng";
 }
 
 function StatusBadge({ status }) {
@@ -366,6 +387,7 @@ function buildDefaultInternalForm(propertyId = "") {
 
 const COMPLETE_COST_RESPONSIBILITY_OPTIONS = [
   ["UNDECIDED", "Chưa xác định"],
+  ["PROPERTY", "Chủ trọ chịu"],
   ["OWNER", "Chủ trọ chịu"],
   ["TENANT", "Khách thuê chịu"],
   ["OPERATION", "Chi phí vận hành"],
@@ -430,6 +452,7 @@ export default function MaintenancePage() {
   const [completionTicket, setCompletionTicket] = useState(null);
   const [completionForm, setCompletionForm] = useState(buildCompleteForm());
   const [isCompletionOpen, setIsCompletionOpen] = useState(false);
+  const [editCompletionRepairDetails, setEditCompletionRepairDetails] = useState(false);
   const completionSubmitLockRef = useRef(false);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [page, setPage] = useState(1);
@@ -460,7 +483,7 @@ export default function MaintenancePage() {
       .map((room) => {
         return {
           id: String(room.id),
-          label: room.roomCode || room.name || `Phong ${room.id}`,
+          label: room.roomCode || room.name || `Phòng ${room.id}`,
           floorId: room.floorId ?? room.floor_id ?? room.floor?.id ?? "",
           floorLabel:
             room.floorName ||
@@ -787,20 +810,9 @@ export default function MaintenancePage() {
     }
   }
 
-  async function handleStartProgress(ticketId) {
+  function handleStartProgress(ticket) {
     if (actionLoading) return;
-    setActionLoading(`progress-${ticketId}`);
-    setError("");
-    try {
-      await startMaintenanceProgress(ticketId, {
-        note: "Đã bắt đầu xử lý sự cố",
-      });
-      await loadTickets();
-    } catch (progressError) {
-      setError(progressError?.message || "Không thể bắt đầu xử lý phiếu.");
-    } finally {
-      setActionLoading("");
-    }
+    openCompletionDialog(ticket, true);
   }
 
   function updateCompletionForm(name, value) {
@@ -823,11 +835,12 @@ export default function MaintenancePage() {
     event.target.value = "";
   }
 
-  function openCompletionDialog(ticket) {
+  function openCompletionDialog(ticket, editRepairDetails = false) {
     completionSubmitLockRef.current = false;
     setError("");
     setCompletionTicket(ticket);
     setCompletionForm(buildCompleteForm(ticket));
+    setEditCompletionRepairDetails(editRepairDetails);
     setIsCompletionOpen(true);
   }
 
@@ -837,25 +850,24 @@ export default function MaintenancePage() {
 
     setError("");
     const ticket = completionTicket;
-    if (!completionForm.repairItems.trim()) {
-      setError("Vui lòng nhập hạng mục đã sửa.");
+    const isProposal = ticket.status === "ACCEPTED";
+    const isEditingRepairDetails = isProposal || editCompletionRepairDetails;
+    if (isEditingRepairDetails && !completionForm.repairItems.trim()) {
+      setError(isProposal ? "Vui lòng nhập hạng mục dự kiến sửa." : "Vui lòng nhập hạng mục đã sửa.");
       return;
     }
-    if (
-      ticket.ticketScope === "PROPERTY_OPERATION" &&
-      !completionForm.repairmanName.trim()
-    ) {
+    if (isEditingRepairDetails && !completionForm.repairmanName.trim()) {
       setError("Vui lòng nhập tên thợ sửa hoặc nhân sự xử lý.");
       return;
     }
-    if (
+    if (!isProposal &&
       (ticket.afterAttachments?.length || 0) === 0 &&
       completionForm.images.length === 0
     ) {
       setError("Vui lòng upload ít nhất 1 ảnh sau sửa trước khi hoàn tất.");
       return;
     }
-    if (
+    if (!isProposal &&
       (ticket.afterAttachments?.length || 0) + completionForm.images.length >
       3
     ) {
@@ -863,42 +875,57 @@ export default function MaintenancePage() {
       return;
     }
     const amount = parseMoneyInput(completionForm.actualCost);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError("Chi phí thực tế không hợp lệ.");
-      return;
-    }
-    if (ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
-      setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
-      return;
+    if (isEditingRepairDetails) {
+      if (!Number.isFinite(amount) || amount < 0) {
+        setError(isProposal ? "Chi phí dự kiến không hợp lệ." : "Chi phí thực tế không hợp lệ.");
+        return;
+      }
+      if (!isProposal && ticket.ticketScope === "PROPERTY_OPERATION" && amount <= 0) {
+        setError("Vui lòng nhập chi phí thực tế cho phiếu nội bộ.");
+        return;
+      }
     }
 
     completionSubmitLockRef.current = true;
     setActionLoading(`complete-${ticket.id}`);
     try {
-      const uploaded = await Promise.all(
-        completionForm.images.map((file) => uploadMaintenanceImage(file)),
-      );
-      await completeMaintenanceTicket(ticket.id, {
-        repairmanName: completionForm.repairmanName.trim(),
-        repairmanPhone: completionForm.repairmanPhone.trim(),
-        rootCause: completionForm.rootCause.trim(),
-        repairItems: completionForm.repairItems.trim(),
-        actualCost: amount,
-        costResponsibility: completionForm.costResponsibility,
-        collectionMethod:
-          completionForm.costResponsibility === "TENANT"
-            ? completionForm.collectionMethod
-            : null,
-        billingPeriod:
-          completionForm.costResponsibility === "TENANT" &&
-          completionForm.collectionMethod === "MONTHLY_SCHEDULED"
-            ? completionForm.billingPeriod
-            : null,
-        costDescription: completionForm.repairItems.trim(),
-        completionNote: completionForm.completionNote.trim(),
-        attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
-        phase: "AFTER",
-      });
+      const repairPayload = isEditingRepairDetails
+        ? {
+            repairmanName: completionForm.repairmanName.trim(),
+            repairmanPhone: completionForm.repairmanPhone.trim(),
+            rootCause: completionForm.rootCause.trim(),
+            repairItems: completionForm.repairItems.trim(),
+            actualCost: amount,
+            costResponsibility: completionForm.costResponsibility,
+            costDescription: completionForm.repairItems.trim(),
+            completionNote: completionForm.completionNote.trim(),
+          }
+        : {};
+      if (isProposal) {
+        await updateMaintenanceRepairInfo(ticket.id, repairPayload);
+      } else {
+        const uploaded = await Promise.all(
+          completionForm.images.map((file) => uploadMaintenanceImage(file)),
+        );
+        const costResponsibility = isEditingRepairDetails
+          ? completionForm.costResponsibility
+          : ticket.costResponsibility;
+        await completeMaintenanceTicket(ticket.id, {
+          ...repairPayload,
+          collectionMethod:
+            costResponsibility === "TENANT"
+              ? completionForm.collectionMethod
+              : null,
+          billingPeriod:
+            costResponsibility === "TENANT" &&
+            completionForm.collectionMethod === "MONTHLY_SCHEDULED"
+              ? completionForm.billingPeriod
+              : null,
+          completionNote: completionForm.completionNote.trim(),
+          attachmentIds: uploaded.map((file) => file.fileId).filter(Boolean),
+          phase: "AFTER",
+        });
+      }
       setIsCompletionOpen(false);
       setCompletionTicket(null);
       await loadTickets();
@@ -909,6 +936,14 @@ export default function MaintenancePage() {
       setActionLoading("");
     }
   }
+
+  const isCompletionProposal = completionTicket?.status === "ACCEPTED";
+  const completionRepairDetailsEditable =
+    isCompletionProposal || editCompletionRepairDetails;
+  const completionCostResponsibility =
+    completionRepairDetailsEditable
+      ? completionForm.costResponsibility
+      : completionTicket?.costResponsibility || completionForm.costResponsibility;
 
   return (
     <section className="grid gap-6">
@@ -1058,7 +1093,7 @@ export default function MaintenancePage() {
                           },
                           ...roomOptions.map((room) => ({
                             value: room.id,
-                            label: `${room.label}${room.status ? ` · ${room.status}` : ""}`,
+                            label: `${room.label}${room.status ? ` · ${roomStatusLabel(room.status)}` : ""}`,
                           })),
                         ]}
                       />
@@ -1245,10 +1280,12 @@ export default function MaintenancePage() {
               <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
                 <DialogHeader className="gap-1 text-left">
                   <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
-                    Hoàn tất xử lý
+                    {isCompletionProposal ? "Lập phương án sửa chữa" : "Hoàn tất xử lý"}
                   </DialogTitle>
                   <DialogDescription className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    {completionTicket.ticketCode} · Ghi nhận kết quả sửa chữa.
+                    {completionTicket.ticketCode} · {isCompletionProposal
+                      ? "Nhập thông tin thợ và chi phí để gửi khách thuê quyết định."
+                      : "Ghi nhận kết quả sửa chữa."}
                   </DialogDescription>
                 </DialogHeader>
                 {error && <div className="mt-3"><InlineNotice type="error">{error}</InlineNotice></div>}
@@ -1262,6 +1299,7 @@ export default function MaintenancePage() {
                       <input
                         value={completionForm.repairmanName}
                         onChange={(event) => updateCompletionForm("repairmanName", event.target.value)}
+                        readOnly={!completionRepairDetailsEditable}
                         className={`${inputClassName()} pl-9`}
                         placeholder="Tên thợ hoặc nhân sự"
                       />
@@ -1273,6 +1311,7 @@ export default function MaintenancePage() {
                       <input
                         value={completionForm.repairmanPhone}
                         onChange={(event) => updateCompletionForm("repairmanPhone", event.target.value)}
+                        readOnly={!completionRepairDetailsEditable}
                         className={`${inputClassName()} pl-9`}
                         placeholder="SĐT liên hệ"
                       />
@@ -1280,9 +1319,9 @@ export default function MaintenancePage() {
                   </Field>
                   <Field label="Trách nhiệm chi phí">
                     <select
-                      value={completionTicket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionForm.costResponsibility}
+                      value={completionTicket.ticketScope === "PROPERTY_OPERATION" ? "OWNER" : completionCostResponsibility}
                       onChange={(event) => updateCompletionForm("costResponsibility", event.target.value)}
-                      disabled={completionTicket.ticketScope === "PROPERTY_OPERATION"}
+                      disabled={!completionRepairDetailsEditable || completionTicket.ticketScope === "PROPERTY_OPERATION"}
                       className={`${inputClassName()} disabled:bg-slate-50 disabled:text-slate-600`}
                     >
                       {COMPLETE_COST_RESPONSIBILITY_OPTIONS.map(([value, label]) => (
@@ -1292,7 +1331,7 @@ export default function MaintenancePage() {
                   </Field>
                 </div>
 
-                {completionForm.costResponsibility === "TENANT" && (
+                {!isCompletionProposal && completionCostResponsibility === "TENANT" && (
                   <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
                     <Field label="Cách thu tiền *">
                       <select
@@ -1320,41 +1359,53 @@ export default function MaintenancePage() {
                     <textarea
                       value={completionForm.rootCause}
                       onChange={(event) => updateCompletionForm("rootCause", event.target.value)}
+                      readOnly={!completionRepairDetailsEditable}
                       className={textareaClassName()}
                       placeholder="Nguyên nhân sự cố"
                     />
                   </Field>
-                  <Field label="Hạng mục đã sửa *">
+                  <Field label={isCompletionProposal ? "Hạng mục dự kiến sửa *" : "Hạng mục đã sửa *"}>
                     <textarea
                       value={completionForm.repairItems}
                       onChange={(event) => updateCompletionForm("repairItems", event.target.value)}
+                      readOnly={!completionRepairDetailsEditable}
                       className={textareaClassName()}
-                      placeholder="Các việc đã xử lý"
+                      placeholder={isCompletionProposal ? "Các việc dự kiến thực hiện" : "Các việc đã xử lý"}
                     />
                   </Field>
                 </div>
 
                 <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2">
-                  <Field label="Chi phí thực tế (VNĐ)">
+                  <Field label={isCompletionProposal ? "Chi phí dự kiến (VNĐ) *" : "Chi phí thực tế (VNĐ)"}>
                     <input
                       value={completionForm.actualCost}
                       onChange={(event) => updateCompletionForm("actualCost", event.target.value)}
+                      readOnly={!completionRepairDetailsEditable}
                       className={`${inputClassName()} tabular-nums`}
                       inputMode="numeric"
                       placeholder="0"
                     />
                   </Field>
-                  <Field label="Ghi chú hoàn tất">
+                  <Field label={isCompletionProposal ? "Ghi chú gửi khách" : "Ghi chú hoàn tất"}>
                     <input
                       value={completionForm.completionNote}
                       onChange={(event) => updateCompletionForm("completionNote", event.target.value)}
                       className={inputClassName()}
-                      placeholder="Ghi chú hoàn tất nếu có"
+                      placeholder={isCompletionProposal ? "Thông tin thêm cho khách thuê" : "Ghi chú hoàn tất nếu có"}
                     />
                   </Field>
                 </div>
 
-                <CompletionImageSection
+                {!isCompletionProposal && !editCompletionRepairDetails && (
+                  <button
+                    type="button"
+                    onClick={() => setEditCompletionRepairDetails(true)}
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-[#cbd5e1] px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+                  >
+                    Chỉnh sửa thông tin thực tế
+                  </button>
+                )}
+                {!isCompletionProposal && <CompletionImageSection
                   existingAttachments={completionTicket.afterAttachments}
                   files={completionForm.images}
                   onChange={handleCompletionImages}
@@ -1366,7 +1417,7 @@ export default function MaintenancePage() {
                       ),
                     }))
                   }
-                />
+                />}
               </div>
 
               <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 sm:flex-row sm:justify-end dark:border-white/10 dark:bg-white/[0.03]">
@@ -1384,7 +1435,7 @@ export default function MaintenancePage() {
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {actionLoading === `complete-${completionTicket.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
-                  Xác nhận hoàn tất
+                  {isCompletionProposal ? "Gửi phương án cho khách" : "Xác nhận hoàn tất"}
                 </button>
               </div>
             </form>
@@ -1520,7 +1571,7 @@ export default function MaintenancePage() {
                         {ticket.roomCode ||
                           ticket.roomName ||
                           SCOPE_LABELS[ticket.ticketScope] ||
-                          ticket.ticketScope}
+                          "Khu vực chưa xác định"}
                       </p>
                     </td>
                     <td
@@ -1650,11 +1701,11 @@ export default function MaintenancePage() {
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleStartProgress(ticket.id)}
+                                  onClick={() => handleStartProgress(ticket)}
                                   disabled={Boolean(actionLoading)}
                                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-300 dark:hover:bg-blue-500/10"
                                 >
-                                  {actionLoading === `progress-${ticket.id}` ? (
+                                    {actionLoading === `complete-${ticket.id}` ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Wrench className="h-4 w-4" />

@@ -10,10 +10,13 @@ export function isLeaseSignedUploadDisabled({
 export function getContractActivationReadiness({
   leaseSignedFileId = null,
   requiresMoveInHandover = true,
+  requiresActivationReading = undefined,
   hasHandoverData = false,
   handoverSignedFileId = null,
   activationReadingReady = undefined,
 } = {}) {
+  const shouldRequireActivationReading =
+    requiresActivationReading ?? requiresMoveInHandover;
   const requirements = [
     /* ...(hasDeposit
       ? [
@@ -29,7 +32,7 @@ export function getContractActivationReadiness({
       label: "Hợp đồng thuê đã ký",
       complete: Boolean(leaseSignedFileId),
     },
-    ...(requiresMoveInHandover && activationReadingReady !== undefined
+    ...(shouldRequireActivationReading && activationReadingReady !== undefined
       ? [
           {
             key: "activation-reading",

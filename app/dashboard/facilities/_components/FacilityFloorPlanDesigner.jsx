@@ -184,7 +184,7 @@ function layoutFromSavedItems(floor, savedItems) {
       id: blockIdFromSavedItem(item, index),
       persistedId: valueOf(item, "id"),
       type: itemType || "UTILITY",
-      label: metadata.label ?? valueOf(item, "label") ?? BLOCK_TYPES[itemType]?.label ?? itemType,
+      label: metadata.label ?? valueOf(item, "label") ?? BLOCK_TYPES[itemType]?.label ?? "Hạng mục khác",
     });
   });
 
@@ -219,7 +219,7 @@ function floorPlanItemsFromState(rooms, blocks) {
     width: Math.round(Number(block.width) || BLOCK_TYPES[block.type]?.width || 80),
     height: Math.round(Number(block.height) || BLOCK_TYPES[block.type]?.height || 80),
     metadata: {
-      label: block.label ?? BLOCK_TYPES[block.type]?.label ?? block.type,
+      label: block.label ?? BLOCK_TYPES[block.type]?.label ?? "Hạng mục khác",
       rotation: 0,
       sortOrder: roomItems.length + index,
       orientation: normalizeOrientation(block.orientation, block.width, block.height),

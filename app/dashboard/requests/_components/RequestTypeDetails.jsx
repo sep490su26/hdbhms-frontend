@@ -312,7 +312,7 @@ export function TransferRequestDetail({ payload, transfer }) {
                 <InfoField label="Phòng cũ" value={currentRoomLabel} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Phòng muốn chuyển" value={targetRoomLabel} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Hợp đồng sau chuyển" value={contractTarget} icon={<FileText className="w-4 h-4" />} />
-                <InfoField label="Ngày dự kiến" value={formatDateValue(transferDate)} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Tháng chuyển dự kiến" value={formatDateValue(transferDate)} icon={<Calendar className="w-4 h-4" />} />
                 <InfoField label="Hình thức chuyển" value={transferType} icon={<ArrowRightLeft className="w-4 h-4" />} />
                 <InfoField label="Người chuyển" value={currentHolder} icon={<User className="w-4 h-4" />} />
                 <InfoField label="Holder phòng cũ được đề cử" value={targetHolder} icon={<User className="w-4 h-4" />} />
@@ -430,7 +430,7 @@ export function ExpenseApprovalRequestDetail({ payload }) {
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-500/10">
                     <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Quy trình hoàn cọc</p>
                     <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
-                        Sau khi chủ trọ duyệt, chủ trọ hoặc quản lý hoàn tiền ngoài hệ thống, upload minh chứng và hệ thống sẽ gửi thông báo để khách thuê xác nhận đã nhận tiền.
+                        Sau khi chủ trọ duyệt, yêu cầu chuyển sang khách thuê để xác nhận đã nhận tiền. Không cần thao tác ghi nhận đã thanh toán từ chủ trọ hoặc quản lý.
                     </p>
                 </div>
             )}

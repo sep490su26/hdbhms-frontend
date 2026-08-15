@@ -21,7 +21,7 @@ const money = new Intl.NumberFormat("vi-VN");
 function getStatusLabel(status) {
   return (
     facilityStatusOptions.find((option) => option.value === status)?.label ||
-    status
+    "Chưa xác định"
   );
 }
 

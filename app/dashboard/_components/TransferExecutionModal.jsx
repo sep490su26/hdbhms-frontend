@@ -78,6 +78,22 @@ async function loadConfirmedHandover(contractId, handoverType) {
     return isConfirmedHandover(handover);
 }
 
+async function loadTransferInHandover(contractId) {
+    if (!contractId) return {ready: false, type: null};
+    const transferIn = await fetchContractHandover(contractId, "TRANSFER_IN").catch(() => null);
+    if (isConfirmedHandover(transferIn)) {
+        return {ready: true, type: "TRANSFER_IN"};
+    }
+
+    // The target-room handover is confirmed during contract activation.
+    const moveIn = await fetchContractHandover(contractId, "MOVE_IN").catch(() => null);
+    const moveInReady = isConfirmedHandover(moveIn);
+    return {
+        ready: moveInReady,
+        type: moveInReady ? "MOVE_IN" : null,
+    };
+}
+
 export function isTransferExecutionStatus(status) {
     return EXECUTION_STATUSES.has(status);
 }
@@ -162,16 +178,22 @@ export default function TransferExecutionModal({
 
                 const phase = transfer.status === "WAITING_EXECUTION" ? "COMPLETE_TRANSFER" : "MOVE_OUT";
                 const targetContractId = transfer.newContractId || transfer.targetContractId || null;
-                const [transferOutReady, transferInReady] = await Promise.all([
+                const [transferOutReady, transferInState] = await Promise.all([
                     phase === "MOVE_OUT"
                         ? loadConfirmedHandover(transfer.oldContractId, "TRANSFER_OUT")
                         : Promise.resolve(false),
                     phase === "COMPLETE_TRANSFER" && requiresFullMoveIn(transfer)
-                        ? loadConfirmedHandover(targetContractId, "TRANSFER_IN")
-                        : Promise.resolve(false),
+                        ? loadTransferInHandover(targetContractId)
+                        : Promise.resolve({ready: false, type: null}),
                 ]);
                 if (cancelled) return;
-                setExecution({transfer, phase, transferOutReady, transferInReady});
+                setExecution({
+                    transfer,
+                    phase,
+                    transferOutReady,
+                    transferInReady: transferInState.ready,
+                    transferInHandoverType: transferInState.type,
+                });
             } catch (error) {
                 toast.error(error?.message || "Không tải được chi tiết chuyển phòng.");
                 onClose?.();
@@ -477,7 +499,12 @@ export default function TransferExecutionModal({
                                     </div>
 
                                     {requiresFullMoveIn(transfer) ? (
-                                        <ContractHandoverSection
+                                        execution?.transferInReady ? (
+                                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+                                                Ban giao phong moi da duoc xac nhan trong buoc kich hoat hop dong. Khong can nhap lai khi hoan tat yeu cau.
+                                            </div>
+                                        ) : (
+                                            <ContractHandoverSection
                                             contractId={targetContractId}
                                             roomId={transfer?.targetRoomId}
                                             roomCode={transfer?.targetRoomName || transfer?.targetRoomCode}
@@ -491,7 +518,8 @@ export default function TransferExecutionModal({
                                             confirmOnSave={false}
                                             onLoaded={handleTransferInLoaded}
                                             onSaved={handleTransferInSaved}
-                                        />
+                                            />
+                                        )
                                     ) : (
                                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
                                             Ca này không cần check-in phòng mới dạng hợp đồng mới. Bấm hoàn tất để chuyển trạng thái theo backend.

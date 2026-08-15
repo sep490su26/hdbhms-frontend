@@ -48,6 +48,7 @@ import {
 import { DashboardStatCard } from "@/components/dashboard/DashboardStatCard";
 import { DashboardPagination } from "@/components/dashboard/DashboardPagination";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import { enumLabel } from "@/lib/enumLabels";
 
 const emptyForm = {
   fullName: "",
@@ -332,7 +333,7 @@ function TrashModal({ rows, pagination, onClose, onRestore, onForceDelete, onPag
                   <td className="px-5 py-4 text-[#374151]">{customer.propertyName}</td>
                   <td className="px-5 py-4 text-[#374151]">{customer.interestedRoomName || "Chưa chọn phòng"}</td>
                   <td className="px-5 py-4 font-bold text-[#111827]">{customer.appointmentLabel || "—"}</td>
-                  <td className="px-5 py-4 text-[#374151]">{VIEWING_STATUSES[customer.status] || customer.status}</td>
+                  <td className="px-5 py-4 text-[#374151]">{enumLabel(customer.status, VIEWING_STATUSES, "Chưa xác định")}</td>
                   <td className="px-5 py-4 text-[#374151]">{customer.deletedLabel || "—"}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">

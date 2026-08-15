@@ -538,7 +538,7 @@ const OCCUPANT_ROLE_LABELS = {
 };
 
 function contractStatusLabel(status) {
-    return CONTRACT_STATUS_LABELS[status] || status || "Chưa rõ";
+    return CONTRACT_STATUS_LABELS[String(status || "").trim().toUpperCase()] || "Chưa rõ";
 }
 
 function RentalHistoryPanel({history, isLoading, error}) {

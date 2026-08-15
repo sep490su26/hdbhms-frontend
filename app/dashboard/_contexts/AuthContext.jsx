@@ -34,7 +34,7 @@ function normalizeUser(user, fallbackRole = null) {
     name: displayName,
     avatarUrl: user.avatarUrl || user.avatar_url || null,
     role,
-    roleLabel: ROLE_LABELS[role] || user.role || fallbackRole || "Khong ro",
+    roleLabel: ROLE_LABELS[role] || "Chưa xác định",
   };
 }
 

@@ -263,7 +263,7 @@ const VARIABLE_LABELS = {
   depositDetails: "Chi tiết đặt cọc",
   depositReference: "Mã đặt cọc",
   dueDate: "Hạn xử lý",
-  expectedTransferDate: "Ngày chuyển dự kiến",
+  expectedTransferDate: "Tháng chuyển dự kiến",
   expectedLeaseSignDate: "Ngày ký hợp đồng dự kiến",
   expectedMoveInDate: "Ngày vào ở dự kiến",
   loginIdentifier: "Tên đăng nhập",
@@ -284,7 +284,7 @@ const VARIABLE_LABELS = {
   recipientProfileId: "ID hồ sơ người nhận",
   requestCode: "Mã yêu cầu",
   requestId: "ID yêu cầu",
-  requestedTransferDate: "Ngày yêu cầu chuyển",
+  requestedTransferDate: "Tháng yêu cầu chuyển",
   requesterUserId: "ID người yêu cầu",
   resolutionNote: "Ghi chú xử lý",
   roomName: "Tên phòng",
@@ -323,7 +323,7 @@ function getErrorMessage(error) {
 }
 
 function optionLabel(options, value) {
-  return options.find((item) => item.value === value)?.label ?? value;
+  return options.find((item) => item.value === value)?.label ?? "Chưa xác định";
 }
 
 function localizeDefinition(definition) {
@@ -435,7 +435,7 @@ function templateTokenDeletionRange(value, range, event) {
 }
 
 function variableLabel(name) {
-  return VARIABLE_LABELS[name] ?? name;
+  return VARIABLE_LABELS[name] ?? "Thông tin khác";
 }
 
 function tokenChip(token) {

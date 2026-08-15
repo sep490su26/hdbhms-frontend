@@ -184,6 +184,7 @@ export async function fetchUtilityBillingRuns(filters = {}) {
   if (filters.billingPeriod) params.set("billingPeriod", filters.billingPeriod);
   if (filters.propertyId) params.set("propertyId", filters.propertyId);
   if (filters.status && filters.status !== "ALL") params.set("status", filters.status);
+  if (filters.invoiceReason) params.set("invoiceReason", filters.invoiceReason);
   const query = params.toString();
   const data = await authenticatedFetch(`${API_BASE_URL}/admin/utility-billing-runs${query ? `?${query}` : ""}`);
   return Array.isArray(data) ? data.map(normalizeUtilityBillingRun) : [];

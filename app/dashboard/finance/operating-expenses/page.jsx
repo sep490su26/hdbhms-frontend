@@ -32,6 +32,7 @@ import { useTheme } from "../../_contexts/ThemeContext";
 import { compareByNewest } from "@/lib/sortByNewest.mjs";
 import { fetchAllExpenseRequests } from "@/services/expenseReportService";
 import { formatThousandVND } from "../_lib/formatters";
+import { enumLabel } from "@/lib/enumLabels";
 
 const money = new Intl.NumberFormat("vi-VN");
 const PERIOD_COUNT = 6;
@@ -267,7 +268,7 @@ function normalizeExpenseRow(item = {}) {
     detail: item.description || "Khoản chi vận hành",
     amount: Number(item.amount) || 0,
     status: item.status || "",
-    statusLabel: statusLabels[item.status] || item.status || "Chưa rõ",
+    statusLabel: enumLabel(item.status, statusLabels, "Chưa rõ"),
   };
 }
 

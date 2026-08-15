@@ -53,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import { enumLabel } from "@/lib/enumLabels";
 
 const emptyForm = {
   fullName: "",
@@ -97,7 +98,7 @@ function StatusSelect({ status, onChange }) {
           className={`inline-flex h-8 w-full max-w-[132px] items-center justify-between gap-2 rounded-full border px-3 text-xs font-bold outline-none transition hover:brightness-95 ${styles[status] || styles.NOT_VIEWED}`}
         >
           <span className="truncate">
-            {currentStatus?.label || VIEWING_STATUSES[status] || status}
+            {currentStatus?.label || enumLabel(status, VIEWING_STATUSES, "Chưa xác định")}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
         </button>
@@ -400,7 +401,7 @@ function TrashModal({
                     data-label="Trạng thái"
                     className="px-5 py-4 text-slate-700 dark:text-slate-200"
                   >
-                    {VIEWING_STATUSES[customer.status] || customer.status}
+                    {enumLabel(customer.status, VIEWING_STATUSES, "Chưa xác định")}
                   </td>
                   <td
                     data-label="Ngày xóa"
@@ -575,7 +576,7 @@ function CustomerDetailModal({ customer, onClose }) {
             />
             <DetailItem
               label="Trạng thái"
-              value={VIEWING_STATUSES[customer.status] || customer.status}
+              value={enumLabel(customer.status, VIEWING_STATUSES, "Chưa xác định")}
             />
           </div>
           <div className="py-3">

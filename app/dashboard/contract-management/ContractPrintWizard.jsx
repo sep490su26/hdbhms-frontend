@@ -7,6 +7,20 @@ import {buildLeaseContractDocumentFilename} from "@/services/leaseContractsServi
 import {fetchRoomAssets, createRoomAsset, updateRoomAsset} from "@/services/roomAssetsService";
 import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
 
+const CONTRACT_STATUS_LABELS = {
+    ACTIVE: "Đang hiệu lực",
+    DRAFT: "Bản nháp",
+    PENDING_SIGNATURE: "Chờ ký",
+    SIGNED: "Đã ký",
+    EXPIRING_SOON: "Sắp hết hạn",
+    TERMINATION_PENDING: "Chờ thanh lý",
+    LIQUIDATED: "Đã thanh lý",
+    EXPIRED: "Hết hạn",
+    RENEWED: "Đã gia hạn",
+    TRANSFERRED: "Đã chuyển phòng",
+    CANCELLED: "Đã hủy",
+};
+
 const OWNER_INFO = {
     fullName: "ĐẶNG VĂN NHUẬN",
     birthDate: "06/08/1978",
@@ -61,6 +75,10 @@ function formatMoney(value) {
     const number = Number(value);
     if (!Number.isFinite(number)) return "..........";
     return new Intl.NumberFormat("vi-VN", {maximumFractionDigits: 0}).format(number);
+}
+
+function contractStatusLabel(value) {
+    return CONTRACT_STATUS_LABELS[String(value || "").trim().toUpperCase()] || "Chưa xác định";
 }
 
 function escapeHtml(value) {
@@ -493,7 +511,7 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                     <h2 className="mt-3 text-2xl font-extrabold">{form.contractCode || "Chưa có mã hợp đồng"}</h2>
                     <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
                         <span
-                            className="rounded-full bg-white/10 px-3 py-1">Hợp đồng {contract?.status || "DRAFT"}</span>
+                            className="rounded-full bg-white/10 px-3 py-1">Hợp đồng {contractStatusLabel(contract?.status || "DRAFT")}</span>
                         <span
                             className="rounded-full bg-white/10 px-3 py-1">Phòng {form.roomCode || "chưa cập nhật"}</span>
                         <span

@@ -91,3 +91,18 @@ test("activation reading checklist uses UTF-8 Vietnamese text", () => {
     "Chỉ số điện đầu kỳ",
   );
 });
+
+test("transfer replacement activation can require electricity without move-in handover", () => {
+  const readiness = getContractActivationReadiness({
+    leaseSignedFileId: 12,
+    requiresMoveInHandover: false,
+    requiresActivationReading: true,
+    activationReadingReady: true,
+  });
+
+  assert.equal(readiness.ready, true);
+  assert.deepEqual(
+    readiness.requirements.map((item) => item.key),
+    ["lease", "activation-reading"],
+  );
+});

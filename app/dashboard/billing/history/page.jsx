@@ -20,6 +20,7 @@ import DateInput from "@/components/DateInput";
 import { DashboardPageHeader } from "@/components/dashboard/DashboardPageHeader";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { toDate } from "@/lib/dateFormat";
+import { enumLabel } from "@/lib/enumLabels";
 
 const money = new Intl.NumberFormat("vi-VN");
 
@@ -42,6 +43,9 @@ const STATUS_LABELS = {
   DUPLICATE: "Trùng giao dịch",
   REJECTED: "Từ chối",
   REFUNDED: "Đã hoàn",
+  ISSUED: "Chờ thanh toán",
+  OVERDUE: "Quá hạn",
+  PAID: "Đã thanh toán",
 };
 
 function emptyFilters() {
@@ -71,11 +75,11 @@ function formatDateTime(value) {
 }
 
 function typeLabel(value) {
-  return TYPE_LABELS[value] || value || "Khác";
+  return enumLabel(value, TYPE_LABELS, "Khác");
 }
 
 function statusLabel(value) {
-  return STATUS_LABELS[value] || value || "Chưa rõ";
+  return enumLabel(value, STATUS_LABELS, "Chưa rõ");
 }
 
 export default function TransactionHistoryPage() {

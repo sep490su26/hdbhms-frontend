@@ -9,6 +9,7 @@ import {
   uploadCurrentUserAvatar,
 } from "@/services/identityAccessService";
 import {readCachedProfile, writeCachedProfile} from "@/lib/profileCache";
+import {ROLE_LABELS, normalizeRole} from "@/app/dashboard/_lib/rbac";
 
 const DUPLICATE_MESSAGE = "SĐT/email đã được đăng ký bởi tài khoản khác";
 const INVALID_IMAGE_MESSAGE = "File ảnh không hợp lệ";
@@ -26,6 +27,11 @@ function firstValue(source, keys, fallback = "") {
 
 export function normalizeProfile(source, fallback = {}) {
   const merged = {...fallback, ...source};
+  const rawPosition = firstValue(
+    merged,
+    ["position", "positionName", "position_name", "roleLabel", "role"],
+  );
+  const normalizedPositionRole = normalizeRole(rawPosition);
 
   return {
     ...merged,
@@ -46,10 +52,7 @@ export function normalizeProfile(source, fallback = {}) {
       "facilityName",
       "facility_name",
     ]),
-    position: firstValue(
-      merged,
-      ["position", "positionName", "position_name", "roleLabel", "role"],
-    ),
+    position: ROLE_LABELS[normalizedPositionRole] || rawPosition || "Chưa xác định",
     startDate: firstValue(merged, [
       "startDate",
       "start_date",

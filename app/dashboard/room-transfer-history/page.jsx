@@ -644,7 +644,7 @@ export default function RoomTransferHistoryPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Thông tin khách</TableHead>
                   <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Lộ trình chuyển</TableHead>
-                  <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Ngày chuyển</TableHead>
+                  <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Tháng chuyển</TableHead>
                   <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Người duyệt</TableHead>
                   <TableHead className="whitespace-normal px-3 py-4 font-black sm:px-4 lg:px-5">Lý do</TableHead>
                 </TableRow>

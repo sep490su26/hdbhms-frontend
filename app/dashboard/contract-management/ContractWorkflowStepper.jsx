@@ -355,7 +355,16 @@ export default function ContractWorkflowStepper({
     const isRenewalContract = Boolean(
         contractDetails?.previousContractId ?? contractDetails?.previous_contract_id,
     );
-    const requiresMoveInHandover = !isRenewalContract;
+    const isTransferReSignContract = Boolean(
+        contractDetails?.transferRequestId && isRenewalContract,
+    );
+    const isTransferTargetContract =
+        isTransferReSignContract &&
+        contractDetails?.transferContractRole !== "REPLACEMENT_OLD_CONTRACT";
+    const requiresActivationReading =
+        !isRenewalContract || isTransferReSignContract;
+    const requiresMoveInHandover =
+        !isRenewalContract || isTransferTargetContract;
 
     useEffect(() => {
         const persistedValue =
@@ -379,7 +388,7 @@ export default function ContractWorkflowStepper({
     ]);
 
     useEffect(() => {
-        if (!contractId || !requiresMoveInHandover) return undefined;
+        if (!contractId || !requiresActivationReading) return undefined;
 
         const trimmedValue = String(activationReading ?? "").trim();
         const currentValue = trimmedValue === "" ? null : Number(trimmedValue);
@@ -427,7 +436,7 @@ export default function ContractWorkflowStepper({
         contractDetails?.activation_electricity_value,
         contractDetails?.activation_reading_date,
         contractId,
-        requiresMoveInHandover,
+        requiresActivationReading,
     ]);
 
     useEffect(() => {
@@ -495,14 +504,15 @@ export default function ContractWorkflowStepper({
         ? "PDF toi da 15 MB - can upload truoc khi kich hoat"
         : "Mo sau khi hoan tat thong tin ban giao";
     const activationReadingReady =
-        !requiresMoveInHandover ||
+        !requiresActivationReading ||
         (activationReading !== "" &&
             Number.isFinite(Number(activationReading)) &&
             Number(activationReading) >= 0);
-    const leaseDraftReady = !requiresMoveInHandover || activationReadingReady;
+    const leaseDraftReady = !requiresActivationReading || activationReadingReady;
     const readiness = getContractActivationReadiness({
         leaseSignedFileId,
         requiresMoveInHandover,
+        requiresActivationReading,
         hasHandoverData: handoverReady,
         handoverSignedFileId: signedHandoverReady ? handoverSignedFileId : null,
         activationReadingReady,
@@ -520,7 +530,7 @@ export default function ContractWorkflowStepper({
     const missingCount = readiness.totalCount - readiness.completedCount;
 
     async function handleActivation() {
-        if (requiresMoveInHandover && !activationReadingReady) {
+        if (requiresActivationReading && !activationReadingReady) {
             toast.error("Vui lòng nhập chỉ số điện đầu kỳ.");
             return;
         }
@@ -531,7 +541,7 @@ export default function ContractWorkflowStepper({
         }
         try {
             await onActivate?.({
-                electricity: requiresMoveInHandover
+                electricity: requiresActivationReading
                     ? {
                         currentValue: Number(activationReading),
                         photoFileId,
@@ -601,7 +611,7 @@ export default function ContractWorkflowStepper({
 
     async function handleDownloadLease() {
         if (!contractId) return;
-        if (requiresMoveInHandover && !activationReadingReady) {
+        if (requiresActivationReading && !activationReadingReady) {
             toast.error("Nhap chi so dien dau ky truoc khi tai hop dong.");
             return;
         }
@@ -610,7 +620,7 @@ export default function ContractWorkflowStepper({
             await downloadLeaseContractDraftPdf(
                 contractId,
                 buildLeaseContractDocumentFilename(contractDetails),
-                requiresMoveInHandover
+                requiresActivationReading
                     ? {electricityValue: Number(activationReading)}
                     : undefined,
             );
@@ -744,7 +754,7 @@ export default function ContractWorkflowStepper({
                 </div>
             </section>
 
-            {requiresMoveInHandover && (
+            {requiresActivationReading && (
                 <section className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/50 shadow-[0_5px_16px_rgba(16,24,40,0.04)] dark:border-blue-400/20 dark:bg-blue-400/[0.06]">
                     <PanelHeader
                         kicker="Chỉ số đầu kỳ"

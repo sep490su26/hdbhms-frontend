@@ -61,7 +61,9 @@ function formatDate(value) {
 }
 
 function roleLabel(role) {
-  return role === "PRIMARY" ? "Người ký chính" : "Người ở cùng";
+  if (role === "PRIMARY") return "Người ký chính";
+  if (role === "CO_OCCUPANT") return "Người ở cùng";
+  return "Chưa xác định";
 }
 
 function roleClass(role) {

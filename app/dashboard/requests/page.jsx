@@ -564,8 +564,8 @@ function buildRequiredSigningDocuments(transfer) {
       kind: "target",
       label:
         transfer.targetTransferType === "OTHER_CONTRACT"
-          ? "Thoa thuan chuyen vao phong dich"
-          : "Hop dong phong dich",
+          ? `Thoả thuận chuyển vào phòng đã chọn`
+          : "Hợp đồng phòng chuyển đến",
     });
   }
   if (transfer.replacementOldContractId) {
@@ -586,7 +586,7 @@ function getTransferSigningDocuments(transfer) {
 }
 
 function isTransferSigningDocumentSigned(document) {
-  return document?.contractStatus === "SIGNED";
+  return ["SIGNED", "ACTIVE"].includes(document?.contractStatus);
 }
 
 function allTransferSigningDocumentsSigned(transfer) {
@@ -968,6 +968,10 @@ export default function ApprovalCenter() {
   };
 
   const openPaymentModal = (req) => {
+    if (isLiquidationRefundExpenseRequest(req)) {
+      window.alert("Khoản hoàn cọc thanh lý chỉ chờ khách thuê xác nhận đã nhận tiền.");
+      return;
+    }
     setPaymentModal(req);
     setPaymentForm({
       paymentDate: new Date().toISOString().slice(0, 10),
@@ -979,6 +983,11 @@ export default function ApprovalCenter() {
 
   const handleMarkExpensePaid = async () => {
     if (!paymentModal) return;
+    if (isLiquidationRefundExpenseRequest(paymentModal)) {
+      window.alert("Khoản hoàn cọc thanh lý chỉ chờ khách thuê xác nhận đã nhận tiền.");
+      setPaymentModal(null);
+      return;
+    }
     const expenseId = getExpenseIdFromRequest(paymentModal);
     if (!expenseId) {
       window.alert("Không xác định được khoản chi cần ghi nhận.");
@@ -1164,7 +1173,20 @@ export default function ApprovalCenter() {
     }
     setActionLoading(`sign-transfer-contract-document-${document.id}`);
     try {
-      await signTransferContractDocument(detailTransfer.id, document.id);
+      // The modal may have been left open while another screen activated the
+      // contracts, so refresh before sending a potentially stale signing action.
+      const latestTransfer = await loadTransferDetail(detailModal);
+      setDetailTransfer(latestTransfer);
+      if (!isTransferSigningStatus(latestTransfer?.status)) {
+        return;
+      }
+      const latestDocument = getTransferSigningDocuments(latestTransfer).find(
+        (item) => item.id === document.id,
+      );
+      if (!latestDocument?.signedFileId || isTransferSigningDocumentSigned(latestDocument)) {
+        return;
+      }
+      await signTransferContractDocument(latestTransfer.id, latestDocument.id);
       const refreshedTransfer = await loadTransferDetail(detailModal);
       setDetailTransfer(refreshedTransfer);
       await loadData();
@@ -1534,7 +1556,8 @@ export default function ApprovalCenter() {
                             </>
                           )}
                           {isExpenseApprovalRequest(req) &&
-                            req.status === "APPROVED" && (
+                            req.status === "APPROVED" &&
+                            !isLiquidationRefundExpenseRequest(req) && (
                               <Button
                                 size="sm"
                                 onClick={() => openPaymentModal(req)}
@@ -1602,7 +1625,8 @@ export default function ApprovalCenter() {
             </div>
             {(canResolveRequest(detailModal, isOwner) ||
               (isExpenseApprovalRequest(detailModal) &&
-                detailModal.status === "APPROVED") ||
+                detailModal.status === "APPROVED" &&
+                !isLiquidationRefundExpenseRequest(detailModal)) ||
               (detailModal.requestType === "ROOM_TRANSFER" &&
                 detailTransfer)) && (
               <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 flex flex-wrap items-center justify-end gap-3 dark:border-white/10 dark:bg-[#0f172a]">
@@ -1636,7 +1660,8 @@ export default function ApprovalCenter() {
                   </>
                 )}
                 {isExpenseApprovalRequest(detailModal) &&
-                  detailModal.status === "APPROVED" && (
+                  detailModal.status === "APPROVED" &&
+                  !isLiquidationRefundExpenseRequest(detailModal) && (
                     <Button
                       onClick={() => openPaymentModal(detailModal)}
                       disabled={Boolean(actionLoading)}
@@ -1734,6 +1759,7 @@ export default function ApprovalCenter() {
                               {document.signedFileId ? "Upload lại" : "Upload"}
                             </Button>
                             <Button
+                              type="button"
                               onClick={() =>
                                 handleSignTransferContractDocument(document)
                               }
@@ -1771,6 +1797,7 @@ export default function ApprovalCenter() {
                         ) && (
                           <div className="flex flex-col items-end gap-1">
                             <Button
+                              type="button"
                               onClick={handleSignTransferContract}
                               disabled={
                                 Boolean(actionLoading) ||

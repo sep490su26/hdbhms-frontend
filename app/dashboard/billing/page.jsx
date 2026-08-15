@@ -42,6 +42,7 @@ import {
 } from "@/services/billingService";
 import { fetchManagementRoomCatalog } from "@/services/managementRoomsService";
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
+import { enumLabel } from "@/lib/enumLabels";
 
 const money = new Intl.NumberFormat("vi-VN");
 const FORM_CONTROL_CLASS =
@@ -51,6 +52,8 @@ const STATUS_LABELS = {
   ISSUED: "Chờ thanh toán",
   PAID: "Đã thanh toán",
   OVERDUE: "Quá hạn",
+  PARTIALLY_PAID: "Thanh toán một phần",
+  VOIDED: "Đã hủy",
 };
 
 const TYPE_LABELS = {
@@ -148,11 +151,11 @@ function formatMoney(value) {
 
 
 function statusLabel(value) {
-  return STATUS_LABELS[value] || value || "Chưa rõ";
+  return enumLabel(value, STATUS_LABELS, "Chưa rõ");
 }
 
 function typeLabel(value) {
-  return TYPE_LABELS[value] || value || "Khác";
+  return enumLabel(value, TYPE_LABELS, "Khác");
 }
 
 function invoiceStatusClasses(status) {

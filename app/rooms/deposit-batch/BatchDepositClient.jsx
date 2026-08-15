@@ -115,6 +115,7 @@ function validateField(name, value, form = {}) {
   const maxScheduleDate = todayValue(MAX_DEPOSIT_SCHEDULE_DAYS);
   const requiredMessages = {
     contractTermMonths: "Vui lòng nhập thời hạn hợp đồng.",
+    paymentCycleMonths: "Vui lòng chọn chu kỳ thanh toán.",
     fullName: "Vui lòng nhập họ và tên.",
     dob: "Vui lòng chọn ngày sinh.",
     gender: "Vui lòng chọn giới tính.",
@@ -145,6 +146,17 @@ function validateField(name, value, form = {}) {
   }
   if (name === "contractTermMonths" && (!/^\d+$/.test(normalized) || Number(normalized) < 6)) {
     return "Thời hạn hợp đồng tối thiểu là 6 tháng.";
+  }
+  if (name === "paymentCycleMonths" && !["1", "3"].includes(normalized)) {
+    return "Chu kỳ thanh toán chỉ được chọn 1 hoặc 3 tháng.";
+  }
+  if (
+    (name === "contractTermMonths" || name === "paymentCycleMonths") &&
+    /^\d+$/.test(String(form.contractTermMonths || "").trim()) &&
+    ["1", "3"].includes(String(form.paymentCycleMonths || "").trim()) &&
+    Number(form.contractTermMonths) % Number(form.paymentCycleMonths) !== 0
+  ) {
+    return "Thời hạn hợp đồng phải là bội số của chu kỳ thanh toán.";
   }
   if (name === "gender" && !GENDER_OPTIONS.includes(normalized)) {
     return requiredMessages.gender;
@@ -875,6 +887,11 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
     setFieldErrors((current) => ({
       ...current,
       [name]: validateField(name, value, nextForm),
+      ...(name === "contractTermMonths"
+        ? { paymentCycleMonths: validateField("paymentCycleMonths", nextForm.paymentCycleMonths, nextForm) }
+        : name === "paymentCycleMonths"
+          ? { contractTermMonths: validateField("contractTermMonths", nextForm.contractTermMonths, nextForm) }
+          : {}),
       ...(name === "dob" && nextForm.idIssueDate
         ? { idIssueDate: validateField("idIssueDate", nextForm.idIssueDate, nextForm) }
         : {}),
@@ -1013,6 +1030,7 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
       "expectedMoveInDate",
       "expectedLeaseSignDate",
       "contractTermMonths",
+      "paymentCycleMonths",
     ].forEach((name) => {
       const message = validateField(name, form[name], form);
       if (message) nextErrors[name] = message;
@@ -1025,9 +1043,6 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
     const propertyIds = new Set(rooms.map((room) => String(room.propertyId || room.buildingId || "")));
     if (propertyIds.size > 1) {
       nextErrors.rooms = "Các phòng trong một lần đặt cọc phải cùng một cơ sở.";
-    }
-    if (!["1", "3"].includes(String(form.paymentCycleMonths))) {
-      nextErrors.paymentCycleMonths = "Chu kỳ thanh toán chỉ được là 1 hoặc 3 tháng.";
     }
     [
       ["front", "Vui lòng tải lên ảnh mặt trước CCCD."],

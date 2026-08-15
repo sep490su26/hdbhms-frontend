@@ -330,7 +330,7 @@ function getDepositRefundStatusLabel(value) {
     NOT_REQUIRED: "Không cần hoàn cọc",
     CANCELLED: "Đã hủy",
   };
-  return map[value] || value || "Chưa tạo yêu cầu";
+  return map[String(value || "").trim().toUpperCase()] || "Chưa tạo yêu cầu";
 }
 
 function getLiquidationChargeTypeLabel(value) {
@@ -928,6 +928,21 @@ function isRenewalContract(item) {
   return Boolean(item?.previousContractId ?? item?.previous_contract_id);
 }
 
+function isTransferReSignContract(item) {
+  return Boolean(item?.transferRequestId && isRenewalContract(item));
+}
+
+function isTransferTargetContract(item) {
+  return (
+    isTransferReSignContract(item) &&
+    item?.transferContractRole !== "REPLACEMENT_OLD_CONTRACT"
+  );
+}
+
+function requiresMoveInHandover(item) {
+  return !isRenewalContract(item) || isTransferTargetContract(item);
+}
+
 function getLeaseSignedFileId(item = {}) {
   return (
     item?.signedFileId ??
@@ -940,6 +955,9 @@ function getLeaseSignedFileId(item = {}) {
 
 function needsActivationFlow(item) {
   if (!item) return false;
+  if (isTransferReSignContract(item)) {
+    return !["ACTIVE", "TRANSFERRED"].includes(item?.status);
+  }
   if (isRoomTransferManagedContract(item)) return false;
   if (isRenewalContract(item)) return false;
   if (!item.leaseContractId && getDepositFormId(item)) return true;
@@ -2166,7 +2184,7 @@ export default function ContractTemplatePage() {
   async function handleActivate(item, payload) {
     if (!item?.leaseContractId) return;
 
-    if (isRoomTransferManagedContract(item)) {
+    if (isRoomTransferManagedContract(item) && !isTransferReSignContract(item)) {
       window.alert(
         "Hợp đồng này thuộc yêu cầu chuyển phòng. Vui lòng xử lý trong khối chuyển phòng ngay tại chi tiết hợp đồng.",
       );
@@ -2181,7 +2199,7 @@ export default function ContractTemplatePage() {
     setActionLoading(`activate-${item.leaseContractId}`);
     setError("");
     try {
-      if (!isRenewalContract(item)) {
+      if (requiresMoveInHandover(item)) {
         try {
           const handoverData = unwrapHandoverResponse(
             await fetchContractHandover(item.leaseContractId, "MOVE_IN"),
@@ -2250,8 +2268,9 @@ export default function ContractTemplatePage() {
       setDetails(refreshedDetails);
       setTermsForm(buildTermsForm(refreshedDetails));
 
-      // Auto-send account credentials after activation
-      try {
+      // Transfer re-signing keeps the existing tenant account.
+      if (!isTransferReSignContract(item)) {
+        try {
         const provResult = await sendTenantAccountCredentials(
           item.leaseContractId,
           { retry: false },
@@ -2266,12 +2285,15 @@ export default function ContractTemplatePage() {
         toast.success(
           provResult?.message || "Đã kích hoạt và cấp tài khoản thành công.",
         );
-      } catch (provErr) {
+        } catch (provErr) {
         // Account send failed — activation succeeded. Stepper will show retry button.
         toast.warning(
           provErr?.message ||
             "Kích hoạt thành công nhưng chưa gửi được tài khoản.",
         );
+        }
+      } else {
+        toast.success("Da kich hoat hop dong tai phong chuyen den.");
       }
     } catch (err) {
       setError(err?.message || "Không kích hoạt được hợp đồng.");
@@ -3549,6 +3571,7 @@ export default function ContractTemplatePage() {
                 </div>
               )}
               {isRoomTransferManagedContract(mergedSelected) &&
+                !needsActivationFlow(mergedSelected) &&
                 !isTransferExecuted(mergedSelected) && (
                   <DetailCard
                     title="Xử lý hợp đồng chuyển phòng"
@@ -3658,7 +3681,9 @@ export default function ContractTemplatePage() {
                               disabled={
                                 isBusy ||
                                 !getLeaseSignedFileId(mergedSelected) ||
-                                mergedSelected.status === "SIGNED"
+                                ["SIGNED", "ACTIVE"].includes(
+                                  mergedSelected.status,
+                                )
                               }
                               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60"
                             >
@@ -3668,7 +3693,9 @@ export default function ContractTemplatePage() {
                               ) : (
                                 <CheckCircle2 className="h-4 w-4" />
                               )}
-                              {mergedSelected.status === "SIGNED"
+                              {["SIGNED", "ACTIVE"].includes(
+                                mergedSelected.status,
+                              )
                                 ? "Đã xác nhận ký"
                                 : "Xác nhận hợp đồng này"}
                             </button>

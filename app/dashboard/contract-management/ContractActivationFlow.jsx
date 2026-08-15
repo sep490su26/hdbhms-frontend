@@ -29,9 +29,17 @@ export default function ContractActivationFlow({
   const isRenewalContract = Boolean(
     contract?.previousContractId ?? contract?.previous_contract_id,
   );
+  const isTransferReSignContract = Boolean(
+    contract?.transferRequestId && isRenewalContract,
+  );
+  const isTransferTargetContract =
+    isTransferReSignContract &&
+    contract?.transferContractRole !== "REPLACEMENT_OLD_CONTRACT";
+  const requiresMoveInHandover =
+    !isRenewalContract || isTransferTargetContract;
 
   const [activeView, setActiveView] = useState("workflow");
-  const effectiveActiveView = isRenewalContract ? "workflow" : activeView;
+  const effectiveActiveView = requiresMoveInHandover ? activeView : "workflow";
 
   // Incremented every time the signed lease file changes (re-upload).
   // The stepper uses this to invalidate handover completion state,
@@ -57,7 +65,7 @@ export default function ContractActivationFlow({
   }, [leaseSignedFileId]);
 
   function handleRequestShowHandover() {
-    if (isRenewalContract) return;
+    if (!requiresMoveInHandover) return;
     setActiveView("handover");
   }
 

@@ -2083,6 +2083,31 @@ export default function ContractTemplatePage() {
         details.liquidationStatus ?? selected.liquidationStatus ?? null,
       liquidationCreatedAt:
         details.liquidationCreatedAt ?? selected.liquidationCreatedAt ?? null,
+      moveOutHandoverRecordId:
+        details.moveOutHandoverRecordId ??
+        details.move_out_handover_record_id ??
+        selected.moveOutHandoverRecordId ??
+        null,
+      moveOutHandoverStatus:
+        details.moveOutHandoverStatus ??
+        details.move_out_handover_status ??
+        selected.moveOutHandoverStatus ??
+        null,
+      moveOutHandoverDate:
+        details.moveOutHandoverDate ??
+        details.move_out_handover_date ??
+        selected.moveOutHandoverDate ??
+        null,
+      moveOutHandoverElectricityReadingId:
+        details.moveOutHandoverElectricityReadingId ??
+        details.move_out_handover_electricity_reading_id ??
+        selected.moveOutHandoverElectricityReadingId ??
+        null,
+      moveOutHandoverSignedFileId:
+        details.moveOutHandoverSignedFileId ??
+        details.move_out_handover_signed_file_id ??
+        selected.moveOutHandoverSignedFileId ??
+        null,
       liquidationDepositRefundRequestId:
         details.liquidationDepositRefundRequestId ??
         selected.liquidationDepositRefundRequestId ??
@@ -2162,8 +2187,12 @@ export default function ContractTemplatePage() {
     );
   const liquidationInvoiceSettled =
     isLiquidationInvoiceSettled(mergedSelected);
+  const moveOutHandoverConfirmed =
+    mergedSelected?.moveOutHandoverStatus === "CONFIRMED" ||
+    mergedSelected?.moveOutHandoverStatus === "CONFIRMED_BY_TENANT";
   const exitFlowCanComplete = Boolean(
     mergedSelected?.liquidationId &&
+      moveOutHandoverConfirmed &&
       refundSettlementConfirmed &&
       forfeitureSettlementConfirmed &&
       liquidationInvoiceSettled,
@@ -2173,7 +2202,9 @@ export default function ContractTemplatePage() {
       user?.role === ROLES.OWNER &&
       mergedSelected?.liquidationStatus !== "CONFIRMED",
   );
-  const liquidationEditorVisible = exitFlowEditable || isEditingLiquidation;
+  // Liquidation details are derived from the MOVE_OUT handover. There is no
+  // separate editable liquidation dossier in this workflow.
+  const liquidationEditorVisible = false;
   // Handover is the source of truth for the closing reading and damage data.
   // Deposit and invoice checks belong to the final liquidation step.
   const handoverBlocked = false;
@@ -2504,9 +2535,31 @@ export default function ContractTemplatePage() {
   );
 
   function handleHandoverSaved(handoverResponse) {
-    handleHandoverDraftChange(unwrapHandoverResponse(handoverResponse));
+    const handover = unwrapHandoverResponse(handoverResponse);
+    handleHandoverDraftChange(handover);
+    setSelected((current) =>
+      current
+        ? {
+            ...current,
+            moveOutHandoverRecordId:
+              handover?.handoverRecordId ??
+              handover?.handover_record_id ??
+              current.moveOutHandoverRecordId,
+            moveOutHandoverStatus:
+              handover?.status ?? current.moveOutHandoverStatus,
+            moveOutHandoverDate:
+              handover?.handoverDate ??
+              handover?.handover_date ??
+              current.moveOutHandoverDate,
+            moveOutHandoverElectricityReadingId:
+              handover?.electricityReadingId ??
+              handover?.electricity_reading_id ??
+              current.moveOutHandoverElectricityReadingId,
+          }
+        : current,
+    );
     setHandoverRefreshKey((v) => v + 1);
-    handleContractUpdated();
+    void handleContractUpdated();
   }
 
   async function handleActivate(item, payload) {
@@ -2754,7 +2807,25 @@ export default function ContractTemplatePage() {
     const refreshedDetails = await fetchManagementLeaseContractDetails(
       contract.leaseContractId,
     );
-    const latestContract = { ...selectedUpdate, ...refreshedDetails };
+    // The management detail endpoint is intentionally slimmer than the list
+    // response. Do not let omitted nullable fields erase liquidation state
+    // that was already returned by the list after the handover save.
+    const latestContract = Object.entries(refreshedDetails || {}).reduce(
+      (merged, [key, value]) => {
+        if (value == null) return merged;
+        if (
+          Array.isArray(value) &&
+          value.length === 0 &&
+          Array.isArray(merged[key]) &&
+          merged[key].length > 0
+        ) {
+          return merged;
+        }
+        merged[key] = value;
+        return merged;
+      },
+      { ...selectedUpdate },
+    );
     setDetails(refreshedDetails);
     setTermsForm(buildTermsForm(refreshedDetails));
     if (resetLiquidationForm) {
@@ -3293,21 +3364,21 @@ export default function ContractTemplatePage() {
 
       if (!currentItem.liquidationId) {
         toast.info(
-          "Đã lưu hồ sơ thanh lý. Hãy hoàn tất các điều kiện còn thiếu rồi tiếp tục.",
+          "Đã lưu biên bản bàn giao trả phòng. Hãy hoàn tất các điều kiện còn thiếu rồi tiếp tục.",
         );
         return;
       }
 
       if (!areLiquidationSettlementsConfirmed(currentItem)) {
         toast.info(
-          "Đã lưu bàn giao và hồ sơ thanh lý. Hãy hoàn tất xử lý tiền cọc rồi tiếp tục.",
+          "Đã lưu biên bản bàn giao. Hãy hoàn tất xử lý tiền cọc rồi tiếp tục.",
         );
         return;
       }
 
       if (!isLiquidationInvoiceSettled(currentItem)) {
         toast.info(
-          "Đã lưu bàn giao và hồ sơ thanh lý. Hãy chờ khách thuê thanh toán hóa đơn chốt rồi tiếp tục.",
+          "Đã lưu biên bản bàn giao. Hãy chờ khách thuê thanh toán hóa đơn chốt rồi tiếp tục.",
         );
         return;
       }
@@ -4612,38 +4683,9 @@ export default function ContractTemplatePage() {
 
                   {showExitFlow && (
                     <DetailCard
-                      title="Hồ sơ thanh lý và bàn giao trả phòng"
+                      title="Bàn giao trả phòng và trạng thái thanh lý"
                       icon={FileWarning}
                       className="lg:col-span-2"
-                      action={
-                        !exitFlowEditable &&
-                        canUseLiquidationActions &&
-                        mergedSelected.liquidationStatus !== "CONFIRMED" ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isEditingLiquidation) {
-                                setLiquidationForm(
-                                  buildLiquidationForm(mergedSelected),
-                                );
-                                setLiquidationError("");
-                                setIsEditingLiquidation(false);
-                              } else {
-                                openLiquidationEditor(mergedSelected);
-                              }
-                            }}
-                            disabled={isBusy}
-                            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-extrabold text-[#091426] hover:bg-[#f8fafc] disabled:opacity-60"
-                          >
-                            {isEditingLiquidation ? (
-                              <X className="h-3.5 w-3.5" />
-                            ) : (
-                              <Pencil className="h-3.5 w-3.5" />
-                            )}
-                            {isEditingLiquidation ? "Hủy" : "Cập nhật"}
-                          </button>
-                        ) : null
-                      }
                     >
                       {showExitFlow && (
                         <ContractHandoverSection
@@ -4746,11 +4788,19 @@ export default function ContractTemplatePage() {
                         ) : (
                           <>
                             <InfoValue
-                              label="Trạng thái hồ sơ"
+                              label="Trạng thái thanh lý"
                               value={
                                 mergedSelected.liquidationStatus === "CONFIRMED"
                                   ? "Đã xác nhận"
                                   : "Bản nháp"
+                              }
+                            />
+                            <InfoValue
+                              label="Biên bản bàn giao trả phòng"
+                              value={
+                                moveOutHandoverConfirmed
+                                  ? `Đã lưu #${mergedSelected.moveOutHandoverRecordId || ""}`.trim()
+                                  : "Chưa lưu"
                               }
                             />
                             <InfoValue
@@ -4887,9 +4937,9 @@ export default function ContractTemplatePage() {
                         <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
                           {!exitFlowCanComplete && (
                             <p className="max-w-2xl text-xs font-semibold leading-5 text-amber-700">
-                              Nút này sẽ lưu toàn bộ thông tin đã nhập. Khi hoàn cọc
+                              Nút này sẽ lưu biên bản bàn giao trả phòng. Khi hoàn cọc
                               hoặc xác nhận mất cọc và hóa đơn chốt đã xử lý xong,
-                              bấm lại để hệ thống tiếp tục bàn giao và hoàn tất thanh lý.
+                              bấm lại để hoàn tất thanh lý.
                             </p>
                           )}
                           <button
@@ -4906,7 +4956,7 @@ export default function ContractTemplatePage() {
                             )}
                             {exitFlowCanComplete
                               ? "Lưu và hoàn tất thanh lý"
-                              : "Lưu hồ sơ và tiếp tục"}
+                              : "Lưu bàn giao và tiếp tục"}
                           </button>
                         </div>
                       )}
@@ -5262,6 +5312,15 @@ export default function ContractTemplatePage() {
                           <AlertTriangle className="h-4 w-4" />
                           Thanh lý hợp đồng
                         </button>
+                      )}
+                    {details?.canLiquidate === false &&
+                      ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATION_PENDING"].includes(
+                        getWorkflow(mergedSelected),
+                      ) &&
+                      details?.canLiquidateBlockedReason && (
+                        <p className="flex min-h-11 items-center rounded-lg border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 sm:col-span-2">
+                          {details.canLiquidateBlockedReason}
+                        </p>
                       )}
                     <button
                       type="button"

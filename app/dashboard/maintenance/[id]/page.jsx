@@ -946,7 +946,6 @@ export default function MaintenanceTicketDetailPage() {
               disabled={Boolean(actionLoading)}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1e40af] dark:bg-[#2563eb] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] dark:hover:bg-[#1d4ed8] disabled:opacity-60"
             >
-              {actionLoading === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
               {ticket.status === "ACCEPTED" ? "Gửi phương án cho khách" : "Xác nhận hoàn tất"}
             </button>
           </div>
@@ -958,6 +957,7 @@ export default function MaintenanceTicketDetailPage() {
       </Dialog>
 
       <Dialog
+        modal={false}
         open={repairDecision !== null}
         onOpenChange={(open) => {
           if (actionLoading === "repair-decision") return;
@@ -968,7 +968,7 @@ export default function MaintenanceTicketDetailPage() {
           }
         }}
       >
-        <DialogContent className="w-[calc(100%-1rem)] max-w-lg rounded-xl border border-[#d8dee8] bg-white dark:border-white/10 dark:bg-[#0f172a]">
+        <DialogContent lockScroll={false} className="w-[calc(100%-1rem)] max-w-lg rounded-xl border border-[#d8dee8] bg-white dark:border-white/10 dark:bg-[#0f172a]">
           <form onSubmit={submitTenantRepairDecision} className="grid gap-5">
             <DialogHeader className="gap-1 text-left">
               <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">

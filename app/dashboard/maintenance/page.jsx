@@ -807,7 +807,14 @@ export default function MaintenancePage() {
 
   function handleStartProgress(ticket) {
     if (actionLoading) return;
-    openCompletionDialog(ticket, true);
+    // Let Radix finish closing the action menu before mounting the dialog.
+    window.setTimeout(() => openCompletionDialog(ticket, true), 140);
+  }
+
+  function handleOpenCompletionDialog(ticket) {
+    if (actionLoading) return;
+    // The completion dialog is launched from the same dropdown menu.
+    window.setTimeout(() => openCompletionDialog(ticket), 140);
   }
 
   function updateCompletionForm(name, value) {
@@ -1429,7 +1436,6 @@ export default function MaintenancePage() {
                   disabled={Boolean(actionLoading)}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#1e40af] px-5 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {actionLoading === `complete-${completionTicket.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <TimerReset className="h-4 w-4" />}
                   {isCompletionProposal ? "Gửi phương án cho khách" : "Xác nhận hoàn tất"}
                 </button>
               </div>
@@ -1707,7 +1713,7 @@ export default function MaintenancePage() {
                               >
                                 <button
                                   type="button"
-                                  onClick={() => openCompletionDialog(ticket)}
+                                  onClick={() => handleOpenCompletionDialog(ticket)}
                                   disabled={Boolean(actionLoading)}
                                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
                                 >

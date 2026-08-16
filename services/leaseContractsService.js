@@ -288,6 +288,20 @@ export function normalizeLeaseContractItem(item = {}) {
       null,
     handoverSignedFileId:
       item.handoverSignedFileId ?? item.handover_signed_file_id ?? null,
+    moveOutHandoverRecordId:
+      item.moveOutHandoverRecordId ?? item.move_out_handover_record_id ?? null,
+    moveOutHandoverStatus:
+      item.moveOutHandoverStatus ?? item.move_out_handover_status ?? null,
+    moveOutHandoverDate:
+      item.moveOutHandoverDate ?? item.move_out_handover_date ?? null,
+    moveOutHandoverElectricityReadingId:
+      item.moveOutHandoverElectricityReadingId ??
+      item.move_out_handover_electricity_reading_id ??
+      null,
+    moveOutHandoverSignedFileId:
+      item.moveOutHandoverSignedFileId ??
+      item.move_out_handover_signed_file_id ??
+      null,
     signedAt: item.signedAt ?? item.signed_at ?? null,
     createdAt: item.createdAt ?? item.created_at ?? null,
     accountProvisioned:
@@ -1135,6 +1149,26 @@ function normalizeLeaseContractDetails(details = {}) {
     transferRequestedDate: details.transferRequestedDate ?? null,
     transferContractRole: details.transferContractRole ?? null,
     transferActivationLocked: details.transferActivationLocked ?? false,
+    moveOutHandoverRecordId:
+      details.moveOutHandoverRecordId ??
+      details.move_out_handover_record_id ??
+      null,
+    moveOutHandoverStatus:
+      details.moveOutHandoverStatus ??
+      details.move_out_handover_status ??
+      null,
+    moveOutHandoverDate:
+      details.moveOutHandoverDate ??
+      details.move_out_handover_date ??
+      null,
+    moveOutHandoverElectricityReadingId:
+      details.moveOutHandoverElectricityReadingId ??
+      details.move_out_handover_electricity_reading_id ??
+      null,
+    moveOutHandoverSignedFileId:
+      details.moveOutHandoverSignedFileId ??
+      details.move_out_handover_signed_file_id ??
+      null,
     intentionRecordedAt:
       details.intentionRecordedAt ?? details.intention_recorded_at ?? null,
     intentionNote:
@@ -1149,6 +1183,10 @@ function normalizeLeaseContractDetails(details = {}) {
     canRenewBlockedReason:
       details.canRenewBlockedReason ?? details.can_renew_blocked_reason ?? "",
     canLiquidate: details.canLiquidate ?? details.can_liquidate ?? false,
+    canLiquidateBlockedReason:
+      details.canLiquidateBlockedReason ??
+      details.can_liquidate_blocked_reason ??
+      "",
     canSendAccount: details.canSendAccount ?? details.can_send_account ?? false,
     accountProvisioningStatus:
       details.accountProvisioningStatus ??

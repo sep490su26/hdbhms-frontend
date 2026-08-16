@@ -363,7 +363,9 @@ const LIQUIDATION_STAGE_LABELS = {
     WAITING_PAYMENT: "Chờ thanh toán công nợ cuối kỳ",
     WAITING_DEPOSIT_REFUND: "Chờ hoàn cọc",
     WAITING_DEPOSIT_FORFEITURE_CONFIRMATION: "Chờ xác nhận mất cọc",
-    WAITING_SIGNED_DOCUMENT: "Chờ hoàn thiện biên bản đã ký",
+    READY_TO_COMPLETE: "Sẵn sàng hoàn tất thanh lý",
+    // Kept as a compatibility label for old request payloads; it is no longer a required step.
+    WAITING_SIGNED_DOCUMENT: "Sẵn sàng hoàn tất thanh lý",
     WAITING_REPLACEMENT_CONTRACT: "Chờ hợp đồng thay thế",
     CONFIRMED: "Đã hoàn tất thanh lý",
 };
@@ -428,11 +430,6 @@ function LiquidationTracking({ payload }) {
             label: hasForfeitureFlow ? "Xác nhận mất cọc" : "Hoàn cọc",
             done: depositDone,
             detail: liquidationStatusLabel(depositStatus),
-        },
-        {
-            label: "Biên bản thanh lý đã ký",
-            done: isChecked(checklist.signedDocumentUploaded),
-            detail: isChecked(checklist.signedDocumentUploaded) ? "Đã cập nhật" : "Chưa cập nhật",
         },
     ];
 

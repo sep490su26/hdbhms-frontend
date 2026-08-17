@@ -596,7 +596,7 @@ export function statusCopy(status) {
   const copy = {
     draft: "Bản nháp",
     available: "Trống",
-    onHold: "Đang đặt cọc",
+    onHold: "Đang Rđặt cọc",
     deposited: "Đã đặt cọc",
     occupied: "Đã thuê",
     soonVacant: "Sắp trống",

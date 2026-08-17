@@ -407,7 +407,7 @@ function areLiquidationSettlementsConfirmed(item = {}) {
     );
   const forfeitureConfirmed =
     deductionAmount <= 0 ||
-    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+    ["TENANT_CONFIRMED", "AUTOMATICALLY_FORFEITED", "NOT_REQUIRED"].includes(
       item?.liquidationDepositForfeitureStatus,
     );
   return refundConfirmed && forfeitureConfirmed;
@@ -713,31 +713,37 @@ function toOptionalNumber(value) {
 }
 
 function getHandoverElectricity(handover = {}) {
-  const source = handover?.electricity || handover?.electricityReading || {};
+  const safeHandover = handover ?? {};
+  const source =
+    safeHandover.electricity || safeHandover.electricityReading || {};
   return {
     previousValue: toOptionalNumber(
       source.previousValue ??
         source.previous_value ??
-        handover.previousElectricityValue ??
-        handover.previous_electricity_value,
+        safeHandover.previousElectricityValue ??
+        safeHandover.previous_electricity_value,
     ),
     currentValue: toOptionalNumber(
       source.currentValue ??
         source.current_value ??
-        handover.electricReading ??
-        handover.electric_reading,
+        safeHandover.electricReading ??
+        safeHandover.electric_reading,
     ),
     photoFileId:
-      source.photoFileId ?? source.photo_file_id ?? handover.electricityPhotoFileId ?? null,
+      source.photoFileId ??
+      source.photo_file_id ??
+      safeHandover.electricityPhotoFileId ??
+      null,
   };
 }
 
 function getHandoverCompensationAmount(handover = {}) {
+  const safeHandover = handover ?? {};
   const responseAmount = toOptionalNumber(
-    handover.compensationAmount ?? handover.compensation_amount,
+    safeHandover.compensationAmount ?? safeHandover.compensation_amount,
   );
-  const itemAmount = Array.isArray(handover.items)
-    ? handover.items.reduce(
+  const itemAmount = Array.isArray(safeHandover.items)
+    ? safeHandover.items.reduce(
         (total, item) =>
           total + Math.max(0, toOptionalNumber(item?.compensationAmount ?? item?.compensation_amount) || 0),
         0,
@@ -1165,7 +1171,7 @@ function getTransferContractNotice(item) {
 }
 
 function unwrapHandoverResponse(response) {
-  return response?.data || response || null;
+  return response?.data ?? response ?? {};
 }
 
 function hasHandoverReadings(handover) {
@@ -2182,7 +2188,7 @@ export default function ContractTemplatePage() {
     );
   const forfeitureSettlementConfirmed =
     liquidationDeductionAmount <= 0 ||
-    ["TENANT_CONFIRMED", "NOT_REQUIRED"].includes(
+    ["TENANT_CONFIRMED", "AUTOMATICALLY_FORFEITED", "NOT_REQUIRED"].includes(
       mergedSelected?.liquidationDepositForfeitureStatus,
     );
   const liquidationInvoiceSettled =

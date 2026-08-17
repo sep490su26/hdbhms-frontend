@@ -1814,17 +1814,6 @@ export default function ApprovalCenter() {
                 {canResolveRequest(detailModal, isOwner) && (
                   <>
                     <Button
-                      variant="outline"
-                      onClick={() => {
-                        setRejectModal(detailModal);
-                        setRejectNote("");
-                        closeDetailModal();
-                      }}
-                      className="rounded-lg text-red-600 border-red-200 hover:bg-red-50 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/10"
-                    >
-                      Từ chối
-                    </Button>
-                    <Button
                       onClick={() => {
                         handleApprove(detailModal);
                         closeDetailModal();
@@ -1837,6 +1826,17 @@ export default function ApprovalCenter() {
                       ) : (
                         "Duyệt yêu cầu"
                       )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setRejectModal(detailModal);
+                        setRejectNote("");
+                        closeDetailModal();
+                      }}
+                      className="rounded-lg text-red-600 border-red-200 hover:bg-red-50 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/10"
+                    >
+                      Từ chối
                     </Button>
                   </>
                 )}

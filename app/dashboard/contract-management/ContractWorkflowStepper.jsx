@@ -45,10 +45,21 @@ const ACTION = {
     UPLOAD_LEASE: "upload-lease",
     DOWNLOAD_HANDOVER: "download-handover",
     UPLOAD_HANDOVER: "upload-handover",
+    SAVE_ACTIVATION_READING: "save-activation-reading",
 };
 
+function parseNonNegativeNumberInput(value) {
+    const trimmedValue = String(value ?? "").trim();
+    if (trimmedValue === "") return null;
+
+    const parsedValue = Number(trimmedValue);
+    return Number.isFinite(parsedValue) && parsedValue >= 0
+        ? parsedValue
+        : undefined;
+}
+
 function unwrapHandoverResponse(response) {
-    return response?.data || response || null;
+    return response?.data ?? response ?? {};
 }
 
 function hasHandoverReadings(handover) {
@@ -475,9 +486,8 @@ export default function ContractWorkflowStepper({
     useEffect(() => {
         if (!contractId || !requiresActivationReading) return undefined;
 
-        const trimmedValue = String(activationReading ?? "").trim();
-        const currentValue = trimmedValue === "" ? null : Number(trimmedValue);
-        if (currentValue !== null && !Number.isFinite(currentValue)) {
+        const currentValue = parseNonNegativeNumberInput(activationReading);
+        if (currentValue === undefined) {
             return undefined;
         }
 
@@ -588,11 +598,10 @@ export default function ContractWorkflowStepper({
     const signedHandoverDescription = handoverHasData
         ? "PDF tối đa 15 MB - có thể tải lên trước khi kích hoạt"
         : "Mở sau khi hoàn tất thông tin bàn giao";
+    const parsedActivationReading =
+        parseNonNegativeNumberInput(activationReading);
     const activationReadingReady =
-        !requiresActivationReading ||
-        (activationReading !== "" &&
-            Number.isFinite(Number(activationReading)) &&
-            Number(activationReading) >= 0);
+        !requiresActivationReading || parsedActivationReading != null;
     const leaseDraftReady = !requiresActivationReading || activationReadingReady;
     const readiness = getContractActivationReadiness({
         leaseSignedFileId,
@@ -615,7 +624,8 @@ export default function ContractWorkflowStepper({
     const missingCount = readiness.totalCount - readiness.completedCount;
 
     async function handleActivation() {
-        if (requiresActivationReading && !activationReadingReady) {
+        const currentValue = parseNonNegativeNumberInput(activationReading);
+        if (requiresActivationReading && currentValue == null) {
             toast.error("Vui lòng nhập chỉ số điện đầu kỳ.");
             return;
         }
@@ -628,7 +638,7 @@ export default function ContractWorkflowStepper({
             await onActivate?.({
                 electricity: requiresActivationReading
                     ? {
-                        currentValue: Number(activationReading),
+                        currentValue,
                         photoFileId,
                         readingDate: activationReadingDate || undefined,
                     }
@@ -637,6 +647,41 @@ export default function ContractWorkflowStepper({
         } catch (error) {
             toast.error(error?.message || "Không thể kích hoạt hợp đồng.");
         }
+    }
+
+    async function handleRequestShowHandover() {
+        if (requiresActivationReading) {
+            const currentValue = parseNonNegativeNumberInput(activationReading);
+            if (currentValue == null) {
+                toast.error("Vui lòng nhập chỉ số điện đầu kỳ trước khi nhập bàn giao.");
+                return;
+            }
+
+            // The workflow view unmounts when the handover view opens, so flush
+            // the debounced activation-reading update before changing views.
+            if (activationSaveTimerRef.current) {
+                clearTimeout(activationSaveTimerRef.current);
+                activationSaveTimerRef.current = null;
+            }
+
+            try {
+                setLoadingStep(ACTION.SAVE_ACTIVATION_READING);
+                await updateLeaseContractActivationReading(contractId, {
+                    currentValue,
+                    readingDate: activationReadingDate || null,
+                });
+                await onContractUpdated?.();
+            } catch (error) {
+                toast.error(
+                    error?.message || "Không lưu được chỉ số điện đầu kỳ.",
+                );
+                return;
+            } finally {
+                setLoadingStep(null);
+            }
+        }
+
+        onRequestShowHandover?.();
     }
 
     function handleActivationPhotoChange(event) {
@@ -696,7 +741,8 @@ export default function ContractWorkflowStepper({
 
     async function handleDownloadLease() {
         if (!contractId) return;
-        if (requiresActivationReading && !activationReadingReady) {
+        const currentValue = parseNonNegativeNumberInput(activationReading);
+        if (requiresActivationReading && currentValue == null) {
             toast.error("Vui lòng nhập chỉ số điện đầu kỳ trước khi tải hợp đồng.");
             return;
         }
@@ -706,7 +752,7 @@ export default function ContractWorkflowStepper({
                 contractId,
                 buildLeaseContractDocumentFilename(contractDetails),
                 requiresActivationReading
-                    ? {electricityValue: Number(activationReading)}
+                    ? {electricityValue: currentValue}
                     : undefined,
             );
             toast.success("Đã tải hợp đồng thuê để in và ký.");
@@ -846,7 +892,7 @@ export default function ContractWorkflowStepper({
                         title="Nhập số điện khi ký hợp đồng thuê"
                         description="Chỉ số này được lưu làm chỉ số bắt đầu hợp đồng; biên bản bàn giao chỉ quản lý thiết bị và hiện trạng phòng."
                     />
-                    <div className="grid items-start gap-3 border-t border-blue-200 px-4 py-4 dark:border-blue-400/20 sm:grid-cols-3 sm:items-center sm:px-5">
+                    <div className="grid items-start gap-3 border-t border-blue-200 px-4 py-4 dark:border-blue-400/20 sm:grid-cols-3 sm:px-5">
                             <label className="grid gap-1.5">
                              <span className="flex items-center justify-between gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
                                  <span>Chỉ số điện (kWh) *</span>
@@ -970,16 +1016,20 @@ export default function ContractWorkflowStepper({
                         >
                             <button
                                 type="button"
-                                onClick={onRequestShowHandover}
+                                onClick={handleRequestShowHandover}
                                 disabled={isBusy || handoverLoading}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-white"
                             >
-                                {handoverLoading ? (
+                                {handoverLoading || loadingStep === ACTION.SAVE_ACTIVATION_READING ? (
                                     <Loader2 className="h-3.5 w-3.5 animate-spin"/>
                                 ) : (
                                     <ClipboardEdit className="h-3.5 w-3.5"/>
                                 )}
-                                {handoverHasData ? "Xem bàn giao" : "Nhập bàn giao"}
+                                {loadingStep === ACTION.SAVE_ACTIVATION_READING
+                                    ? "Đang lưu..."
+                                    : handoverHasData
+                                        ? "Xem bàn giao"
+                                        : "Nhập bàn giao"}
                             </button>
                             <button
                                 type="button"

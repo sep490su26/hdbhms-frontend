@@ -376,6 +376,7 @@ const LIQUIDATION_STATUS_LABELS = {
     APPROVED_WAITING_TENANT_CONFIRMATION: "Đã duyệt, chờ khách xác nhận đã nhận tiền",
     RECORDED_BY_MANAGER: "Đã ghi nhận, chờ khách xác nhận đã nhận tiền",
     TENANT_CONFIRMED: "Khách đã xác nhận",
+    AUTOMATICALLY_FORFEITED: "Đã tự động mất cọc",
     PENDING_TENANT_CONFIRMATION: "Chờ khách xác nhận chấp nhận mất cọc",
     DISPUTED: "Khách chưa chấp nhận",
 };
@@ -409,7 +410,7 @@ function LiquidationTracking({ payload }) {
     );
     const depositStatus = hasForfeitureFlow ? forfeitureStatus : refundStatus;
     const depositDone = hasForfeitureFlow
-        ? forfeitureStatus === "NOT_REQUIRED" || forfeitureStatus === "TENANT_CONFIRMED" || isChecked(checklist.depositForfeitureConfirmed)
+        ? forfeitureStatus === "NOT_REQUIRED" || forfeitureStatus === "TENANT_CONFIRMED" || forfeitureStatus === "AUTOMATICALLY_FORFEITED" || isChecked(checklist.depositForfeitureConfirmed)
         : refundStatus === "NOT_REQUIRED" || refundStatus === "TENANT_CONFIRMED" || isChecked(checklist.depositRefundConfirmed);
     const replacementRequired =
         stage === "WAITING_REPLACEMENT_CONTRACT" ||

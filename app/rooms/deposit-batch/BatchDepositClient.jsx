@@ -21,12 +21,23 @@ import {
   Mail,
   Phone,
   Ruler,
+  RotateCcw,
   ShieldCheck,
   Upload,
   Users,
   Wifi,
+  ZoomIn,
+  ZoomOut,
   X,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   cancelBatchDeposit,
   checkoutBatchDeposit,
@@ -43,6 +54,7 @@ import {
 } from "../../../services/depositBatchDraftStorage";
 import { ROOM_HOLD_DURATION_MS } from "../../../lib/roomHoldStorage";
 import { fetchMyTenantProfile, fetchPrivateFile, lookupPersonProfileByPhone } from "../../../services/tenantProfilesService";
+import { previewDepositContract } from "../../../services/depositContractsService";
 import DateInput from "@/components/DateInput";
 import { getAuthToken } from "../../../services/identityAccessService";
 import CccdUploadFlow from "../../../components/identity/CccdUploadFlow";
@@ -50,6 +62,8 @@ import IdentityEntryModeSelector from "../../../components/identity/IdentityEntr
 import { extractCccdImages, normalizeGenderLabel } from "../../../services/identityVerificationService";
 
 const DEPOSIT_PER_ROOM = 2000;
+const MIN_DEPOSIT_AGE = 18;
+const ADULT_DOB_ERROR_MESSAGE = "Người đặt cọc phải từ 18 tuổi trở lên.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const FULL_NAME_PATTERN = /^[\p{L}\s]+$/u;
@@ -87,6 +101,16 @@ function todayValue(offsetDays = 0) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function dateYearsAgo(value, years) {
+  const parts = String(value || "").split("-").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return "";
+
+  const [year, month, day] = parts;
+  const date = new Date(year - years, month - 1, day, 12, 0, 0, 0);
+  if (date.getMonth() !== month - 1) date.setDate(0);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function formatMoney(value) {
@@ -143,6 +167,9 @@ function validateField(name, value, form = {}) {
   }
   if (name === "dob" && normalized > today) {
     return "Ngày sinh không được lớn hơn ngày hiện tại.";
+  }
+  if (name === "dob" && normalized > dateYearsAgo(today, MIN_DEPOSIT_AGE)) {
+    return ADULT_DOB_ERROR_MESSAGE;
   }
   if (name === "contractTermMonths" && (!/^\d+$/.test(normalized) || Number(normalized) < 6)) {
     return "Thời hạn hợp đồng tối thiểu là 6 tháng.";
@@ -272,7 +299,7 @@ function CopyRow({ label, value, disabled = false }) {
   );
 }
 
-/* function buildContractPreviewMetadata(room, form) {
+function buildContractPreviewMetadata(room, form, roomForm = {}) {
   return {
     roomId: room.roomId,
     fullName: String(form.fullName || "").trim(),
@@ -287,17 +314,48 @@ function CopyRow({ label, value, disabled = false }) {
     expectedMoveInDate: form.expectedMoveInDate || null,
     expectedLeaseSignDate: form.expectedLeaseSignDate || null,
     paymentCycleMonths: Number(form.paymentCycleMonths || 1),
+    occupantCount: Number(roomForm.occupantCount || 1),
+    coOccupants: (roomForm.coOccupants || []).map((occupant, index) => ({
+      fullName: String(occupant.fullName || "").trim(),
+      phone: normalizePhone(occupant.phone),
+      displayOrder: index + 1,
+    })),
   };
 }
 
-function contractSignature(room, form) {
-  return JSON.stringify(buildContractPreviewMetadata(room, form));
+function contractSignature(room, form, roomForm) {
+  return JSON.stringify(buildContractPreviewMetadata(room, form, roomForm));
 }
 
-function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
+function ContractPreviewModal({ review, onAcceptedChange, onClose }) {
+  const DEFAULT_ZOOM = 0.7;
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 1.8;
+  const ZOOM_STEP = 0.1;
+  const dragRef = useRef(null);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  const previewHtml = useMemo(() => {
+    const html = review?.preview?.html || "";
+    if (!html) return "";
+    const previewStyles = `
+      <style>
+        html, body { background: #fff !important; }
+        body { padding: 58px 64px 64px !important; }
+      </style>
+    `;
+    return html.includes("</head>")
+      ? html.replace("</head>", `${previewStyles}</head>`)
+      : `${previewStyles}${html}`;
+  }, [review?.preview?.html]);
+
   const resizePreviewFrame = (event) => {
     const frameDocument = event.currentTarget.contentDocument;
-    if (frameDocument?.documentElement) frameDocument.documentElement.style.overflow = "hidden";
+    if (frameDocument?.documentElement) {
+      frameDocument.documentElement.style.overflow = "hidden";
+    }
     if (frameDocument?.body) frameDocument.body.style.overflow = "hidden";
     const contentHeight = Math.max(
       frameDocument?.documentElement?.scrollHeight || 0,
@@ -307,47 +365,145 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
     event.currentTarget.style.height = `${contentHeight}px`;
   };
 
+  const updateZoom = (nextZoom) => {
+    setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom)));
+  };
+
+  const handlePointerDown = (event) => {
+    if (event.button !== 0) return;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+    };
+    setIsDragging(true);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    setOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    });
+  };
+
+  const stopDragging = (event) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+    setIsDragging(false);
+  };
+
+  const resetPreviewPosition = () => {
+    setZoom(DEFAULT_ZOOM);
+    setOffset({ x: 0, y: 0 });
+  };
+
   return (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-[#091426]/70 p-3 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <div
-        className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        onMouseDown={(event) => event.stopPropagation()}
+      <DialogContent
+        showCloseButton={false}
+        onInteractOutside={(event) => event.preventDefault()}
+        className="flex h-[min(94vh,980px)] w-[calc(100%-1rem)] !max-w-7xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:rounded-2xl"
       >
-        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
+        <DialogHeader className="flex shrink-0 flex-row items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#006c49]">
               Xem trước hợp đồng
             </p>
-            <h2 className="text-lg font-bold text-[#091426]">
-              Hợp đồng đặt cọc - Phòng {room.roomCode}
-            </h2>
+            <DialogTitle className="text-lg font-bold text-[#091426]">
+              Hợp đồng thuê và đặt cọc
+            </DialogTitle>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-[#45474c] transition hover:bg-[#f2f4f6] hover:text-[#091426]"
-            aria-label="Đóng"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-auto bg-[#eef2f7] px-3 py-6">
+          <DialogDescription className="sr-only">
+            Ban xem truoc hop dong thue va dat coc.
+          </DialogDescription>
+          <DialogClose asChild>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-[#45474c] transition hover:bg-[#f2f4f6] hover:text-[#091426]"
+              aria-label="Đóng"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </DialogClose>
+        </DialogHeader>
+        <div className="flex min-h-0 flex-1 flex-col bg-[#eef2f7]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#dce3ec] bg-white px-4 py-2">
+            <div className="flex items-center gap-1 rounded-lg border border-[#d8dde6] bg-[#f8fafc] p-1">
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom - ZOOM_STEP)}
+                disabled={zoom <= MIN_ZOOM}
+                className="rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Thu nho"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <span className="min-w-14 text-center text-xs font-bold tabular-nums text-[#091426]">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom + ZOOM_STEP)}
+                disabled={zoom >= MAX_ZOOM}
+                className="rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426] disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Phong to"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={resetPreviewPosition}
+                className="ml-1 rounded-md p-1.5 text-[#334155] transition hover:bg-white hover:text-[#091426]"
+                aria-label="Dat lai vi tri va zoom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
           <div
-            className="origin-top scale-[0.46] sm:scale-[0.7] lg:scale-90 xl:scale-100"
-            style={{ width: 794, margin: "0 auto", minHeight: 540 }}
+            className={`relative min-h-0 flex-1 overflow-hidden px-3 py-6 ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            style={{ touchAction: "none" }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
           >
-            <iframe
-              title={`Xem trước hợp đồng đặt cọc phòng ${room.roomCode}`}
-              srcDoc={review?.preview?.html || ""}
-              scrolling="no"
-              onLoad={resizePreviewFrame}
-              className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
-            />
+            <div
+              className="absolute left-1/2 top-6 w-[794px] select-none"
+              style={{
+                transform: `translate3d(calc(-50% + ${offset.x}px), ${offset.y}px, 0)`,
+              }}
+            >
+              <iframe
+                title="Xem trước hợp đồng thuê và đặt cọc"
+                srcDoc={previewHtml}
+                scrolling="no"
+                onLoad={resizePreviewFrame}
+                className="min-h-[1123px] w-[794px] border-0 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top center",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
           </div>
         </div>
         <div className="grid gap-4 border-t border-[#e2e8f0] bg-white px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -359,8 +515,9 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
               className="mt-1 h-4 w-4 rounded border-[#c5c6cd] accent-[#091426]"
             />
             <span>
-              Tôi đã đọc và đồng ý với <strong className="text-[#091426]">điều khoản đặt cọc</strong>{" "}
-              của phòng {room.roomCode}.
+              Tôi đã đọc và đồng ý với{" "}
+              <strong className="text-[#091426]">điều khoản hợp đồng</strong>{" "}
+              trong hợp đồng này.
             </span>
           </label>
           <button
@@ -371,12 +528,10 @@ function ContractPreviewModal({ room, review, onAcceptedChange, onClose }) {
             Quay lại form
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
-
-*/
 function createDefaultRoomForms(rooms) {
   return Object.fromEntries(
     rooms.map((room) => [room.roomId, { occupantCount: 1, coOccupants: [] }]),
@@ -422,6 +577,9 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
   const [generatedQr, setGeneratedQr] = useState({ payload: "", image: "" });
   const [conflict, setConflict] = useState(null);
   const [unavailableRooms, setUnavailableRooms] = useState([]);
+  const [contractReviews, setContractReviews] = useState({});
+  const [previewingRoomId, setPreviewingRoomId] = useState(null);
+  const [activeContractRoomId, setActiveContractRoomId] = useState(null);
   const [draftReady, setDraftReady] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState(initialError);
@@ -459,6 +617,16 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
   }, [checkout]);
 
   const isCccdScanMode = identityEntryMode === "scan";
+  const dobValidationError = validateField("dob", form.dob, form);
+  const hasInvalidDob = Boolean(form.dob && dobValidationError);
+  const allContractsAccepted = rooms.length > 0 && rooms.every((room) => {
+    const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
+    const review = contractReviews[room.roomId];
+    return Boolean(
+      review?.accepted
+      && review.signature === contractSignature(room, form, roomForm),
+    );
+  });
   const initialRoomKey = initialRooms.map((room) => String(room.roomId)).join(",");
 
   const handleSessionExpired = useCallback((message) => {
@@ -1055,11 +1223,11 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
     const mainPhone = normalizePhone(form.phone);
     rooms.forEach((room) => {
       const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
-      /* const review = contractReviews[room.roomId];
-      if (!review?.accepted || review.signature !== contractSignature(room, form)) {
+      const review = contractReviews[room.roomId];
+      if (!review?.accepted || review.signature !== contractSignature(room, form, roomForm)) {
         nextErrors[`room-${room.roomId}-terms`] =
           `Vui lòng xem hợp đồng đặt cọc phòng ${room.roomCode} và tick đồng ý.`;
-      } */
+      }
       if (roomForm.occupantCount < 1 || roomForm.occupantCount > Number(room.maxPeople || 1)) {
         nextErrors[`room-${room.roomId}-occupantCount`] = `Số người ở tối đa là ${room.maxPeople}.`;
       }
@@ -1088,7 +1256,7 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
     return nextErrors;
   };
 
-  /* const validateContractPreviewFields = () => {
+  const validateContractPreviewFields = (room) => {
     const nextErrors = {};
     [
       "fullName",
@@ -1102,9 +1270,21 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
       "permanentAddress",
       "expectedMoveInDate",
       "expectedLeaseSignDate",
+      "contractTermMonths",
+      "paymentCycleMonths",
     ].forEach((name) => {
       const message = validateField(name, form[name], form);
       if (message) nextErrors[name] = message;
+    });
+    const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
+    if (roomForm.occupantCount < 1 || roomForm.occupantCount > Number(room.maxPeople || 1)) {
+      nextErrors[`room-${room.roomId}-occupantCount`] = `Số người ở tối đa là ${room.maxPeople}.`;
+    }
+    roomForm.coOccupants.forEach((occupant, index) => {
+      const nameError = validateCoOccupantName(index, occupant.fullName);
+      const phoneError = validateCoOccupantPhone(room.roomId, index, occupant.phone);
+      if (nameError) nextErrors[`room-${room.roomId}-co-${index}-fullName`] = nameError;
+      if (phoneError) nextErrors[`room-${room.roomId}-co-${index}-phone`] = phoneError;
     });
     setFieldErrors((current) => ({ ...current, ...nextErrors }));
     return nextErrors;
@@ -1112,7 +1292,7 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
 
   const previewContract = async (room) => {
     setError("");
-    const previewErrors = validateContractPreviewFields();
+    const previewErrors = validateContractPreviewFields(room);
     if (Object.keys(previewErrors).length > 0) {
       setError("Vui lòng hoàn thành thông tin người đại diện trước khi xem hợp đồng đặt cọc.");
       window.setTimeout(() => {
@@ -1123,8 +1303,10 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
 
     try {
       setPreviewingRoomId(room.roomId);
-      const signature = contractSignature(room, form);
-      const preview = await previewDepositContract(buildContractPreviewMetadata(room, form));
+      const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
+      const metadata = buildContractPreviewMetadata(room, form, roomForm);
+      const signature = contractSignature(room, form, roomForm);
+      const preview = await previewDepositContract(metadata);
       setContractReviews((current) => ({
         ...current,
         [room.roomId]: {
@@ -1150,11 +1332,12 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
   };
 
   const setContractAccepted = (room, accepted) => {
+    const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
     setContractReviews((current) => ({
       ...current,
       [room.roomId]: {
         ...current[room.roomId],
-        signature: contractSignature(room, form),
+        signature: contractSignature(room, form, roomForm),
         accepted,
       },
     }));
@@ -1165,8 +1348,6 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
       }));
     }
   };
-
-  } */
 
   const updateRoomForm = (roomId, updater) => {
     setRoomForms((current) => ({
@@ -1221,6 +1402,12 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
   const removeRoom = (roomId) => {
     setRooms((current) => current.filter((room) => room.roomId !== roomId));
     setUnavailableRooms((current) => current.filter((room) => String(room.roomId) !== String(roomId)));
+    setContractReviews((current) => {
+      const next = { ...current };
+      delete next[roomId];
+      return next;
+    });
+    if (String(activeContractRoomId) === String(roomId)) setActiveContractRoomId(null);
   };
 
   const metadata = useMemo(() => ({
@@ -1354,14 +1541,12 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
     router.push("/rooms");
   };
 
-  /* const activeContractRoom = rooms.find(
+  const activeContractRoom = rooms.find(
     (room) => String(room.roomId) === String(activeContractRoomId),
   );
   const activeContractReview = activeContractRoom
     ? contractReviews[activeContractRoom.roomId]
     : null;
-
-  } */
 
   if (isLoadingRooms) {
     return (
@@ -1803,7 +1988,7 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
                 <div className="sm:col-span-2">
                   <TextField label="Họ và tên" required disabled={isCccdExtracting} error={fieldErrors.fullName} value={form.fullName} onChange={(event) => updateFormField("fullName", event.target.value)} onBlur={(event) => updateFormField("fullName", event.target.value)} />
                 </div>
-                <TextField label="Ngày sinh" required disabled={isCccdExtracting} type="date" error={fieldErrors.dob} value={form.dob} max={todayValue()} onChange={(event) => updateFormField("dob", event.target.value)} onBlur={(event) => updateFormField("dob", event.target.value)} />
+                <TextField label="Ngày sinh" required disabled={isCccdExtracting} type="date" error={fieldErrors.dob || (form.dob && dobValidationError)} value={form.dob} max={todayValue()} onChange={(event) => updateFormField("dob", event.target.value)} onBlur={(event) => updateFormField("dob", event.target.value)} />
                 <label className="grid gap-2 text-sm font-bold text-slate-700">
                   <span>
                     Giới tính <span className="text-rose-600">*</span>
@@ -2004,9 +2189,10 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
               </section>
             </section>
 
-            {/* {rooms.map((room) => {
+            {rooms.map((room) => {
               const review = contractReviews[room.roomId];
-              const accepted = review?.accepted && review.signature === contractSignature(room, form);
+              const roomForm = roomForms[room.roomId] || { occupantCount: 1, coOccupants: [] };
+              const accepted = review?.accepted && review.signature === contractSignature(room, form, roomForm);
               return (
                 <section key={room.roomId} className="rounded-xl border border-[#d8dde6] bg-white p-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2055,11 +2241,10 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
               </div>
             ) : null}
 
-            */}
 
             <button
               type="submit"
-              disabled={submitting || isCccdExtracting || rooms.length < 1 || unavailableRooms.length > 0}
+              disabled={submitting || isCccdExtracting || hasInvalidDob || rooms.length < 1 || unavailableRooms.length > 0}
               className="flex h-14 w-full items-center justify-center gap-3 rounded-lg bg-[#091426] px-5 text-base font-black text-white shadow-sm transition hover:bg-[#16253a] disabled:cursor-not-allowed disabled:bg-[#8f9398]"
             >
               {submitting ? <LoaderCircle className="h-5 w-5 animate-spin" /> : null}
@@ -2124,14 +2309,13 @@ export function BatchDepositClient({ initialRooms = EMPTY_ROOMS, initialError = 
         </div>
       )}
 
-      {/* {activeContractRoom && activeContractReview?.preview ? (
+      {activeContractRoom && activeContractReview?.preview ? (
         <ContractPreviewModal
-          room={activeContractRoom}
           review={activeContractReview}
           onAcceptedChange={(accepted) => setContractAccepted(activeContractRoom, accepted)}
           onClose={() => setActiveContractRoomId(null)}
         />
-      ) : null} */}
+      ) : null}
     </main>
   );
 }

@@ -216,6 +216,9 @@ const DATE_TOO_FAR_ERROR_MESSAGE =
   "Ngày chọn chỉ được tối đa 14 ngày kể từ hôm nay.";
 const MOVE_IN_BEFORE_LEASE_SIGN_DATE_ERROR_MESSAGE =
   "Ngày dự kiến vào ở không được trước ngày hẹn ký hợp đồng.";
+const MIN_DEPOSIT_AGE = 18;
+const ADULT_BIRTH_DATE_ERROR_MESSAGE =
+  "Người đặt cọc phải từ 18 tuổi trở lên.";
 const MAX_DEPOSIT_SCHEDULE_DAYS = 14;
 const MAX_DEPOSIT_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_DEPOSIT_UPLOAD_TOTAL_BYTES = 30 * 1024 * 1024;
@@ -264,6 +267,16 @@ const normalizeDateInputString = (value) => {
   }
 
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+const getDateStringYearsAgo = (value, years) => {
+  const normalizedValue = normalizeDateInputString(value);
+  if (!normalizedValue) return "";
+
+  const [year, month, day] = normalizedValue.split("-").map(Number);
+  const date = new Date(year - years, month - 1, day, 12, 0, 0, 0);
+  if (date.getMonth() !== month - 1) date.setDate(0);
+  return toLocalDateInputValue(date);
 };
 
 const addDaysToDateString = (value, days) => {
@@ -841,6 +854,13 @@ const validateDepositValue = (
 
   if (name === "birthDate" && normalizedValue > todayDate) {
     return "Ngày sinh không được lớn hơn ngày hiện tại.";
+  }
+
+  if (
+    name === "birthDate" &&
+    normalizedValue > getDateStringYearsAgo(todayDate, MIN_DEPOSIT_AGE)
+  ) {
+    return ADULT_BIRTH_DATE_ERROR_MESSAGE;
   }
 
   if (name === "idIssueDate" && normalizedValue > todayDate) {
@@ -1429,6 +1449,15 @@ function DepositInfoForm({
   const moveInMinDate =
     getLaterDateString(minScheduleDate, scheduleDates.contractDate) ||
     minScheduleDate;
+  const birthDateValidationError = validateDepositValue(
+    "birthDate",
+    identityValues.birthDate,
+    scheduleWindow,
+    { birthDate: identityValues.birthDate },
+  );
+  const hasInvalidBirthDate = Boolean(
+    identityValues.birthDate && birthDateValidationError,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -2308,6 +2337,10 @@ function DepositInfoForm({
                 type="date"
                 placeholder="dd/MM/yyyy"
                 max={todayDate}
+                error={
+                  fieldErrors.birthDate ||
+                  (identityValues.birthDate && birthDateValidationError)
+                }
                 value={identityValues.birthDate}
                 defaultValue={savedDraft.birthDate}
                 disabled={isCccdExtracting}
@@ -2729,6 +2762,7 @@ function DepositInfoForm({
             disabled={
               isSubmitting ||
               isCccdExtracting ||
+              hasInvalidBirthDate ||
               (blockingStatus && !blockingStatus.canBook)
             }
             className="flex h-[74px] items-center justify-center gap-4 rounded-xl bg-[#091426] text-base font-bold text-white shadow-[0_10px_18px_rgba(9,20,38,0.18)] transition hover:bg-[#16253a] disabled:opacity-75 sm:col-span-2"

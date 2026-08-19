@@ -214,9 +214,11 @@ function normalizeCatalogRoom(room) {
   };
 }
 
-function uniqueBy(items, key) {
+function uniqueBy(items = [], key) {
+  if (!Array.isArray(items)) return [];
   const seen = new Set();
   return items.filter((item) => {
+    if (!item) return false;
     const value = key(item);
     if (!value || seen.has(value)) return false;
     seen.add(value);
@@ -365,24 +367,29 @@ export default function RoomTransferHistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const catalogRooms = useMemo(() => {
-    const normalizedRooms = rooms
-      .map(normalizeCatalogRoom)
-      .filter((room) => room.code)
-      .sort((left, right) => left.label.localeCompare(right.label, "vi"));
-  }, [rooms]);
+const catalogRooms = useMemo(() => {
+  if (!Array.isArray(rooms)) return [];
+  return rooms
+    .map(normalizeCatalogRoom)
+    .filter((room) => room && room.code)
+    .sort((left, right) => (left?.label || "").localeCompare(right?.label || "", "vi"));
+}, [rooms]);
 
-  const floorOptions = useMemo(() => {
-    return uniqueBy(
-      catalogRooms
-        .map((room) => ({
-          id: room.floorId,
-          label: room.floorLabel || normalizeFloorLabel(room.floorId),
-        }))
-        .filter((floor) => floor.id),
-      (floor) => floor.id,
-    ).sort((left, right) => left.label.localeCompare(right.label, "vi"));
-  }, [catalogRooms]);
+const floorOptions = useMemo(() => {
+  if (!Array.isArray(catalogRooms) || catalogRooms.length === 0) return [];
+  
+  const mapped = catalogRooms
+    .filter(Boolean)
+    .map((room) => ({
+      id: room.floorId,
+      label: room.floorLabel || normalizeFloorLabel(room.floorId),
+    }))
+    .filter((floor) => floor.id);
+
+  return uniqueBy(mapped, (floor) => floor.id).sort((left, right) =>
+    (left?.label || "").localeCompare(right?.label || "", "vi")
+  );
+}, [catalogRooms]);
 
   const roomOptions = useMemo(() => {
     if (!filters.floorId) return [];
@@ -413,10 +420,20 @@ export default function RoomTransferHistoryPage() {
   }, [page, query, size]);
 
   useEffect(() => {
-    fetchManagementRoomCatalog()
-      .then(setRooms)
-      .catch(() => setRooms([]));
-  }, []);
+  fetchManagementRoomCatalog()
+    .then((res) => {
+      // Đảm bảo luôn lấy đúng mảng kể cả khi API bọc trong data/items/result
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.items)
+        ? res.items
+        : [];
+      setRooms(list);
+    })
+    .catch(() => setRooms([]));
+}, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(loadTransfers, 0);

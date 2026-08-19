@@ -697,33 +697,30 @@ export default function DashboardPage() {
         />
       </section>
 
-      <section className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <ActivityFeed items={overview?.recentActivities ?? []} />
-        <div className="grid gap-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <UtilityCard
-              icon={Zap}
-              label="Tiêu thụ điện"
-              value={
-                loading
-                  ? "..."
-                  : formatUsage(utilityUsage.electricityUsage < 0 ? utilityUsage.electricityUsage * -1 : utilityUsage.electricityUsage, "kWh")
-              }
-              note={`Kỳ ${utilityUsage.period || "hiện tại"}`}
-              dark
-            />
-            <UtilityCard
-              icon={Droplets}
-              label="Tiêu thụ nước"
-              value={
-                loading ? "..." : formatUsage(utilityUsage.waterUsage < 0 ? utilityUsage.waterUsage * -1 : utilityUsage.waterUsage, "m³")
-              }
-              note={`Kỳ ${utilityUsage.period || "hiện tại"}`}
-            />
-          </div>
-          <ExpiringContractCard summary={overview?.expiringContractSummary} />
-        </div>
-      </section>
+<section className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-3">
+  <div className="xl:col-span-2">
+    <ActivityFeed items={overview?.recentActivities ?? []} />
+  </div>
+
+  <div className="flex flex-col gap-5">
+    <UtilityCard
+      icon={Zap}
+      label="Tiêu thụ điện"
+      value={
+        loading
+          ? "..."
+          : formatUsage(
+              Math.abs(utilityUsage.electricityUsage || 0),
+              "kWh"
+            )
+      }
+      note={`Kỳ ${utilityUsage.period || "hiện tại"}`}
+      dark
+    />
+
+    <ExpiringContractCard summary={overview?.expiringContractSummary} />
+  </div>
+</section>
     </div>
   );
 }

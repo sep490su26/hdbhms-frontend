@@ -37,15 +37,6 @@ function debtTypeLabel(value) {
   return enumLabel(value, DEBT_TYPE_LABELS, "Nợ khác");
 }
 
-function UnitBadge() {
-  return (
-    <div className="inline-flex h-10 shrink-0 overflow-hidden rounded-lg border border-[#dce2ec] bg-white text-xs font-bold shadow-sm dark:border-white/10">
-      <span className="inline-flex items-center bg-white px-3 text-[#5f6b7c]">
-        Đơn vị: Nghìn VND
-      </span>
-    </div>
-  );
-}
 
 function readDebtCache() {
   if (typeof window === "undefined") return null;
@@ -142,7 +133,6 @@ export default function DebtDashboardPage() {
         title="Công nợ tổng hợp"
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <UnitBadge />
             <select
               value={propertyId}
               onChange={(event) => setPropertyId(event.target.value)}
@@ -176,32 +166,6 @@ export default function DebtDashboardPage() {
         </section>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
-          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Tổng công nợ
-          </p>
-          <p className="mt-2 text-xl font-black">
-            {formatThousandMoney(totals.total)}
-          </p>
-        </article>
-        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
-          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Nợ phòng
-          </p>
-          <p className="mt-2 text-xl font-black text-[#3156b6]">
-            {formatThousandMoney(totals.rent)}
-          </p>
-        </article>
-        <article className="relative flex h-full flex-col rounded-lg border border-[#e2e8f0] bg-white p-4 dark:border-white/10 dark:bg-[#0f172a]">
-          <p className="truncate text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-            Nợ điện nước
-          </p>
-          <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
-            {formatThousandMoney(totals.utility)}
-          </p>
-        </article>
-      </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading &&

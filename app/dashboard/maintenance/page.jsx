@@ -1451,7 +1451,7 @@ export default function MaintenancePage() {
 
         <div className="w-full min-w-0 flex-1 space-y-4">
       <section className="overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="border-b border-[#d9dde5] bg-white px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="grid gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <FilterDropdown
@@ -1492,8 +1492,12 @@ export default function MaintenancePage() {
 
             </div>
 
-            {/* Trạng thái nằm ở hàng riêng như các màn hình có filter dạng pill. */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+
+          </div>
+        </div>
+      </section>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
               {STATUS_OPTIONS.map(([value, label]) => (
                 <button
                   key={value}
@@ -1509,10 +1513,6 @@ export default function MaintenancePage() {
                 </button>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
       {error && <InlineNotice type="error">{error}</InlineNotice>}
 
       <section className="overflow-hidden rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] shadow-[0_1px_2px_rgba(9,20,38,0.06)]">

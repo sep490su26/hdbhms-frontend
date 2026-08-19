@@ -1478,37 +1478,18 @@ export default function ApprovalCenter() {
               />
 
               {/* Right Column: Main Data Table & Pagination */}
-              <div className="w-full min-w-0 flex-1 space-y-4">
+              <div className="w-full min-w-0 flex-1 flex flex-col gap-1">
                 {/* Toolbar */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {STATUS_FILTERS.map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setStatusFilter(item.value);
-                          setPage(1);
-                        }}
-                        className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                          statusFilter === item.value
-                            ? "bg-[#1e40af] text-white shadow-sm"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="w-full sm:w-auto shrink-0">
+                <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] flex flex-col">
+                  <div className="flex flex-wrap items-center gap-3 p-3">
                     <select
-                      className="h-9 w-full sm:w-[200px] rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:border-slate-300 focus:ring-0 dark:border-white/10 dark:bg-[#0f172a] dark:text-white dark:hover:bg-white/5"
+                      className="h-10 w-full sm:w-[200px] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-blue-500 dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
                       value={typeFilter}
                       onChange={(e) => {
                         setTypeFilter(e.target.value);
                         setPage(1);
                       }}
+                      aria-label="Lọc theo loại yêu cầu"
                     >
                       <option value="All Types">Tất cả loại</option>
                       {Object.keys(TYPE_CONFIG).map((t) => (
@@ -1518,6 +1499,26 @@ export default function ApprovalCenter() {
                       ))}
                     </select>
                   </div>
+                </section>
+
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3 dark:border-white/5">
+                  {STATUS_FILTERS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(item.value);
+                        setPage(1);
+                      }}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                        statusFilter === item.value
+                          ? "bg-[#1e40af] text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0f172a]">
               <div className="overflow-hidden">

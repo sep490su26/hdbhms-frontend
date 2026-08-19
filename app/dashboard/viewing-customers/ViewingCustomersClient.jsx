@@ -971,7 +971,6 @@ export default function ViewingCustomersClient() {
             </div>
           )}
 
-        {/* Top Header Row */}
         <section className="mb-6 flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-900 dark:text-white">
@@ -991,9 +990,7 @@ export default function ViewingCustomersClient() {
         </section>
 
 
-        {/* Body Row */}
         <div className="flex gap-[24px]">
-          {/* Column 2 – Time Tree Filter Sidebar */}
           <TimeTreeFilter
             treeData={fullTreeData}
             selectedDate={timeFilter}
@@ -1001,10 +998,8 @@ export default function ViewingCustomersClient() {
             className="hidden lg:flex"
           />
 
-          {/* Column 3 – Main Content */}
           <div className="w-full min-w-0 flex-1">
-            <section className="overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
-            <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="border-b border-[#d9dde5] bg-[#f8fafc] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
               <div className="grid gap-3">  
              <div className="flex flex-wrap items-center gap-2">
   <button
@@ -1057,6 +1052,8 @@ export default function ViewingCustomersClient() {
 
               </div>
             </div>
+            <section className="overflow-hidden rounded-lg border border-[#cfd5de] bg-white shadow-[0_1px_1px_rgba(9,20,38,0.03)] dark:border-white/10 dark:bg-[#0f172a]">
+
 
             <div className="dashboard-table">
               <table

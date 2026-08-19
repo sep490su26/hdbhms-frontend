@@ -53,15 +53,12 @@ const STATUS_LABELS = {
   ISSUED: "Chờ thanh toán",
   PAID: "Đã thanh toán",
   OVERDUE: "Quá hạn",
-  PARTIALLY_PAID: "Thanh toán một phần",
-  VOIDED: "Đã hủy",
 };
 
 const TYPE_LABELS = {
   RENT: "Tiền phòng",
   UTILITY: "Tiền điện",
   OTHER: "Khác",
-  DEPOSIT: "Đặt cọc",
   TRANSFER_DIFFERENCE: "Chênh lệch chuyển phòng",
 };
 
@@ -292,6 +289,7 @@ export default function BillingPage() {
     status: "ALL",
     invoiceType: "ALL",
     propertyId: queryPropertyId,
+    floorId: "",
     roomId: "",
   });
   const [billingPeriodText, setBillingPeriodText] = useState(() =>
@@ -336,15 +334,24 @@ export default function BillingPage() {
     [invoices, selectedInvoiceId],
   );
   const visibleInvoices = useMemo(
-    () =>
-      sortByNewest(invoices, [
+    () => {
+      let result = invoices;
+      if (filters.floorId) {
+        result = result.filter((invoice) => {
+          const room = rooms.find((r) => String(r.id ?? r.roomId) === String(invoice.roomId));
+          const fId = room?.floorId ?? room?.floor?.id;
+          return String(fId) === String(filters.floorId);
+        });
+      }
+      return sortByNewest(result, [
         "createdAt",
         "created_at",
         "issueDate",
         "issue_date",
         "billingPeriod",
-      ]),
-    [invoices],
+      ]);
+    },
+    [invoices, filters.floorId, rooms],
   );
   const selectedInvoicePaymentHistory = useMemo(
     () =>
@@ -381,6 +388,20 @@ export default function BillingPage() {
     [rooms, filters.propertyId],
   );
 
+  const floors = useMemo(() => {
+    if (!filters.propertyId) return [];
+    const floorMap = new Map();
+    filterRooms.forEach((room) => {
+      const fId = room.floorId ?? room.floor?.id;
+      if (!fId) return;
+      const fName = room.floorName ?? room.floor?.name ?? `Tầng ${fId}`;
+      if (!floorMap.has(String(fId))) {
+        floorMap.set(String(fId), { id: String(fId), name: fName });
+      }
+    });
+    return Array.from(floorMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [filterRooms, filters.propertyId]);
+
   const paymentRooms = useMemo(
     () => roomsForProperty(rooms, paymentForm.propertyId),
     [rooms, paymentForm.propertyId],
@@ -405,7 +426,7 @@ export default function BillingPage() {
     [paymentForm.propertyId, paymentForm.roomId, visibleInvoices],
   );
 
-  const totals = invoices.reduce(
+  const totals = visibleInvoices.reduce(
     (summary, invoice) => ({
       count: summary.count + 1,
       totalAmount: summary.totalAmount + Number(invoice.totalAmount || 0),
@@ -415,13 +436,13 @@ export default function BillingPage() {
     { count: 0, totalAmount: 0, paidAmount: 0, remainingAmount: 0 },
   );
 
-  const totalElements = invoices.length;
+  const totalElements = visibleInvoices.length;
   const totalPages = Math.ceil(totalElements / size);
   const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
   const paginatedInvoices = useMemo(() => {
     const firstIndex = (safePage - 1) * size;
-    return invoices.slice(firstIndex, firstIndex + size);
-  }, [invoices, safePage, size]);
+    return visibleInvoices.slice(firstIndex, firstIndex + size);
+  }, [visibleInvoices, safePage, size]);
 
   const loadInvoices = useCallback(async () => {
     setLoading(true);
@@ -779,70 +800,89 @@ export default function BillingPage() {
         />
 
         {/* Main content */}
-        <div className="w-full min-w-0 flex-1 flex flex-col gap-6">
+        <div className="w-full min-w-0 flex-1 flex flex-col gap-1">
 
-      <section className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Left – Status chips */}
-          <div className="flex flex-wrap items-center gap-2">
-            {[["ALL", "Tất cả"], ...Object.entries(STATUS_LABELS)].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFilters((current) => ({ ...current, status: value }))}
-                className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                  filters.status === value
-                    ? "bg-[#1e40af] text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
-                }`}
-              >
+      <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] flex flex-col">
+        <div className="flex flex-wrap items-center gap-3 p-3">
+          <select
+            value={filters.invoiceType}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                invoiceType: event.target.value,
+              }))
+            }
+            className={FORM_CONTROL_CLASS}
+            aria-label="Lọc theo loại hóa đơn"
+          >
+            <option value="ALL">Tất cả loại</option>
+            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
                 {label}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
 
-          {/* Right – Type + Property dropdowns */}
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={filters.invoiceType}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  invoiceType: event.target.value,
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
-              aria-label="Lọc theo loại hóa đơn"
-            >
-              <option value="ALL">Tất cả loại</option>
-              {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.propertyId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  propertyId: event.target.value,
-                  roomId: "",
-                }))
-              }
-              className={FORM_CONTROL_CLASS}
-              aria-label="Lọc theo cơ sở"
-            >
-              <option value="">Tất cả cơ sở</option>
-              {properties.map((property) => (
-                <option key={property.id} value={property.id}>
-                  {property.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={filters.propertyId}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                propertyId: event.target.value,
+                floorId: "",
+                roomId: "",
+              }))
+            }
+            className={FORM_CONTROL_CLASS}
+            aria-label="Lọc theo cơ sở"
+          >
+            <option value="">Tất cả cơ sở</option>
+            {properties.map((property) => (
+              <option key={property.id} value={property.id}>
+                {property.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.floorId || ""}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                floorId: event.target.value,
+                roomId: "",
+              }))
+            }
+            className={FORM_CONTROL_CLASS}
+            aria-label="Lọc theo tầng"
+            disabled={!filters.propertyId}
+          >
+            <option value="">Tất cả tầng</option>
+            {floors.map((floor) => (
+              <option key={floor.id} value={floor.id}>
+                {floor.name}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
+
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3 dark:border-white/5">
+          {[["ALL", "Tất cả"], ...Object.entries(STATUS_LABELS)].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFilters((current) => ({ ...current, status: value }))}
+              className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                filters.status === value
+                  ? "bg-[#1e40af] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
 
       <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">

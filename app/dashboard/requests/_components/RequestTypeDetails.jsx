@@ -289,9 +289,9 @@ export function TransferRequestDetail({ payload, transfer }) {
         <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <InfoField label="Hợp đồng cũ" value={transfer?.oldContractCode} icon={<FileText className="w-4 h-4" />} />
-                <InfoField label="Phòng cũ" value={currentRoomLabel} icon={<MapPin className="w-4 h-4" />} />
+                <InfoField label="Ngày chuyển dự kiến" value={formatDateValue(transferDate)} icon={<Calendar className="w-4 h-4" />} />                
                 <InfoField label="Phòng muốn chuyển" value={targetRoomLabel} icon={<MapPin className="w-4 h-4" />} />
-                <InfoField label="Ngày chuyển dự kiến" value={formatDateValue(transferDate)} icon={<Calendar className="w-4 h-4" />} />
+                <InfoField label="Phòng cũ" value={currentRoomLabel} icon={<MapPin className="w-4 h-4" />} />
                 <InfoField label="Hình thức chuyển" value={transferType} icon={<ArrowRightLeft className="w-4 h-4" />} />
                 {rawTransferType === "OTHER_CONTRACT" && targetHolder && (
                     <InfoField label="Người đại diện phòng đích" value={targetHolder} icon={<User className="w-4 h-4" />} />

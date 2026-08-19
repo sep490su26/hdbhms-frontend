@@ -43,6 +43,11 @@ function withRoomPrefix(roomCode) {
 }
 
 export function buildLeaseContractDocumentFilename(item = {}) {
+  const contractCode = item.contractCode ?? item.contract_code;
+  if (contractCode && String(contractCode).trim() !== "") {
+    return `${sanitizeFilenamePart(contractCode, "HDT-Hop-Dong")}.pdf`;
+  }
+
   const roomCode = withRoomPrefix(
     sanitizeFilenamePart(
       item.roomCode ??
@@ -59,6 +64,18 @@ export function buildLeaseContractDocumentFilename(item = {}) {
       item.expected_lease_sign_date,
   );
   return `HDT_${roomCode}_${date}.pdf`;
+}
+
+export function isSignedLeaseContractFilenameMatch(fileName, contractCode) {
+  if (!fileName || !contractCode) return false;
+
+  const leafName = String(fileName).split(/[\\/]/).pop() || "";
+  const extensionIndex = leafName.lastIndexOf(".");
+  const fileBaseName = extensionIndex > 0
+    ? leafName.slice(0, extensionIndex)
+    : leafName;
+
+  return fileBaseName.trim().toUpperCase() === String(contractCode).trim().toUpperCase();
 }
 
 const DEFAULT_LEASE_CONTRACT_DOCUMENT_FILENAME =
@@ -514,6 +531,15 @@ export async function uploadSignedLeaseContractFile(
   if (!target.leaseContractId) {
     throw new Error(
       "Hợp đồng thuê chưa được tạo. Vui lòng tạo hợp đồng thuê trước khi upload file đã ký.",
+    );
+  }
+  if (
+    file.name &&
+    target.contractCode &&
+    !isSignedLeaseContractFilenameMatch(file.name, target.contractCode)
+  ) {
+    throw new Error(
+      `Tên file phải khớp mã hợp đồng ${target.contractCode} (không tính phần mở rộng).`,
     );
   }
 

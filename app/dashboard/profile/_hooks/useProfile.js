@@ -27,6 +27,13 @@ function firstValue(source, keys, fallback = "") {
 
 export function normalizeProfile(source, fallback = {}) {
   const merged = {...fallback, ...source};
+  const contactPhone = firstValue(merged, [
+    "contactPhone",
+    "contact_phone",
+    "phone",
+    "phoneNumber",
+    "phone_number",
+  ]);
   const rawPosition = firstValue(
     merged,
     ["position", "positionName", "position_name", "roleLabel", "role"],
@@ -38,6 +45,7 @@ export function normalizeProfile(source, fallback = {}) {
     id: firstValue(merged, ["id", "userId", "user_id"], null),
     fullName: firstValue(merged, ["fullName", "full_name", "name"]),
     phone: firstValue(merged, ["phone", "phoneNumber", "phone_number"]),
+    contactPhone,
     email: firstValue(merged, ["email"]),
     avatarUrl: firstValue(
       merged,
@@ -82,19 +90,19 @@ function getDuplicateErrors(error) {
   if (!isDuplicate) return null;
 
   if (message.includes("phone") || message.includes("sđt")) {
-    return {phone: DUPLICATE_MESSAGE};
+    return {contactPhone: DUPLICATE_MESSAGE};
   }
   if (message.includes("email")) {
     return {email: DUPLICATE_MESSAGE};
   }
-  return {phone: DUPLICATE_MESSAGE, email: DUPLICATE_MESSAGE};
+  return {contactPhone: DUPLICATE_MESSAGE, email: DUPLICATE_MESSAGE};
 }
 
 export function useProfile() {
   const {user, setUser} = useAuth();
   const initialUser = useRef(user);
   const [profile, setProfile] = useState(null);
-  const [draft, setDraft] = useState({phone: "", email: ""});
+  const [draft, setDraft] = useState({contactPhone: "", email: ""});
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -122,7 +130,7 @@ export function useProfile() {
         if (!isActive) return;
         const nextProfile = normalizeProfile(response, initialUser.current);
         commitProfile(nextProfile);
-        setDraft({phone: nextProfile.phone, email: nextProfile.email});
+        setDraft({contactPhone: nextProfile.contactPhone, email: nextProfile.email});
       } catch {
         if (!isActive) return;
         const cachedProfile = readCachedProfile();
@@ -131,7 +139,7 @@ export function useProfile() {
         if (fallbackProfile) {
           const nextProfile = normalizeProfile(fallbackProfile);
           setProfile(nextProfile);
-          setDraft({phone: nextProfile.phone, email: nextProfile.email});
+          setDraft({contactPhone: nextProfile.contactPhone, email: nextProfile.email});
         }
         setLoadError("Không thể tải hồ sơ mới nhất. Đang hiển thị dữ liệu đã lưu gần nhất.");
         setToast({tone: "error", message: "Mất kết nối mạng khi tải hồ sơ."});
@@ -148,18 +156,18 @@ export function useProfile() {
 
   const missingFields = useMemo(() => {
     if (!profile) return [];
-    return ["fullName", "phone", "email", "avatarUrl"].filter((field) => !profile[field]);
+    return ["fullName", "contactPhone", "email", "avatarUrl"].filter((field) => !profile[field]);
   }, [profile]);
 
   const beginEditing = useCallback(() => {
     if (!profile) return;
-    setDraft({phone: profile.phone || "", email: profile.email || ""});
+    setDraft({contactPhone: profile.contactPhone || "", email: profile.email || ""});
     setFieldErrors({});
     setIsEditing(true);
   }, [profile]);
 
   const cancelEditing = useCallback(() => {
-    setDraft({phone: profile?.phone || "", email: profile?.email || ""});
+    setDraft({contactPhone: profile?.contactPhone || "", email: profile?.email || ""});
     setFieldErrors({});
     setIsEditing(false);
   }, [profile]);
@@ -176,21 +184,23 @@ export function useProfile() {
     setFieldErrors({});
 
     try {
+      const contactPhone = draft.contactPhone.trim();
       const response = await updateCurrentUserProfile({
-        phone: draft.phone.trim(),
+        contactPhone,
         email: draft.email.trim(),
       });
       const nextProfile = normalizeProfile(
         {
           ...profile,
           ...response,
-          phone: draft.phone.trim(),
+          phone: contactPhone,
+          contactPhone,
           email: draft.email.trim(),
         },
         profile,
       );
       commitProfile(nextProfile);
-      setDraft({phone: nextProfile.phone, email: nextProfile.email});
+      setDraft({contactPhone: nextProfile.contactPhone, email: nextProfile.email});
       setIsEditing(false);
       setToast({tone: "success", message: "Đã cập nhật hồ sơ thành công."});
     } catch (error) {
@@ -208,7 +218,7 @@ export function useProfile() {
     } finally {
       setIsSaving(false);
     }
-  }, [commitProfile, draft.email, draft.phone, isSaving, profile]);
+  }, [commitProfile, draft.contactPhone, draft.email, isSaving, profile]);
 
   const uploadAvatar = useCallback(async (file) => {
     if (!file || !ACCEPTED_IMAGE_TYPES.has(file.type) || file.size > MAX_AVATAR_SIZE) {

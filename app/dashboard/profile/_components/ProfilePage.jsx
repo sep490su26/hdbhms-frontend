@@ -289,14 +289,14 @@ export function ProfilePage() {
                 missing={isMissing("fullName")}
               />
               <Field
-                label="Số điện thoại"
-                value={state.isEditing ? state.draft.phone : profile.phone}
-                missing={isMissing("phone")}
+                label="Số liên hệ"
+                value={state.isEditing ? state.draft.contactPhone : profile.contactPhone}
+                missing={isMissing("contactPhone")}
                 editable={state.isEditing}
-                error={state.fieldErrors.phone}
+                error={state.fieldErrors.contactPhone}
                 type="tel"
                 onChange={(event) =>
-                  state.updateDraft("phone", event.target.value)
+                  state.updateDraft("contactPhone", event.target.value)
                 }
               />
               <div className="sm:col-span-2">
@@ -313,7 +313,7 @@ export function ProfilePage() {
                 />
               </div>
               <p className="sm:col-span-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Họ tên được đồng bộ từ hồ sơ nhân sự. Bạn có thể cập nhật SĐT,
+                Họ tên được đồng bộ từ hồ sơ nhân sự. Bạn có thể cập nhật số liên hệ,
                 email và ảnh đại diện.
               </p>
             </div>

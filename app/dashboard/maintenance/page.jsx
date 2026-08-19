@@ -58,12 +58,10 @@ import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import { toDate } from "@/lib/dateFormat";
 
 const STATUS_OPTIONS = [
-  ["WAITING_TENANT_DECISION", "Chờ khách quyết định"],
   ["all", "Tất cả"],
   ["PENDING", "Chờ tiếp nhận"],
   ["ACCEPTED", "Đã tiếp nhận"],
   ["IN_PROGRESS", "Đang xử lý"],
-  ["WAITING_CONFIRMATION", "Chờ xác nhận"],
   ["COMPLETED", "Hoàn tất"],
   ["REJECTED", "Từ chối"],
   ["CANCELLED", "Đã hủy"],
@@ -111,7 +109,6 @@ const CATEGORY_OPTIONS = [
   ["FURNITURE", "Nội thất"],
   ["PAINTING", "Sơn sửa"],
   ["CLEANING", "Vệ sinh"],
-  ["SANITARY", "Vệ sinh"],
   ["SECURITY", "An ninh"],
   ["COMMON_EQUIPMENT", "Thiết bị chung"],
   ["OTHER", "Khác"],

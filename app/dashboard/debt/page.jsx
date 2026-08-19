@@ -140,7 +140,6 @@ export default function DebtDashboardPage() {
     <div className="flex w-full min-w-0 flex-col gap-6 text-slate-900 dark:text-white">
       <DashboardPageHeader
         title="Công nợ tổng hợp"
-        description="Theo dõi phòng đang nợ tiền phòng, điện nước và các phòng vượt ngưỡng."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <UnitBadge />
@@ -200,14 +199,6 @@ export default function DebtDashboardPage() {
           </p>
           <p className="mt-2 text-xl font-black text-emerald-700 dark:text-emerald-300">
             {formatThousandMoney(totals.utility)}
-          </p>
-        </article>
-        <article className="flex h-full flex-col rounded-lg border border-rose-200 bg-white p-4 dark:border-rose-500/20 dark:bg-[#0f172a]">
-          <p className="truncate text-xs font-black uppercase text-rose-600 dark:text-rose-300">
-            Vượt ngưỡng
-          </p>
-          <p className="mt-2 text-xl font-black text-rose-700 dark:text-rose-300">
-            {totals.warning}
           </p>
         </article>
       </section>

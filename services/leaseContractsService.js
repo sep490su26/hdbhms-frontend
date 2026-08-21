@@ -618,11 +618,31 @@ export async function updateLeaseContractTerms(leaseContractId, payload) {
         endDate: payload.endDate,
         paymentCycleMonths: payload.paymentCycleMonths,
         monthlyRent: payload.monthlyRent,
-        depositAmount: payload.depositAmount,
       }),
     },
   );
   return normalizeLeaseContractItem(data);
+}
+
+export async function submitLeaseContractFinancialTermsRequest(
+  leaseContractId,
+  payload,
+) {
+  if (!leaseContractId) {
+    throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c há»£p Ä‘á»“ng cáº§n gá»­i yÃªu cáº§u.");
+  }
+  return authenticatedFetch(
+    `${API_BASE_URL}/lease-contracts/${encodeURIComponent(leaseContractId)}/financial-terms-requests`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        monthlyRent: payload.monthlyRent,
+        paymentCycleMonths: payload.paymentCycleMonths,
+        note: payload.note || null,
+      }),
+    },
+  );
 }
 
 export async function liquidateLeaseContract(leaseContractId, payload = {}) {

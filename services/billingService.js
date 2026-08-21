@@ -20,6 +20,8 @@ function normalizeLine(raw = {}) {
     quantity: Number(read(raw, "quantity") || 0),
     unitPrice: Number(read(raw, "unitPrice", "unit_price") || 0),
     amount: Number(read(raw, "amount") || 0),
+    previousValue: read(raw, "previousValue", "previous_value"),
+    currentValue: read(raw, "currentValue", "current_value"),
   };
 }
 
@@ -79,7 +81,11 @@ function normalizeUtilityBillingRunItem(raw = {}) {
     contractCode: read(raw, "contractCode", "contract_code") || "",
     electricityUsage: Number(read(raw, "electricityUsage", "electricity_usage") || 0),
     electricityAmount: Number(read(raw, "electricityAmount", "electricity_amount") || 0),
+    electricityWaived: Boolean(read(raw, "electricityWaived", "electricity_waived")),
+    electricityWaiveReason: read(raw, "electricityWaiveReason", "electricity_waive_reason") || "",
     serviceFeeAmount: Number(read(raw, "serviceFeeAmount", "service_fee_amount") || 0),
+    serviceFeeWaived: Boolean(read(raw, "serviceFeeWaived", "service_fee_waived")),
+    serviceFeeWaiveReason: read(raw, "serviceFeeWaiveReason", "service_fee_waive_reason") || "",
     roomRentAmount: Number(read(raw, "roomRentAmount", "room_rent_amount") || 0),
     payablePeriods: Array.isArray(read(raw, "payablePeriods", "payable_periods"))
       ? read(raw, "payablePeriods", "payable_periods")

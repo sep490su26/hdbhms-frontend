@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
+import DateInput from "@/components/DateInput";
 import * as XLSX from "xlsx";
 import {
   Dialog,
@@ -903,11 +904,10 @@ export default function ContractHandoverSection({
             <span className="ml-1 text-rose-600 dark:text-rose-300">*</span>
           </span>
 
-          <input
-            type="date"
+          <DateInput
             value={handoverDate}
             disabled={effectiveReadonly || saving}
-            onChange={(e) => setHandoverDate(e.target.value)}
+            onChange={(event) => setHandoverDate(event.target.value)}
             className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
           />
         </label>
@@ -942,11 +942,10 @@ export default function ContractHandoverSection({
 
           <div className="grid gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">Ngày chốt chỉ số *</span>
-            <input
-              type="date"
+            <DateInput
               value={electricReadingDate}
               disabled={effectiveReadonly}
-              onChange={(e) => setElectricReadingDate(e.target.value)}
+              onChange={(event) => setElectricReadingDate(event.target.value)}
               className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:bg-slate-100"
             />
           </div>

@@ -60,6 +60,10 @@ export function normalizeMeterReadingRoom(room = {}, index = 0) {
       readField(room, "electricityCurrent", "electricity_current"),
       electricityPrevious,
     ),
+    electricityRolloverCount: toFiniteNumber(
+      readField(room, "electricityRolloverCount", "electricity_rollover_count"),
+      0,
+    ),
     electricityPhotoId: electricityPhotoId ?? null,
     status: readField(room, "status", "status") || "pending",
     syncTime: formatDateTime(syncTimeValue, null),

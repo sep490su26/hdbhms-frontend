@@ -409,6 +409,10 @@ export default function MeterReadings() {
                     roomId,
                     elecPrev,
                     elecCurr: numberOrDefault(readField(r, "electricityCurrent", "electricity_current"), elecPrev),
+                    electricityRolloverCount: numberOrDefault(
+                        readField(r, "electricityRolloverCount", "electricity_rollover_count"),
+                        0,
+                    ),
                     electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
                     offlineElectricityPhotoQueued: false,
                     offlineQueuedAt: null,
@@ -460,6 +464,10 @@ export default function MeterReadings() {
                             roomId,
                             elecPrev,
                             elecCurr: numberOrDefault(readField(r, "electricityCurrent", "electricity_current"), elecPrev),
+                            electricityRolloverCount: numberOrDefault(
+                                readField(r, "electricityRolloverCount", "electricity_rollover_count"),
+                                0,
+                            ),
                             electricityPhotoId: readField(r, "electricityPhotoId", "electricity_photo_id") ?? null,
                             offlineElectricityPhotoQueued: false,
                             offlineQueuedAt: null,
@@ -834,11 +842,6 @@ export default function MeterReadings() {
             return;
         }
 
-        if (room.elecCurr < room.elecPrev) {
-            toast.error("Chỉ số mới không được nhỏ hơn chỉ số cũ");
-            return;
-        }
-
         const activeBatchId = await ensureBatchForSaving();
 
         if (!activeBatchId) return;
@@ -1200,7 +1203,10 @@ export default function MeterReadings() {
                                                     </TableHead>
                                                     <TableHead
                                                         className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-b border-gray-100 dark:border-white/10"
-                                                    >Điện (kWh)
+                                                     >
+                                                         <span className="flex flex-col items-center gap-0.5">
+                                                             <span>Điện (kWh)</span>
+                                                         </span>
                                                     </TableHead>
                                                     <TableHead
                                                         className="text-center text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 border-l border-gray-200 dark:border-white/10"
@@ -1256,6 +1262,9 @@ export default function MeterReadings() {
                                                                     {elecCharge === null ? "" : elecCharge.isInvalid ? "Lỗi" : formatVnd(elecCharge.amount)}
                                                                 </span>
                                                                 </div>
+                                                                <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                                                    Chu kỳ đồng hồ: {room.electricityRolloverCount ?? 0}
+                                                                </p>
                                                             </TableCell>
 
                                                             {/* Photos */}
@@ -1394,8 +1403,11 @@ export default function MeterReadings() {
                                                         <div className="bg-gray-50 dark:bg-[#020817] rounded-lg p-3">
                                                             <div
                                                                 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Điện
-                                                                (kWh)
-                                                            </div>
+                                                                 (kWh)
+                                                                 <span className="mt-0.5 block text-[11px] font-medium text-blue-600 dark:text-blue-300">
+                                                                     Chu kỳ đồng hồ: {room.electricityRolloverCount ?? 0}
+                                                                 </span>
+                                                             </div>
                                                             <div
                                                                 className="grid grid-cols-3 gap-2 text-sm items-center">
                                                                 <div className="flex flex-col">

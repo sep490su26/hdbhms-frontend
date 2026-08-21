@@ -21,9 +21,11 @@ export default function DashboardFilterDropdown({
 
   return (
     <div className="grid min-w-0 gap-1.5">
-      <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">
-        {label}
-      </span>
+      {label ? (
+        <span className="text-[11px] font-semibold text-[#8490a5] dark:text-slate-400">
+          {label}
+        </span>
+      ) : null}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button

@@ -38,6 +38,7 @@ import {
   uploadSignedLeaseContractFile,
   liquidateLeaseContract,
   recordLeaseContractTenantIntention,
+  submitLeaseContractFinancialTermsRequest,
   updateLeaseContractLiquidationDraft,
   updateLeaseContractTerms,
 } from "@/services/leaseContractsService";
@@ -372,6 +373,48 @@ function formatCycle(value) {
   return `${number} tháng/lần`;
 }
 
+function contractStatus(item) {
+  return String(item?.status || item?.contractStatus || "")
+    .trim()
+    .toUpperCase();
+}
+
+function isPreSigningContract(item) {
+  return (
+    ["DRAFT", "PENDING_SIGNATURE"].includes(contractStatus(item)) &&
+    !item?.signedFileId &&
+    !item?.signedAt
+  );
+}
+
+function isFinancialTermsAdjustmentStatus(item) {
+  const status = contractStatus(item);
+  return (
+    ["SIGNED", "ACTIVE", "EXPIRING_SOON"].includes(status) ||
+    (status === "PENDING_SIGNATURE" && !isPreSigningContract(item))
+  );
+}
+
+function canEditPaymentCycle(item, role) {
+  const status = contractStatus(item);
+  if (isPreSigningContract(item)) {
+    return !item?.signedFileId && !item?.signedAt;
+  }
+  return isFinancialTermsAdjustmentStatus(item) &&
+    [ROLES.OWNER, ROLES.MANAGER].includes(role);
+}
+
+function canEditContractDates(item) {
+  return isPreSigningContract(item) && !item?.signedFileId && !item?.signedAt;
+}
+
+function isManagerFinancialTermsRequest(item, role) {
+  return (
+    role === ROLES.MANAGER &&
+    isFinancialTermsAdjustmentStatus(item)
+  );
+}
+
 function toDateInputValue(value) {
   if (!value) return "";
   return String(value).slice(0, 10);
@@ -428,8 +471,6 @@ function buildTermsForm(item = {}) {
     endDate: toDateInputValue(item.endDate),
     paymentCycleMonths: String(item.paymentCycleMonths || 1),
     monthlyRent: item.monthlyRent == null ? "" : String(item.monthlyRent),
-    depositAmount:
-      item.depositAmount == null ? "0" : String(item.depositAmount),
   };
 }
 
@@ -1751,6 +1792,7 @@ export default function ContractTemplatePage() {
   const [roomFilter, setRoomFilter] = useState("all");
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [termsForm, setTermsForm] = useState(buildTermsForm());
+  const [termsNote, setTermsNote] = useState("");
   const [termsError, setTermsError] = useState("");
   const [termsFieldErrors, setTermsFieldErrors] = useState({});
   const [isEditingLiquidation, setIsEditingLiquidation] = useState(false);
@@ -2890,6 +2932,7 @@ export default function ContractTemplatePage() {
 
   function cancelTermsEditing() {
     setTermsForm(buildTermsForm(mergedSelected));
+    setTermsNote("");
     setTermsFieldErrors({});
     setTermsError("");
     setIsEditingTerms(false);
@@ -2899,8 +2942,11 @@ export default function ContractTemplatePage() {
     if (!mergedSelected?.leaseContractId) return;
 
     const monthlyRent = Number(termsForm.monthlyRent);
-    const depositAmount = Number(termsForm.depositAmount);
     const paymentCycleMonths = Number(termsForm.paymentCycleMonths);
+    const managerRequest = isManagerFinancialTermsRequest(
+      mergedSelected,
+      user?.role,
+    );
     const validationErrors = {};
 
     if (!termsForm.startDate) {
@@ -2922,10 +2968,6 @@ export default function ContractTemplatePage() {
     if (!Number.isFinite(monthlyRent) || monthlyRent <= 0) {
       validationErrors.monthlyRent = "Giá thuê mỗi tháng phải lớn hơn 0.";
     }
-    if (!Number.isFinite(depositAmount) || depositAmount < 0) {
-      validationErrors.depositAmount = "Tiền cọc phải lớn hơn hoặc bằng 0.";
-    }
-
     if (Object.keys(validationErrors).length > 0) {
       setTermsFieldErrors(validationErrors);
       setTermsError("Vui lòng kiểm tra các trường được đánh dấu đỏ.");
@@ -2937,6 +2979,21 @@ export default function ContractTemplatePage() {
     setTermsError("");
     setError("");
     try {
+      if (managerRequest) {
+        await submitLeaseContractFinancialTermsRequest(
+          mergedSelected.leaseContractId,
+          {
+            monthlyRent,
+            paymentCycleMonths,
+            note: termsNote,
+          },
+        );
+        setActionMessage("Đã gửi yêu cầu điều chỉnh điều khoản tài chính cho chủ trọ.");
+        setTermsNote("");
+        setIsEditingTerms(false);
+        return;
+      }
+
       const updated = await updateLeaseContractTerms(
         mergedSelected.leaseContractId,
         {
@@ -2944,7 +3001,6 @@ export default function ContractTemplatePage() {
           endDate: termsForm.endDate,
           paymentCycleMonths,
           monthlyRent,
-          depositAmount,
         },
       );
       setContracts((current) =>
@@ -2962,6 +3018,7 @@ export default function ContractTemplatePage() {
       );
       setDetails(refreshedDetails);
       setTermsForm(buildTermsForm(refreshedDetails));
+      setTermsNote("");
       setTermsFieldErrors({});
       setIsEditingTerms(false);
     } catch (err) {
@@ -2975,8 +3032,6 @@ export default function ContractTemplatePage() {
         paymentCycleMonths:
           serverErrors.paymentCycleMonths || serverErrors.payment_cycle_months,
         monthlyRent: serverErrors.monthlyRent || serverErrors.monthly_rent,
-        depositAmount:
-          serverErrors.depositAmount || serverErrors.deposit_amount,
       });
       setTermsError(
         Object.keys(serverErrors).length > 0
@@ -4354,36 +4409,6 @@ export default function ContractTemplatePage() {
                             className="h-10 min-w-0 rounded-lg border border-[#d8e1ef] bg-[#f2f6fc] px-3 text-sm font-extrabold text-[#091426]"
                           />
                         </label>
-                        <label className="grid min-w-0 gap-1.5">
-                          <span className="text-xs font-bold text-[#58667c]">
-                            Tiền cọc *
-                          </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            value={termsForm.depositAmount}
-                            onChange={(event) =>
-                              updateTermsField(
-                                "depositAmount",
-                                event.target.value,
-                              )
-                            }
-                            aria-invalid={Boolean(
-                              termsFieldErrors.depositAmount,
-                            )}
-                            className={`h-10 min-w-0 rounded-lg border bg-white px-3 text-sm font-semibold outline-none ${
-                              termsFieldErrors.depositAmount
-                                ? "border-red-500 text-red-700 focus:border-red-600"
-                                : "border-[#cbd5e1] focus:border-[#091426]"
-                            }`}
-                          />
-                          {termsFieldErrors.depositAmount && (
-                            <span className="text-xs font-semibold leading-4 text-red-600">
-                              {termsFieldErrors.depositAmount}
-                            </span>
-                          )}
-                        </label>
                         <InfoValue
                           label="Số người"
                           value={`${getOccupantsCount(mergedSelected, details)} người`}
@@ -4449,6 +4474,7 @@ export default function ContractTemplatePage() {
                               cancelTermsEditing();
                             } else {
                               setTermsForm(buildTermsForm(mergedSelected));
+                              setTermsNote("");
                               setTermsFieldErrors({});
                               setTermsError("");
                               setIsEditingTerms(true);
@@ -4484,6 +4510,7 @@ export default function ContractTemplatePage() {
                             </span>
                             <DateInput
                               value={termsForm.startDate}
+                              disabled={!canEditContractDates(mergedSelected)}
                               onChange={(event) =>
                                 updateTermsField(
                                   "startDate",
@@ -4510,6 +4537,7 @@ export default function ContractTemplatePage() {
                             <DateInput
                               value={termsForm.endDate}
                               min={termsForm.startDate || undefined}
+                              disabled={!canEditContractDates(mergedSelected)}
                               onChange={(event) =>
                                 updateTermsField("endDate", event.target.value)
                               }
@@ -4532,6 +4560,7 @@ export default function ContractTemplatePage() {
                             </span>
                             <select
                               value={termsForm.paymentCycleMonths}
+                              disabled={!canEditPaymentCycle(mergedSelected, user?.role)}
                               onChange={(event) =>
                                 updateTermsField(
                                   "paymentCycleMonths",
@@ -4550,6 +4579,19 @@ export default function ContractTemplatePage() {
                               <option value="1">1 tháng/lần</option>
                               <option value="3">3 tháng/lần</option>
                             </select>
+                            {!canEditPaymentCycle(mergedSelected, user?.role) && (
+                              <span className="text-xs font-semibold leading-4 text-slate-500">
+                                Chu kỳ không thể chỉnh sửa ở trạng thái hiện tại.
+                              </span>
+                            )}
+                            {isManagerFinancialTermsRequest(
+                              mergedSelected,
+                              user?.role,
+                            ) && (
+                              <span className="text-xs font-semibold leading-4 text-amber-700">
+                                Thay đổi sẽ được gửi chủ trọ phê duyệt.
+                              </span>
+                            )}
                             {termsFieldErrors.paymentCycleMonths && (
                               <span className="text-xs font-semibold leading-4 text-red-600">
                                 {termsFieldErrors.paymentCycleMonths}
@@ -4607,6 +4649,25 @@ export default function ContractTemplatePage() {
                           </div>
                         )}
 
+                        {isManagerFinancialTermsRequest(
+                          mergedSelected,
+                          user?.role,
+                        ) && (
+                          <label className="mt-3 grid gap-1.5">
+                            <span className="text-xs font-bold text-[#58667c]">
+                              Lý do điều chỉnh
+                            </span>
+                            <textarea
+                              value={termsNote}
+                              onChange={(event) => setTermsNote(event.target.value)}
+                              maxLength={1000}
+                              rows={3}
+                              placeholder="Nhập lý do để chủ trọ xem xét..."
+                              className="rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#091426]"
+                            />
+                          </label>
+                        )}
+
                         {termsError && (
                           <div
                             role="alert"
@@ -4628,7 +4689,12 @@ export default function ContractTemplatePage() {
                           ) : (
                             <Save className="h-4 w-4" />
                           )}
-                          Lưu thông tin hợp đồng
+                          {isManagerFinancialTermsRequest(
+                            mergedSelected,
+                            user?.role,
+                          )
+                            ? "Gửi yêu cầu điều chỉnh"
+                            : "Lưu thông tin hợp đồng"}
                         </button>
                       </div>
                     ) : (
@@ -5266,10 +5332,7 @@ export default function ContractTemplatePage() {
                         tiếp ở hợp đồng mới.
                       </p>
                     )}
-                    {(details?.canRenew ??
-                      ["ACTIVE", "EXPIRING_SOON", "EXPIRED"].includes(
-                        getWorkflow(mergedSelected),
-                      )) && (
+                    {details?.canRenew === true && (
                       <button
                         type="button"
                         onClick={openRenewModal}
@@ -5632,8 +5695,7 @@ export default function ContractTemplatePage() {
                   <span className="text-sm font-bold text-[#34445c]">
                     Ngày dự kiến trả phòng / bàn giao phòng
                   </span>
-                  <input
-                    type="date"
+                  <DateInput
                     value={intentionForm.expectedMoveOutDate}
                     onChange={(event) =>
                       setIntentionForm((current) => ({

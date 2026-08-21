@@ -494,14 +494,20 @@ function getRoomFloorId(room) {
 
 function roomToEditForm(room) {
     return {
-        listedPrice: String(room?.listedPrice ?? room?.price ?? ""),
+        listedPrice: formatAmountInput(room?.listedPrice ?? room?.price ?? ""),
         publicNote: String(room?.publicNote ?? room?.note ?? room?.description ?? ""),
     };
 }
 
+function formatAmountInput(value) {
+    const digits = String(value ?? "").replace(/\D/g, "");
+    return digits ? money.format(Number(digits)) : "";
+}
+
 function toNullableNumber(value) {
     if (value === "" || value === null || value === undefined) return null;
-    const parsed = Number(value);
+    const normalized = typeof value === "string" ? value.replace(/\D/g, "") : value;
+    const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -531,6 +537,29 @@ const CURRENT_CONTRACT_STATUSES = new Set([
     "EXPIRING_SOON",
     "TERMINATION_PENDING",
 ]);
+
+function findCurrentRentalContract(contracts = []) {
+    return contracts.find((contract) =>
+        CURRENT_CONTRACT_STATUSES.has(
+            String(contract?.status ?? contract?.contractStatus ?? "")
+                .trim()
+                .toUpperCase(),
+        ),
+    ) ?? null;
+}
+
+function getRentalOccupantCount(contract) {
+    const occupants = Array.isArray(contract?.occupants) ? contract.occupants : [];
+    if (occupants.length > 0) {
+        return occupants.filter((occupant) => {
+            const status = String(occupant?.status ?? "").trim().toUpperCase();
+            return !occupant?.moveOutDate && !["MOVED_OUT", "INACTIVE", "TERMINATED", "LIQUIDATED"].includes(status);
+        }).length;
+    }
+
+    const count = Number(contract?.occupantsCount);
+    return Number.isFinite(count) ? count : 0;
+}
 
 const OCCUPANT_ROLE_LABELS = {
     PRIMARY: "Người ký chính",
@@ -807,9 +836,9 @@ function RoomEditModal({room, isSaving, error, onClose, onSubmit}) {
             <DialogContent
                 lockScroll={false}
                 showCloseButton={false}
-                className="max-h-[min(90vh,760px)] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-2xl bg-white p-0 dark:bg-[#0f172a] sm:max-w-2xl"
+                className="flex max-h-[min(90vh,760px)] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl bg-white p-0 dark:bg-[#0f172a] sm:max-w-2xl"
             >
-                <div className="flex items-center justify-between border-b border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+                <div className="flex shrink-0 items-center justify-between border-b border-[#e2e8f0] px-6 py-3.5 dark:border-white/10">
                     <div>
                         <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
                             Sửa {roomLabel}
@@ -828,8 +857,8 @@ function RoomEditModal({room, isSaving, error, onClose, onSubmit}) {
                         <X className="h-5 w-5"/>
                     </button>
                 </div>
-                <div className="max-h-[calc(min(90vh,760px)-145px)] overflow-y-auto px-6 py-5">
-            <form id="room-edit-form" onSubmit={handleSubmit} className="grid gap-5">
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <form id="room-edit-form" onSubmit={handleSubmit} className="grid gap-4">
                 {(localError || error) && (
                     <div
                         className="rounded-lg border border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
@@ -837,15 +866,16 @@ function RoomEditModal({room, isSaving, error, onClose, onSubmit}) {
                     </div>
                 )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4">
                     <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
                         Giá niêm yết
                         <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             min="0"
-                            step="1000"
                             value={form.listedPrice}
-                            onChange={(event) => updateField("listedPrice", event.target.value)}
+                            onChange={(event) => updateField("listedPrice", formatAmountInput(event.target.value))}
+                            placeholder="0"
                             className={inputClass}
                         />
                     </label>
@@ -954,7 +984,7 @@ function RoomEditModal({room, isSaving, error, onClose, onSubmit}) {
                 </section>
             </form>
                 </div>
-                <div className="flex justify-end gap-3 border-t border-[#e2e8f0] px-6 py-4 dark:border-white/10">
+                <div className="flex shrink-0 justify-end gap-3 border-t border-[#e2e8f0] px-6 py-3.5 dark:border-white/10">
                     <button
                         type="button"
                         onClick={onClose}
@@ -1072,7 +1102,14 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
     const roomLabel = getRoomDisplayCode(room);
     const roomBadges = Array.isArray(room.badges) ? room.badges : [];
     const historyContracts = rentalHistory?.contracts || [];
-    const currentOccupants = Number(room.currentOccupants ?? 0);
+    const currentRentalContract = findCurrentRentalContract(historyContracts);
+    const roomOccupantCount =
+        roomDetail?.currentOccupants ??
+        roomDetail?.current_occupants ??
+        room.currentOccupants;
+    const currentOccupants = currentRentalContract
+        ? getRentalOccupantCount(currentRentalContract)
+        : Number(roomOccupantCount ?? 0);
     const roomFloorName =
         roomDetail?.floor?.name ?? room.floorName ?? room.floor ?? "Chưa có";
     const detail = {
@@ -1086,8 +1123,9 @@ function RoomDetailDrawer({room, tenantList, activeRole, onClose, onEdit}) {
     return (
         <Dialog open={!!room} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
+                lockScroll={false}
                 showCloseButton={false}
-                className="flex max-h-[min(94dvh,920px)] w-[calc(100vw-2rem)] max-w-[1280px] flex-col overflow-hidden rounded-[28px] border border-[#dcd9d2] bg-[#f7f5f0] p-0 text-[#24272b] shadow-[0_30px_100px_rgba(29,32,36,0.28)] dark:border-white/10 dark:bg-[#17191c] dark:text-white sm:w-[calc(100vw-3rem)] sm:rounded-[28px]">
+                className="flex max-h-[min(94dvh,920px)] w-[calc(100vw-1rem)] !max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[28px] border border-[#dcd9d2] bg-[#f7f5f0] p-0 text-[#24272b] shadow-[0_30px_100px_rgba(29,32,36,0.28)] dark:border-white/10 dark:bg-[#17191c] dark:text-white sm:w-[calc(100vw-2rem)] sm:!max-w-[calc(100vw-2rem)] sm:rounded-[28px] lg:!max-w-[1180px] xl:!max-w-[1280px]">
                 <DialogHeader className="sr-only">
                     <DialogTitle>Chi tiết phòng {roomLabel}</DialogTitle>
                     <DialogDescription>

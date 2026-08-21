@@ -472,7 +472,7 @@ const DEPOSIT_FIELD_LABELS = {
   portraitImage: "ảnh chân dung",
   occupantCount: "số lượng người ở",
   coOccupants: "thông tin người ở cùng",
-  terms: "hợp đồng đặt cọc",
+  terms: "hợp đồng",
 };
 
 const buildRetryFieldMessage = (fieldName, fallbackMessage) => {
@@ -2204,7 +2204,7 @@ function DepositInfoForm({
         acceptedSignature !== signatureFromMetadata(metadata)
       ) {
         nextErrors.terms =
-          "Vui lòng xem hợp đồng đặt cọc và tick đồng ý trước khi tiếp tục thanh toán.";
+          "Vui lòng xem hợp đồng và tick đồng ý trước khi tiếp tục thanh toán.";
       }
     }
 
@@ -2606,13 +2606,6 @@ function DepositInfoForm({
                 onChange={handleFieldChange}
                 onBlur={handleFieldBlur}
               />
-              {scheduleWindow.isSoonVacant && availableForDepositDateLabel && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
-                  Phòng sắp trống. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở
-                  có thể bắt đầu từ {availableForDepositDateLabel}, tối đa
-                  trong vòng 14 ngày.
-                </div>
-              )}
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold tracking-[0.04em] text-[#45474c]">
                   Chu kỳ thanh toán <span className="text-rose-600">*</span>
@@ -2645,6 +2638,13 @@ function DepositInfoForm({
                   </span>
                 )}
               </label>
+              {scheduleWindow.isSoonVacant && availableForDepositDateLabel && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800 sm:col-span-2">
+                  Phòng sắp trống. Ngày hẹn ký hợp đồng và ngày dự kiến vào ở
+                  có thể bắt đầu từ {availableForDepositDateLabel}, tối đa
+                  trong vòng 14 ngày.
+                </div>
+              )}
             </div>
           </FormSection>
 

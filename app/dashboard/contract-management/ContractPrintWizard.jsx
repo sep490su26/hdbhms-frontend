@@ -6,6 +6,7 @@ import {createHandoverReadings} from "@/services/contractHandoverService";
 import {buildLeaseContractDocumentFilename} from "@/services/leaseContractsService";
 import {fetchRoomAssets, createRoomAsset, updateRoomAsset} from "@/services/roomAssetsService";
 import {formatDate as formatDisplayDate} from "@/lib/dateFormat";
+import DateInput from "@/components/DateInput";
 
 const CONTRACT_STATUS_LABELS = {
     ACTIVE: "Đang hiệu lực",
@@ -197,13 +198,21 @@ function Field({label, value, onChange, type = "text", placeholder = ""}) {
     return (
         <label className="grid min-w-0 gap-1.5">
             <span className="text-xs font-bold text-[#58667c]">{label}</span>
-            <input
-                type={type}
-                value={value ?? ""}
-                placeholder={placeholder}
-                onChange={(event) => onChange(event.target.value)}
-                className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
-            />
+            {type === "date" ? (
+                <DateInput
+                    value={value ?? ""}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
+                />
+            ) : (
+                <input
+                    type={type}
+                    value={value ?? ""}
+                    placeholder={placeholder}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="h-10 min-w-0 rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-white dark:bg-[#0f172a] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#1e40af]"
+                />
+            )}
         </label>
     );
 }
@@ -681,11 +690,10 @@ export default function ContractPrintWizard({contract, details, occupants = [], 
                                         Ngày bàn giao
                                         <span className="ml-1 text-rose-600 dark:text-rose-300">*</span>
                                     </span>
-                                    <input
-                                        type="date"
+                                    <DateInput
                                         value={handover.handoverDate}
                                         disabled={true}
-                                        onChange={(e) => updateHandover("handoverDate", e.target.value)}
+                                        onChange={(event) => updateHandover("handoverDate", event.target.value)}
                                         className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
                                     />
                                 </div>

@@ -52,12 +52,14 @@ export async function askAdvisor({ question, sessionId, period }) {
 export async function fetchAdvisorReport(period) {
   return authenticatedFetch(`${API_BASE_URL}/advisor/copilot/report${periodQuery(period)}`, {
     method: "POST",
+    cache: "no-store",
   });
 }
 
 async function fetchReportBlob(url, token) {
   return fetch(url, {
     method: "GET",
+    cache: "no-store",
     credentials: "include",
     headers: {
       Accept: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

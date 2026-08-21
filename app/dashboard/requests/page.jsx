@@ -60,6 +60,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import DashboardFilterDropdown from "@/components/dashboard/DashboardFilterDropdown";
 import {
   Table,
   TableBody,
@@ -100,7 +101,7 @@ const translateType = (type) => {
     PERMISSION_ACCESS: "Quyền truy cập",
     METER_READING_CORRECTION: "Điều chỉnh chỉ số",
     INVOICE_ADJUSTMENT: "Điều chỉnh hóa đơn",
-    RENT_PRICE_ADJUSTMENT: "Điều chỉnh giá thuê",
+    RENT_PRICE_ADJUSTMENT: "Điều chỉnh điều khoản tài chính",
     DEPOSIT_REFUND_REQUEST: "Hoàn cọc",
     EXPENSE_APPROVAL: "Duyệt khoản chi",
     TRANSFER: "Chuyển phòng",
@@ -621,11 +622,19 @@ function isLiquidationRefundExpenseRequest(req) {
   );
 }
 
+function isContractFinancialTermsRequest(req) {
+  return (
+    req?.requestType === "RENT_PRICE_ADJUSTMENT" &&
+    String(req?.targetType || "").toUpperCase() === "CONTRACT"
+  );
+}
+
 function canResolveRequest(req, isOwner) {
   if (req?.status !== "PENDING") return false;
   if (
     isContractLiquidationRequest(req) ||
-    isLiquidationRefundExpenseRequest(req)
+    isLiquidationRefundExpenseRequest(req) ||
+    isContractFinancialTermsRequest(req)
   )
     return isOwner;
   return true;
@@ -1481,23 +1490,22 @@ export default function ApprovalCenter() {
               <div className="w-full min-w-0 flex-1 flex flex-col gap-1">
                 {/* Toolbar */}
                 <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] flex flex-col">
-                  <div className="flex flex-wrap items-center gap-3 p-3">
-                    <select
-                      className="h-10 w-full sm:w-[200px] rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-blue-500 dark:border-white/10 dark:bg-[#0f172a] dark:text-white"
+                  <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
+                    <DashboardFilterDropdown
                       value={typeFilter}
-                      onChange={(e) => {
-                        setTypeFilter(e.target.value);
+                      onChange={(value) => {
+                        setTypeFilter(value);
                         setPage(1);
                       }}
-                      aria-label="Lọc theo loại yêu cầu"
-                    >
-                      <option value="All Types">Tất cả loại</option>
-                      {Object.keys(TYPE_CONFIG).map((t) => (
-                        <option key={t} value={t}>
-                          {translateType(t)}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: "All Types", label: "Tất cả loại" },
+                        ...Object.keys(TYPE_CONFIG).map((t) => ({
+                          value: t,
+                          label: translateType(t),
+                        })),
+                      ]}
+                    />
+
                   </div>
                 </section>
 

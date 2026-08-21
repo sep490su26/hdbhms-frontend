@@ -15,7 +15,12 @@ function loadAdvisorService(authenticatedFetch = async () => ({})) {
     "getAuthToken",
     "refreshTokenApi",
     `${source}
-return { askAdvisor, currentAdvisorPeriod, fetchAdvisorSessionHistory };`,
+return {
+  askAdvisor,
+  currentAdvisorPeriod,
+  fetchAdvisorSessionHistory,
+  fetchAdvisorReport,
+};`,
   );
 
   return factory("https://api.test", Error, authenticatedFetch, () => "", async () => "");
@@ -49,4 +54,19 @@ test("askAdvisor sends camelCase sessionId", async () => {
   await askAdvisor({ question: "doanh thu?", sessionId: "17:abc", period: "2026-07" });
 
   assert.deepEqual(JSON.parse(body), { question: "doanh thu?", sessionId: "17:abc" });
+});
+
+test("fetchAdvisorReport uses the monthly report endpoint and forwards period", async () => {
+  let calledUrl = "";
+  let calledMethod = "";
+  const { fetchAdvisorReport } = loadAdvisorService(async (url, options) => {
+    calledUrl = url;
+    calledMethod = options.method;
+    return {};
+  });
+
+  await fetchAdvisorReport("2026-07");
+
+  assert.equal(calledUrl, "https://api.test/advisor/copilot/report?period=2026-07");
+  assert.equal(calledMethod, "POST");
 });

@@ -1046,12 +1046,12 @@ export default function ContractWorkflowStepper({
                             </button>
                         </DocumentRow>
 
-                        <div
-                            className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] leading-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:mx-5">
-                            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0"/>
-                            Nút “Nhập bàn giao” chuyển sang màn con ngay trong popup hiện tại,
-                            không mở thêm popup lồng nhau.
-                        </div>
+                        {/*<div*/}
+                        {/*    className="mx-4 mb-4 mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] leading-4 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:mx-5">*/}
+                        {/*    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0"/>*/}
+                        {/*    Nút “Nhập bàn giao” chuyển sang màn con ngay trong popup hiện tại,*/}
+                        {/*    không mở thêm popup lồng nhau.*/}
+                        {/*</div>*/}
                     </>
                 )}
             </section>

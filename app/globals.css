@@ -283,6 +283,11 @@ body {
   scrollbar-gutter: stable;
 }
 
+/* Keep Radix overlays from adding a second right-side gap when scroll is locked. */
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+}
+
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

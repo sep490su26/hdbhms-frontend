@@ -7,9 +7,13 @@ import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
+  Download,
   Loader2,
   Mail,
+  MessageCircle,
   Phone,
   ShieldAlert,
   Star,
@@ -17,6 +21,7 @@ import {
   User,
   Wrench,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { useDashboardLayout } from "../../_contexts/DashboardLayoutContext";
 import {
@@ -87,7 +92,6 @@ const BILLING_STATUS_LABELS = {
   DRAFT: "Chờ phát hành",
   PENDING_PAYMENT: "Chờ thanh toán",
   ISSUED: "Chờ thanh toán",
-  PARTIALLY_PAID: "Thanh toán một phần",
   PAID: "Đã thanh toán",
   OVERDUE: "Quá hạn",
   VOIDED: "Đã hủy",
@@ -242,13 +246,22 @@ function Field({ label, children }) {
 }
 
 function Notice({ type = "info", children }) {
-  const tone = type === "error"
-    ? "border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
-    : "border-amber-200 dark:border-yellow-500/20 bg-amber-50 dark:bg-yellow-500/10 text-amber-900 dark:text-yellow-300";
+  const isError = type === "error";
+  const tone = isError
+    ? "border-rose-200 bg-gradient-to-r from-rose-50 to-white text-rose-800 shadow-[0_8px_24px_rgba(225,29,72,0.06)] dark:border-rose-500/20 dark:from-rose-500/10 dark:to-transparent dark:text-rose-300"
+    : "border-amber-200 bg-gradient-to-r from-amber-50 to-white text-amber-900 shadow-[0_8px_24px_rgba(245,158,11,0.06)] dark:border-yellow-500/20 dark:from-yellow-500/10 dark:to-transparent dark:text-yellow-300";
+  const iconTone = isError
+    ? "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/20"
+    : "bg-amber-100 text-amber-700 ring-amber-200 dark:bg-yellow-500/15 dark:text-yellow-300 dark:ring-yellow-500/20";
   return (
-    <div className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold ${tone}`}>
-      <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{children}</span>
+    <div
+      role={isError ? "alert" : "status"}
+      className={`flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm font-semibold ${tone}`}
+    >
+      <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full ring-1 ${iconTone}`}>
+        <ShieldAlert className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 leading-6">{children}</span>
     </div>
   );
 }
@@ -301,20 +314,81 @@ function ContactItem({ label, user }) {
   );
 }
 
-function AttachmentGrid({ title, attachments }) {
+function attachmentKey(attachment, index) {
+  return String(attachment?.id || attachment?.fileId || attachment?.url || `attachment-${index}`);
+}
+
+function AttachmentGrid({ title, attachments = [] }) {
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [objectUrls, setObjectUrls] = useState({});
+  const [failedAttachments, setFailedAttachments] = useState({});
+  const items = Array.isArray(attachments) ? attachments : [];
+
+  const updateObjectUrl = useCallback((key, url) => {
+    setObjectUrls((current) => {
+      if (url) return { ...current, [key]: url };
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const updateAttachmentFailure = useCallback((key, failed) => {
+    setFailedAttachments((current) => {
+      if (failed) return { ...current, [key]: true };
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const openPreview = useCallback((index) => setSelectedIndex(index), []);
+
+  const closePreview = useCallback(() => setSelectedIndex(null), []);
+
+  const movePreview = useCallback((direction) => {
+    setSelectedIndex((current) => {
+      if (current === null || items.length <= 1) return current;
+      return (current + direction + items.length) % items.length;
+    });
+  }, [items.length]);
+
+  useEffect(() => {
+    if (selectedIndex === null || items.length <= 1) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "ArrowLeft") movePreview(-1);
+      if (event.key === "ArrowRight") movePreview(1);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [items.length, movePreview, selectedIndex]);
+
+  const activeIndex = selectedIndex !== null && selectedIndex < items.length ? selectedIndex : null;
+  const selectedAttachment = activeIndex === null ? null : items[activeIndex];
+  const selectedKey = selectedAttachment ? attachmentKey(selectedAttachment, activeIndex) : "";
+  const selectedObjectUrl = selectedKey ? objectUrls[selectedKey] : "";
+  const selectedFailed = selectedKey ? failedAttachments[selectedKey] : false;
+
   return (
-    <section className="grid gap-3">
+    <section className="grid min-w-0 gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-black text-slate-900 dark:text-white">{title}</h2>
-        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{attachments.length} ảnh</span>
+        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{items.length} ảnh</span>
       </div>
-      {attachments.length > 0 ? (
+      {items.length > 0 ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,140px),1fr))] gap-3">
-          {attachments.map((attachment) => (
+          {items.map((attachment, index) => (
             <AuthorizedAttachmentLink
-              key={`${attachment.id}-${attachment.fileId}`}
+              key={attachmentKey(attachment, index)}
               attachment={attachment}
               title={title}
+              index={index}
+              onPreview={openPreview}
+              attachmentKey={attachmentKey(attachment, index)}
+              onObjectUrlChange={updateObjectUrl}
+              onFailureChange={updateAttachmentFailure}
             />
           ))}
         </div>
@@ -323,21 +397,152 @@ function AttachmentGrid({ title, attachments }) {
           Chưa có ảnh.
         </div>
       )}
+
+      <Dialog
+        open={activeIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) closePreview();
+        }}
+      >
+        <DialogContent
+          lockScroll={false}
+          showCloseButton={false}
+          className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] !max-w-5xl flex-col gap-0 overflow-x-hidden overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-0 text-white shadow-2xl sm:w-full"
+        >
+          <DialogTitle className="sr-only">
+            {selectedAttachment?.name || `Xem ${title.toLowerCase()}`}
+          </DialogTitle>
+
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black">{title}</p>
+              <p className="mt-0.5 text-xs font-semibold text-white/60">
+                {(activeIndex ?? 0) + 1} / {items.length}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <a
+                href={selectedObjectUrl || "#"}
+                download={selectedAttachment?.name || `incident-image-${(activeIndex ?? 0) + 1}`}
+                onClick={(event) => {
+                  if (!selectedObjectUrl) event.preventDefault();
+                }}
+                aria-label="Tải ảnh xuống"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:pointer-events-none"
+              >
+                <Download className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                onClick={closePreview}
+                aria-label="Đóng xem ảnh"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex min-h-[min(68vh,620px)] items-center justify-center overflow-hidden bg-black/30 px-12 py-5 sm:px-16">
+            <button
+              type="button"
+              onClick={() => movePreview(-1)}
+              disabled={items.length <= 1}
+              aria-label="Ảnh trước"
+              className="absolute left-2 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-30 sm:left-4"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+
+            <div className="relative h-[min(64vh,580px)] w-full">
+              {selectedFailed ? (
+                <div className="grid h-full place-items-center px-6 text-center text-sm font-semibold text-white/65">
+                  Không tải được ảnh này.
+                </div>
+              ) : selectedObjectUrl ? (
+                <Image
+                  key={selectedKey}
+                  src={selectedObjectUrl}
+                  alt={selectedAttachment?.name || title}
+                  fill
+                  sizes="90vw"
+                  className="object-contain"
+                  unoptimized
+                  onError={() => updateAttachmentFailure(selectedKey, true)}
+                />
+              ) : (
+                <div className="grid h-full place-items-center gap-3 text-sm font-semibold text-white/65">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  Đang tải ảnh...
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => movePreview(1)}
+              disabled={items.length <= 1}
+              aria-label="Ảnh tiếp theo"
+              className="absolute right-2 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-30 sm:right-4"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+
+          {items.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-4 py-3 scrollbar-thin sm:px-5">
+              {items.map((attachment, index) => {
+                const key = attachmentKey(attachment, index);
+                const url = objectUrls[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => openPreview(index)}
+                    aria-label={`Xem ảnh ${index + 1}`}
+                    className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+                      index === activeIndex ? "border-white" : "border-transparent opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    {url ? (
+                      <Image src={url} alt="" fill sizes="56px" className="object-cover" unoptimized />
+                    ) : (
+                      <span className="grid h-full place-items-center bg-white/10 text-[10px] text-white/50">...</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
-function AuthorizedAttachmentLink({ attachment, title }) {
+function AuthorizedAttachmentLink({
+  attachment,
+  title,
+  index,
+  onPreview,
+  attachmentKey: itemKey,
+  onObjectUrlChange,
+  onFailureChange,
+}) {
   const [objectUrl, setObjectUrl] = useState("");
-  const [failed, setFailed] = useState(false);
+  const [loadedUrl, setLoadedUrl] = useState("");
+  const [failedUrl, setFailedUrl] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     let currentObjectUrl = "";
+    const controller = new AbortController();
+
+    onObjectUrlChange(itemKey, "");
+    onFailureChange(itemKey, !attachment.url);
 
     async function loadImage() {
       if (!attachment.url) {
-        setFailed(true);
         return;
       }
       try {
@@ -345,49 +550,84 @@ function AuthorizedAttachmentLink({ attachment, title }) {
         const response = await fetch(attachment.url, {
           credentials: "include",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`download_failed_${response.status}`);
         }
         const blob = await response.blob();
         currentObjectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(currentObjectUrl);
+          currentObjectUrl = "";
+          return;
+        }
         if (!cancelled) {
           setObjectUrl(currentObjectUrl);
-          setFailed(false);
+          setLoadedUrl(attachment.url);
+          setFailedUrl("");
+          onObjectUrlChange(itemKey, currentObjectUrl);
+          onFailureChange(itemKey, false);
         }
       } catch {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) {
+          setFailedUrl(attachment.url);
+          onFailureChange(itemKey, true);
+        }
       }
     }
 
     loadImage();
     return () => {
       cancelled = true;
+      controller.abort();
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     };
-  }, [attachment.url]);
+  }, [attachment.url, itemKey, onFailureChange, onObjectUrlChange]);
 
-  const href = objectUrl || attachment.url || "#";
+  const failed = !attachment.url || failedUrl === attachment.url;
+  const imageReady = Boolean(objectUrl) && loadedUrl === attachment.url;
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="group relative block h-36 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] dark:border-white/10 dark:bg-white/5"
+    <button
+      type="button"
+      onClick={() => onPreview(index)}
+      disabled={failed}
+      aria-label={`Xem ảnh ${index + 1}`}
+      aria-busy={!imageReady && !failed}
+      className="group relative block h-36 min-w-0 overflow-hidden rounded-lg border border-[#d8dee8] bg-[#f8fafc] text-left transition hover:border-[#3156b6] hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3156b6] disabled:cursor-not-allowed dark:border-white/10 dark:bg-white/5"
     >
       {failed ? (
         <div className="grid h-36 place-items-center px-3 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
           Không tải được ảnh.
         </div>
-      ) : objectUrl ? (
-        <Image src={objectUrl} alt={attachment.name || title} fill sizes="240px" className="object-cover transition group-hover:scale-[1.02]" unoptimized />
+      ) : imageReady ? (
+        <>
+          <Image
+            src={objectUrl}
+            alt={attachment.name || title}
+            fill
+            sizes="240px"
+            className="object-cover transition duration-300 group-hover:scale-[1.04]"
+            unoptimized
+            onError={() => {
+              setFailedUrl(attachment.url);
+              onFailureChange(itemKey, true);
+            }}
+          />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/35">
+            <ZoomIn className="h-7 w-7 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-100" />
+          </span>
+          <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+            {attachment.name || title}
+          </span>
+        </>
       ) : (
         <div className="grid h-36 place-items-center text-xs font-bold text-slate-500 dark:text-slate-400">
-          Đang tải ảnh...
+          <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       )}
-    </a>
+    </button>
   );
 }
 
@@ -401,7 +641,7 @@ function Timeline({ events }) {
   }
 
   return (
-    <ol className="grid gap-3">
+    <ol className="relative ml-1 grid gap-4 before:absolute before:bottom-4 before:left-2 before:top-4 before:w-px before:bg-[#d8dee8] dark:before:bg-white/10">
       {events.map((event) => {
         const hasStatusChange =
           event.fromStatus &&
@@ -409,7 +649,9 @@ function Timeline({ events }) {
           event.fromStatus !== event.toStatus;
 
         return (
-          <li key={event.id || `${event.action}-${event.createdAt}`} className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-4">
+          <li key={event.id || `${event.action}-${event.createdAt}`} className="relative pl-8">
+            <span className="absolute left-0 top-5 h-4 w-4 rounded-full border-4 border-white bg-[#3156b6] shadow-sm dark:border-[#0f172a] dark:bg-blue-400" />
+            <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 transition-shadow hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="text-sm font-black text-slate-900 dark:text-white">{formatActionLabel(event.action)}</p>
@@ -429,6 +671,7 @@ function Timeline({ events }) {
                 {event.createdBy?.phone && <span className="ml-auto">{event.createdBy.phone}</span>}
               </div>
             )}
+            </div>
           </li>
         );
       })}
@@ -678,23 +921,25 @@ export default function MaintenanceTicketDetailPage() {
   const incidentalBillingStatus = String(ticket.billingStatus || ticket.invoiceStatus || "").toUpperCase();
   const shouldShowIncidentalPayment = ticket.status !== "REJECTED" && (
     Boolean(ticket.invoiceId)
-    || ["SCHEDULED", "SCHEDULE_FAILED", "DRAFT", "PENDING_PAYMENT", "ISSUED", "PARTIALLY_PAID", "PAID", "OVERDUE", "VOIDED"]
+    || ["SCHEDULED", "SCHEDULE_FAILED", "DRAFT", "PENDING_PAYMENT", "ISSUED", "PAID", "OVERDUE", "VOIDED"]
       .includes(incidentalBillingStatus)
   );
   const isEditingRepairDetails = ticket.status === "ACCEPTED" || editRepairDetails;
   const completionCostResponsibility = editRepairDetails
     ? completeForm.costResponsibility
     : ticket.costResponsibility || completeForm.costResponsibility;
+  const reviewRating = Math.max(0, Math.min(5, Number(ticket.review?.rating) || 0));
 
   return (
     <section className="grid gap-6">
-      <div>
+      <div className="rounded-2xl border border-[#dce3ee] bg-gradient-to-br from-white via-white to-[#f2f6ff] p-5 shadow-[0_10px_30px_rgba(30,64,175,0.06)] dark:border-white/10 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-[#172554] md:p-6">
         <Link href="/dashboard/maintenance" className="inline-flex items-center gap-2 text-sm font-bold text-[#3156b6]">
           <ArrowLeft className="h-4 w-4" />
           Danh sách bảo trì
         </Link>
         <DashboardPageHeader
-          className="mt-4"
+          eyebrow="PHIẾU SỰ CỐ"
+          className="mt-5"
           title={
             <span className="flex flex-wrap items-center gap-3">
               {ticket.ticketCode}
@@ -783,11 +1028,20 @@ export default function MaintenanceTicketDetailPage() {
             </div>
           ) : null}
         />
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[#dce3ee] pt-4 text-xs font-bold text-slate-600 dark:border-white/10 dark:text-slate-300">
+          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-800 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/20">
+            {SCOPE_LABELS[ticket.ticketScope] || "Phạm vi chưa xác định"}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-200 dark:ring-white/10">
+            {CATEGORY_LABELS[ticket.category] || "Khác"}
+          </span>
+          <span className="ml-0 sm:ml-auto">Cập nhật {formatDateTime(ticket.updatedAt || ticket.createdAt)}</span>
+        </div>
       </div>
 
       {error && <Notice type="error">{error}</Notice>}
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <InfoItem label="Vị trí" value={locationText} />
         <InfoItem label="Hạng mục" value={CATEGORY_LABELS[ticket.category] || "Khác"} />
         <InfoItem label="Mong muốn xử lý" value={ticket.repairRequested === false ? "Chỉ báo sự cố" : "Cần sửa chữa"} />
@@ -812,14 +1066,16 @@ export default function MaintenanceTicketDetailPage() {
         </section>
       )}
 
-      <section className="grid gap-4 rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
+      <section className="grid gap-5 rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] md:p-6">
         <h2 className="text-lg font-black text-slate-900 dark:text-white">Thông tin sự cố</h2>
-        <p className="rounded-lg bg-[#f8fafc] dark:bg-white/5 p-4 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{ticket.description}</p>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(260px,0.75fr)]">
+          <p className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-5 text-sm font-semibold leading-7 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">{ticket.description}</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           <ContactItem label="Người gửi" user={ticket.createdBy} />
           <InfoItem label="Người xử lý" value={ticket.workerName || ticket.assignedTo?.phone || ticket.assignedTo?.email || "Chưa phân công"} />
           <InfoItem label="SĐT thợ" value={ticket.repairmanPhone || "Chưa có"} />
           <InfoItem label="Cập nhật cuối" value={formatDateTime(ticket.updatedAt || ticket.createdAt)} />
+          </div>
         </div>
       </section>
 
@@ -833,7 +1089,6 @@ export default function MaintenanceTicketDetailPage() {
       </div>
 
       <Dialog
-        modal={false}
         open={isCompleteDialogOpen}
         onOpenChange={(open) => {
           if (actionLoading === "complete") return;
@@ -841,10 +1096,7 @@ export default function MaintenanceTicketDetailPage() {
           if (!open) setError("");
         }}
       >
-        <DialogContent
-          lockScroll={false}
-          className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] !max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full"
-        >
+        <DialogContent lockScroll={false} className="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] !max-w-4xl flex-col gap-0 overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full">
           <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
             <DialogHeader className="gap-1 text-left">
               <DialogTitle className="text-lg font-black text-slate-900 dark:text-white">
@@ -957,7 +1209,6 @@ export default function MaintenanceTicketDetailPage() {
       </Dialog>
 
       <Dialog
-        modal={false}
         open={repairDecision !== null}
         onOpenChange={(open) => {
           if (actionLoading === "repair-decision") return;
@@ -1074,15 +1325,38 @@ export default function MaintenanceTicketDetailPage() {
       )}
 
       {ticket.review && (
-        <section className="rounded-lg border border-[#e2e8f0] dark:border-white/10 bg-white dark:bg-[#0f172a] p-5 shadow-[0_1px_2px_rgba(9,20,38,0.06)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">Đánh giá khách thuê</h2>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-yellow-500/10 px-3 py-1 text-sm font-black text-amber-800 dark:text-yellow-300">
-              <Star className="h-4 w-4 fill-current" />
-              {ticket.review.rating}/5
-            </span>
+        <section className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white via-white to-amber-50/70 p-5 shadow-[0_10px_30px_rgba(245,158,11,0.08)] dark:border-amber-500/20 dark:from-[#0f172a] dark:via-[#0f172a] dark:to-amber-500/10 md:p-6">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-amber-200/30 blur-2xl dark:bg-amber-400/10" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/20">
+                <Star className="h-5 w-5 fill-current" />
+              </span>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-700/80 dark:text-amber-300/80">Phản hồi sau xử lý</p>
+                <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">Đánh giá khách thuê</h2>
+              </div>
+            </div>
+            <div className="flex w-fit items-center gap-3 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 dark:border-amber-500/20 dark:bg-white/5">
+              <div className="flex items-center gap-0.5" aria-label={`${reviewRating}/5 sao`}>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Star
+                    key={index}
+                    className={`h-4 w-4 ${index < reviewRating ? "fill-amber-500 text-amber-500" : "text-amber-200 dark:text-amber-500/30"}`}
+                  />
+                ))}
+              </div>
+              <span className="border-l border-amber-200 pl-3 text-sm font-black tabular-nums text-amber-800 dark:border-amber-500/20 dark:text-amber-300">
+                {reviewRating}/5
+              </span>
+            </div>
           </div>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">{ticket.review.comment || "Không có nhận xét."}</p>
+          <div className="relative mt-5 flex gap-3 rounded-xl border border-amber-100 bg-white/80 px-4 py-4 dark:border-amber-500/10 dark:bg-white/[0.04]">
+            <MessageCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" />
+            <p className="text-sm font-semibold leading-7 text-slate-700 dark:text-slate-200">
+              {ticket.review.comment || "Khách thuê không để lại nhận xét."}
+            </p>
+          </div>
         </section>
       )}
 

@@ -446,6 +446,7 @@ export default function MaintenancePage() {
   const [isCompletionOpen, setIsCompletionOpen] = useState(false);
   const [editCompletionRepairDetails, setEditCompletionRepairDetails] = useState(false);
   const completionSubmitLockRef = useRef(false);
+  const pendingCompletionActionRef = useRef(null);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
@@ -804,14 +805,22 @@ export default function MaintenancePage() {
 
   function handleStartProgress(ticket) {
     if (actionLoading) return;
-    // Let Radix finish closing the action menu before mounting the dialog.
-    window.setTimeout(() => openCompletionDialog(ticket, true), 140);
+    pendingCompletionActionRef.current = { ticket, editRepairDetails: true };
   }
 
   function handleOpenCompletionDialog(ticket) {
     if (actionLoading) return;
-    // The completion dialog is launched from the same dropdown menu.
-    window.setTimeout(() => openCompletionDialog(ticket), 140);
+    pendingCompletionActionRef.current = { ticket, editRepairDetails: false };
+  }
+
+  function handleActionMenuCloseAutoFocus(event) {
+    const pendingAction = pendingCompletionActionRef.current;
+    if (!pendingAction) return;
+
+    // Keep focus inside the dialog instead of returning it to the menu trigger.
+    event.preventDefault();
+    pendingCompletionActionRef.current = null;
+    openCompletionDialog(pendingAction.ticket, pendingAction.editRepairDetails);
   }
 
   function updateCompletionForm(name, value) {
@@ -1265,7 +1274,6 @@ export default function MaintenancePage() {
 
       {completionTicket && (
         <Dialog
-          modal={false}
           open={isCompletionOpen}
           onOpenChange={(open) => {
             if (actionLoading === `complete-${completionTicket.id}`) return;
@@ -1276,10 +1284,7 @@ export default function MaintenancePage() {
             }
           }}
         >
-          <DialogContent
-            lockScroll={false}
-            className="w-[calc(100%-1rem)] !max-w-4xl overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full"
-          >
+          <DialogContent lockScroll={false} className="w-[calc(100%-1rem)] !max-w-4xl overflow-hidden rounded-xl border border-[#d8dee8] bg-white p-0 dark:border-white/10 dark:bg-[#0f172a] sm:w-full">
             <form onSubmit={handleCompleteTicket} className="flex max-h-[calc(100dvh-1rem)] min-w-0 flex-col">
               <div className="shrink-0 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
                 <DialogHeader className="gap-1 text-left">
@@ -1629,6 +1634,7 @@ export default function MaintenancePage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
                             align="end"
+                            onCloseAutoFocus={handleActionMenuCloseAutoFocus}
                             className="w-44 rounded-lg border border-[#d9dde5] bg-white p-1.5 shadow-lg dark:border-white/10 dark:bg-[#0f172a]"
                           >
                             <DropdownMenuItem
@@ -1686,11 +1692,12 @@ export default function MaintenancePage() {
                             {canManage && ticket.status === "ACCEPTED" && (
                               <DropdownMenuItem
                                 asChild
+                                disabled={Boolean(actionLoading)}
+                                onSelect={() => handleStartProgress(ticket)}
                                 className="rounded-md p-0 focus:bg-transparent"
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleStartProgress(ticket)}
                                   disabled={Boolean(actionLoading)}
                                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-300 dark:hover:bg-blue-500/10"
                                 >
@@ -1706,11 +1713,12 @@ export default function MaintenancePage() {
                             {canManage && ticket.status === "IN_PROGRESS" && (
                               <DropdownMenuItem
                                 asChild
+                                disabled={Boolean(actionLoading)}
+                                onSelect={() => handleOpenCompletionDialog(ticket)}
                                 className="rounded-md p-0 focus:bg-transparent"
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenCompletionDialog(ticket)}
                                   disabled={Boolean(actionLoading)}
                                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
                                 >

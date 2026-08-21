@@ -34,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import DashboardFilterDropdown from "@/components/dashboard/DashboardFilterDropdown";
 import {
   applyRentOverride,
   confirmManualPayment,
@@ -803,87 +804,81 @@ export default function BillingPage() {
         <div className="w-full min-w-0 flex-1 flex flex-col gap-1">
 
       <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a] flex flex-col">
-        <div className="flex flex-wrap items-center gap-3 p-3">
-          <select
+        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DashboardFilterDropdown
             value={filters.invoiceType}
-            onChange={(event) =>
+            onChange={(value) =>
               setFilters((current) => ({
                 ...current,
-                invoiceType: event.target.value,
+                invoiceType: value,
               }))
             }
-            className={FORM_CONTROL_CLASS}
-            aria-label="Lọc theo loại hóa đơn"
-          >
-            <option value="ALL">Tất cả loại</option>
-            {Object.entries(TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "ALL", label: "Tất cả loại" },
+              ...Object.entries(TYPE_LABELS).map(([value, label]) => ({
+                value,
+                label,
+              })),
+            ]}
+          />
 
-          <select
+          <DashboardFilterDropdown
             value={filters.propertyId}
-            onChange={(event) =>
+            onChange={(value) =>
               setFilters((current) => ({
                 ...current,
-                propertyId: event.target.value,
+                propertyId: value,
                 floorId: "",
                 roomId: "",
               }))
             }
-            className={FORM_CONTROL_CLASS}
-            aria-label="Lọc theo cơ sở"
-          >
-            <option value="">Tất cả cơ sở</option>
-            {properties.map((property) => (
-              <option key={property.id} value={property.id}>
-                {property.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Tất cả cơ sở" },
+              ...properties.map((property) => ({
+                value: String(property.id),
+                label: property.name,
+              })),
+            ]}
+          />
 
-          <select
-            value={filters.floorId || ""}
-            onChange={(event) =>
+          <DashboardFilterDropdown
+            value={filters.floorId}
+            onChange={(value) =>
               setFilters((current) => ({
                 ...current,
-                floorId: event.target.value,
+                floorId: value,
                 roomId: "",
               }))
             }
-            className={FORM_CONTROL_CLASS}
-            aria-label="Lọc theo tầng"
+            options={[
+              { value: "", label: "Tất cả tầng" },
+              ...floors.map((floor) => ({
+                value: String(floor.id),
+                label: floor.name,
+              })),
+            ]}
             disabled={!filters.propertyId}
-          >
-            <option value="">Tất cả tầng</option>
-            {floors.map((floor) => (
-              <option key={floor.id} value={floor.id}>
-                {floor.name}
-              </option>
-            ))}
-          </select>
+          />
+
         </div>
       </section>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3 dark:border-white/5">
-          {[["ALL", "Tất cả"], ...Object.entries(STATUS_LABELS)].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilters((current) => ({ ...current, status: value }))}
-              className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                filters.status === value
-                  ? "bg-[#1e40af] text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3 dark:border-white/5">
+        {[['ALL', 'Tất cả'], ...Object.entries(STATUS_LABELS)].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFilters((current) => ({ ...current, status: value }))}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+              filters.status === value
+                ? "bg-[#1e40af] text-white shadow-sm"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <section className="w-full overflow-hidden rounded-lg border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(9,20,38,0.06)] dark:border-white/10 dark:bg-[#0f172a]">
         <div className="overflow-x-auto">
@@ -1341,6 +1336,12 @@ export default function BillingPage() {
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                           {typeLabel(line.lineType)}
                         </p>
+                        {line.lineType === "ELECTRICITY" &&
+                        (line.previousValue != null || line.currentValue != null) ? (
+                          <p className="mt-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                            Chỉ số kỳ trước: {line.previousValue ?? "—"} kWh · Chỉ số kỳ này: {line.currentValue ?? "—"} kWh
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 text-right font-black">
                         {formatMoney(line.amount)}

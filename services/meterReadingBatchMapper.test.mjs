@@ -13,6 +13,7 @@ test("normalizes the backend camelCase meter reading payload", () => {
     roomName: "Phòng 401",
     electricityPrevious: "1200.5",
     electricityCurrent: null,
+    electricityRolloverCount: 2,
     electricityPhotoId: 9,
     status: "synced",
   });
@@ -22,6 +23,7 @@ test("normalizes the backend camelCase meter reading payload", () => {
   assert.equal(room.roomId, 41);
   assert.equal(room.elecPrev, 1200.5);
   assert.equal(room.elecCurr, 1200.5);
+  assert.equal(room.electricityRolloverCount, 2);
   assert.equal(room.photos, 1);
 });
 

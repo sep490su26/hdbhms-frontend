@@ -314,6 +314,11 @@ export function UtilityBillingRunsPanel({
                         </td>
                         <td className="px-4 py-3 text-center">
                           <p className="font-bold">{formatMoney(item.electricityAmount)}</p>
+                          {item.electricityWaived ? (
+                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                              {item.electricityWaiveReason || "ÄÆ°á»£c miá»…n tiá»n Ä‘iá»‡n"}
+                            </p>
+                          ) : null}
                           <p className="text-xs text-slate-500">{item.electricityUsage || 0} số</p>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -326,7 +331,16 @@ export function UtilityBillingRunsPanel({
                             <p className="text-xs text-slate-400">Không thu kỳ này</p>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center font-semibold">{formatMoney(item.serviceFeeAmount)}</td>
+                        <td className="px-4 py-3 text-center font-semibold">
+                          {item.serviceFeeWaived ? (
+                            <>
+                              <p>{formatMoney(item.serviceFeeAmount)}</p>
+                              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                {item.serviceFeeWaiveReason || "Được miễn phí dịch vụ"}
+                              </p>
+                            </>
+                          ) : formatMoney(item.serviceFeeAmount)}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-black ${billingBatchItemStatusClasses(itemStatus)}`}>
                             {billingBatchItemStatusLabel(itemStatus)}

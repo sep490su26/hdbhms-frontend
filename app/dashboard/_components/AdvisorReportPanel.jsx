@@ -19,7 +19,7 @@ import {
 import { MarkdownContent } from "./MarkdownContent";
 import { MonthYearField } from "./MonthYearField";
 
-const REPORT_CACHE_KEY = "advisor:report-cache:v2";
+const REPORT_CACHE_KEY = "advisor:report-cache:v4";
 
 function readCachedReports() {
   if (typeof window === "undefined") return {};
@@ -74,7 +74,7 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
       const data = await fetchAdvisorReport(reportPeriod);
       saveReport(reportPeriod, data);
     } catch (loadError) {
-      setError(loadError?.message || "Không tạo được báo cáo AI.");
+      setError(loadError?.message || "Không tải được báo cáo AI.");
     } finally {
       setLoading(false);
     }
@@ -165,27 +165,18 @@ export function AdvisorReportPanel({ period = currentAdvisorPeriod() }) {
           {isLoading ? (
             <div className="flex min-h-52 items-center justify-center gap-2 text-sm font-bold text-[#475569]">
               <Loader2 className="h-5 w-5 animate-spin" />
-              Đang tạo báo cáo...
+              Đang tải báo cáo...
             </div>
           ) : report?.report ? (
             <MarkdownContent content={report.report} className="text-sm leading-6 text-[#1f2937]" />
           ) : (
             <p className="text-sm font-semibold leading-6 text-[#64748b]">
-              Chưa có báo cáo cho {periodLabel}. Bấm tạo báo cáo để AI phân tích KPI, công nợ, chi phí và đề xuất hành động.
+              Chưa có báo cáo lưu cho {periodLabel}.
             </p>
           )}
         </div>
 
         <DialogFooter className="flex-row flex-wrap justify-end border-t border-[#dce2ec] px-5 py-4">
-          <button
-            type="button"
-            onClick={loadReport}
-            disabled={isLoading || !selectedPeriod}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 text-xs font-bold text-[#0f1d33] hover:bg-[#f8fafc] disabled:opacity-50"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            {report?.report ? "Tạo lại báo cáo" : "Tạo báo cáo"}
-          </button>
           <button
             type="button"
             onClick={downloadReport}

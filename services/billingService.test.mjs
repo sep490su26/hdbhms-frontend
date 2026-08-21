@@ -12,8 +12,9 @@ function loadBillingService(authenticatedFetch = async () => ({})) {
     "API_BASE_URL",
     "authenticatedFetch",
     `${source}
-return {
+  return {
   normalizeInvoice,
+  normalizeUtilityBillingRun,
   fetchBillingInvoices,
   applyRentOverride,
   confirmManualPayment,
@@ -34,16 +35,46 @@ test("normalizeInvoice maps snake_case billing payloads to numeric fields", () =
     total_amount: "3200000",
     paid_amount: "500000",
     remaining_amount: "2700000",
-    lines: [{ id: 1, line_type: "ROOM_RENT", unit_price: "3200000", amount: "3200000" }],
+    lines: [{
+      id: 1,
+      line_type: "ELECTRICITY",
+      unit_price: "3500",
+      amount: "350000",
+      previous_value: "1200",
+      current_value: "1300",
+    }],
     payment_history: [{ id: 2, amount: "500000", provider: "CASH", confirmed_by: 9 }],
   });
 
   assert.equal(invoice.invoiceCode, "INV-7");
   assert.equal(invoice.totalAmount, 3200000);
-  assert.equal(invoice.lines[0].lineType, "ROOM_RENT");
-  assert.equal(invoice.lines[0].unitPrice, 3200000);
+  assert.equal(invoice.lines[0].lineType, "ELECTRICITY");
+  assert.equal(invoice.lines[0].unitPrice, 3500);
+  assert.equal(invoice.lines[0].previousValue, "1200");
+  assert.equal(invoice.lines[0].currentValue, "1300");
   assert.equal(invoice.paymentHistory[0].amount, 500000);
   assert.equal(invoice.paymentHistory[0].confirmedBy, 9);
+});
+
+test("normalizeUtilityBillingRun preserves automatic service fee waivers", () => {
+  const { normalizeUtilityBillingRun } = loadBillingService();
+  const run = normalizeUtilityBillingRun({
+    items: [{
+      electricity_amount: 0,
+      electricity_waived: true,
+      electricity_waive_reason: "electricity waiver review",
+      service_fee_amount: 0,
+      service_fee_waived: true,
+      service_fee_waive_reason: "Phí dịch vụ được miễn vì tiền điện < 100.000đ",
+    }],
+  });
+
+  assert.equal(run.items[0].electricityAmount, 0);
+  assert.equal(run.items[0].electricityWaived, true);
+  assert.equal(run.items[0].electricityWaiveReason, "electricity waiver review");
+  assert.equal(run.items[0].serviceFeeAmount, 0);
+  assert.equal(run.items[0].serviceFeeWaived, true);
+  assert.equal(run.items[0].serviceFeeWaiveReason, "Phí dịch vụ được miễn vì tiền điện < 100.000đ");
 });
 
 test("fetchBillingInvoices forwards property and room filters", async () => {

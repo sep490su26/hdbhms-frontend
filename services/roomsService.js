@@ -170,6 +170,12 @@ export function normalizeApiRoom(apiRoom, roomHolds = {}) {
     feature: apiRoom.public_note ?? apiRoom.publicNote ?? "Tiện nghi",
     description: apiRoom.description ?? apiRoom.public_note ?? apiRoom.publicNote ?? "Không có mô tả",
     maxPeople: apiRoom.max_occupants ?? apiRoom.maxOccupants ?? 3,
+    currentOccupants:
+      apiRoom.current_occupants ??
+      apiRoom.currentOccupants ??
+      apiRoom.occupants_count ??
+      apiRoom.occupantsCount ??
+      (Array.isArray(apiRoom.occupants) ? apiRoom.occupants.length : 0),
     ownerName: "Hải Đăng House",
     ownerNote: "Chủ nhà hỗ trợ xem phòng và phản hồi yêu cầu đặt cọc trong giờ hành chính.",
     houseRules: [

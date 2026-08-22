@@ -420,22 +420,43 @@ function toDateInputValue(value) {
   return String(value).slice(0, 10);
 }
 
-function isShortTermEarlyTerminationPreview(item = {}, liquidationDateValue) {
-  const endDateValue = toDateInputValue(item.endDate);
-  const liquidationDate = toDateInputValue(liquidationDateValue);
-  if (!endDateValue || !liquidationDate || liquidationDate >= endDateValue) {
+function isShortNoticeMoveOutPreview(
+  liquidationDateValue,
+  noticeDateValue,
+) {
+  const moveOutDateValue = toDateInputValue(liquidationDateValue);
+  if (!moveOutDateValue) {
     return false;
   }
 
-  const endDate = new Date(`${endDateValue}T00:00:00`);
-  const liquidation = new Date(`${liquidationDate}T00:00:00`);
-  if (Number.isNaN(endDate.getTime()) || Number.isNaN(liquidation.getTime())) {
+  const moveOutDate = new Date(`${moveOutDateValue}T00:00:00`);
+  const noticeDateText = toDateInputValue(noticeDateValue);
+  const today = new Date();
+  const currentDate = noticeDateText
+    ? new Date(`${noticeDateText}T00:00:00`)
+    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (
+    Number.isNaN(moveOutDate.getTime()) ||
+    Number.isNaN(currentDate.getTime())
+  ) {
     return false;
   }
 
-  const oneMonthBeforeEnd = new Date(endDate);
-  oneMonthBeforeEnd.setMonth(oneMonthBeforeEnd.getMonth() - 1);
-  return liquidation > oneMonthBeforeEnd;
+  const previousMonth = moveOutDate.getMonth() - 1;
+  const previousMonthYear =
+    previousMonth < 0 ? moveOutDate.getFullYear() - 1 : moveOutDate.getFullYear();
+  const normalizedPreviousMonth = (previousMonth + 12) % 12;
+  const lastDayOfPreviousMonth = new Date(
+    previousMonthYear,
+    normalizedPreviousMonth + 1,
+    0,
+  ).getDate();
+  const oneMonthBeforeMoveOut = new Date(
+    previousMonthYear,
+    normalizedPreviousMonth,
+    Math.min(moveOutDate.getDate(), lastDayOfPreviousMonth),
+  );
+  return currentDate <= moveOutDate && currentDate > oneMonthBeforeMoveOut;
 }
 
 function areLiquidationSettlementsConfirmed(item = {}) {
@@ -2290,9 +2311,9 @@ export default function ContractTemplatePage() {
     mergedSelected?.transferContractRole === "REPLACEMENT_OLD_CONTRACT";
   const shortTermDepositForfeiture =
     !isDepositCarriedForward &&
-    isShortTermEarlyTerminationPreview(
-      mergedSelected || {},
+    isShortNoticeMoveOutPreview(
       liquidationForm.liquidationDate,
+      mergedSelected?.intentionRecordedAt,
     );
   const liquidationDraftDepositDeduction = shortTermDepositForfeiture
     ? safeLiquidationDraftDeposit
@@ -4795,8 +4816,8 @@ export default function ContractTemplatePage() {
                           <>
                             {shortTermDepositForfeiture && (
                               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold leading-6 text-red-700 sm:col-span-2">
-                                Hợp đồng còn dưới 1 tháng và khách trả phòng
-                                trước hạn: toàn bộ tiền cọc sẽ bị giữ lại,
+                                Ngày chuyển đi còn dưới 1 tháng kể từ ngày gửi
+                                yêu cầu: toàn bộ tiền cọc sẽ bị giữ lại,
                                 không tạo yêu cầu hoàn cọc.
                               </p>
                             )}
@@ -4837,7 +4858,7 @@ export default function ContractTemplatePage() {
                               {shortTermDepositForfeiture && (
                                 <InfoValue
                                   label="Lý do khấu trừ cọc"
-                                  value="Trả phòng trước hạn khi còn dưới 1 tháng"
+                                  value="Gửi yêu cầu trước ngày chuyển đi dưới 1 tháng"
                                 />
                               )}
                             </div>

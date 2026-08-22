@@ -74,6 +74,7 @@ import TimeTreeFilter, { buildTreeFromCustomers } from "@/components/dashboard/T
 import { sortByNewest } from "@/lib/sortByNewest.mjs";
 import {
   TransferRequestDetail,
+  RequestContractLinks,
   MoveoutRequestDetail,
   RenewalRequestDetail,
   TerminationRequestDetail,
@@ -865,6 +866,13 @@ function RequestDetailContent({ req, detailTransfer, onOpenContract }) {
           onOpenContract={onOpenContract}
         />
       )}
+
+      <RequestContractLinks
+        request={req}
+        payload={payload}
+        transfer={mappedType === "TRANSFER" ? detailTransfer : null}
+        onOpenContract={onOpenContract}
+      />
 
       {mappedType === "TRANSFER" && detailTransfer && transferActionMeta && (
         <div

@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowRightLeft, Calendar, CheckCircle2, Clock3, DollarSign, ExternalLink, FileText, Gauge, MapPin, User, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toDate } from "@/lib/dateFormat";
 import { InfoField, formatMoney } from "./RequestDetailFields";
 
@@ -90,6 +91,93 @@ function formatEligibilityResult(value) {
     if (value === true) return "Đủ điều kiện";
     if (value === false) return "Không đủ điều kiện";
     return "Chưa có dữ liệu";
+}
+
+const CONTRACT_REQUEST_TYPES = new Set([
+    "CONTRACT_LIQUIDATION",
+    "CONTRACT_TERMINATION",
+    "CONTRACT_RENEWAL",
+    "MOVE_OUT",
+    "RENT_PRICE_ADJUSTMENT",
+    "ADD_CO_OCCUPANT",
+    "DEPOSIT_REFUND_REQUEST",
+]);
+
+function uniqueContractLinks(links) {
+    const seen = new Set();
+    return links.filter(({ id }) => {
+        if (id === undefined || id === null || id === "") return false;
+        const key = String(id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+export function RequestContractLinks({ request, payload, transfer, onOpenContract }) {
+    if (!onOpenContract) return null;
+
+    const requestType = String(request?.requestType || "").toUpperCase();
+    const payloadContractIds = [
+        payload?.contractId,
+        payload?.contract_id,
+        payload?.leaseContractId,
+        payload?.lease_contract_id,
+        payload?.sourceContractId,
+        payload?.source_contract_id,
+    ];
+
+    const links = requestType === "ROOM_TRANSFER"
+        ? uniqueContractLinks([
+            {
+                // A replacement contract represents the occupants remaining in
+                // the old room after a transfer splits the original contract.
+                id: firstValue(transfer?.replacementOldContractId, transfer?.oldContractId, payload?.oldContractId, payload?.old_contract_id),
+                label: transfer?.replacementOldContractId
+                    ? "Đi tới hợp đồng tái ký phòng cũ"
+                    : "Đi tới hợp đồng cũ",
+            },
+            {
+                id: firstValue(transfer?.newContractId, transfer?.targetContractId, payload?.newContractId, payload?.new_contract_id, payload?.targetContractId, payload?.target_contract_id),
+                label: "Đi tới hợp đồng mới",
+            },
+        ])
+        : uniqueContractLinks([
+            {
+                id: String(request?.targetType || "").toUpperCase() === "CONTRACT" ? request?.targetId : null,
+                label: "Đi tới hợp đồng",
+            },
+            ...(CONTRACT_REQUEST_TYPES.has(requestType) || payloadContractIds.some(Boolean)
+                ? [{ id: firstValue(...payloadContractIds), label: "Đi tới hợp đồng" }]
+                : []),
+        ]);
+
+    if (!links.length) return null;
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                Hợp đồng liên quan
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {links.map((link) => (
+                    <Button
+                        key={`${link.label}-${link.id}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onOpenContract(link.id)}
+                        className="gap-2 border-blue-200 bg-white text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-400/30 dark:bg-white/5 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                    >
+                        <ExternalLink className="h-4 w-4" />
+                        {link.label}
+                        <ArrowRight className="h-4 w-4" />
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 const RENEWAL_BLOCKED_REASON_LABELS = {
@@ -474,7 +562,7 @@ function LiquidationTracking({ payload }) {
     );
 }
 
-export function TerminationRequestDetail({ payload, request, onOpenContract }) {
+export function TerminationRequestDetail({ payload }) {
     if (!payload) return null;
     const effectiveDate = payload.liquidationDate
         || payload.liquidation_date
@@ -483,13 +571,6 @@ export function TerminationRequestDetail({ payload, request, onOpenContract }) {
         || payload.effectiveDate
         || payload.effective_date;
     const reason = payload.reason || payload.terminationReason || payload.termination_reason;
-    const contractId = firstValue(
-        request?.targetId,
-        payload.contractId,
-        payload.contract_id,
-        payload.leaseContractId,
-        payload.lease_contract_id,
-    );
     const contractCode = firstValue(
         payload.contractCode,
         payload.contract_code,
@@ -507,18 +588,6 @@ export function TerminationRequestDetail({ payload, request, onOpenContract }) {
                     <InfoField label="Ngày dự kiến thanh lý" value={formatDateValue(effectiveDate)} icon={<Calendar className="w-4 h-4" />} />
                 )}
             </div>
-
-            {contractId && onOpenContract && (
-                <button
-                    type="button"
-                    onClick={() => onOpenContract(contractId)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
-                >
-                    <ExternalLink className="h-4 w-4" />
-                    Xem hợp đồng
-                    <ArrowRight className="h-4 w-4" />
-                </button>
-            )}
 
             <LiquidationTracking payload={payload} />
 

@@ -4763,6 +4763,7 @@ export default function ContractTemplatePage() {
                         <ContractHandoverSection
                           key={`${mergedSelected.leaseContractId}-move-out`}
                           contractId={mergedSelected.leaseContractId}
+                          contractEndDate={mergedSelected.endDate}
                           tenantId={mergedSelected.tenantId || null}
                           roomId={mergedSelected.roomId || null}
                           roomCode={
@@ -5164,6 +5165,7 @@ export default function ContractTemplatePage() {
                       <ContractHandoverSection
                         key={mergedSelected.leaseContractId}
                         contractId={mergedSelected.leaseContractId}
+                        contractEndDate={mergedSelected.endDate}
                         tenantId={mergedSelected.tenantId || null}
                         roomId={mergedSelected.roomId || null}
                         roomCode={

@@ -169,6 +169,7 @@ function ImageUploadButton({ imageUrl, fileId, label, disabled, onChange }) {
 
 export default function ContractHandoverSection({
   contractId,
+  contractEndDate,
   roomId,
   roomCode,
   readonly = false,
@@ -224,6 +225,32 @@ export default function ContractHandoverSection({
   const assetEditingDisabled = effectiveReadonly || saving || loadingAssets;
   const readingLabel = meterReadingLabel(handoverType);
   const requiresElectricity = handoverType !== "MOVE_IN";
+  const today = new Date();
+  const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const contractEndDateValue = contractEndDate
+    ? String(contractEndDate).slice(0, 10)
+    : "";
+  // Keep expired contracts usable while capping active move-out dates at the contract end.
+  const maxHandoverDate = handoverType !== "MOVE_OUT"
+    ? undefined
+    : !contractEndDateValue
+      ? undefined
+      : contractEndDateValue > todayValue
+        ? contractEndDateValue
+        : todayValue;
+
+  function handleHandoverDateChange(event) {
+    const nextValue = event.target.value;
+    if (
+      maxHandoverDate &&
+      /^\d{4}-\d{2}-\d{2}$/.test(nextValue) &&
+      nextValue > maxHandoverDate
+    ) {
+      setHandoverDate(maxHandoverDate);
+      return;
+    }
+    setHandoverDate(nextValue);
+  }
 
   useEffect(() => {
     if (handoverType !== "MOVE_OUT" || !onDraftChange) return;
@@ -347,7 +374,14 @@ export default function ContractHandoverSection({
               setIsConfirmed(CONFIRMED_STATUSES.has(status));
 
               const hDate = data.handover_date || data.handoverDate;
-              if (hDate) setHandoverDate(hDate.split("T")[0]);
+              if (hDate) {
+                const normalizedDate = hDate.split("T")[0];
+                setHandoverDate(
+                  maxHandoverDate && normalizedDate > maxHandoverDate
+                    ? maxHandoverDate
+                    : normalizedDate,
+                );
+              }
               
               if (requiresElectricity) {
                 const previousValue =
@@ -406,7 +440,16 @@ export default function ContractHandoverSection({
     }
 
     return () => controller.abort();
-  }, [loadReadings, readonly, contractId, handoverType, onLoaded, showCompensation, requiresElectricity]);
+  }, [
+    loadReadings,
+    readonly,
+    contractId,
+    handoverType,
+    onLoaded,
+    showCompensation,
+    requiresElectricity,
+    maxHandoverDate,
+  ]);
 
   /* Cleanup blob URLs ----------------------------------------------- */
   useEffect(() => {
@@ -669,6 +712,7 @@ export default function ContractHandoverSection({
 
   const isValid =
     Boolean(contractId && handoverDate) &&
+    (!maxHandoverDate || handoverDate <= maxHandoverDate) &&
     (!requiresElectricity || (
       electricReading !== "" &&
       Number.isFinite(Number(electricReading)) && Number(electricReading) >= 0
@@ -906,8 +950,9 @@ export default function ContractHandoverSection({
 
           <DateInput
             value={handoverDate}
+            max={maxHandoverDate}
             disabled={effectiveReadonly || saving}
-            onChange={(event) => setHandoverDate(event.target.value)}
+            onChange={handleHandoverDateChange}
             className="h-10 w-full rounded-lg border border-[#cbd5e1] dark:border-white/10 bg-slate-100 px-3 text-sm font-semibold outline-none focus:border-[#1e40af] disabled:opacity-70"
           />
         </label>

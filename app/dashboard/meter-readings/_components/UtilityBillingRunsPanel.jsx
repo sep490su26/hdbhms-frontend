@@ -336,7 +336,7 @@ export function UtilityBillingRunsPanel({
                             <>
                               <p>{formatMoney(item.serviceFeeAmount)}</p>
                               <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                {item.serviceFeeWaiveReason || "Được miễn phí dịch vụ"}
+                                {item.serviceFeeWaiveReason || "Được miễn phí dịch vụ; tiền điện vẫn được thu"}
                               </p>
                             </>
                           ) : formatMoney(item.serviceFeeAmount)}

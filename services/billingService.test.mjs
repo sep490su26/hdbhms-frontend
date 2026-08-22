@@ -60,21 +60,21 @@ test("normalizeUtilityBillingRun preserves automatic service fee waivers", () =>
   const { normalizeUtilityBillingRun } = loadBillingService();
   const run = normalizeUtilityBillingRun({
     items: [{
-      electricity_amount: 0,
-      electricity_waived: true,
-      electricity_waive_reason: "electricity waiver review",
+      electricity_amount: 50000,
+      electricity_waived: false,
+      electricity_waive_reason: null,
       service_fee_amount: 0,
       service_fee_waived: true,
-      service_fee_waive_reason: "Phí dịch vụ được miễn vì tiền điện < 100.000đ",
+      service_fee_waive_reason: "Phí dịch vụ được miễn vì tiền điện dưới 100.000 VND; tiền điện vẫn được thu.",
     }],
   });
 
-  assert.equal(run.items[0].electricityAmount, 0);
-  assert.equal(run.items[0].electricityWaived, true);
-  assert.equal(run.items[0].electricityWaiveReason, "electricity waiver review");
+  assert.equal(run.items[0].electricityAmount, 50000);
+  assert.equal(run.items[0].electricityWaived, false);
+  assert.equal(run.items[0].electricityWaiveReason, "");
   assert.equal(run.items[0].serviceFeeAmount, 0);
   assert.equal(run.items[0].serviceFeeWaived, true);
-  assert.equal(run.items[0].serviceFeeWaiveReason, "Phí dịch vụ được miễn vì tiền điện < 100.000đ");
+  assert.equal(run.items[0].serviceFeeWaiveReason, "Phí dịch vụ được miễn vì tiền điện dưới 100.000 VND; tiền điện vẫn được thu.");
 });
 
 test("fetchBillingInvoices forwards property and room filters", async () => {
